@@ -8,11 +8,11 @@ Payloads are form-encoded as Slack posts them, with the review form's state,
 and fed to ``App.dispatch`` with listeners run inline; the harness sends every
 payload as user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call``
 records Web API calls, and the entrypoint's ``generate_status_update_draft`` and
-``get_draft_for_review`` are the real services bound to a core
-``InMemoryStatusUpdateStore``, a stub transcript reader and a stub text
-generator, with a fixed ``now``; text generation is reported available. The
-plugin's service scopes resolve an ``InMemoryRecordStore`` holding the channel's
-incident as a legacy item without a security attribute, and Slack configured
+``get_draft_for_review`` are the real services over the status-update store the
+handler builds, a stub transcript reader and a stub text generator, with a fixed
+``now``; text generation is reported available. The plugin's service scopes
+resolve an ``InMemoryRecordStore`` holding the channel's incident as a legacy
+item without a security attribute and the status updates, and Slack configured
 under one tenant, so the real incident store, legacy bridge and command check
 resolve the incident and its security flag reads as not set.
 Assertions read the exact Web API calls in order (only ``views.update``, never
@@ -32,7 +32,6 @@ import pytest
 import features.incident.comms as comms_module
 from contracts.operations import OperationResult
 from features.incident.comms import form
-from features.incident.comms.approval import get_draft_for_review
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import (
     GENERATE_ACTION_ID,
@@ -43,18 +42,18 @@ from features.incident.comms.entrypoints.slack_views import (
 )
 from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from features.incident.comms.service import generate_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
     TranscriptMessage,
 )
 from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import incident_scopes
+from tests.factories.incident import incident_scopes, status_update_store_in
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -185,29 +184,27 @@ def generator() -> _StubGenerator:
 
 
 @pytest.fixture
-def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator) -> InMemoryStatusUpdateStore:
-    status_updates = InMemoryStatusUpdateStore()
+def records() -> InMemoryRecordStore:
+    return _records()
+
+
+@pytest.fixture
+def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator, records: InMemoryRecordStore) -> StatusUpdateStore:
+    status_updates = status_update_store_in(records)
     status_updates.append(_APPROVED)
     status_updates.append(_PENDING)
     monkeypatch.setattr(
         form,
         "generate_status_update_draft",
-        partial(
-            generate_status_update_draft,
-            reader=_StubReader(),
-            store=status_updates,
-            generator=generator,
-            now=_NOW,
-        ),
+        partial(generate_status_update_draft, reader=_StubReader(), generator=generator, now=_NOW),
     )
-    monkeypatch.setattr(form, "get_draft_for_review", partial(get_draft_for_review, store=status_updates))
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
     return status_updates
 
 
 @pytest.fixture
-def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms", lambda: incident_scopes(_records()))(monkeypatch, comms_module)
+def harness(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore, store: StatusUpdateStore) -> Iterator[Harness]:
+    yield from harness_fixture("incident.comms", lambda: incident_scopes(records))(monkeypatch, comms_module)
 
 
 def _generate_action(instructions: str | None) -> dict[str, Any]:
@@ -259,7 +256,7 @@ def test_instructions_make_one_model_call_from_the_form_values_and_the_window(
 
 
 def test_blank_instructions_draft_from_the_conversation_with_the_base_prompt(
-    harness: Harness, generator: _StubGenerator, store: InMemoryStatusUpdateStore
+    harness: Harness, generator: _StubGenerator, store: StatusUpdateStore
 ) -> None:
     """Someone posted since the approved update, so blank instructions still make one model call, with the base prompt."""
     harness.dispatch(_generate_action("   "))
@@ -268,7 +265,7 @@ def test_blank_instructions_draft_from_the_conversation_with_the_base_prompt(
     assert store.list_for_incident(_INCIDENT).data == (_expected_fill(StatusUpdateOrigin.MODEL), _PENDING, _APPROVED)
 
 
-def test_the_fill_is_stored_as_a_new_draft_and_keeps_the_previous_one(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_the_fill_is_stored_as_a_new_draft_and_keeps_the_previous_one(harness: Harness, store: StatusUpdateStore) -> None:
     """The fill is the next DRAFT by the presser; the reviewed draft and the approved update are unchanged."""
     harness.dispatch(_generate_action(_GUIDANCE))
 
@@ -292,7 +289,7 @@ def test_shows_generating_then_the_new_draft_form_and_posts_nothing(harness: Har
 
 
 def test_nothing_new_carries_the_typed_values_forward_without_a_model_call(
-    harness: Harness, generator: _StubGenerator, store: InMemoryStatusUpdateStore, monkeypatch: pytest.MonkeyPatch
+    harness: Harness, generator: _StubGenerator, store: StatusUpdateStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With only messages from before the approved cutoff, the new draft repeats the typed values with the wording."""
     monkeypatch.setattr(_StubReader, "read_transcript", lambda self, conversation_id, **kwargs: ())

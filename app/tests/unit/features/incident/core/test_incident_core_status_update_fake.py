@@ -1,9 +1,9 @@
 """Behavior tests for the in-memory StatusUpdateStore.
 
-The fake is what subdomain tests inject in place of the DynamoDB adapter, so it
-is held to the same observable rules: a conditional append that tolerates its
-own replay, newest-first reads, and state changes that refuse once the stored
-state has moved on.
+The fake is what subdomain tests inject in place of the records-backed store,
+so it is held to the same observable rules: an append only where no record is
+stored, newest-first reads, and state changes that refuse once the stored state
+has moved on, a repeat of the same write included.
 """
 
 import dataclasses
@@ -78,12 +78,12 @@ def test_latest_without_updates_is_success_with_nothing() -> None:
     assert result.data is None
 
 
-def test_appending_the_same_record_twice_is_success_and_stores_one() -> None:
-    """A replay of an identical append is tolerated, as the adapter tolerates an SDK retry."""
+def test_appending_the_same_record_twice_is_a_conflict_and_stores_one() -> None:
+    """A second call is another writer, even with identical content; only a store's own SDK retry is resolved as created."""
     store = InMemoryStatusUpdateStore()
     store.append(_draft(1))
 
-    assert store.append(_draft(1)).is_success
+    assert store.append(_draft(1)).error_code == "STATUS_UPDATE_CONFLICT"
     assert len(store.list_for_incident(INCIDENT_ID).data or ()) == 1
 
 
@@ -99,13 +99,13 @@ def test_appending_a_different_record_at_a_taken_sequence_is_a_conflict() -> Non
 
 
 def test_transition_from_the_expected_state_replaces_the_record() -> None:
-    """Approval stores the approver; a repeat of the same approval is success."""
+    """Approval stores the approver; a repeat of the same approval finds the guard unmet and is a conflict."""
     store = InMemoryStatusUpdateStore()
     store.append(_draft(1))
     approved = _approved(_draft(1))
 
     assert store.transition(approved, expected_state=StatusUpdateState.DRAFT).is_success
-    assert store.transition(approved, expected_state=StatusUpdateState.DRAFT).is_success
+    assert store.transition(approved, expected_state=StatusUpdateState.DRAFT).error_code == "STATUS_UPDATE_CONFLICT"
     assert store.latest(INCIDENT_ID).data == approved
 
 

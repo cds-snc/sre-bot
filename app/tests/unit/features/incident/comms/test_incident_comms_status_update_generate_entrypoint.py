@@ -18,8 +18,8 @@ and the client, so call order is asserted directly. Expected views come from
 the platform view builders, and notice wording is pinned literally (the
 catalogue is not loaded in unit tests).
 
-``TestWithTheService`` binds the real services to a core
-``InMemoryStatusUpdateStore``, an in-memory incident store that counts security
+``TestWithTheService`` runs the real services over the status-update store the
+handler builds on an in-memory record store, an in-memory incident store that counts security
 flag reads, a stub transcript reader and a recording text generator, so the
 number of model calls and what reaches the model are asserted at the listener.
 Every handler runs over a fake scope opener with Slack configured.
@@ -29,7 +29,6 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime, timedelta
-from functools import partial
 from typing import Any
 from unittest.mock import MagicMock, call
 
@@ -38,7 +37,6 @@ import pytest
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import form
-from features.incident.comms.approval import get_draft_for_review
 from features.incident.comms.domain import (
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
@@ -47,10 +45,6 @@ from features.incident.comms.domain import (
 )
 from features.incident.comms.entrypoints.slack import (
     handle_generate_action,
-    handle_open_action,
-    handle_published_action,
-    handle_review_action,
-    handle_review_submission,
     register,
 )
 from features.incident.comms.entrypoints.slack_views import (
@@ -68,17 +62,19 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_view,
 )
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
     TranscriptMessage,
 )
-from tests.factories.incident import incident_on, incident_scopes, slack_conversation
+from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import incident_on, incident_scopes, slack_conversation, status_update_store_in
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -180,6 +176,7 @@ class _Services:
     model_calls: int = 1
     generate_calls: list[dict[str, Any]] = field(default_factory=list)
     review_calls: list[tuple[str, int]] = field(default_factory=list)
+    stores: list[StatusUpdateStore] = field(default_factory=list)
 
     async def generate_status_update_draft(
         self,
@@ -193,9 +190,11 @@ class _Services:
         instructions: str = "",
         security_confirmed: bool = False,
         on_started: Any = None,
+        store: StatusUpdateStore,
     ) -> OperationResult[StatusUpdateDraftOutcome]:
         assert isinstance(incidents, IncidentStore)
         self.events.append("generate_status_update_draft")
+        self.stores.append(store)
         self.generate_calls.append(
             {
                 "conversation": conversation,
@@ -211,8 +210,11 @@ class _Services:
             on_started()
         return self.generate_result
 
-    async def get_draft_for_review(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def get_draft_for_review(
+        self, incident_id: str, sequence: int, *, store: StatusUpdateStore
+    ) -> OperationResult[StatusUpdate]:
         self.events.append("get_draft_for_review")
+        self.stores.append(store)
         self.review_calls.append((incident_id, sequence))
         return self.review_result
 
@@ -315,8 +317,8 @@ class TestRegister:
     def test_registers_exactly_the_final_listeners(self) -> None:
         """Seven block actions and the approval submission; no overview Draft, Confirm and draft or Redraft.
 
-        New update, Save, Draft with AI and Back are scope-binding wrappers, so
-        only their ids are asserted; the other listeners are the handlers themselves.
+        Every listener is a scope-binding wrapper around its handler, so only
+        the ids are asserted here; the other tests call the handlers.
         """
         registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
@@ -331,10 +333,7 @@ class TestRegister:
             HISTORY_ACTION_ID,
             PUBLISHED_ACTION_ID,
         }
-        assert registrar.block_actions[REVIEW_ACTION_ID] is handle_review_action
-        assert registrar.block_actions[OPEN_ACTION_ID] is handle_open_action
-        assert registrar.block_actions[PUBLISHED_ACTION_ID] is handle_published_action
-        assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
+        assert list(registrar.view_submissions) == [REVIEW_CALLBACK_ID]
 
 
 class TestDrafted:
@@ -346,6 +345,7 @@ class TestDrafted:
 
         ack.assert_called_once_with()
         assert services.generate_calls == [_generate_call()]
+        assert len(services.stores) == 1 and isinstance(services.stores[0], StatusUpdateStore)
         assert events == ["ack", "generate_status_update_draft", "views_update", "views_update"]
 
     @pytest.mark.parametrize("instructions", ["", "   ", None], ids=["empty", "spaces", "null"])
@@ -681,18 +681,27 @@ class _RecordingGenerator:
 
 @dataclass
 class _World:
-    store: InMemoryStatusUpdateStore
+    records: InMemoryRecordStore
+    store: StatusUpdateStore
     generator: _RecordingGenerator
     incidents: _CountingIncidents
 
 
 def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessage], security_incident: bool) -> _World:
-    """Bind the real service to an in-memory store holding an approved update and the pending draft.
+    """Bind the real service to the handler's own status-update store, holding an approved update and the pending draft.
 
-    The incident store built in the handler's scope is replaced by the
-    counting in-memory one, so the security flag reads are observable.
+    The records are in memory and seeded through the same builder the handler
+    uses, so the store the handler passes sees them. The incident store built
+    in the handler's scope is replaced by the counting in-memory one, so the
+    security flag reads are observable.
     """
-    world = _World(InMemoryStatusUpdateStore(), _RecordingGenerator(), _CountingIncidents(security_incident=security_incident))
+    records = InMemoryRecordStore()
+    world = _World(
+        records,
+        status_update_store_in(records),
+        _RecordingGenerator(),
+        _CountingIncidents(security_incident=security_incident),
+    )
     world.store.append(_APPROVED)
     world.store.append(_PENDING)
 
@@ -704,14 +713,12 @@ def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessa
             conversation,
             sequence,
             reader=_StubReader(messages),
-            store=world.store,
             generator=world.generator,
             now=_NOW,
             **kwargs,
         )
 
     monkeypatch.setattr(form, "generate_status_update_draft", service)
-    monkeypatch.setattr(form, "get_draft_for_review", partial(get_draft_for_review, store=world.store))
     return world
 
 
@@ -732,7 +739,7 @@ class TestWithTheService:
         """Code decides nothing is new: zero model calls, and the new draft's current action is the no-new-information wording."""
         world = _bind(monkeypatch, messages=[_OLD], security_incident=True)
 
-        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes())
+        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes(world.records))
 
         assert world.generator.calls == [] and world.incidents.calls == []
         carried = _latest(world)
@@ -747,7 +754,7 @@ class TestWithTheService:
         """Someone posted since the approved update, so the model is called once and its fields are the new draft."""
         world = _bind(monkeypatch, messages=[_NEW], security_incident=False)
 
-        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes())
+        handle_generate_action(MagicMock(), _generate_body(""), client, incident_scopes(world.records))
 
         assert len(world.generator.calls) == 1
         filled = _latest(world)
@@ -761,7 +768,7 @@ class TestWithTheService:
         """The responder's guidance is part of the one model call's instructions, even with nothing new."""
         world = _bind(monkeypatch, messages=[_OLD], security_incident=False)
 
-        handle_generate_action(MagicMock(), _generate_body(_GUIDANCE), client, incident_scopes())
+        handle_generate_action(MagicMock(), _generate_body(_GUIDANCE), client, incident_scopes(world.records))
 
         (model_call,) = world.generator.calls
         assert _GUIDANCE in str(model_call["instructions"])
@@ -772,7 +779,7 @@ class TestWithTheService:
         """Unconfirmed: no model call and the checkbox is shown. Checked: one call, and the flag is not read again."""
         world = _bind(monkeypatch, messages=[_NEW], security_incident=True)
 
-        handle_generate_action(MagicMock(), _generate_body(), client, incident_scopes())
+        handle_generate_action(MagicMock(), _generate_body(), client, incident_scopes(world.records))
 
         assert world.generator.calls == []
         assert _latest(world) == _PENDING
@@ -780,7 +787,9 @@ class TestWithTheService:
         assert "security_confirm" in [block.get("block_id") for block in refused["blocks"]]
 
         reads_before = len(world.incidents.calls)
-        handle_generate_action(MagicMock(), _generate_body(extra_values=_checkbox("confirmed")), client, incident_scopes())
+        handle_generate_action(
+            MagicMock(), _generate_body(extra_values=_checkbox("confirmed")), client, incident_scopes(world.records)
+        )
 
         assert len(world.generator.calls) == 1
         assert len(world.incidents.calls) == reads_before

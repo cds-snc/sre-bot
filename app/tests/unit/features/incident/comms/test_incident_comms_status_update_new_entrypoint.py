@@ -6,9 +6,10 @@ pending. The form carries the AI section only when text generation is
 configured. ``start_status_update_draft`` is patched with a ``MagicMock``, the
 availability predicate with a constant, and the Slack client is a
 ``MagicMock``, so the tests assert the service arguments and the view sent to
-``views.update``; one test binds the real service to a core
-``InMemoryStatusUpdateStore``, an in-memory incident store holding the
-channel's incident and a stub transcript reader to assert the stored record.
+``views.update``; one test binds the real service to the status-update store
+the handler builds over the scope's in-memory record store, an in-memory
+incident store holding the channel's incident and a stub transcript reader to
+assert the stored record.
 Handlers run over a fake scope opener with Slack configured.
 """
 
@@ -27,7 +28,6 @@ from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdat
 from features.incident.comms.entrypoints.slack import handle_new_update_action, register
 from features.incident.comms.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_CALLBACK_ID, build_review_view
 from features.incident.comms.service import start_status_update_draft
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
@@ -35,10 +35,18 @@ from features.incident.core.api import (
     StatusUpdateOrigin,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
     TranscriptMessage,
 )
-from tests.factories.incident import incident_on, incident_scopes, incident_store_with, slack_conversation
+from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import (
+    incident_on,
+    incident_scopes,
+    incident_store_with,
+    slack_conversation,
+    status_update_store_in,
+)
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -133,21 +141,24 @@ class TestNewUpdateAction:
         ack.assert_called_once()
         incidents, conversation = service.call_args.args
         assert isinstance(incidents, IncidentStore)
-        assert (conversation, service.call_args.kwargs) == (slack_conversation(_CHANNEL), {"author": _USER})
+        assert isinstance(service.call_args.kwargs["store"], StatusUpdateStore)
+        assert (conversation, service.call_args.kwargs["author"]) == (slack_conversation(_CHANNEL), _USER)
+        assert set(service.call_args.kwargs) == {"author", "store"}
 
     def test_stores_a_blank_hand_written_draft_and_shows_its_form(self) -> None:
         """With the real service, the first update is stored as a blank HAND draft by the presser and its form is shown."""
-        store = InMemoryStatusUpdateStore()
+        records = InMemoryRecordStore()
+        store = status_update_store_in(records)
         client = MagicMock()
         incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
         def service(
-            _: IncidentStore, conversation: ConversationReference, *, author: str
+            _: IncidentStore, conversation: ConversationReference, *, author: str, store: StatusUpdateStore
         ) -> OperationResult[StatusUpdateDraftOutcome]:
             return start_status_update_draft(incidents, conversation, author=author, reader=_StubReader(), store=store, now=_NOW)
 
         with patch(_TARGET, new=service):
-            handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
+            handle_new_update_action(MagicMock(), _body(), client, incident_scopes(records))
 
         listed = store.list_for_incident(_INCIDENT).data
         assert listed is not None

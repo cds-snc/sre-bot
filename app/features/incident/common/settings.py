@@ -21,7 +21,7 @@ class IncidentCoreSettings(ConfigurationSlice):
     """Table names of the incident record, the system that hosts new incidents, and the shared document ids.
 
     Keys of [incident_core]:
-        incidents_table, timeline_table, new_incident_system (absent: unset).
+        incidents_table, timeline_table, status_updates_table, new_incident_system (absent: unset).
 
     Environment only (non-public values):
         INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, INCIDENT_CORE__LIST_SHEET_ID.
@@ -35,6 +35,10 @@ class IncidentCoreSettings(ConfigurationSlice):
         default="sre_bot_incident_timeline",
         description="Records table holding the timeline entries of every incident.",
     )
+    status_updates_table: str = Field(
+        default="sre_bot_incident_status_updates",
+        description="Records table holding every incident's public status updates, each its own item.",
+    )
     new_incident_system: WorkplaceSystem | None = Field(
         default=None,
         description=(
@@ -46,7 +50,7 @@ class IncidentCoreSettings(ConfigurationSlice):
     report_template_id: str = env_only("Google Docs template a new incident report is copied from.", "codespaces", default="")
     list_sheet_id: str = env_only("Google Sheets spreadsheet listing every incident.", "codespaces", default="")
 
-    @field_validator("incidents_table", "timeline_table")
+    @field_validator("incidents_table", "timeline_table", "status_updates_table")
     @classmethod
     def _require_table_name(cls, value: str) -> str:
         if not value.strip():

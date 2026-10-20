@@ -45,6 +45,7 @@ from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from tests.factories.incident import incident_scopes, slack_conversation
@@ -428,8 +429,11 @@ class TestCommandShowsOverview:
         overview = StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED, _PUBLISHED))
         reads: list[ConversationReference] = []
 
-        def read_overview(_: IncidentStore, conversation: ConversationReference) -> OperationResult[StatusUpdateOverview]:
+        def read_overview(
+            _: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
+        ) -> OperationResult[StatusUpdateOverview]:
             reads.append(conversation)
+            assert isinstance(store, StatusUpdateStore)
             return OperationResult.success(data=overview)
 
         monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", read_overview)

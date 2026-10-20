@@ -23,12 +23,12 @@ Slack  /sre incident status-update, modal buttons, Approve submission
   │
   ▼
 entrypoints/slack.py      parse payload → typed values → one service call → OperationResult → render (slack_views.py, i18n)
-  │                         one service scope per call: RecordStore + ConfiguredSystems → IncidentStore, ConversationReference
+  │                         one service scope per call: RecordStore + ConfiguredSystems → IncidentStore, ConversationReference, StatusUpdateStore
   │
   ▼
 form.py | approval.py | history.py | service.py      platform-agnostic; no Slack or OpenAI imports
   │
-  ├─► IncidentStore (passed in), IncidentTranscriptReader, StatusUpdateStore ── core/api.py
+  ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader ── core/api.py
   ├─► TextGenerator ──────── providers.py ──► adapters/text_generation.py   (integrations.openai)
   └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (publisher.py, comms_profile.py)
 ```

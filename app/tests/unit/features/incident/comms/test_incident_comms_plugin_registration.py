@@ -7,7 +7,6 @@ import pytest
 
 import features.incident.comms as comms_pkg
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
-from features.incident.comms.entrypoints.slack import handle_review_submission
 from features.incident.comms.entrypoints.slack_views import REVIEW_CALLBACK_ID
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.resources import I18nResourceRegistry
@@ -62,14 +61,16 @@ def test_hookimpl_registers_the_approval_submission_with_the_command() -> None:
 
     Both come from the comms Slack entry point's single ``register``, so the
     command that opens the modal never ships without the listener that
-    approves from it.
+    approves from it. The listener is the scope-binding wrapper around the
+    handler, so the assertion is on the callback id and that it is callable.
     """
     registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     comms_pkg.register_slack_commands(registrar=registrar)
 
     assert REVIEW_CALLBACK_ID == "incident.comms.status_update.approve"
-    assert registrar.view_submissions == {REVIEW_CALLBACK_ID: handle_review_submission}
+    assert list(registrar.view_submissions) == [REVIEW_CALLBACK_ID]
+    assert callable(registrar.view_submissions[REVIEW_CALLBACK_ID])
 
 
 def test_registered_locales_path_loads_the_status_update_domain_in_every_locale() -> None:
