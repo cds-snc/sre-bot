@@ -18,13 +18,13 @@ pytestmark = pytest.mark.unit
 
 
 def test_table_name_defaults_to_provisioned_table() -> None:
-    assert AuditSettings(_env_file=None).AUDIT_TABLE_NAME == "sre_bot_audit_trail"
+    assert AuditSettings(_env_file=None).audit_table_name == "sre_bot_audit_trail"
 
 
 def test_table_name_reads_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AUDIT_TABLE_NAME", "audit_elsewhere")
 
-    assert AuditSettings(_env_file=None).AUDIT_TABLE_NAME == "audit_elsewhere"
+    assert AuditSettings(_env_file=None).audit_table_name == "audit_elsewhere"
 
 
 def test_settings_provider_is_a_singleton() -> None:

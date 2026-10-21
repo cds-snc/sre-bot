@@ -100,4 +100,4 @@ async def test_valid_security_slice_boots_and_reaches_security_initialization(mo
     assert reached_yield is True
     security_settings = security.call_args.args[0]
     assert isinstance(security_settings, SecuritySettings)
-    assert security_settings.CORS_ALLOWED_ORIGINS == ["https://frontend.example"]
+    assert security_settings.cors_allowed_origins == ["https://frontend.example"]

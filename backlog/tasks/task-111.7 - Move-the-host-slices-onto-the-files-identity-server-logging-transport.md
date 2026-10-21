@@ -3,18 +3,19 @@ id: TASK-111.7
 title: 'Move the host slices onto the files: identity, server, logging, transport'
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:25'
-updated_date: '2026-10-21 13:02'
+created_date: 2026-10-20 23:25
+updated_date: '2026-10-21T20:23:00Z'
 labels:
   - configuration
 milestone: m-7
 dependencies:
   - TASK-111.3
   - TASK-111.4
-  - TASK-111.5
+  - TASK-111.5.2
+  - TASK-111.16
 references:
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1754'
+  - https://github.com/cds-snc/sre-bot/issues/1754
 parent_task_id: TASK-111
 type: feature
 ordinal: 413000

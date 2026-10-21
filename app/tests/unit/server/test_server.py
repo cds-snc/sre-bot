@@ -39,9 +39,9 @@ def test_cors_middleware_configured():
     )
     assert cors_middleware is not None
     assert cors_middleware.kwargs["allow_credentials"] is False
-    assert cors_middleware.kwargs["allow_origins"] == server.security_settings.CORS_ALLOWED_ORIGINS
-    assert cors_middleware.kwargs["allow_methods"] == server.security_settings.CORS_ALLOWED_METHODS
-    assert cors_middleware.kwargs["allow_headers"] == server.security_settings.CORS_ALLOWED_HEADERS
+    assert cors_middleware.kwargs["allow_origins"] == server.security_settings.cors_allowed_origins
+    assert cors_middleware.kwargs["allow_methods"] == server.security_settings.cors_allowed_methods
+    assert cors_middleware.kwargs["allow_headers"] == server.security_settings.cors_allowed_headers
     assert "*" not in cors_middleware.kwargs["allow_origins"]
     assert "*" not in cors_middleware.kwargs["allow_methods"]
     assert "*" not in cors_middleware.kwargs["allow_headers"]

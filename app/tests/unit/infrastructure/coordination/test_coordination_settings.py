@@ -28,12 +28,12 @@ class TestConditionalWriteSettingsSingleton:
 
     def test_default_ttl_seconds_is_one_hour(self):
         settings = ConditionalWriteSettings()
-        assert settings.IDEMPOTENCY_TTL_SECONDS == 3600
+        assert settings.idempotency_ttl_seconds == 3600
 
     def test_reads_ttl_seconds_from_env(self, monkeypatch):
         monkeypatch.setenv("IDEMPOTENCY_TTL_SECONDS", "7200")
         settings = ConditionalWriteSettings()
-        assert settings.IDEMPOTENCY_TTL_SECONDS == 7200
+        assert settings.idempotency_ttl_seconds == 7200
 
 
 class TestConditionalWriteInProgressTtlSetting:
@@ -41,9 +41,9 @@ class TestConditionalWriteInProgressTtlSetting:
 
     def test_default_in_progress_ttl_seconds(self):
         settings = ConditionalWriteSettings()
-        assert settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS == 300
+        assert settings.idempotency_in_progress_ttl_seconds == 300
 
     def test_reads_in_progress_ttl_seconds_from_env(self, monkeypatch):
         monkeypatch.setenv("IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS", "60")
         settings = ConditionalWriteSettings()
-        assert settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS == 60
+        assert settings.idempotency_in_progress_ttl_seconds == 60

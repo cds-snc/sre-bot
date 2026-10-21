@@ -318,7 +318,7 @@ class TestInitJobRegistration:
         """init() registers Tier-1 jobs (scheduler_heartbeat, integration_healthchecks) without lease wrapping."""
         # Single shared default Tier-2 lease TTL (no per-job aggregator).
         mock_settings = MagicMock()
-        mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        mock_settings.default_tier2_lease_ttl_seconds = 1800
         mock_get_settings.return_value = mock_settings
 
         # Plugin job registration callable handed in by the host
@@ -350,7 +350,7 @@ class TestInitJobRegistration:
         """init() registers Tier-2 jobs (provision_aws_identity_center, etc.) with lease wrapping via _tier2."""
         # Single shared default Tier-2 lease TTL (no per-job aggregator).
         mock_settings = MagicMock()
-        mock_settings.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        mock_settings.default_tier2_lease_ttl_seconds = 1800
         mock_get_settings.return_value = mock_settings
 
         # Plugin job registration callable handed in by the host
@@ -412,7 +412,7 @@ class TestInitJobRegistration:
         safe_run_error may be logged.
         """
         # Arrange
-        mock_get_settings.return_value.DEFAULT_TIER2_LEASE_TTL_SECONDS = 1800
+        mock_get_settings.return_value.default_tier2_lease_ttl_seconds = 1800
         settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
         mock_get_lease_store.return_value = LeaseStore(
             InMemoryConditionalWriteStore(settings=settings), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED

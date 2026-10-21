@@ -23,11 +23,11 @@ class ConfigurationError(Exception):
 
 handler.add_middleware(
     CORSMiddleware,
-    allow_origins=security_settings.CORS_ALLOWED_ORIGINS,
+    allow_origins=security_settings.cors_allowed_origins,
     # Bearer tokens travel in the Authorization header; no cookie or browser credential is needed.
     allow_credentials=False,
-    allow_methods=security_settings.CORS_ALLOWED_METHODS,
-    allow_headers=security_settings.CORS_ALLOWED_HEADERS,
+    allow_methods=security_settings.cors_allowed_methods,
+    allow_headers=security_settings.cors_allowed_headers,
 )
 handler.add_middleware(
     MaxBodySizeMiddleware,

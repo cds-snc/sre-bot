@@ -260,4 +260,4 @@ def get_audit_trail_service() -> AuditTrailService:
     events. The implementation uses DynamoDB, but can be swapped for alternative
     audit backends that satisfy the Protocol.
     """
-    return DynamoDBAuditTrailService(get_record_store(), table_name=get_audit_settings().AUDIT_TABLE_NAME)
+    return DynamoDBAuditTrailService(get_record_store(), table_name=get_audit_settings().audit_table_name)

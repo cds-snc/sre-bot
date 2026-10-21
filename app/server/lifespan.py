@@ -159,7 +159,7 @@ def _initialize_security_services(
     """
     log = logger.bind(phase="security")
     log.info("security_services_initialization_started")
-    issuer_config = settings.ISSUER_CONFIG
+    issuer_config = settings.issuer_config
     if not issuer_config:
         log.warning(
             "security_services_no_issuer_config",

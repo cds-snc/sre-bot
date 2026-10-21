@@ -18,8 +18,8 @@ logger = structlog.get_logger()
 def get_issuer_config() -> dict[str, dict[str, Any]]:
     """Return the JWT issuers configured in the security settings slice, warning when there are none."""
     settings = get_security_settings()
-    if settings.ISSUER_CONFIG:
-        return settings.ISSUER_CONFIG
+    if settings.issuer_config:
+        return settings.issuer_config
 
     log = logger.bind(key="ISSUER_CONFIG", operation="get_issuer_config")
     log.warning(

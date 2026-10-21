@@ -2,8 +2,6 @@
 
 from functools import lru_cache
 
-from pydantic import Field
-
 from infrastructure.configuration.base import InfrastructureSettings
 
 
@@ -18,11 +16,8 @@ class ConditionalWriteSettings(InfrastructureSettings):
         IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS: TTL for in-progress claims (default: 300)
     """
 
-    IDEMPOTENCY_TTL_SECONDS: int = Field(default=3600, alias="IDEMPOTENCY_TTL_SECONDS")
-    IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS: int = Field(
-        default=300,
-        alias="IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS",
-    )
+    idempotency_ttl_seconds: int = 3600
+    idempotency_in_progress_ttl_seconds: int = 300
 
 
 @lru_cache(maxsize=1)

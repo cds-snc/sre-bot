@@ -3,19 +3,19 @@ id: TASK-111.8
 title: Move the security slice onto the files
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:36'
+created_date: 2026-10-20 23:25
+updated_date: '2026-10-21T20:23:00Z'
 labels:
   - configuration
 milestone: m-7
 dependencies:
   - TASK-111.3
   - TASK-111.4
-  - TASK-111.5
+  - TASK-111.5.1
 references:
   - decisions/security.md
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1755'
+  - https://github.com/cds-snc/sre-bot/issues/1755
 parent_task_id: TASK-111
 type: feature
 ordinal: 414000
