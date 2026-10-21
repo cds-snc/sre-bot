@@ -8,6 +8,7 @@ import pytest
 import integrations.slack.provider as provider_module
 from contracts.operations import OperationStatus
 from contracts.slack.models import CommandPayload, CommandResponse
+from infrastructure.logging.formatters import SLACK_SOCKET_MODE_LOGGER
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 
@@ -235,7 +236,7 @@ class TestInitializeApp:
 
         handler = provider.socket_mode_handler
         assert handler is not None
-        assert handler.logger is logging.getLogger("slack_sdk.socket_mode")
+        assert handler.logger is logging.getLogger(SLACK_SOCKET_MODE_LOGGER)
 
     def test_initialize_app_disabled_provider(self, slack_settings_disabled, mock_slack_bolt):
         """Test initialization when provider is disabled."""

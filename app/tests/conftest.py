@@ -1,6 +1,7 @@
 import logging
 import sys
 from collections.abc import AsyncIterator
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
@@ -8,7 +9,7 @@ import slack_bolt
 import svcs
 
 # Ensure project root is on path BEFORE importing test factories.
-project_root = "/workspace/app"
+project_root = str(Path(__file__).resolve().parents[1])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 

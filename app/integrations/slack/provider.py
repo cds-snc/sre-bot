@@ -21,7 +21,6 @@ from contracts.operations import ErrorCode, OperationResult, OperationStatus
 from contracts.services import ServiceScopeOpener
 from contracts.slack.models import ArgumentParsingError, CommandPayload, CommandResponse
 from infrastructure.i18n import Locale, TranslationKey, Translator
-from infrastructure.logging.formatters import SLACK_SOCKET_MODE_LOGGER
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.client import classify_slack_error
@@ -319,7 +318,7 @@ class SlackPlatformProvider:
                 self._handler = SocketModeHandler(
                     self._app,
                     self._settings.APP_TOKEN,
-                    logger=logging.getLogger(SLACK_SOCKET_MODE_LOGGER),
+                    logger=logging.getLogger("slack_sdk.socket_mode"),
                 )
                 log.info("socket_mode_handler_prepared")
             else:
