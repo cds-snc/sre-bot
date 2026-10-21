@@ -56,7 +56,7 @@
 			"installDockerBuildx": false
 		},
 		"ghcr.io/devcontainers/features/terraform:1": {
-			"version": "1.5.3",
+			"version": "1.16.6",
 			"terragrunt": "0.48.0"
 		},
 		"ghcr.io/devcontainers/features/node:1": {

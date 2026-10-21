@@ -17,17 +17,20 @@ resource "aws_ecs_task_definition" "sre-bot" {
   task_role_arn            = aws_iam_role.sre-bot.arn
 
   container_definitions = templatefile("${path.module}/templates/sre-bot.json.tpl", {
-    awslogs-group                    = aws_cloudwatch_log_group.sre-bot_group.name
-    awslogs-region                   = "ca-central-1"
-    awslogs-stream-prefix            = "ecs-sre-bot"
-    image                            = "${aws_ecr_repository.sre-bot.repository_url}:latest"
-    backend_url                      = "https://${aws_route53_zone.sre_bot.name}"
-    fargate_cpu                      = var.fargate_cpu
-    fargate_memory                   = var.fargate_memory
-    aws_region                       = "ca-central-1"
-    cors_allowed_origins             = jsonencode(var.cors_allowed_origins)
-    forwarded_allow_ips              = join(",", module.vpc.public_subnet_cidr_blocks)
-    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE = aws_ssm_parameter.gcp_sre_service_account_key.arn
+    awslogs-group         = aws_cloudwatch_log_group.sre-bot_group.name
+    awslogs-region        = "ca-central-1"
+    awslogs-stream-prefix = "ecs-sre-bot"
+    image                 = "${aws_ecr_repository.sre-bot.repository_url}:latest"
+    backend_url           = "https://${aws_route53_zone.sre_bot.name}"
+    fargate_cpu           = var.fargate_cpu
+    fargate_memory        = var.fargate_memory
+    aws_region            = "ca-central-1"
+    cors_allowed_origins  = jsonencode(var.cors_allowed_origins)
+    forwarded_allow_ips   = join(",", module.vpc.public_subnet_cidr_blocks)
+    secrets = jsonencode(concat(
+      [{ name = "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", valueFrom = aws_ssm_parameter.gcp_sre_service_account_key.arn }],
+      [for name in sort(local.sre_bot_secret_names) : { name = name, valueFrom = aws_ssm_parameter.sre_bot_secret[name].arn }],
+    ))
   })
 }
 

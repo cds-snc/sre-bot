@@ -4,7 +4,7 @@ title: 'Contract: stop fetching the SSM parameters and remove the old deployment
 status: To Do
 assignee: []
 created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:35'
+updated_date: '2026-10-21 17:07'
 labels:
   - configuration
 milestone: m-7
@@ -30,7 +30,7 @@ ordinal: 421000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Delivers TASK-54 AC3: app/bin/entry.sh no longer fetches sre-bot-config and sre-bot-config-infrastructure; the task definition drops BACKEND_URL, CORS_ALLOWED_ORIGINS and SLACK__COMMAND_PREFIX; the IAM read on the two parameters goes; the CI workflow drops the unread secrets. Human: once the deploy is verified, delete both SSM parameters. TASK-54 is set to Done in this PR.
+Delivers TASK-54 AC3: app/bin/entry.sh no longer fetches sre-bot-config and sre-bot-config-infrastructure; the task definition drops BACKEND_URL, CORS_ALLOWED_ORIGINS, SLACK__COMMAND_PREFIX and the old GCP_SRE_SERVICE_ACCOUNT_KEY_FILE secret; the IAM read on the two blob parameters and the old gcp_sre_service_account_key parameter goes, with that parameter's terraform resource and variable (its value sits in terraform state today) and the TF_VAR_gcp_sre_service_account_key lines in tf_plan.yml and tf_apply.yml; the CI workflow drops the unread secrets. Human: once the deploy is verified, delete both SSM parameters and the GCP_SRE_SERVICE_ACCOUNT_KEY_FILE GitHub secret. TASK-54 is set to Done in this PR.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
