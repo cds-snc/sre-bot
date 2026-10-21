@@ -71,7 +71,16 @@ class TestHealthcheck:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-123", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-123",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-7ca4be7c-72b1-5fb0-a0c9-15b8194c4d9a",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890", "MaxResults": 1},
             )
 
@@ -99,7 +108,12 @@ class TestCreateUser:
         with Stubber(no_retry_client) as stub:
             stub.add_response(
                 "create_user",
-                {"UserId": "user-456", "IdentityStoreId": "d-1234567890"},
+                {
+                    "UserId": "user-456",
+                    "IdentityStoreId": "d-1234567890",
+                    "UserArn": "arn:aws:identitystore:::user/1234567890-6c260ee1-f8a7-5c2b-9975-0ed331591d07",
+                    "Revision": "1",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "UserName": "alice@example.com",
@@ -129,7 +143,12 @@ class TestCreateUser:
         with Stubber(std_client) as std_stub, Stubber(no_retry_client) as no_retry_stub:
             no_retry_stub.add_response(
                 "create_user",
-                {"UserId": "user-456", "IdentityStoreId": "d-1234567890"},
+                {
+                    "UserId": "user-456",
+                    "IdentityStoreId": "d-1234567890",
+                    "UserArn": "arn:aws:identitystore:::user/1234567890-6c260ee1-f8a7-5c2b-9975-0ed331591d07",
+                    "Revision": "1",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "UserName": "bob@example.com",
@@ -189,7 +208,11 @@ class TestGetUserId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_user_id",
-                {"UserId": "user-789", "IdentityStoreId": "d-1234567890"},
+                {
+                    "UserId": "user-789",
+                    "IdentityStoreId": "d-1234567890",
+                    "UserArn": "arn:aws:identitystore:::user/1234567890-8d7e4ea4-d90a-51f1-9c85-f85c7f6d8c95",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "AlternateIdentifier": {
@@ -230,6 +253,8 @@ class TestDescribeUser:
                     "Name": {"GivenName": "Alice", "FamilyName": "Smith"},
                     "IdentityStoreId": "d-1234567890",
                     "ResponseMetadata": {"RequestId": "abc123"},
+                    "UserArn": "arn:aws:identitystore:::user/1234567890-8d7e4ea4-d90a-51f1-9c85-f85c7f6d8c95",
+                    "Revision": "1",
                 },
                 expected_params={"IdentityStoreId": "d-1234567890", "UserId": "user-789"},
             )
@@ -241,6 +266,8 @@ class TestDescribeUser:
         assert result.is_success
         assert result.data == {
             "UserId": "user-789",
+            "UserArn": "arn:aws:identitystore:::user/1234567890-8d7e4ea4-d90a-51f1-9c85-f85c7f6d8c95",
+            "Revision": "1",
             "UserName": "alice@example.com",
             "Name": {"GivenName": "Alice", "FamilyName": "Smith"},
         }
@@ -263,8 +290,20 @@ class TestListUsers:
                 "list_users",
                 {
                     "Users": [
-                        {"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"},
-                        {"UserId": "user-2", "UserName": "bob@example.com", "IdentityStoreId": "d-1234567890"},
+                        {
+                            "UserId": "user-1",
+                            "UserName": "alice@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
+                        },
+                        {
+                            "UserId": "user-2",
+                            "UserName": "bob@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-4b15e443-cf48-5b71-8fd6-4e52809ffbd5",
+                            "Revision": "1",
+                        },
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -297,14 +336,32 @@ class TestListUsers:
             stub.add_response(
                 "list_users",
                 {
-                    "Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}],
+                    "Users": [
+                        {
+                            "UserId": "user-1",
+                            "UserName": "alice@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
+                        }
+                    ],
                     "NextToken": "token123",
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-2", "UserName": "bob@example.com", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-2",
+                            "UserName": "bob@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-4b15e443-cf48-5b71-8fd6-4e52809ffbd5",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "token123"},
             )
 
@@ -329,7 +386,17 @@ class TestListUsers:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-1",
+                            "UserName": "alice@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "Filters": filters,
@@ -358,7 +425,11 @@ class TestGetGroupId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_group_id",
-                {"GroupId": "group-123", "IdentityStoreId": "d-1234567890"},
+                {
+                    "GroupId": "group-123",
+                    "IdentityStoreId": "d-1234567890",
+                    "GroupArn": "arn:aws:identitystore:::group/1234567890-225bfb47-93c3-5a21-8e64-acab8c8d8d9e",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "AlternateIdentifier": {
@@ -395,8 +466,20 @@ class TestListGroups:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"},
-                        {"GroupId": "group-2", "DisplayName": "Users", "IdentityStoreId": "d-1234567890"},
+                        {
+                            "GroupId": "group-1",
+                            "DisplayName": "Admins",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1902d27f-9ac3-5599-b580-a0e46606d27c",
+                            "Revision": "1",
+                        },
+                        {
+                            "GroupId": "group-2",
+                            "DisplayName": "Users",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-6784e4a6-4ac9-58c7-8d20-bbc5f20d0b33",
+                            "Revision": "1",
+                        },
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -428,14 +511,32 @@ class TestListGroups:
             stub.add_response(
                 "list_groups",
                 {
-                    "Groups": [{"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"}],
+                    "Groups": [
+                        {
+                            "GroupId": "group-1",
+                            "DisplayName": "Admins",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1902d27f-9ac3-5599-b580-a0e46606d27c",
+                            "Revision": "1",
+                        }
+                    ],
                     "NextToken": "g-token",
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_groups",
-                {"Groups": [{"GroupId": "group-2", "DisplayName": "Users", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Groups": [
+                        {
+                            "GroupId": "group-2",
+                            "DisplayName": "Users",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-6784e4a6-4ac9-58c7-8d20-bbc5f20d0b33",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890", "NextToken": "g-token"},
             )
 
@@ -460,7 +561,17 @@ class TestListGroups:
         with Stubber(client) as stub:
             stub.add_response(
                 "list_groups",
-                {"Groups": [{"GroupId": "group-1", "DisplayName": "Admins", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Groups": [
+                        {
+                            "GroupId": "group-1",
+                            "DisplayName": "Admins",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1902d27f-9ac3-5599-b580-a0e46606d27c",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "Filters": filters,
@@ -490,7 +601,11 @@ class TestCreateGroupMembership:
         with Stubber(no_retry_client) as stub:
             stub.add_response(
                 "create_group_membership",
-                {"MembershipId": "membership-789", "IdentityStoreId": "d-1234567890"},
+                {
+                    "MembershipId": "membership-789",
+                    "IdentityStoreId": "d-1234567890",
+                    "MembershipArn": "arn:aws:identitystore:::membership/1234567890-e8ab811c-ac38-5ee1-b071-9f7693def2c3",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "group-123",
@@ -551,7 +666,11 @@ class TestGetGroupMembershipId:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_group_membership_id",
-                {"MembershipId": "membership-999", "IdentityStoreId": "d-1234567890"},
+                {
+                    "MembershipId": "membership-999",
+                    "IdentityStoreId": "d-1234567890",
+                    "MembershipArn": "arn:aws:identitystore:::membership/1234567890-6895fd4c-004a-5c13-8929-2065827c6a1f",
+                },
                 expected_params={
                     "IdentityStoreId": "d-1234567890",
                     "GroupId": "group-123",
@@ -588,11 +707,13 @@ class TestListGroupMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         },
                         {
                             "MembershipId": "m-2",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-2"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-1cce2af6-1337-5995-824f-3f978b6d4cd6",
                         },
                     ]
                 },
@@ -632,6 +753,7 @@ class TestListGroupMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         }
                     ],
                     "NextToken": "m-token",
@@ -646,6 +768,7 @@ class TestListGroupMemberships:
                             "MembershipId": "m-2",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-2"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-1cce2af6-1337-5995-824f-3f978b6d4cd6",
                         }
                     ]
                 },

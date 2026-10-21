@@ -118,8 +118,7 @@ def test_api_router_included():
     app = server.handler
 
     # Assert - Check that at least some routes exist from api_router
-    route_paths = [str(route.path) for route in app.routes]
-    assert len(route_paths) > 0
+    assert len(app.routes) > 0
 
 
 @pytest.mark.unit

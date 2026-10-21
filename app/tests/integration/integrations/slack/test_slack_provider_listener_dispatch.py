@@ -31,7 +31,7 @@ USER_ID = "U0APPROVER"
 TRIGGER_ID = "trigger-456"
 
 
-@dataclass
+@dataclass(eq=False)
 class DemoPlugin:
     """Opens a modal from a button and validates the modal's single text field."""
 

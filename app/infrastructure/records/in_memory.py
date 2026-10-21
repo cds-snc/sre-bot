@@ -39,7 +39,10 @@ def _matches(value: Any, condition: SortCondition) -> bool:
         case SortOperator.EQ:
             return bool(value == condition.value)
         case SortOperator.LT:
-            return type(value) is type(condition.value) and value < condition.value
+            bound = condition.value
+            if isinstance(bound, str):
+                return type(value) is str and value < bound
+            return type(value) is type(bound) and value < bound
         case SortOperator.BEGINS_WITH:
             return isinstance(value, str) and value.startswith(str(condition.value))
 
