@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 23:27'
+updated_date: '2026-10-21 16:23'
 labels:
   - plugin-architecture
   - configuration
@@ -39,7 +39,7 @@ Not in scope: renaming feature-slice fields and prefixes (each package move does
 - [ ] #1 base.toml and one file per ENVIRONMENT value (local, ci, production) load in the order base, environment file, then environment variables (TASK-111.2)
 - [ ] #2 Every value production sets that is neither a secret nor a platform-provided name is read from the files, and the deployment config no longer sets it (TASK-111.7 to 111.15)
 - [ ] #3 Boot fails naming the key for an invalid file, an unknown key or a missing required secret; CI fails on a table no slice owns (TASK-111.2, 111.3)
-- [ ] #4 CI checks: no secret-shaped key or detected secret in a configuration file; each key and table is owned by exactly one settings slice (TASK-111.3)
+- [ ] #4 CI checks: each key and table is owned by exactly one settings slice, and a configuration-file slice reads only its own names or a platform-provided name; secret leaks are left to GitHub secret scanning (TASK-111.3)
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass on every subtask
 - [ ] #6 The production SSM inventory, by key with no values and mapped to slice and destination, is recorded as a backlog doc (TASK-111.1)
 - [ ] #7 Every remaining environment variable is a secret named <SLICE>__<FIELD> or a platform-provided name; no per-field aliases; renamed secrets were published beside the old names and the old names removed once the deploy was verified (TASK-111.4, 111.7 to 111.15)
