@@ -11,11 +11,13 @@ Makefile and CI, since a guard nothing runs protects nothing.
 
 from pathlib import Path
 
+import pytest
 from pydantic import AliasChoices
 from pydantic_settings import BaseSettings
 
 from bin import check_settings_key_ownership as checker
 from infrastructure.configuration.app import AppSettings
+from infrastructure.logging.settings import LoggingSettings
 from infrastructure.security.settings import SecuritySettings
 from infrastructure.slack.settings import SlackTransportSettings
 from integrations.slack.settings import SlackSettings
@@ -25,6 +27,7 @@ APP_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = APP_ROOT.parent
 
 SETTINGS_IMPORTS = "from pydantic import AliasChoices, AliasPath, BaseModel, Field\nfrom pydantic_settings import BaseSettings, SettingsConfigDict\n"
+CONTRACT_IMPORTS = "from pydantic import Field\nfrom pydantic_settings import SettingsConfigDict\n\nfrom contracts.configuration import ConfigurationSlice\n\n"
 
 
 def _write(root: Path, relative: str, source: str) -> None:
@@ -351,6 +354,159 @@ def test_bin_and_tests_trees_may_read_the_environment(tmp_path: Path) -> None:
     assert _rules(tmp_path) == []
 
 
+# Configuration-file tables
+
+
+def _slice(name: str, table: str, body: str = "    level: str = 'INFO'\n") -> str:
+    """Return a module declaring one ConfigurationSlice that names its table."""
+    return (
+        CONTRACT_IMPORTS
+        + f"class {name}(ConfigurationSlice):\n"
+        + f"    model_config = SettingsConfigDict(toml_table_header=('{table}',), env_prefix='{table.upper()}__')\n"
+        + body
+    )
+
+
+def _tree_with_contract(root: Path) -> None:
+    """Write the slice base the guard recognises configuration slices by."""
+    _write(
+        root,
+        "contracts/configuration.py",
+        SETTINGS_IMPORTS
+        + "class ConfigurationSlice(BaseSettings):\n"
+        + "    model_config = SettingsConfigDict(env_nested_delimiter='__')\n",
+    )
+
+
+def test_table_named_by_two_slices_fails_naming_both_owners(tmp_path: Path) -> None:
+    """One table read by two slices gives a key two owners, as two env readers do."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "one/settings.py", _slice("One", "logging"))
+    _write(tmp_path, "two/settings.py", _slice("Two", "logging", "    other: str = ''\n"))
+    _write(tmp_path, "config/base.toml", "[logging]\nlevel = 'INFO'\n")
+
+    violations = checker.find_violations(tmp_path)
+
+    assert [violation.rule for violation in violations] == ["key-ownership"]
+    assert "[logging]" in violations[0].message
+    assert "one.settings:One" in violations[0].message
+    assert "two.settings:Two" in violations[0].message
+
+
+def test_non_literal_table_header_fails_loudly(tmp_path: Path) -> None:
+    """A computed table name hides the slice's table from review, so it is reported."""
+    _tree_with_contract(tmp_path)
+    _write(
+        tmp_path,
+        "a.py",
+        CONTRACT_IMPORTS
+        + "TABLE = ('logging',)\n\n"
+        + "class A(ConfigurationSlice):\n"
+        + "    model_config = SettingsConfigDict(toml_table_header=TABLE, env_prefix='LOGGING__')\n",
+    )
+
+    assert _rules(tmp_path) == ["unreadable-alias"]
+
+
+def test_table_no_slice_owns_fails_naming_file_and_table(tmp_path: Path) -> None:
+    """A table in any configuration file needs an owning slice, or its values go nowhere."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "a.py", _slice("A", "logging"))
+    _write(tmp_path, "config/base.toml", "[logging]\nlevel = 'INFO'\n")
+    _write(tmp_path, "config/local.toml", "[slack]\ncommand_prefix = 'dev'\n")
+
+    violations = checker.find_violations(tmp_path)
+
+    assert [violation.rule for violation in violations] == ["unowned-table"]
+    assert "local.toml" in violations[0].message
+    assert "[slack]" in violations[0].message
+
+
+def test_slice_table_missing_from_the_base_file_fails_naming_the_slice(tmp_path: Path) -> None:
+    """The base file holds every slice's table, which CI checks before a slice ever builds."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "a.py", _slice("A", "logging"))
+    _write(tmp_path, "config/base.toml", "# no tables yet\n")
+
+    violations = checker.find_violations(tmp_path)
+
+    assert [violation.rule for violation in violations] == ["missing-table"]
+    assert "a:A" in violations[0].message
+    assert "[logging]" in violations[0].message
+
+
+def test_nested_table_belongs_to_its_top_level_table(tmp_path: Path) -> None:
+    """A tenant entry such as [slack.tenant] is part of the slack slice's table."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "a.py", _slice("Slack", "slack", "    tenant: dict[str, str] = {}\n"))
+    _write(tmp_path, "config/base.toml", "[slack]\n\n[slack.tenant]\nteam_id = 'T1'\n")
+
+    assert _rules(tmp_path) == []
+
+
+def test_malformed_configuration_file_fails_naming_it(tmp_path: Path) -> None:
+    """A file the guard cannot parse is reported, never skipped."""
+    _write(tmp_path, "config/base.toml", "[logging\n")
+
+    violations = checker.find_violations(tmp_path)
+
+    assert [violation.rule for violation in violations] == ["invalid-config"]
+    assert "base.toml" in violations[0].message
+
+
+# Configuration-slice environment names
+
+
+def test_configuration_slice_alias_outside_its_table_fails(tmp_path: Path) -> None:
+    """A slice on the files reads <TABLE>__<FIELD> only; a bare alias escapes that naming."""
+    _tree_with_contract(tmp_path)
+    _write(
+        tmp_path, "a.py", _slice("Slack", "slack", "    bot_token: str = Field(default='', validation_alias='SLACK_BOT_TOKEN')\n")
+    )
+    _write(tmp_path, "config/base.toml", "[slack]\n")
+
+    assert _rules(tmp_path) == ["env-naming"]
+
+
+@pytest.mark.parametrize("name", ["AWS_REGION", "UVICORN_PORT", "OTEL_SERVICE_NAME"])
+def test_configuration_slice_reading_an_sdk_namespace_fails(tmp_path: Path, name: str) -> None:
+    """The SDK or runtime reads these names itself, so no slice declares them."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "a.py", _slice("Server", "server", f"    value: str = Field(default='', validation_alias='{name}')\n"))
+    _write(tmp_path, "config/base.toml", "[server]\n")
+
+    assert _rules(tmp_path) == ["sdk-namespace"]
+
+
+def test_aws_table_prefix_is_not_the_sdk_namespace(tmp_path: Path) -> None:
+    """AWS__REGION cannot collide with AWS_REGION: the double underscore separates them."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "a.py", _slice("Aws", "aws", "    region: str = 'ca-central-1'\n"))
+    _write(tmp_path, "config/base.toml", "[aws]\nregion = 'ca-central-1'\n")
+
+    assert _rules(tmp_path) == []
+
+
+def test_configuration_slice_may_read_a_platform_name(tmp_path: Path) -> None:
+    """ENVIRONMENT, GIT_SHA and FORWARDED_ALLOW_IPS keep their bare names."""
+    _tree_with_contract(tmp_path)
+    _write(
+        tmp_path,
+        "a.py",
+        _slice("Identity", "identity", "    environment: str = Field(default='', validation_alias='ENVIRONMENT')\n"),
+    )
+    _write(tmp_path, "config/base.toml", "[identity]\n")
+
+    assert _rules(tmp_path) == []
+
+
+def test_legacy_settings_class_is_not_held_to_configuration_naming(tmp_path: Path) -> None:
+    """A slice not yet on the files keeps its flat names until its move onto them."""
+    _write(tmp_path, "a.py", SETTINGS_IMPORTS + "class Aws(BaseSettings):\n    AWS_REGION: str = 'ca-central-1'\n")
+
+    assert _rules(tmp_path) == []
+
+
 # Collision grouping is source-agnostic
 
 
@@ -390,7 +546,7 @@ def test_source_derivation_matches_pydantic_for_real_settings_classes() -> None:
     Nested sub-field names are the only extra the guard adds, so pydantic's
     top-level names must be a subset and every extra must extend one of them.
     """
-    for cls in (SlackSettings, SlackTransportSettings, AppSettings, AccessSettings, SecuritySettings):
+    for cls in (SlackSettings, SlackTransportSettings, AppSettings, AccessSettings, SecuritySettings, LoggingSettings):
         derived = _keys(APP_ROOT, f"{cls.__module__}:{cls.__qualname__}")
         expected = _pydantic_env_names(cls)
 
@@ -418,6 +574,16 @@ def test_real_tree_reads_every_settings_class() -> None:
     assert "packages.access.common.config.loaders:EnvConfigLoader._EnvModel" in owners
     assert "jobs.settings:SchedulerSettings" in owners
     assert len(owners) >= 30
+
+
+def test_real_tree_claims_the_logging_table() -> None:
+    """The one slice on the files today claims its table, so the table rules see real claims."""
+    claims, _ = checker.collect_claims(APP_ROOT)
+
+    assert (
+        checker.Claim(source_kind=checker.TABLE_SOURCE, key="logging", owner="infrastructure.logging.settings:LoggingSettings")
+        in claims
+    )
 
 
 def test_guard_is_wired_into_the_makefile_and_ci() -> None:

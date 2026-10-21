@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 """Guardrail: every settings key has exactly one owning slice.
 
-decisions/configuration.md "Checks" asks for three things this script enforces:
-  - key-ownership:  no environment variable is read by two settings classes;
+decisions/configuration.md "Checks" asks for these, all enforced here:
+  - key-ownership:  no environment variable is read by two settings classes,
+                    and no configuration-file table is named by two slices;
+  - unowned-table:  every table in ``config/*.toml`` is named by a slice's
+                    ``toml_table_header``;
+  - missing-table:  every table a slice names is in ``config/base.toml``;
+  - env-naming:     a ``ConfigurationSlice`` reads only ``<TABLE>__`` names or a
+                    platform-provided name (``ENVIRONMENT``, ``GIT_SHA``,
+                    ``FORWARDED_ALLOW_IPS``);
+  - sdk-namespace:  no ``ConfigurationSlice`` reads an ``AWS_*``, ``UVICORN_*`` or
+                    ``OTEL_*`` name, which the SDK or runtime reads itself;
   - vendor-enabled: no ``<VENDOR>_ENABLED`` key in ``integrations/`` (a vendor
                     client is enabled by its tenant entry), with ``SLACK_ENABLED``
                     excepted until TASK-112;
   - environ-read:   no ``os.environ`` / ``os.getenv`` read outside a settings
                     class (``bin/`` developer scripts and tests excepted).
+
+The naming rules apply to slices on the configuration files only; a slice
+still on flat environment names keeps them until TASK-111 moves it.
 
 Everything is read from source with ``ast``, never imported, so modules with
 import-time side effects are safe to scan and a settings class nested inside
@@ -22,8 +34,8 @@ for aliases. An alias the script cannot read as a literal string fails the
 check instead of being skipped.
 
 Each key is recorded as a ``Claim`` of (source kind, key, owner), and
-``find_collisions`` groups claims by source kind and key, so a second source of
-keys (configuration-file tables, TASK-111) adds a collector, not a new rule.
+``find_collisions`` groups claims by source kind and key, so environment names
+and configuration-file tables share one ownership rule.
 
 There is deliberately no baseline: the tree is clean, so any violation is new.
 
@@ -32,7 +44,9 @@ Usage:
 """
 
 import ast
+import re
 import sys
+import tomllib
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
@@ -51,11 +65,22 @@ ENVIRON_EXEMPT_ROOTS = frozenset({"bin"})
 # The interim Slack transport switch; TASK-112 replaces it and empties this set.
 ALLOWED_VENDOR_SWITCHES = frozenset({"SLACK_ENABLED"})
 
+# Names the platform sets for the app; they keep their bare names.
+PLATFORM_NAMES = frozenset({"ENVIRONMENT", "GIT_SHA", "FORWARDED_ALLOW_IPS"})
+
+# Names an SDK or runtime reads itself; AWS__ (a table prefix) is not one of them.
+SDK_NAMESPACE = re.compile(r"(AWS|UVICORN|OTEL)_[^_]")
+
 ENV_SOURCE = "env"
+TABLE_SOURCE = "config-table"
+CONFIG_DIR_NAME = "config"
 SETTINGS_ROOT = ("pydantic_settings", "BaseSettings")
 MODEL_ROOT = ("pydantic", "BaseModel")
+CONFIGURATION_SLICE_ROOT = ("contracts.configuration", "ConfigurationSlice")
 ENVIRON_NAMES = frozenset({"environ", "environb", "getenv", "getenvb"})
-CONFIG_KEYS = frozenset({"env_prefix", "env_nested_delimiter", "env_nested_max_split", "populate_by_name", "validate_by_name"})
+CONFIG_KEYS = frozenset(
+    {"env_prefix", "env_nested_delimiter", "env_nested_max_split", "populate_by_name", "validate_by_name", "toml_table_header"}
+)
 MAX_NESTING = 5
 
 
@@ -220,6 +245,16 @@ class _Tree:
     def settings_classes(self) -> list[_Class]:
         return [cls for cls in self.classes if self.kind(cls) == "settings"]
 
+    def derives_from(self, cls: _Class, root: tuple[str, str], seen: frozenset[str] = frozenset()) -> bool:
+        """Return True when a class's base chain reaches the (module, name) root."""
+        for key in self.base_keys(cls):
+            base = self.lookup(key)
+            if key == root or (base is not None and (base.module.name, base.qualname) == root):
+                return True
+            if base is not None and base.owner not in seen and self.derives_from(base, root, seen | {cls.owner}):
+                return True
+        return False
+
     def model_for(self, module: _Module, annotation: ast.expr | None) -> _Class | None:
         """Return the pydantic model an annotation names (``X``, ``X | None``, ``Optional[X]``)."""
         if annotation is None:
@@ -269,7 +304,14 @@ def _literal_config(cls: _Class) -> dict[str, object]:
     for name, item in pairs:
         if name is None:
             raise _Unreadable("model_config unpacks another mapping")
-        if name in CONFIG_KEYS:
+        if name == "toml_table_header":
+            if not (
+                isinstance(item, ast.Tuple)
+                and all(isinstance(part, ast.Constant) and isinstance(part.value, str) for part in item.elts)
+            ):
+                raise _Unreadable("model_config toml_table_header is not a literal tuple of strings")
+            config[name] = tuple(part.value for part in item.elts if isinstance(part, ast.Constant))
+        elif name in CONFIG_KEYS:
             if not isinstance(item, ast.Constant):
                 raise _Unreadable(f"model_config {name} is not a literal")
             config[name] = item.value
@@ -379,7 +421,13 @@ def _class_claims(tree: _Tree, cls: _Class) -> list[Claim]:
         if model is not None and isinstance(delimiter, str) and delimiter:
             subs = _sub_field_names(tree, model, delimiter, depth, frozenset({cls.owner}))
             keys.extend(f"{top}{delimiter}{sub}" for top in names for sub in subs)
-    return [Claim(source_kind=ENV_SOURCE, key=key.lower(), owner=cls.owner) for key in dict.fromkeys(keys)]
+    claims = [Claim(source_kind=ENV_SOURCE, key=key.lower(), owner=cls.owner) for key in dict.fromkeys(keys)]
+    header = config.get("toml_table_header")
+    if isinstance(header, tuple) and header:
+        if len(header) != 1:
+            raise _Unreadable("toml_table_header must name exactly one table")
+        claims.append(Claim(source_kind=TABLE_SOURCE, key=str(header[0]).lower(), owner=cls.owner))
+    return claims
 
 
 def _collect(tree: _Tree) -> tuple[list[Claim], list[Violation]]:
@@ -399,9 +447,15 @@ def _collect(tree: _Tree) -> tuple[list[Claim], list[Violation]]:
     return claims, errors
 
 
+def collect_claims(root: Path) -> tuple[list[Claim], list[Violation]]:
+    """Return every key and table the settings classes under root claim, and any unreadable declaration."""
+    return _collect(_Tree(root))
+
+
 def collect_env_claims(root: Path) -> tuple[list[Claim], list[Violation]]:
     """Return every environment key the settings classes under root read, and any unreadable declaration."""
-    return _collect(_Tree(root))
+    claims, errors = collect_claims(root)
+    return [claim for claim in claims if claim.source_kind == ENV_SOURCE], errors
 
 
 def find_collisions(claims: Iterable[Claim]) -> list[Collision]:
@@ -420,6 +474,8 @@ def find_vendor_switches(claims: Iterable[Claim]) -> list[Violation]:
     """Return each ``<VENDOR>_ENABLED`` key a vendor client slice reads, the allowed switch aside."""
     violations = []
     for claim in claims:
+        if claim.source_kind != ENV_SOURCE:
+            continue
         key = claim.key.upper()
         in_integrations = claim.owner.split(".", 1)[0] == "integrations"
         if in_integrations and (key == "ENABLED" or key.endswith("_ENABLED")) and key not in ALLOWED_VENDOR_SWITCHES:
@@ -464,19 +520,83 @@ def _environ_reads(tree: _Tree) -> list[Violation]:
     return violations
 
 
+def _collision_violation(collision: Collision) -> Violation:
+    owners = ", ".join(collision.owners)
+    if collision.source_kind == TABLE_SOURCE:
+        message = f"table [{collision.key}] is named by {owners}; one table has exactly one owning slice"
+        return Violation(rule="key-ownership", location=f"[{collision.key}]", message=message)
+    message = f"{collision.source_kind} key {collision.key.upper()} is read by {owners}; one key has exactly one owning slice"
+    return Violation(rule="key-ownership", location=collision.key.upper(), message=message)
+
+
+def _read_tables(path: Path, root: Path) -> tuple[set[str], list[Violation]]:
+    """Return the top-level tables of one configuration file, or the parse failure."""
+    location = path.relative_to(root).as_posix()
+    try:
+        return set(tomllib.loads(path.read_text(encoding="utf-8"))), []
+    except tomllib.TOMLDecodeError as exc:
+        return set(), [Violation(rule="invalid-config", location=location, message=f"{location}: invalid TOML: {exc}")]
+
+
+def _table_violations(root: Path, claims: Iterable[Claim]) -> list[Violation]:
+    """Return each table no slice owns and each slice table the base file lacks."""
+    table_claims = sorted(
+        (claim for claim in claims if claim.source_kind == TABLE_SOURCE), key=lambda claim: (claim.key, claim.owner)
+    )
+    owned = {claim.key for claim in table_claims}
+    config_dir = root / CONFIG_DIR_NAME
+    violations: list[Violation] = []
+    base_tables: set[str] = set()
+    for path in sorted(config_dir.glob("*.toml")):
+        tables, errors = _read_tables(path, root)
+        violations.extend(errors)
+        if path.name == "base.toml":
+            base_tables = tables
+        location = path.relative_to(root).as_posix()
+        for table in sorted(tables - owned):
+            message = (
+                f"{location}: [{table}] is named by no settings slice; name it in one slice's toml_table_header or remove it"
+            )
+            violations.append(Violation(rule="unowned-table", location=f"{location}:[{table}]", message=message))
+    for claim in table_claims:
+        if claim.key not in base_tables:
+            message = f"{claim.owner} reads [{claim.key}], which {CONFIG_DIR_NAME}/base.toml lacks; the base file holds every slice's table"
+            violations.append(Violation(rule="missing-table", location=claim.owner, message=message))
+    return violations
+
+
+def _naming_violations(tree: _Tree, claims: Iterable[Claim]) -> list[Violation]:
+    """Return each name a configuration slice reads outside its table, the platform names aside."""
+    slices = {cls.owner for cls in tree.settings_classes() if tree.derives_from(cls, CONFIGURATION_SLICE_ROOT)}
+    tables = {claim.owner: claim.key for claim in claims if claim.source_kind == TABLE_SOURCE and claim.owner in slices}
+    violations = []
+    for claim in claims:
+        table = tables.get(claim.owner)
+        if claim.source_kind != ENV_SOURCE or table is None:
+            continue
+        key = claim.key.upper()
+        if SDK_NAMESPACE.match(key):
+            message = f"{claim.owner} reads {key}: the SDK or runtime reads this name itself, so no slice declares it"
+            violations.append(Violation(rule="sdk-namespace", location=claim.owner, message=message))
+        elif key not in PLATFORM_NAMES and not key.startswith(f"{table.upper()}__"):
+            message = f"{claim.owner} reads {key}: a slice on the configuration files reads {table.upper()}__<FIELD> names only, with no per-field alias"
+            violations.append(Violation(rule="env-naming", location=claim.owner, message=message))
+    return violations
+
+
 def find_violations(root: Path) -> list[Violation]:
     """Return every broken rule for the source tree under root."""
     tree = _Tree(root)
     claims, errors = _collect(tree)
-    collisions = [
-        Violation(
-            rule="key-ownership",
-            location=collision.key.upper(),
-            message=f"{collision.source_kind} key {collision.key.upper()} is read by {', '.join(collision.owners)}; one key has exactly one owning slice",
-        )
-        for collision in find_collisions(claims)
+    collisions = [_collision_violation(collision) for collision in find_collisions(claims)]
+    return [
+        *errors,
+        *collisions,
+        *_table_violations(root, claims),
+        *_naming_violations(tree, claims),
+        *find_vendor_switches(claims),
+        *_environ_reads(tree),
     ]
-    return [*errors, *collisions, *find_vendor_switches(claims), *_environ_reads(tree)]
 
 
 def main() -> int:
@@ -487,13 +607,17 @@ def main() -> int:
         for violation in violations:
             print(f"  - [{violation.rule}] {violation.message}")
         print(
-            "\nEach environment variable is read by exactly one settings slice, a vendor\n"
-            "client is enabled by its tenant entry, and only settings classes read the\n"
-            "environment. Move the key to its one owner, or read it through that slice."
+            "\nEach environment variable and each configuration-file table has exactly one\n"
+            "owning settings slice, a slice on the files reads only its own <TABLE>__ names,\n"
+            "a vendor client is enabled by its tenant entry, and only settings classes read\n"
+            "the environment. Move the key or table to its one owner, or read it through that slice."
         )
         return 1
 
-    print("OK: every settings key has one owner, no vendor switch exists, and only settings classes read the environment.")
+    print(
+        "OK: every settings key and configuration table has one owner, slices on the files read only their own names,"
+        " no vendor switch exists, and only settings classes read the environment."
+    )
     return 0
 
 
