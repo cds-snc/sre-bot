@@ -3,11 +3,11 @@ id: TASK-111.2
 title: >-
   Load settings from base and per-environment TOML files through a contracts
   settings base and a host loader
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-10-20 23:25'
-updated_date: '2026-10-21 13:28'
+updated_date: '2026-10-21 13:32'
 labels:
   - configuration
 milestone: m-7
