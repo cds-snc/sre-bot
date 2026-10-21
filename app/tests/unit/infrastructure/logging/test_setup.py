@@ -202,7 +202,7 @@ class TestPipelineRedaction:
 
     def test_pipeline_redaction_extra_keys_extend_defaults(self):
         """AC#3: redaction_extra_keys extends the deny-list through the real chain."""
-        logging_settings = LoggingSettings(REDACTION_EXTRA_KEYS=("custom_secret",))
+        logging_settings = LoggingSettings(redaction_extra_keys=("custom_secret",))
         processors = _build_base_processors(logging_settings=logging_settings)
 
         with capture_logs(processors=processors) as entries:
@@ -352,3 +352,23 @@ class TestConfigureLoggingRealCodePath:
             logger.info("login_attempt", password="hunter2")
 
         assert entries[0]["password"] == "***REDACTED***"
+
+    def test_root_level_comes_from_the_logging_slice(self, mock_settings, monkeypatch):
+        """With no explicit level, the root logger takes LoggingSettings.log_level."""
+        monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
+
+        configure_logging(settings=mock_settings, logging_settings=LoggingSettings(log_level="WARNING"))
+
+        assert logging.getLogger().level == logging.WARNING
+
+    def test_explicit_log_level_argument_beats_the_logging_slice(self, mock_settings, monkeypatch):
+        """The log_level argument still overrides the configured level."""
+        monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
+
+        configure_logging(
+            settings=mock_settings,
+            logging_settings=LoggingSettings(log_level="WARNING"),
+            log_level="DEBUG",
+        )
+
+        assert logging.getLogger().level == logging.DEBUG

@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
+from contracts.configuration import install_configuration_files
 from contracts.i18n.resources import I18nResourceSpec
 from contracts.services import ServiceScopeOpener
 from contracts.slack.registrar import SlackCommandRegistrar
@@ -50,6 +51,7 @@ from modules import (
     sre,
     webhook_helper,
 )
+from server.configuration import load_configuration_files
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
@@ -78,6 +80,7 @@ def _get_logger_from_app(
 
 def _list_configs_from_sections(
     app_settings: AppSettings,
+    logging_settings: LoggingSettings,
     server_settings: ServerSettings,
     security_settings: SecuritySettings,
     directory_settings: DirectorySettings,
@@ -86,7 +89,7 @@ def _list_configs_from_sections(
 ) -> None:
     config_settings: dict[str, tuple[object, ...]] = {
         "settings": (
-            {"LOG_LEVEL": app_settings.LOG_LEVEL},
+            {"LOG_LEVEL": logging_settings.log_level},
             {"GIT_SHA": app_settings.GIT_SHA},
         )
     }
@@ -241,7 +244,11 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
 
 @svcs.fastapi.lifespan
 async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None]:
+    # Phase 1: configuration. The identity slice selects the files, which are checked
+    # and installed before any slice on them builds; a bad file fails boot here.
     app_settings = get_app_settings()
+    configuration_files = load_configuration_files(app_settings.ENVIRONMENT)
+    install_configuration_files(configuration_files)
     server_settings = get_server_settings()
     security_settings = get_security_settings()
     directory_settings = get_directory_settings()
@@ -256,8 +263,15 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     app.state.logger = logger
 
     logger.info("application_startup")
+    logger.info(
+        "configuration_files_loaded",
+        phase="configuration",
+        environment=configuration_files.environment,
+        files=[path.name for path in configuration_files.paths],
+    )
     _list_configs_from_sections(
         app_settings,
+        logging_settings,
         server_settings,
         security_settings,
         directory_settings,

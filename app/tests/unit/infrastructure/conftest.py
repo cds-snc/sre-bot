@@ -11,7 +11,6 @@ from infrastructure.configuration import AppSettings
 def mock_settings():
     """Mock Settings instance for testing."""
     settings = Mock(spec=AppSettings)
-    settings.LOG_LEVEL = "INFO"
     settings.ENVIRONMENT = "local"
     return settings
 

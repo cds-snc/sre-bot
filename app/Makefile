@@ -9,7 +9,7 @@ dev-setup: # Requires to be signed in to AWS
 	sh ../.devcontainer/dynamodb-create.sh
 
 debug:
-	SLACK__COMMAND_PREFIX="dev-" LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
+	SLACK__COMMAND_PREFIX="dev-" LOGGING__LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
 
 fmt:
 	uv run ruff check --fix . $(ARGS)

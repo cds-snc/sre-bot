@@ -13,8 +13,8 @@ class TestAppSettings:
         """AppSettings should provide stable defaults."""
         settings = AppSettings()
 
-        assert settings.LOG_LEVEL == "INFO"
         assert settings.GIT_SHA == "Unknown"
+        assert not hasattr(settings, "LOG_LEVEL")
 
     def test_app_settings_no_legacy_prefix_attribute(self):
         """Legacy command-prefix setting is no longer exposed on app settings."""
@@ -28,7 +28,7 @@ class TestAppSettings:
 
         settings = AppSettings()
 
-        assert settings.LOG_LEVEL == "INFO"
+        assert not hasattr(settings, "UNKNOWN_VAR")
 
     def test_app_settings_singleton_returns_same_instance(self):
         """Provider should return same cached singleton instance."""

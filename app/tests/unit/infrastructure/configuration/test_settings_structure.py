@@ -30,7 +30,6 @@ from infrastructure.configuration.infrastructure.server import (
     get_server_settings,
 )
 from infrastructure.coordination.settings import ConditionalWriteSettings
-from infrastructure.logging.settings import LoggingSettings
 
 
 class TestSettingsStructure:
@@ -118,7 +117,6 @@ class TestSettingsStructure:
             RetrySettings(),
             ServerSettings(),
             DevSettings(),
-            LoggingSettings(),
         ]
 
         # Verify they are all instances of InfrastructureSettings

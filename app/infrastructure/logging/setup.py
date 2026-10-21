@@ -133,7 +133,7 @@ def _build_base_processors(
         structlog.processors.StackInfoRenderer(),
         structlog.processors.format_exc_info,
         # 6. Redact sensitive fields before final rendering
-        mask_sensitive_data(additional_patterns=frozenset(logging_settings.REDACTION_EXTRA_KEYS)),
+        mask_sensitive_data(additional_patterns=frozenset(logging_settings.redaction_extra_keys)),
     ]
 
 
@@ -153,7 +153,8 @@ def configure_logging(
     Args:
         settings: AppSettings instance (REQUIRED). Must be passed explicitly.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
-            Defaults to settings.LOG_LEVEL if not provided.
+            Defaults to logging_settings.log_level if not provided.
+        logging_settings: LoggingSettings slice; built from the provider if not provided.
 
     Returns:
         Configured logger instance
@@ -236,7 +237,7 @@ def configure_logging(
             processors=renderers,
         )
     )
-    effective_log_level = log_level or settings.LOG_LEVEL
+    effective_log_level = log_level or resolved_logging_settings.log_level
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
     root_logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))

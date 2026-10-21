@@ -4,7 +4,7 @@ title: 'Lower-case the host, security and hosting settings fields'
 status: To Do
 assignee: []
 created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:36'
+updated_date: '2026-10-21 13:02'
 labels:
   - configuration
 milestone: m-7
@@ -21,7 +21,7 @@ ordinal: 411000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Mechanical: the fields of AppSettings, ServerSettings, LoggingSettings, SecuritySettings, SlackTransportSettings and the hosting slices (retry, audit, coordination, scheduler, directory, drive, spreadsheets) become lower snake_case with case_sensitive=False; every reader follows. Environment names do not change.
+Mechanical: the fields of AppSettings, ServerSettings, SecuritySettings, SlackTransportSettings and the hosting slices (retry, audit, coordination, scheduler, directory, drive, spreadsheets) become lower snake_case with case_sensitive=False; every reader follows. Environment names do not change. LoggingSettings is not in scope: TASK-111.2 lower-cases it when it moves onto the files.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

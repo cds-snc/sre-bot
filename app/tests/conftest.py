@@ -13,7 +13,9 @@ project_root = str(Path(__file__).resolve().parents[1])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+from contracts.configuration import ConfigurationFiles, install_configuration_files  # noqa: E402
 from integrations.slack.provider import get_slack_provider  # noqa: E402
+from server.configuration import load_configuration_files  # noqa: E402
 from tests.factories.aws import (  # noqa: E402
     make_aws_groups,
     make_aws_groups_memberships,
@@ -62,6 +64,18 @@ def pytest_configure(config):
     # Patch before any imports
 
     slack_bolt.App.__init__ = mock_app_init
+
+
+@pytest.fixture(scope="session")
+def ci_configuration_files() -> ConfigurationFiles:
+    """The checked-in base and ci configuration files, loaded once per run (pytest-env sets ENVIRONMENT=ci)."""
+    return load_configuration_files("ci")
+
+
+@pytest.fixture(autouse=True)
+def installed_ci_configuration(ci_configuration_files: ConfigurationFiles) -> None:
+    """Install the ci files before every test, so a test that installed its own leaves nothing behind."""
+    install_configuration_files(ci_configuration_files)
 
 
 @pytest.fixture(autouse=True)
