@@ -170,7 +170,9 @@ def harness_fixture(
         if service_scopes is not None:
             provider.set_scope_opener(service_scopes())
         monkeypatch.setattr("integrations.slack.provider.LegacySlackBootstrap", lambda: SimpleNamespace(create_app=lambda: app))
-        monkeypatch.setattr("integrations.slack.provider.SocketModeHandler", lambda app, token: SimpleNamespace(app=app))
+        monkeypatch.setattr(
+            "integrations.slack.provider.SocketModeHandler", lambda app, token, logger=None: SimpleNamespace(app=app)
+        )
 
         register_feature_integrations(app=MagicMock(), logger=MagicMock(), slack_provider=provider)
         assert provider.initialize_app().is_success

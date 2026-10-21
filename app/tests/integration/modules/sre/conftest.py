@@ -64,9 +64,10 @@ def slack_provider(slack_settings, slack_formatter, monkeypatch):
             self.client = MagicMock()
 
     class FakeSocketModeHandler:
-        def __init__(self, app, token):
+        def __init__(self, app, token, logger=None):
             self.app = app
             self.token = token
+            self.logger = logger
 
         def connect(self):
             return None

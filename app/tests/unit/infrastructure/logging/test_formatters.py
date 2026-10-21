@@ -6,6 +6,7 @@ Tests cover:
 - truncate_large_values processor
 - add_environment_info processor
 - SENSITIVE_PATTERNS constant
+- downgrade_transient_socket_mode_errors processor
 """
 
 import pytest
@@ -14,6 +15,7 @@ from infrastructure.logging.formatters import (
     SENSITIVE_PATTERNS,
     add_app_info,
     add_environment_info,
+    downgrade_transient_socket_mode_errors,
     mask_sensitive_data,
     truncate_large_values,
 )
@@ -474,3 +476,98 @@ class TestSensitivePatterns:
         """SENSITIVE_PATTERNS cannot be modified."""
         with pytest.raises(AttributeError):
             SENSITIVE_PATTERNS.add("new_pattern")
+
+
+SOCKET_LOGGER = "slack_sdk.socket_mode"
+
+
+@pytest.mark.unit
+class TestDowngradeTransientSocketModeErrors:
+    """Self-healing Socket Mode websocket errors are rewritten to info; everything else is untouched."""
+
+    @pytest.mark.parametrize(
+        ("message", "error_type"),
+        [
+            (
+                "on_error invoked (session id: abc, error: BrokenPipeError, message: [Errno 32] Broken pipe)",
+                "BrokenPipeError",
+            ),
+            (
+                "Failed to check the state of sock (session id: abc, error: BrokenPipeError, message: [Errno 32] Broken pipe)",
+                "BrokenPipeError",
+            ),
+            ("Failed to send a message (session id: abc, error: [Errno 32] Broken pipe)", "BrokenPipeError"),
+            (
+                "on_error invoked (session id: abc, error: SSLEOFError, message: [SSL: UNEXPECTED_EOF_WHILE_READING] "
+                "EOF occurred in violation of protocol (_ssl.c:2427))",
+                "SSLError",
+            ),
+            (
+                "Failed to check the current session or reconnect to the server "
+                "(session id: abc, error: SSLError, message: [SSL: BAD_LENGTH] bad length (_ssl.c:2406))",
+                "SSLError",
+            ),
+            (
+                "Got an exception while receiving data (session id: abc, error: [SSL: UNEXPECTED_EOF_WHILE_READING] "
+                "EOF occurred in violation of protocol (_ssl.c:2427))",
+                "SSLError",
+            ),
+        ],
+    )
+    def test_transient_socket_error_is_downgraded_to_info(self, message, error_type):
+        """Both the type-name and str(e)-only slack_sdk message shapes are recognised and tagged."""
+        event_dict = {"event": message, "level": "error", "logger": SOCKET_LOGGER}
+
+        result = downgrade_transient_socket_mode_errors(None, "error", event_dict)
+
+        assert result["level"] == "info"
+        assert result["error_type"] == error_type
+        assert result["socket_mode_transient"] is True
+        assert result["event"] == message
+
+    def test_child_logger_of_socket_mode_is_downgraded(self):
+        """slack_sdk's module loggers under ``slack_sdk.socket_mode.*`` are covered by the prefix match."""
+        event_dict = {
+            "event": "on_error invoked (session id: abc, error: BrokenPipeError, message: [Errno 32] Broken pipe)",
+            "level": "error",
+            "logger": "slack_sdk.socket_mode.builtin.client",
+        }
+
+        assert downgrade_transient_socket_mode_errors(None, "error", event_dict)["level"] == "info"
+
+    @pytest.mark.parametrize(
+        "message",
+        [
+            "Failed to retrieve WSS URL: invalid_auth",
+            "on_error invoked (session id: abc, error: ConnectionRefusedError, message: [Errno 111] Connection refused)",
+            "Failed to establish a connection (session id: abc, error: [SSL: CERTIFICATE_VERIFY_FAILED] "
+            "certificate verify failed: unable to get local issuer certificate (_ssl.c:1032))",
+            "on_error invoked (session id: abc, error: SSLCertVerificationError, message: [SSL: CERTIFICATE_VERIFY_FAILED] x)",
+        ],
+    )
+    def test_non_transient_socket_mode_error_stays_error(self, message):
+        """Auth failures, other socket errors and certificate verification failures keep alerting."""
+        event_dict = {"event": message, "level": "error", "logger": SOCKET_LOGGER}
+
+        result = downgrade_transient_socket_mode_errors(None, "error", event_dict)
+
+        assert result["level"] == "error"
+        assert "socket_mode_transient" not in result
+
+    def test_same_message_from_bolt_app_logger_stays_error(self):
+        """Listener errors on ``slack_bolt.App`` are never rewritten, even if they mention a broken pipe."""
+        event_dict = {
+            "event": "on_error invoked (session id: abc, error: BrokenPipeError, message: [Errno 32] Broken pipe)",
+            "level": "error",
+            "logger": "slack_bolt.App",
+        }
+
+        assert downgrade_transient_socket_mode_errors(None, "error", event_dict)["level"] == "error"
+
+    def test_non_error_level_is_untouched(self):
+        """Warnings from the Socket Mode logger pass through without tagging."""
+        event_dict = {"event": "BrokenPipeError seen", "level": "warning", "logger": SOCKET_LOGGER}
+
+        result = downgrade_transient_socket_mode_errors(None, "warning", event_dict)
+
+        assert result == {"event": "BrokenPipeError seen", "level": "warning", "logger": SOCKET_LOGGER}

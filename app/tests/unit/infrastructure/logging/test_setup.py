@@ -275,6 +275,26 @@ class TestStdlibLoggingBridge:
         assert record["level"] == "error"
         assert record["api_token"] == "***REDACTED***"
 
+    def test_transient_socket_mode_error_renders_as_info(self, production_logging):
+        """A Socket Mode broken-pipe ERROR renders as ``"level": "info"``, which the CloudWatch error filter skips."""
+        logging.getLogger("slack_sdk.socket_mode").error(
+            "on_error invoked (session id: abc, error: BrokenPipeError, message: [Errno 32] Broken pipe)"
+        )
+
+        record = json.loads(production_logging.getvalue().strip())
+        assert record["level"] == "info"
+        assert record["logger"] == "slack_sdk.socket_mode"
+        assert record["error_type"] == "BrokenPipeError"
+        assert record["socket_mode_transient"] is True
+
+    def test_non_transient_socket_mode_error_still_renders_as_error(self, production_logging):
+        """Socket Mode errors outside the transient set keep their ERROR level end to end."""
+        logging.getLogger("slack_sdk.socket_mode").error("Failed to retrieve WSS URL: invalid_auth")
+
+        record = json.loads(production_logging.getvalue().strip())
+        assert record["level"] == "error"
+        assert "socket_mode_transient" not in record
+
 
 @pytest.mark.unit
 class TestConfigureLoggingRealCodePath:

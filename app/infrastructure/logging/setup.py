@@ -31,7 +31,7 @@ from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
 from infrastructure.configuration.app import AppSettings
-from infrastructure.logging.formatters import mask_sensitive_data
+from infrastructure.logging.formatters import downgrade_transient_socket_mode_errors, mask_sensitive_data
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 
 
@@ -228,7 +228,11 @@ def configure_logging(
     handler = logging.StreamHandler()
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
-            foreign_pre_chain=[structlog.stdlib.add_logger_name, *processors],
+            foreign_pre_chain=[
+                structlog.stdlib.add_logger_name,
+                *processors,
+                downgrade_transient_socket_mode_errors,
+            ],
             processors=renderers,
         )
     )

@@ -48,7 +48,7 @@ class RecordingBoltApp:
 def bolt_app(monkeypatch: pytest.MonkeyPatch) -> RecordingBoltApp:
     app = RecordingBoltApp()
     monkeypatch.setattr("integrations.slack.provider.LegacySlackBootstrap", lambda: SimpleNamespace(create_app=lambda: app))
-    monkeypatch.setattr("integrations.slack.provider.SocketModeHandler", lambda app, token: SimpleNamespace(app=app))
+    monkeypatch.setattr("integrations.slack.provider.SocketModeHandler", lambda app, token, logger=None: SimpleNamespace(app=app))
     return app
 
 

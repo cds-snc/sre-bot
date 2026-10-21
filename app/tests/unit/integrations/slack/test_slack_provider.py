@@ -1,5 +1,6 @@
 """Unit tests for SlackPlatformProvider."""
 
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -7,6 +8,7 @@ import pytest
 import integrations.slack.provider as provider_module
 from contracts.operations import OperationStatus
 from contracts.slack.models import CommandPayload, CommandResponse
+from infrastructure.logging.formatters import SLACK_SOCKET_MODE_LOGGER
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 
@@ -19,9 +21,10 @@ def mock_slack_bolt(monkeypatch):
             self.client = object()
 
     class FakeSocketModeHandler:
-        def __init__(self, app, token):
+        def __init__(self, app, token, logger=None):
             self.app = app
             self.token = token
+            self.logger = logger
 
         def connect(self):
             return None
@@ -220,6 +223,20 @@ class TestInitializeApp:
         assert result.is_success
         assert result.data["initialized"] is True
         assert result.data["socket_mode"] is True
+
+    def test_initialize_app_routes_socket_mode_logs_to_dedicated_logger(self, slack_settings, mock_slack_bolt):
+        """Socket Mode handler logs through ``slack_sdk.socket_mode``, not Bolt's app logger.
+
+        The fake handler records the ``logger`` argument; a dedicated name lets the logging
+        pipeline downgrade transient websocket errors without touching listener errors.
+        """
+        provider = SlackPlatformProvider(settings=slack_settings)
+
+        assert provider.initialize_app().is_success
+
+        handler = provider.socket_mode_handler
+        assert handler is not None
+        assert handler.logger is logging.getLogger(SLACK_SOCKET_MODE_LOGGER)
 
     def test_initialize_app_disabled_provider(self, slack_settings_disabled, mock_slack_bolt):
         """Test initialization when provider is disabled."""
