@@ -165,7 +165,7 @@ def harness_fixture(
         monkeypatch.setattr("server.plugins.manager.get_plugin_manager", lambda: plugin_manager)
 
         app = App(authorize=authorize_single_workspace, request_verification_enabled=False, listener_executor=InlineExecutor())
-        settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
+        settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
         provider = SlackPlatformProvider(settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter())
         if service_scopes is not None:
             provider.set_scope_opener(service_scopes())

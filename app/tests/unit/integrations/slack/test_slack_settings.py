@@ -19,53 +19,53 @@ class TestSlackSettingsFields:
     def test_defaults_resolve_when_env_is_empty(self):
         settings = SlackSettings()
 
-        assert settings.BOT_TOKEN == ""
-        assert settings.REQUEST_TIMEOUT_SECONDS == 10
-        assert settings.RETRY_MAX_ATTEMPTS == 2
+        assert settings.bot_token == ""
+        assert settings.request_timeout_seconds == 10
+        assert settings.retry_max_attempts == 2
 
     def test_bot_token_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-real-token")
 
         settings = SlackSettings()
 
-        assert settings.BOT_TOKEN == "xoxb-real-token"
+        assert settings.bot_token == "xoxb-real-token"
 
     def test_request_timeout_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_REQUEST_TIMEOUT_SECONDS", "25")
 
         settings = SlackSettings()
 
-        assert settings.REQUEST_TIMEOUT_SECONDS == 25
+        assert settings.request_timeout_seconds == 25
 
     def test_retry_max_attempts_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_RETRY_MAX_ATTEMPTS", "5")
 
         settings = SlackSettings()
 
-        assert settings.RETRY_MAX_ATTEMPTS == 5
+        assert settings.retry_max_attempts == 5
 
 
 class TestSlackSettingsDeliveryMode:
     """`SlackSettings` carries delivery-mode credentials and fail-fast validation."""
 
     def test_enabled_defaults_to_false(self):
-        assert SlackSettings().ENABLED is False
+        assert SlackSettings().enabled is False
 
     def test_socket_mode_defaults_to_true(self):
-        assert SlackSettings().SOCKET_MODE is True
+        assert SlackSettings().socket_mode is True
 
     def test_app_token_defaults_to_none(self):
-        assert SlackSettings().APP_TOKEN is None
+        assert SlackSettings().app_token is None
 
     def test_signing_secret_defaults_to_none(self):
-        assert SlackSettings().SIGNING_SECRET is None
+        assert SlackSettings().signing_secret is None
 
     def test_enabled_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
         monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
 
-        assert SlackSettings().ENABLED is True
+        assert SlackSettings().enabled is True
 
     def test_socket_mode_false_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
@@ -73,17 +73,17 @@ class TestSlackSettingsDeliveryMode:
         monkeypatch.setenv("SLACK_TEAM_ID", "T0TEST")
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "secret")
 
-        assert SlackSettings().SOCKET_MODE is False
+        assert SlackSettings().socket_mode is False
 
     def test_app_token_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-real-token")
 
-        assert SlackSettings().APP_TOKEN == "xapp-real-token"
+        assert SlackSettings().app_token == "xapp-real-token"
 
     def test_signing_secret_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "abc123")
 
-        assert SlackSettings().SIGNING_SECRET == "abc123"
+        assert SlackSettings().signing_secret == "abc123"
 
 
 class TestSlackSettingsUserToken:
@@ -92,14 +92,14 @@ class TestSlackSettingsUserToken:
     def test_user_token_defaults_to_empty_string(self):
         settings = SlackSettings()
 
-        assert settings.USER_TOKEN == ""
+        assert settings.user_token == ""
 
     def test_user_token_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
 
         settings = SlackSettings()
 
-        assert settings.USER_TOKEN == "xoxp-user-token"
+        assert settings.user_token == "xoxp-user-token"
 
     def test_user_token_does_not_appear_in_repr(self, monkeypatch):
         monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
@@ -107,7 +107,7 @@ class TestSlackSettingsUserToken:
         settings = SlackSettings()
         settings_repr = repr(settings)
 
-        assert "USER_TOKEN" not in settings_repr
+        assert "user_token" not in settings_repr
         assert "xoxp-user-token" not in settings_repr
 
     def test_user_token_is_not_coupled_to_transport_validation(self, monkeypatch):
@@ -116,8 +116,8 @@ class TestSlackSettingsUserToken:
 
         settings = SlackSettings()
 
-        assert settings.ENABLED is False
-        assert settings.USER_TOKEN == "xoxp-user-token"
+        assert settings.enabled is False
+        assert settings.user_token == "xoxp-user-token"
 
 
 class TestSlackSettingsFailFast:
@@ -144,7 +144,7 @@ class TestSlackSettingsFailFast:
         # No APP_TOKEN or SIGNING_SECRET — should not raise because ENABLED=false.
         settings = SlackSettings(SLACK_ENABLED=False)
 
-        assert settings.ENABLED is False
+        assert settings.enabled is False
 
     def test_socket_mode_enabled_with_app_token_is_valid(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
@@ -153,8 +153,8 @@ class TestSlackSettingsFailFast:
 
         settings = SlackSettings()
 
-        assert settings.ENABLED is True
-        assert settings.SOCKET_MODE is True
+        assert settings.enabled is True
+        assert settings.socket_mode is True
 
     def test_http_events_enabled_with_signing_secret_is_valid(self, monkeypatch):
         monkeypatch.setenv("SLACK_ENABLED", "true")
@@ -164,7 +164,7 @@ class TestSlackSettingsFailFast:
 
         settings = SlackSettings()
 
-        assert settings.SOCKET_MODE is False
+        assert settings.socket_mode is False
 
 
 class TestSlackSettingsSocketModeSigningSecretNotice:
@@ -179,8 +179,8 @@ class TestSlackSettingsSocketModeSigningSecretNotice:
         with capture_logs() as entries:
             settings = SlackSettings()
 
-        assert settings.ENABLED is True
-        assert settings.SOCKET_MODE is True
+        assert settings.enabled is True
+        assert settings.socket_mode is True
         notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
         assert notice_entries
         assert notice_entries[0].get("log_level") == "info"
@@ -195,8 +195,8 @@ class TestSlackSettingsSocketModeSigningSecretNotice:
         with capture_logs() as entries:
             settings = SlackSettings()
 
-        assert settings.ENABLED is True
-        assert settings.SOCKET_MODE is True
+        assert settings.enabled is True
+        assert settings.socket_mode is True
         notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
         assert notice_entries == []
 
@@ -204,7 +204,7 @@ class TestSlackSettingsSocketModeSigningSecretNotice:
         with capture_logs() as entries:
             settings = SlackSettings(SLACK_ENABLED=False)
 
-        assert settings.ENABLED is False
+        assert settings.enabled is False
         notice_entries = [entry for entry in entries if entry.get("event") == "slack_signing_secret_not_set_in_socket_mode"]
         assert notice_entries == []
 

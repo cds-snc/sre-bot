@@ -36,11 +36,11 @@ def slack_settings():
     """Mock Slack platform settings for testing."""
 
     class MockSlackSettings:
-        ENABLED = True
-        SOCKET_MODE = True
-        APP_TOKEN = "xapp-test"
-        BOT_TOKEN = "xoxb-test"
-        SIGNING_SECRET = "test-secret"
+        enabled = True
+        socket_mode = True
+        app_token = "xapp-test"
+        bot_token = "xoxb-test"
+        signing_secret = "test-secret"
 
     return MockSlackSettings()
 

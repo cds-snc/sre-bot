@@ -148,7 +148,7 @@ def _build_service(
 
     creds = service_account.Credentials.from_service_account_info(creds_info)
 
-    delegation_email = delegated_user_email or settings.SRE_BOT_EMAIL or None
+    delegation_email = delegated_user_email or settings.sre_bot_email or None
     if delegation_email:
         creds = creds.with_subject(delegation_email)
 
@@ -163,10 +163,10 @@ def _build_service(
     return build(
         api_name,
         api_version,
-        http=_build_authorized_http(creds, settings.GOOGLE_API_TIMEOUT_SECONDS),
+        http=_build_authorized_http(creds, settings.google_api_timeout_seconds),
         cache_discovery=False,
         static_discovery=True,
-        requestBuilder=_build_request_builder(settings.GOOGLE_API_NUM_RETRIES),
+        requestBuilder=_build_request_builder(settings.google_api_num_retries),
     )
 
 

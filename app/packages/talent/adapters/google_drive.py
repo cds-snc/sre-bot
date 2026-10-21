@@ -12,7 +12,7 @@ from infrastructure.drive.factory import get_drive_provider
 from integrations.google_workspace.settings import get_google_workspace_settings
 
 logger = structlog.get_logger()
-BOT_EMAIL = get_google_workspace_settings().SRE_BOT_EMAIL
+BOT_EMAIL = get_google_workspace_settings().sre_bot_email
 
 
 def _log_failure(event: str, result: OperationResult[Any]) -> None:

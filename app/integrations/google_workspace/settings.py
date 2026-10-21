@@ -54,29 +54,27 @@ class GoogleWorkspaceSettings(BaseSettings):
 
         settings = get_google_workspace_settings()
 
-        admin_email = settings.GOOGLE_DELEGATED_ADMIN_EMAIL
+        admin_email = settings.google_delegated_admin_email
         tenant = settings.tenant
         ```
     """
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    GOOGLE_DELEGATED_ADMIN_EMAIL: str = Field(default="", alias="GOOGLE_DELEGATED_ADMIN_EMAIL")
-    SRE_BOT_EMAIL: str = Field(default="", alias="SRE_BOT_EMAIL")
-    GOOGLE_WORKSPACE_CUSTOMER_ID: str | None = Field(default=None, alias="GOOGLE_WORKSPACE_CUSTOMER_ID")
-    GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: str = Field(default="", alias="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
-    GOOGLE_API_NUM_RETRIES: int = Field(
+    google_delegated_admin_email: str = Field(default="")
+    sre_bot_email: str = Field(default="")
+    google_workspace_customer_id: str | None = Field(default=None)
+    gcp_sre_service_account_key_file: str = Field(default="")
+    google_api_num_retries: int = Field(
         default=3,
-        alias="GOOGLE_API_NUM_RETRIES",
         description="Number of automatic retries googleapiclient applies to transient (429/5xx) API call failures, configured once at service construction.",
     )
-    GOOGLE_API_TIMEOUT_SECONDS: float = Field(
+    google_api_timeout_seconds: float = Field(
         default=10.0,
-        alias="GOOGLE_API_TIMEOUT_SECONDS",
         gt=0,
         description="Per-attempt HTTP timeout in seconds for every Google Workspace API client, configured once at service construction. Defaults to 10.0; must be positive.",
     )
@@ -84,25 +82,25 @@ class GoogleWorkspaceSettings(BaseSettings):
     @property
     def tenant(self) -> GoogleWorkspaceTenant | None:
         """Return the Google tenant entry, or None when Google is not configured."""
-        if self.GOOGLE_WORKSPACE_CUSTOMER_ID is None or not self.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE:
+        if self.google_workspace_customer_id is None or not self.gcp_sre_service_account_key_file:
             return None
         return GoogleWorkspaceTenant(
-            customer_id=self.GOOGLE_WORKSPACE_CUSTOMER_ID.strip(),
-            service_account_key=self.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE,
+            customer_id=self.google_workspace_customer_id.strip(),
+            service_account_key=self.gcp_sre_service_account_key_file,
         )
 
-    @field_validator("GOOGLE_WORKSPACE_CUSTOMER_ID", mode="before")
+    @field_validator("google_workspace_customer_id", mode="before")
     @classmethod
     def _empty_customer_id_is_absent(cls, value: object) -> object:
         return None if value == "" else value
 
     @model_validator(mode="after")
     def _validate_tenant_entry(self) -> GoogleWorkspaceSettings:
-        if self.GOOGLE_WORKSPACE_CUSTOMER_ID is None and not self.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE:
+        if self.google_workspace_customer_id is None and not self.gcp_sre_service_account_key_file:
             return self
-        if not self.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE:
+        if not self.gcp_sre_service_account_key_file:
             raise ValueError("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is required when GOOGLE_WORKSPACE_CUSTOMER_ID is set")
-        customer_id = (self.GOOGLE_WORKSPACE_CUSTOMER_ID or "").strip()
+        customer_id = (self.google_workspace_customer_id or "").strip()
         if not customer_id or customer_id == "my_customer":
             raise ValueError(
                 "GOOGLE_WORKSPACE_CUSTOMER_ID must be the real Google Workspace customer id, not blank or the "
@@ -164,7 +162,7 @@ class GoogleResourcesConfig(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 

@@ -242,8 +242,8 @@ class SlackPlatformProvider:
 
         self._logger.info(
             "slack_provider_initialized",
-            socket_mode=settings.SOCKET_MODE,
-            enabled=settings.ENABLED,
+            socket_mode=settings.socket_mode,
+            enabled=settings.enabled,
         )
         self._handler: SocketModeHandler | None = None  # Socket Mode handler reference
         self._socket_thread: threading.Thread | None = None
@@ -276,10 +276,10 @@ class SlackPlatformProvider:
         Returns:
             OperationResult with initialization status
         """
-        log = self._logger.bind(socket_mode=self._settings.SOCKET_MODE)
+        log = self._logger.bind(socket_mode=self._settings.socket_mode)
         log.info("initializing_slack_app")
 
-        if not self._settings.ENABLED:
+        if not self._settings.enabled:
             log.warning("slack_disabled_skipping_init")
             return OperationResult.permanent_error(
                 message="Slack provider is disabled",
@@ -287,14 +287,14 @@ class SlackPlatformProvider:
             )
 
         # Validate required tokens
-        if self._settings.SOCKET_MODE and not self._settings.APP_TOKEN:
+        if self._settings.socket_mode and not self._settings.app_token:
             log.error("missing_app_token")
             return OperationResult.permanent_error(
                 message="APP_TOKEN required for Socket Mode",
                 error_code="MISSING_APP_TOKEN",
             )
 
-        if not self._settings.BOT_TOKEN:
+        if not self._settings.bot_token:
             log.error("missing_bot_token")
             return OperationResult.permanent_error(
                 message="BOT_TOKEN is required",
@@ -314,10 +314,10 @@ class SlackPlatformProvider:
             self._attach_interaction_listeners()
 
             # Prepare Socket Mode handler if enabled (start happens separately)
-            if self._settings.SOCKET_MODE:
+            if self._settings.socket_mode:
                 self._handler = SocketModeHandler(
                     self._app,
-                    self._settings.APP_TOKEN,
+                    self._settings.app_token,
                     logger=logging.getLogger("slack_sdk.socket_mode"),
                 )
                 log.info("socket_mode_handler_prepared")
@@ -326,7 +326,7 @@ class SlackPlatformProvider:
 
             log.info("slack_app_initialized")
             return OperationResult.success(
-                data={"initialized": True, "socket_mode": self._settings.SOCKET_MODE},
+                data={"initialized": True, "socket_mode": self._settings.socket_mode},
                 message="Slack app initialization completed",
             )
 
@@ -502,9 +502,9 @@ class SlackPlatformProvider:
 
     def start(self) -> OperationResult:
         """Start Slack Socket Mode if enabled."""
-        log = self._logger.bind(socket_mode=self._settings.SOCKET_MODE)
+        log = self._logger.bind(socket_mode=self._settings.socket_mode)
 
-        if not self._settings.SOCKET_MODE:
+        if not self._settings.socket_mode:
             log.info("socket_mode_start_skipped")
             return OperationResult.success(message="Socket Mode disabled")
 

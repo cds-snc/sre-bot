@@ -24,11 +24,11 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _stub_settings_and_aws(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("server.services.get_aws_client", MagicMock())
-    monkeypatch.setattr("server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(TEAM_ID="T0123"))
+    monkeypatch.setattr("server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(team_id="T0123"))
     monkeypatch.setattr(
         "server.configured_systems.get_google_workspace_settings",
         lambda: GoogleWorkspaceSettings.model_construct(
-            GOOGLE_WORKSPACE_CUSTOMER_ID="C0abc", GCP_SRE_SERVICE_ACCOUNT_KEY_FILE="/run/key.json"
+            google_workspace_customer_id="C0abc", gcp_sre_service_account_key_file="/run/key.json"
         ),
     )
 

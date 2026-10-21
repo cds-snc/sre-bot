@@ -72,7 +72,7 @@ def test_neither_set_means_no_entry_and_no_default(monkeypatch: pytest.MonkeyPat
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.tenant is None
-    assert settings.GOOGLE_WORKSPACE_CUSTOMER_ID is None
+    assert settings.google_workspace_customer_id is None
 
 
 def test_entry_repr_hides_the_service_account_key() -> None:

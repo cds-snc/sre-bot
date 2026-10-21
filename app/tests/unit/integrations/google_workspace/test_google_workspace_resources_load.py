@@ -22,11 +22,11 @@ def test_provider_returns_one_cached_instance() -> None:
     assert get_google_resources_config() is get_google_resources_config()
 
 
-def test_config_reads_the_env_file_case_sensitively_and_ignores_unknown_keys() -> None:
-    """The configuration keeps the shared .env loading rules."""
+def test_config_reads_the_env_file_case_insensitively_and_ignores_unknown_keys() -> None:
+    """The configuration reads the .env file, matches names in any case and ignores unknown keys."""
     config = GoogleResourcesConfig.model_config
 
-    assert (config.get("env_file"), config.get("case_sensitive"), config.get("extra")) == (".env", True, "ignore")
+    assert (config.get("env_file"), config.get("case_sensitive"), config.get("extra")) == (".env", False, "ignore")
 
 
 def test_properties_read_their_ids_from_the_json_variable(monkeypatch: pytest.MonkeyPatch) -> None:

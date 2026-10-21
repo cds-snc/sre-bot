@@ -31,7 +31,7 @@ def _slack_error(code: str, *, headers: dict[str, str] | None = None, status_cod
 
 
 def _provider(client: Any | None) -> SlackPlatformProvider:
-    settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
+    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
     provider = SlackPlatformProvider(settings=settings)
     provider._client = client
     return provider

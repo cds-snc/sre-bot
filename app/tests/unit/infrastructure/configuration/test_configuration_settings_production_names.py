@@ -6,7 +6,12 @@ field rename that silently stops reading its name falls back to the default and
 fails here instead of in production. The names are the deploy interface: in
 production ISSUER_CONFIG (from the SSM-delivered .env file) and
 CORS_ALLOWED_ORIGINS (from the task definition) are set; the other names run on
-their defaults today but stay part of the interface.
+their defaults today but stay part of the interface. The Slack and Google
+Workspace slices follow the same rule: production sets SLACK_APP_TOKEN,
+SLACK_BOT_TOKEN, SLACK_ENABLED, SLACK_TEAM_ID, SLACK_USER_TOKEN,
+GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
+SRE_BOT_EMAIL and GCP_SRE_SERVICE_ACCOUNT_KEY_FILE; the remaining names of those
+slices stay part of the interface.
 """
 
 from pathlib import Path
@@ -23,6 +28,8 @@ from infrastructure.directory.settings import DirectorySettings
 from infrastructure.drive.settings import DriveSettings
 from infrastructure.security.settings import SecuritySettings
 from infrastructure.spreadsheets.settings import SpreadsheetSettings
+from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
+from integrations.slack.settings import SlackSettings
 from jobs.settings import SchedulerSettings
 
 _ISSUER_SENTINEL = (
@@ -77,6 +84,35 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (SecuritySettings, "CORS_ALLOWED_METHODS", "cors_allowed_methods", '["PUT"]', ["PUT"]),
     (SecuritySettings, "CORS_ALLOWED_HEADERS", "cors_allowed_headers", '["X-Sentinel"]', ["X-Sentinel"]),
     (SecuritySettings, "DEV_BYPASS_ENABLED", "dev_bypass_enabled", "true", True),
+    (SlackSettings, "SLACK_TEAM_ID", "team_id", "TSENTINEL1", "TSENTINEL1"),
+    (SlackSettings, "SLACK_BOT_TOKEN", "bot_token", "xoxb-sentinel", "xoxb-sentinel"),
+    (SlackSettings, "SLACK_USER_TOKEN", "user_token", "xoxp-sentinel", "xoxp-sentinel"),
+    (SlackSettings, "SLACK_APP_TOKEN", "app_token", "xapp-sentinel", "xapp-sentinel"),
+    (SlackSettings, "SLACK_SOCKET_MODE", "socket_mode", "false", False),
+    (SlackSettings, "SLACK_SIGNING_SECRET", "signing_secret", "sentinel-secret", "sentinel-secret"),
+    (SlackSettings, "SLACK_REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds", "17", 17),
+    (SlackSettings, "SLACK_RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
+    (SlackSettings, "SLACK_TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", "41", 41),
+    (SlackSettings, "SLACK_UNAUTHORIZED_ERRORS", "unauthorized_errors", '["sentinel_unauth"]', ["sentinel_unauth"]),
+    (SlackSettings, "SLACK_NOT_FOUND_ERRORS", "not_found_errors", '["sentinel_missing"]', ["sentinel_missing"]),
+    (SlackSettings, "SLACK_TRANSIENT_ERRORS", "transient_errors", '["sentinel_transient"]', ["sentinel_transient"]),
+    (
+        GoogleWorkspaceSettings,
+        "GOOGLE_DELEGATED_ADMIN_EMAIL",
+        "google_delegated_admin_email",
+        "admin@sentinel.example",
+        "admin@sentinel.example",
+    ),
+    (GoogleWorkspaceSettings, "SRE_BOT_EMAIL", "sre_bot_email", "bot@sentinel.example", "bot@sentinel.example"),
+    (GoogleWorkspaceSettings, "GOOGLE_API_NUM_RETRIES", "google_api_num_retries", "7", 7),
+    (GoogleWorkspaceSettings, "GOOGLE_API_TIMEOUT_SECONDS", "google_api_timeout_seconds", "12.5", 12.5),
+    (
+        GoogleResourcesConfig,
+        "GOOGLE_RESOURCES",
+        "resources",
+        '{"inc":{"d":"sentinel-drive"}}',
+        {"inc": {"d": "sentinel-drive"}},
+    ),
 ]
 
 
@@ -162,3 +198,56 @@ def test_configuration_settings_upper_case_keyword_accepted() -> None:
     settings = ConditionalWriteSettings(_env_file=None, IDEMPOTENCY_TTL_SECONDS=42)  # type: ignore[call-arg]
 
     assert settings.idempotency_ttl_seconds == 42
+
+
+def test_configuration_settings_slack_enabled_with_team_id_and_app_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACK_ENABLED switches the transport on only together with its team id and app token, which the validator requires."""
+    monkeypatch.setenv("SLACK_ENABLED", "true")
+    monkeypatch.setenv("SLACK_TEAM_ID", "TSENTINEL1")
+    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-sentinel")
+
+    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.enabled is True
+    assert settings.tenant is not None
+    assert settings.tenant.team_id == "TSENTINEL1"
+
+
+def test_configuration_settings_google_customer_id_and_key_build_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The customer id and the service-account key are read together; the validator rejects either alone."""
+    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0sentinel")
+    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", '{"type":"service_account"}')
+
+    settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.google_workspace_customer_id == "C0sentinel"
+    assert settings.gcp_sre_service_account_key_file == '{"type":"service_account"}'
+    assert settings.tenant is not None
+
+
+def test_configuration_settings_slack_and_google_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lower-case spelling of a Slack alias and of a Google name is read too."""
+    monkeypatch.setenv("slack_bot_token", "xoxb-lower")
+    monkeypatch.setenv("sre_bot_email", "lower@sentinel.example")
+
+    slack = SlackSettings(_env_file=None)  # type: ignore[call-arg]
+    google = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert slack.bot_token == "xoxb-lower"
+    assert google.sre_bot_email == "lower@sentinel.example"
+
+
+def test_configuration_settings_slack_bare_field_name_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The bare field name ENABLED is not an environment name; only the SLACK_ENABLED alias is."""
+    monkeypatch.setenv("ENABLED", "true")
+
+    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.enabled is False
+
+
+def test_configuration_settings_google_upper_case_keyword_accepted() -> None:
+    """Constructor keywords in the environment spelling still set the lower-case Google field."""
+    settings = GoogleWorkspaceSettings(_env_file=None, SRE_BOT_EMAIL="kw@sentinel.example")  # type: ignore[call-arg]
+
+    assert settings.sre_bot_email == "kw@sentinel.example"

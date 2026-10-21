@@ -1,20 +1,20 @@
 ---
 id: TASK-111.9
-title: 'Move the Slack slice onto the files, tenant entry included'
+title: Move the Slack slice onto the files, tenant entry included
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:36'
+created_date: 2026-10-20 23:25
+updated_date: '2026-10-21T21:08:00Z'
 labels:
   - configuration
 milestone: m-7
 dependencies:
   - TASK-111.3
   - TASK-111.4
-  - TASK-111.6
+  - TASK-111.6.1
 references:
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1756'
+  - https://github.com/cds-snc/sre-bot/issues/1756
 parent_task_id: TASK-111
 type: feature
 ordinal: 415000

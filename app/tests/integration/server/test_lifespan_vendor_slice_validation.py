@@ -108,6 +108,6 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
             reached_yield = True
 
     assert reached_yield is True
-    assert get_slack_settings().TEAM_ID is None
-    assert get_google_workspace_settings().GCP_SRE_SERVICE_ACCOUNT_KEY_FILE == ""
+    assert get_slack_settings().team_id is None
+    assert get_google_workspace_settings().gcp_sre_service_account_key_file == ""
     assert connects == []
