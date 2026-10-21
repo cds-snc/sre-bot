@@ -54,9 +54,10 @@ def slack_provider(make_slack_settings, monkeypatch):
             return decorator
 
     class FakeSocketModeHandler:
-        def __init__(self, app, token):
+        def __init__(self, app, token, logger=None):
             self.app = app
             self.token = token
+            self.logger = logger
 
     monkeypatch.setattr("integrations.slack.provider.App", FakeApp)
     monkeypatch.setattr(

@@ -5,6 +5,7 @@ Slack platform provider implementation.
 Provides integration with Slack using the Bolt SDK for Socket Mode.
 """
 
+import logging
 import threading
 from collections.abc import Callable
 from functools import cache
@@ -20,6 +21,7 @@ from contracts.operations import ErrorCode, OperationResult, OperationStatus
 from contracts.services import ServiceScopeOpener
 from contracts.slack.models import ArgumentParsingError, CommandPayload, CommandResponse
 from infrastructure.i18n import Locale, TranslationKey, Translator
+from infrastructure.logging.formatters import SLACK_SOCKET_MODE_LOGGER
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.client import classify_slack_error
@@ -314,7 +316,11 @@ class SlackPlatformProvider:
 
             # Prepare Socket Mode handler if enabled (start happens separately)
             if self._settings.SOCKET_MODE:
-                self._handler = SocketModeHandler(self._app, self._settings.APP_TOKEN)
+                self._handler = SocketModeHandler(
+                    self._app,
+                    self._settings.APP_TOKEN,
+                    logger=logging.getLogger(SLACK_SOCKET_MODE_LOGGER),
+                )
                 log.info("socket_mode_handler_prepared")
             else:
                 log.info("socket_mode_disabled_http_mode")
