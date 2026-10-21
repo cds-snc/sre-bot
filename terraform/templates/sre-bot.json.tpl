@@ -35,12 +35,7 @@
         "protocol": "tcp"
       }
     ],
-    "secrets": [
-      {
-        "name": "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-        "valueFrom": "${GCP_SRE_SERVICE_ACCOUNT_KEY_FILE}"
-      }
-    ],
+    "secrets": ${secrets},
     "ulimits": [
       {
         "hardLimit": 1000000,

@@ -98,4 +98,4 @@ Destinations:
 
 ## Secrets TASK-111.4 creates
 
-`SLACK__BOT_TOKEN`, `SLACK__APP_TOKEN`, `SLACK__USER_TOKEN`, `GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY`, `OPENAI__API_KEY`, `NOTIFY__SRE_USER_NAME`, `NOTIFY__SRE_CLIENT_SECRET`, `OPSGENIE__INTEGRATIONS_KEY`, `TRELLO__APP_KEY`, `TRELLO__TOKEN`, `SENTINEL__SHARED_KEY`: eleven parameters. `SECURITY__DEV_BYPASS_TOKEN` and `SLACK__SIGNING_SECRET` are not set in production and get no parameter.
+`SLACK__BOT_TOKEN`, `SLACK__APP_TOKEN`, `SLACK__USER_TOKEN`, `GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY`, `OPENAI__API_KEY`, `NOTIFY__SRE_USER_NAME`, `NOTIFY__SRE_CLIENT_SECRET`, `OPSGENIE__INTEGRATIONS_KEY`, `TRELLO__APP_KEY`, `TRELLO__TOKEN`, `SENTINEL__SHARED_KEY`: eleven parameters, each named `/sre-bot/<NAME>` and injected as `<NAME>`. Terraform creates them with a placeholder; each real value is set outside terraform from its source key above (`GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY` takes the value of the `gcp_sre_service_account_key` parameter). `SECURITY__DEV_BYPASS_TOKEN` and `SLACK__SIGNING_SECRET` are not set in production and get no parameter.

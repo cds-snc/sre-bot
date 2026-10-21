@@ -6,9 +6,6 @@ on:
       - app/**
       - .github/workflows/ci_code.yml
 
-env:
-  TERRAGRUNT_VERSION: v0.31.1
-
 jobs:
   tests:
     runs-on: ubuntu-latest

@@ -23,7 +23,9 @@ remote_state {
     bucket              = "${local.billing_code}-tf"
     dynamodb_table      = "terraform-state-lock-dynamo"
     region              = "ca-central-1"
-    key                 = "${path_relative_to_include()}/terraform.tfstate"
+    # The object terraform 1.5 wrote as "./terraform.tfstate": its AWS SDK v1
+    # stripped the "./", which terraform 1.6+ sends as-is (hashicorp/terraform#34279).
+    key                 = "terraform.tfstate"
     s3_bucket_tags      = { CostCenter : local.billing_code }
     dynamodb_table_tags = { CostCenter : local.billing_code }
   }
