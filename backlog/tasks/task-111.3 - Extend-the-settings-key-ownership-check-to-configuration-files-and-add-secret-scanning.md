@@ -1,10 +1,10 @@
 ---
 id: TASK-111.3
 title: Extend the settings key ownership check to configuration-file tables
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-20 23:25'
-updated_date: '2026-10-21 16:31'
+updated_date: '2026-10-21 16:34'
 labels:
   - configuration
 milestone: m-7
