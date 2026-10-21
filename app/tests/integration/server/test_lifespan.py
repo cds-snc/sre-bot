@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from infrastructure.logging.settings import LoggingSettings
 from server import lifespan as lifespan_module
 from server.lifespan import (
     _get_logger_from_app,
@@ -80,6 +81,7 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     # Act
     _list_configs_from_sections(
         mock_settings,
+        LoggingSettings(log_level="WARNING"),
         mock_server_settings,
         mock_security_settings,
         mock_directory_settings,
@@ -94,6 +96,7 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
 
     base_settings = first_call.kwargs["base_settings"]
     assert all("PREFIX" not in entry for entry in base_settings)
+    assert {"LOG_LEVEL": "WARNING"} in base_settings
     security_call = next(c for c in mock_logger.info.call_args_list if c.kwargs.get("config_setting") == "security")
     assert security_call.kwargs["keys"] == ("ISSUER_CONFIG", "DEV_BYPASS_TOKEN")
     assert "secret" not in str(mock_logger.info.call_args_list)

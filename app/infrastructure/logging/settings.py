@@ -2,19 +2,22 @@
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
-from infrastructure.configuration.base import InfrastructureSettings
+from contracts.configuration import ConfigurationSlice
 
 
-class LoggingSettings(InfrastructureSettings):
-    """Configuration for structured logging redaction.
+class LoggingSettings(ConfigurationSlice):
+    """Root log level and extra redaction keys, read from the [logging] table.
 
-    Environment Variables:
-        REDACTION_EXTRA_KEYS: JSON array of extra deny-list key substrings.
+    Environment overrides: LOGGING__LOG_LEVEL, LOGGING__REDACTION_EXTRA_KEYS (JSON array
+    of extra deny-list key substrings).
     """
 
-    REDACTION_EXTRA_KEYS: tuple[str, ...] = Field(default=(), alias="REDACTION_EXTRA_KEYS")
+    model_config = SettingsConfigDict(toml_table_header=("logging",), env_prefix="LOGGING__")
+
+    log_level: str = "INFO"
+    redaction_extra_keys: tuple[str, ...] = ()
 
 
 @lru_cache(maxsize=1)

@@ -1,0 +1,7 @@
+# Defaults for every settings slice, one table per slice (decisions/configuration.md).
+# Secure and production-shaped; an environment file overrides it key by key.
+# Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
+
+[logging]
+log_level = "INFO"
+redaction_extra_keys = []

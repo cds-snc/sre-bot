@@ -8,12 +8,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
-    """App-level settings: deployment identity, log level and the webhook body cap."""
+    """App-level settings: deployment identity and the webhook body cap."""
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     ENVIRONMENT: Literal["local", "ci", "production"]
-    LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
     WEBHOOK_MAX_BODY_BYTES: int = Field(default=262_144, alias="WEBHOOK_MAX_BODY_BYTES")
 

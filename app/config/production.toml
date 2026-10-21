@@ -1,0 +1,2 @@
+# Overrides of base.toml for ENVIRONMENT=production, key by key.
+# Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
