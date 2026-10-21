@@ -79,18 +79,24 @@ class TestListGroupsWithMemberships:
                             "DisplayName": "Admins",
                             "Description": "Admin users",
                             "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
                         },
                         {
                             "GroupId": "g-2",
                             "DisplayName": "Users",
                             "Description": "Regular users",
                             "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-ac6b48cb-49bf-522d-a39b-1212de06e9c5",
+                            "Revision": "1",
                         },
                         {
                             "GroupId": "g-3",
                             "DisplayName": "Superadmins",
                             "Description": "Super users",
                             "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-b3003da5-f84f-5fc6-bdba-dbf1ccf7b3c5",
+                            "Revision": "1",
                         },
                     ]
                 },
@@ -147,6 +153,8 @@ class TestListGroupsWithMemberships:
                             "DisplayName": "Admins",
                             "Description": "Admin users",
                             "CreatedBy": "should be removed",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
                         }
                     ]
                 },
@@ -154,7 +162,17 @@ class TestListGroupsWithMemberships:
             )
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-1",
+                            "UserName": "alice@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
@@ -165,6 +183,7 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         }
                     ]
                 },
@@ -207,6 +226,8 @@ class TestListGroupsWithMemberships:
                             "DisplayName": "Admins",
                             "Description": "Admin users",
                             "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
                         }
                     ]
                 },
@@ -222,6 +243,8 @@ class TestListGroupsWithMemberships:
                             "IdentityStoreId": "d-1234567890",
                             "Name": {"GivenName": "Alice", "FamilyName": "Smith"},
                             "Emails": [{"Value": "alice@example.com", "Type": "WORK"}],
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
                         }
                     ]
                 },
@@ -235,6 +258,7 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         }
                     ]
                 },
@@ -272,15 +296,39 @@ class TestListGroupsWithMemberships:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "g-1", "DisplayName": "Admins", "Description": "Group", "IdentityStoreId": "d-1234567890"},
-                        {"GroupId": "g-2", "DisplayName": "Users", "Description": "Group", "IdentityStoreId": "d-1234567890"},
+                        {
+                            "GroupId": "g-1",
+                            "DisplayName": "Admins",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
+                        },
+                        {
+                            "GroupId": "g-2",
+                            "DisplayName": "Users",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-ac6b48cb-49bf-522d-a39b-1212de06e9c5",
+                            "Revision": "1",
+                        },
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-2", "UserName": "bob@example.com", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-2",
+                            "UserName": "bob@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-4b15e443-cf48-5b71-8fd6-4e52809ffbd5",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             # g-1 fails
@@ -301,6 +349,7 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-2",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-2"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-1cce2af6-1337-5995-824f-3f978b6d4cd6",
                         }
                     ]
                 },
@@ -333,7 +382,14 @@ class TestListGroupsWithMemberships:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "g-1", "DisplayName": "Admins", "Description": "Group", "IdentityStoreId": "d-1234567890"}
+                        {
+                            "GroupId": "g-1",
+                            "DisplayName": "Admins",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
+                        }
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -347,6 +403,8 @@ class TestListGroupsWithMemberships:
                             "UserName": "alice@example.com",
                             "IdentityStoreId": "d-1234567890",
                             "Name": {"GivenName": "Alice"},
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
                         }
                     ]
                 },
@@ -360,11 +418,13 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         },
                         {
                             "MembershipId": "m-2",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-2"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-1cce2af6-1337-5995-824f-3f978b6d4cd6",
                         },  # user-2 missing
                     ]
                 },
@@ -396,7 +456,14 @@ class TestListGroupsWithMemberships:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "g-1", "DisplayName": "Admins", "Description": "Group", "IdentityStoreId": "d-1234567890"}
+                        {
+                            "GroupId": "g-1",
+                            "DisplayName": "Admins",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
+                        }
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -410,6 +477,8 @@ class TestListGroupsWithMemberships:
                             "UserName": "alice@example.com",
                             "IdentityStoreId": "d-1234567890",
                             "Name": {"GivenName": "Alice"},
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
                         }
                     ]
                 },
@@ -423,11 +492,13 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         },
                         {
                             "MembershipId": "m-2",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-2"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-1cce2af6-1337-5995-824f-3f978b6d4cd6",
                         },
                     ]
                 },
@@ -482,7 +553,14 @@ class TestListGroupsWithMemberships:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "g-1", "DisplayName": "Admins", "Description": "Group", "IdentityStoreId": "d-1234567890"}
+                        {
+                            "GroupId": "g-1",
+                            "DisplayName": "Admins",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
+                        }
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
@@ -514,15 +592,39 @@ class TestListGroupsWithMemberships:
                 "list_groups",
                 {
                     "Groups": [
-                        {"GroupId": "g-1", "DisplayName": "Admins", "Description": "Group", "IdentityStoreId": "d-1234567890"},
-                        {"GroupId": "g-2", "DisplayName": "Users", "Description": "Group", "IdentityStoreId": "d-1234567890"},
+                        {
+                            "GroupId": "g-1",
+                            "DisplayName": "Admins",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-1bdd323c-938f-5d7b-8dfa-7f6d666522ac",
+                            "Revision": "1",
+                        },
+                        {
+                            "GroupId": "g-2",
+                            "DisplayName": "Users",
+                            "Description": "Group",
+                            "IdentityStoreId": "d-1234567890",
+                            "GroupArn": "arn:aws:identitystore:::group/1234567890-ac6b48cb-49bf-522d-a39b-1212de06e9c5",
+                            "Revision": "1",
+                        },
                     ]
                 },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             stub.add_response(
                 "list_users",
-                {"Users": [{"UserId": "user-1", "UserName": "alice@example.com", "IdentityStoreId": "d-1234567890"}]},
+                {
+                    "Users": [
+                        {
+                            "UserId": "user-1",
+                            "UserName": "alice@example.com",
+                            "IdentityStoreId": "d-1234567890",
+                            "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                            "Revision": "1",
+                        }
+                    ]
+                },
                 expected_params={"IdentityStoreId": "d-1234567890"},
             )
             # g-1 has no memberships
@@ -543,6 +645,7 @@ class TestListGroupsWithMemberships:
                             "MembershipId": "m-1",
                             "IdentityStoreId": "d-1234567890",
                             "MemberId": {"UserId": "user-1"},
+                            "MembershipArn": "arn:aws:identitystore:::membership/1234567890-3387dab8-bada-55e6-9092-0064c468c58c",
                         }
                     ]
                 },

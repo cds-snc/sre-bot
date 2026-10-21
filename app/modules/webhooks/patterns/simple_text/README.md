@@ -5,14 +5,14 @@ This system provides a flexible pattern matching framework for processing simple
 ## RuntimePattern Fields
 
 ```python
-@dataclass 
+@dataclass
 class RuntimePattern:
-    name: str                                          # Unique identifier
-    pattern: str                                       # Pattern string (content depends on match_type)
-    handler: str                                       # Import path to handler function
+    name: str  # Unique identifier
+    pattern: str  # Pattern string (content depends on match_type)
+    handler: str  # Import path to handler function
     match_type: Literal["regex", "contains", "callable"] = "contains"
-    priority: int = 0                                  # Higher = checked first  
-    enabled: bool = True                               # Enable/disable pattern
+    priority: int = 0  # Higher = checked first
+    enabled: bool = True  # Enable/disable pattern
 ```
 
 ## Match Types
@@ -50,27 +50,27 @@ error_pattern = RuntimePattern(
     pattern="ERROR:",
     handler="modules.webhooks.simple_text.handle_generic_text",
     match_type="contains",
-    priority=5
+    priority=5,
 )
 register_pattern(error_pattern)
 
 # Regex pattern
 log_pattern = RuntimePattern(
-    name="structured_logs", 
+    name="structured_logs",
     pattern=r"\[\d{4}-\d{2}-\d{2}.*\]\s+(ERROR|WARN)",
     handler="modules.my_handlers.handle_structured_log",
     match_type="regex",
-    priority=8
+    priority=8,
 )
 register_pattern(log_pattern)
 
 # Callable pattern
 custom_pattern = RuntimePattern(
     name="custom_logic",
-    pattern="modules.my_patterns.my_detection_function", 
+    pattern="modules.my_patterns.my_detection_function",
     handler="modules.my_handlers.my_custom_handler",
     match_type="callable",
-    priority=10
+    priority=10,
 )
 register_pattern(custom_pattern)
 ```
@@ -84,16 +84,16 @@ patterns_config = [
         "handler": "modules.webhooks.simple_text.handle_generic_text",
         "match_type": "contains",
         "priority": 5,
-        "enabled": True
+        "enabled": True,
     },
     {
         "name": "critical_alerts",
         "pattern": r"CRITICAL.*\s+(.+)",
-        "handler": "modules.handlers.critical_alert_handler", 
+        "handler": "modules.handlers.critical_alert_handler",
         "match_type": "regex",
         "priority": 10,
-        "enabled": True
-    }
+        "enabled": True,
+    },
 ]
 
 for config in patterns_config:

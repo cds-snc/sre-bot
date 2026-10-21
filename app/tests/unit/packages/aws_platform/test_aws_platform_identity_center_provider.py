@@ -168,7 +168,11 @@ class TestBuildIdentityCenterAdapter:
         with Stubber(client) as stub:
             stub.add_response(
                 "get_user_id",
-                {"UserId": "user-1", "IdentityStoreId": "d-9876543210"},
+                {
+                    "UserId": "user-1",
+                    "IdentityStoreId": "d-9876543210",
+                    "UserArn": "arn:aws:identitystore:::user/1234567890-e9f7230f-ccb4-582f-82d6-c636512ef431",
+                },
                 expected_params={
                     "IdentityStoreId": "d-9876543210",
                     "AlternateIdentifier": {
@@ -211,7 +215,12 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on no_retry_stub
                 no_retry_stub.add_response(
                     "create_user",
-                    {"UserId": "user-123", "IdentityStoreId": "d-1234567890"},
+                    {
+                        "UserId": "user-123",
+                        "IdentityStoreId": "d-1234567890",
+                        "UserArn": "arn:aws:identitystore:::user/1234567890-7ca4be7c-72b1-5fb0-a0c9-15b8194c4d9a",
+                        "Revision": "1",
+                    },
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "UserName": "test@example.com",
@@ -255,7 +264,11 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on std_stub
                 std_stub.add_response(
                     "get_user_id",
-                    {"UserId": "user-789", "IdentityStoreId": "d-1234567890"},
+                    {
+                        "UserId": "user-789",
+                        "IdentityStoreId": "d-1234567890",
+                        "UserArn": "arn:aws:identitystore:::user/1234567890-8d7e4ea4-d90a-51f1-9c85-f85c7f6d8c95",
+                    },
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "AlternateIdentifier": {
@@ -301,7 +314,11 @@ class TestBuildIdentityCenterAdapter:
                 # Only register on no_retry_stub
                 no_retry_stub.add_response(
                     "create_group_membership",
-                    {"MembershipId": "membership-123", "IdentityStoreId": "d-1234567890"},
+                    {
+                        "MembershipId": "membership-123",
+                        "IdentityStoreId": "d-1234567890",
+                        "MembershipArn": "arn:aws:identitystore:::membership/1234567890-0053d832-757b-5a86-a01f-1f1fa7a3897a",
+                    },
                     expected_params={
                         "IdentityStoreId": "d-1234567890",
                         "GroupId": "group-456",

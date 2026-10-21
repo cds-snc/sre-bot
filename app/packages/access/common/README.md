@@ -14,10 +14,10 @@ The single unified settings object for the entire access feature. Loaded once fr
 from packages.access.common.settings import get_access_settings
 
 settings = get_access_settings()
-settings.config.source          # ACCESS_CONFIG_SOURCE
-settings.sync.enabled           # ACCESS_SYNC_ENABLED
-settings.requests.enabled       # ACCESS_REQUESTS_ENABLED
-settings.catalog.enabled        # ACCESS_CATALOG_ENABLED
+settings.config.source  # ACCESS_CONFIG_SOURCE
+settings.sync.enabled  # ACCESS_SYNC_ENABLED
+settings.requests.enabled  # ACCESS_REQUESTS_ENABLED
+settings.catalog.enabled  # ACCESS_CATALOG_ENABLED
 ```
 
 **Env var → Python attribute mapping:**
@@ -85,8 +85,8 @@ Derives canonical IDP group slugs from config.
 
 ```python
 naming = AccessGroupNaming(dir_prefix="sg", dir_separator="-")
-naming.group_prefix("aws")           # "sg-aws-"
-naming.authn_group_slug("aws")       # "sg-aws-authn"
+naming.group_prefix("aws")  # "sg-aws-"
+naming.authn_group_slug("aws")  # "sg-aws-authn"
 ```
 
 ### `providers.py`

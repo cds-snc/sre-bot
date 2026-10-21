@@ -52,7 +52,7 @@ def test_server_exports_handler_in_server_module():
 def test_server_includes_api_router(integration_server_app):
     """Test that server includes the API router."""
     # Arrange & Act
-    route_paths = [str(route.path) for route in integration_server_app.routes]
+    routes = integration_server_app.routes
 
     # Assert
-    assert len(route_paths) > 0
+    assert len(routes) > 0
