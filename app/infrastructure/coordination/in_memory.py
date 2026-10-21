@@ -23,8 +23,8 @@ class InMemoryConditionalWriteStore(ConditionalWriteStore):
     def __init__(self, settings: ConditionalWriteSettings) -> None:
         self._store: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-        self._record_ttl_seconds = settings.IDEMPOTENCY_TTL_SECONDS
-        self._in_progress_ttl_seconds = settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
+        self._record_ttl_seconds = settings.idempotency_ttl_seconds
+        self._in_progress_ttl_seconds = settings.idempotency_in_progress_ttl_seconds
 
     def claim(self, key: str) -> ClaimOutcome:
         """Atomically claim key unless it is already in progress or completed."""

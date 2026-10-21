@@ -76,7 +76,7 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     mock_sre_ops_settings = MagicMock()
     mock_sre_ops_settings.model_dump.return_value = {"SRE_OPS_CHANNEL_ID": ""}
     mock_security_settings = MagicMock()
-    mock_security_settings.model_dump.return_value = {"ISSUER_CONFIG": {}, "DEV_BYPASS_TOKEN": "secret"}
+    mock_security_settings.model_dump.return_value = {"issuer_config": {}, "dev_bypass_token": "secret"}
 
     # Act
     _list_configs_from_sections(
@@ -98,7 +98,7 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     assert all("PREFIX" not in entry for entry in base_settings)
     assert {"LOG_LEVEL": "WARNING"} in base_settings
     security_call = next(c for c in mock_logger.info.call_args_list if c.kwargs.get("config_setting") == "security")
-    assert security_call.kwargs["keys"] == ("ISSUER_CONFIG", "DEV_BYPASS_TOKEN")
+    assert security_call.kwargs["keys"] == ("issuer_config", "dev_bypass_token")
     assert "secret" not in str(mock_logger.info.call_args_list)
 
 

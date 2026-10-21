@@ -20,7 +20,7 @@ class TestSchedulerSettings:
         """SchedulerSettings exposes one shared default Tier-2 lease TTL."""
         settings = SchedulerSettings()
 
-        assert settings.DEFAULT_TIER2_LEASE_TTL_SECONDS == 1800
+        assert settings.default_tier2_lease_ttl_seconds == 1800
 
     @pytest.mark.unit
     def test_scheduler_settings_env_var_override(self, monkeypatch) -> None:
@@ -29,7 +29,7 @@ class TestSchedulerSettings:
 
         settings = SchedulerSettings()
 
-        assert settings.DEFAULT_TIER2_LEASE_TTL_SECONDS == 3600
+        assert settings.default_tier2_lease_ttl_seconds == 3600
 
     @pytest.mark.unit
     def test_get_scheduler_settings_returns_singleton(self) -> None:

@@ -37,8 +37,8 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
     ) -> None:
         self._dynamodb = dynamodb
         self.table_name = table_name
-        self.record_ttl_seconds = settings.IDEMPOTENCY_TTL_SECONDS
-        self.in_progress_ttl_seconds = settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS
+        self.record_ttl_seconds = settings.idempotency_ttl_seconds
+        self.in_progress_ttl_seconds = settings.idempotency_in_progress_ttl_seconds
         self.log = logger.bind(table_name=table_name)
 
     def claim(self, key: str) -> ClaimOutcome:

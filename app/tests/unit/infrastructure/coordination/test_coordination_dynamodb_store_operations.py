@@ -31,8 +31,8 @@ def conditional_check_failed() -> ClientError:
 @pytest.fixture
 def store_settings():
     settings = MagicMock(spec=ConditionalWriteSettings)
-    settings.IDEMPOTENCY_TTL_SECONDS = 3600
-    settings.IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS = 300
+    settings.idempotency_ttl_seconds = 3600
+    settings.idempotency_in_progress_ttl_seconds = 300
     return settings
 
 

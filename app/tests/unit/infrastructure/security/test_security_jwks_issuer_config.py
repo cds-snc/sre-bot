@@ -34,7 +34,7 @@ def _fresh_jwks_manager() -> Iterator[None]:
 
 
 def test_get_issuer_config_returns_the_security_slice_issuers() -> None:
-    """The issuers come from SecuritySettings.ISSUER_CONFIG."""
+    """The issuers come from SecuritySettings.issuer_config."""
     settings = SecuritySettings(_env_file=None, ISSUER_CONFIG=_ISSUER)
 
     with patch("infrastructure.security.jwks.get_security_settings", return_value=settings):

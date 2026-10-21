@@ -63,25 +63,25 @@ def test_security_settings_reads_each_field_from_its_env_var(monkeypatch: pytest
 
     settings = SecuritySettings(_env_file=None)
 
-    assert settings.ISSUER_CONFIG == _ISSUER
-    assert settings.CORS_ALLOWED_ORIGINS == ["https://frontend.example"]
-    assert settings.CORS_ALLOWED_METHODS == ["GET"]
-    assert settings.CORS_ALLOWED_HEADERS == ["Authorization"]
-    assert settings.DEV_BYPASS_ENABLED is True
-    assert settings.DEV_BYPASS_TOKEN is not None
-    assert settings.DEV_BYPASS_TOKEN.get_secret_value() == "dev-token"
+    assert settings.issuer_config == _ISSUER
+    assert settings.cors_allowed_origins == ["https://frontend.example"]
+    assert settings.cors_allowed_methods == ["GET"]
+    assert settings.cors_allowed_headers == ["Authorization"]
+    assert settings.dev_bypass_enabled is True
+    assert settings.dev_bypass_token is not None
+    assert settings.dev_bypass_token.get_secret_value() == "dev-token"
 
 
 def test_security_settings_defaults_apply_when_unset() -> None:
     """With no variables set: an empty issuer map, no origins, GET and POST only, the bypass off and no token."""
     settings = SecuritySettings(_env_file=None)
 
-    assert settings.ISSUER_CONFIG == {}
-    assert settings.CORS_ALLOWED_ORIGINS == []
-    assert settings.CORS_ALLOWED_METHODS == ["GET", "POST"]
-    assert settings.CORS_ALLOWED_HEADERS == ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
-    assert settings.DEV_BYPASS_ENABLED is False
-    assert settings.DEV_BYPASS_TOKEN is None
+    assert settings.issuer_config == {}
+    assert settings.cors_allowed_origins == []
+    assert settings.cors_allowed_methods == ["GET", "POST"]
+    assert settings.cors_allowed_headers == ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
+    assert settings.dev_bypass_enabled is False
+    assert settings.dev_bypass_token is None
 
 
 def test_security_settings_unparseable_issuer_config_env_yields_empty_map(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -90,7 +90,7 @@ def test_security_settings_unparseable_issuer_config_env_yields_empty_map(monkey
 
     settings = SecuritySettings(_env_file=None)
 
-    assert settings.ISSUER_CONFIG == {}
+    assert settings.issuer_config == {}
 
 
 @pytest.mark.parametrize(
@@ -124,18 +124,18 @@ def test_security_settings_dev_bypass_token_is_masked() -> None:
     assert "dev-token-value" not in settings.model_dump_json()
 
 
-def test_security_settings_model_config_reads_dotenv_case_sensitively() -> None:
-    """The slice loads .env, matches names case-sensitively and ignores unknown keys."""
+def test_security_settings_model_config_reads_dotenv_case_insensitively() -> None:
+    """The slice loads .env, matches names case-insensitively and ignores unknown keys."""
     config = SecuritySettings.model_config
 
     assert config.get("env_file") == ".env"
-    assert config.get("case_sensitive") is True
+    assert config.get("case_sensitive") is False
     assert config.get("extra") == "ignore"
 
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_security_keys_are_declared_only_by_the_security_slice(name: str) -> None:
     """AppSettings and ServerSettings no longer declare any security key."""
-    assert name in SecuritySettings.model_fields
+    assert name.lower() in SecuritySettings.model_fields
     assert name not in AppSettings.model_fields
     assert name not in ServerSettings.model_fields

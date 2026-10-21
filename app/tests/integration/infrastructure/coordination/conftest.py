@@ -21,7 +21,7 @@ STORE_TEST_TABLE_NAME = "test-sre-bot-idempotency-store"
 def mock_settings():
     """Create mock ConditionalWriteSettings for conditional-write store integration tests."""
     mock = MagicMock(spec=ConditionalWriteSettings)
-    mock.IDEMPOTENCY_TTL_SECONDS = 3600
+    mock.idempotency_ttl_seconds = 3600
     return mock
 
 

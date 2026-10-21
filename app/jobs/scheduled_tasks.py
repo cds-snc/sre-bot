@@ -89,7 +89,7 @@ def safe_run(job: Callable[..., Any]) -> Callable[..., None]:
 
 def _tier2(name: str, job: Callable[..., None]) -> Callable[..., None]:
     """Wrap a singleton Tier-2 job with lease acquisition/release."""
-    ttl_seconds = get_scheduler_settings().DEFAULT_TIER2_LEASE_TTL_SECONDS
+    ttl_seconds = get_scheduler_settings().default_tier2_lease_ttl_seconds
     lock_store = get_lease_store(ttl_seconds)
 
     def wrapped(*args: Any, **kwargs: Any) -> None:
