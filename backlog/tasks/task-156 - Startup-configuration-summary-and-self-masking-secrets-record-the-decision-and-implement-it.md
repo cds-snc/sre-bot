@@ -6,17 +6,19 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 12:31'
+updated_date: '2026-10-20 23:36'
 labels:
   - plugin-architecture
   - configuration
   - observability
 milestone: m-7
 dependencies:
-  - TASK-111
+  - TASK-111.2
 references:
   - decisions/configuration.md
   - decisions/observability.md
   - decisions/lifecycle.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1757'
 priority: medium
 type: feature
 ordinal: 405000
@@ -52,3 +54,12 @@ Depends on TASK-111, which builds the TOML loader that the summary reports on. E
 - [ ] #4 The dev bypass enabled at boot and an empty issuer configuration each log a WARNING naming the setting
 - [ ] #5 ruff, lint-imports, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-20 23:27
+---
+2026-10-20 (TASK-111 planning): TASK-111 is split into 111.1 to 111.15; this task needs only the loader (TASK-111.2). Settings fields become lower snake_case (TASK-111.5, 111.6), so the summary prints lower-case keys; secrets reach the app as task-definition secrets named <SLICE>__<FIELD>.
+---
+<!-- COMMENTS:END -->

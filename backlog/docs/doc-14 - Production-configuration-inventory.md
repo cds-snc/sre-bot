@@ -1,0 +1,101 @@
+---
+id: doc-14
+title: Production configuration inventory
+type: specification
+created_date: '2026-10-20 23:50'
+---
+
+# Production configuration inventory
+
+Every key production sets on 2026-10-20, by name only (no values), with its owning settings slice and its destination under decisions/configuration.md. Sources: the two SSM parameters `sre-bot-config` and `sre-bot-config-infrastructure` (read by the maintainer, keys only; the first ends with a newline and has 28 continuation lines of multi-line values) and the terraform task definition (`terraform/templates/sre-bot.json.tpl`).
+
+This is the rename map: TASK-111.4 creates one SSM SecureString parameter per row whose destination is a secret, under the new name shown, and the slice subtasks read the new names. Each slice subtask lower-cases its fields to match the TOML keys and secret names below.
+
+Destinations:
+- `file [table] key`: a value in `app/config/production.toml` (or `base.toml` when it equals the default everywhere).
+- `secret NAME`: an SSM SecureString parameter injected under `NAME` through task-definition `secrets:`.
+- `platform`: a platform-provided name, left as a task-definition environment variable.
+- `delete`: no reader in code; removed with the SSM parameters, never migrated.
+
+## Facts recorded for TASK-111 AC6
+
+- Production sets `AWS_ORG_ACCOUNT_ROLE_ARN` and `ISSUER_CONFIG`.
+- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP`, `SLACK_SIGNING_SECRET` or any `ACCESS_*` key; those run on their code defaults.
+- Production `CORS_ALLOWED_ORIGINS` is the terraform variable default, an empty list.
+
+## sre-bot-config
+
+| Key | Owning slice | Destination | Subtask |
+| --- | --- | --- | --- |
+| ACCESS_TOKEN_EXPIRE_MINUTES | ServerSettings (unused field) | delete | 111.7 |
+| APP_TOKEN | none | delete | 111.15 |
+| ATIP_ANNOUNCE_CHANNEL | AtipSettings (dead slice) | delete | 111.14 |
+| AWS_AUDIT_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] audit_role_arn | 111.11 |
+| AWS_LOGGING_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] logging_role_arn | 111.11 |
+| AWS_ORG_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] org_role_arn | 111.11 |
+| AWS_SRE_ACCOUNT_ROLE_ARN | none | delete | 111.15 |
+| AWS_SSO_INSTANCE_ARN | AWSSettings | file [aws] instance_arn | 111.11 |
+| AWS_SSO_INSTANCE_ID | AWSSettings | file [aws] instance_id | 111.11 |
+| AWS_SSO_ROLE_ARN | none | delete | 111.15 |
+| AWS_SSO_SYSTEM_ADMIN_PERMISSIONS | AWSSettings | file [aws] system_admin_permissions | 111.11 |
+| AWS_SSO_VIEW_ONLY_PERMISSIONS | AWSSettings | file [aws] view_only_permissions | 111.11 |
+| COMMAND_PROVIDERS | none | delete | 111.15 |
+| ENVIRONMENT | AppSettings (identity) | platform (task definition already sets it) | 111.15 |
+| FRONTEND_URL | none | delete | 111.15 |
+| GOOGLE_CLIENT_ID | ServerSettings (unused field) | delete | 111.7 |
+| GOOGLE_CLIENT_SECRET | ServerSettings (unused field) | delete | 111.7 |
+| GOOGLE_DELEGATED_ADMIN_EMAIL | GoogleWorkspaceSettings | file [google_workspace] delegated_admin_email | 111.10 |
+| GOOGLE_RESOURCES | GoogleResourcesConfig (interim) | file [google_resources] (structured table; owners split it, TASK-158 deletes it) | 111.10 |
+| GOOGLE_WORKSPACE_CUSTOMER_ID | GoogleWorkspaceSettings (tenant) | file [google_workspace.tenant] customer_id | 111.10 |
+| GROUP_DOMAIN | GroupsFeatureSettings (dead slice) | delete | 111.14 |
+| GROUP_PROVIDERS | GroupsFeatureSettings (dead slice) | delete | 111.14 |
+| INCIDENT_CHANNEL | IncidentFeatureSettings (infrastructure/configuration/features/incident.py) | file, the slice's table | 111.14 |
+| ISSUER_CONFIG | SecuritySettings | file [security] issuer_config (structured table) | 111.8 |
+| MAXMIND_KEY | none (MaxMindSettings reads only the database path) | delete | 111.15 |
+| NOTIFY_API_URL | NotifySettings | file [notify] api_url | 111.12 |
+| NOTIFY_OPS_CHANNEL_ID | ServerSettings | file [server] notify_ops_channel_id | 111.7 |
+| NOTIFY_SRE_CLIENT_SECRET | NotifySettings | secret NOTIFY__SRE_CLIENT_SECRET | 111.4, 111.12 |
+| NOTIFY_SRE_USER_NAME | NotifySettings (credential id) | secret NOTIFY__SRE_USER_NAME | 111.4, 111.12 |
+| NOTIFY_TEST_KEY | none (one test reads it with a default) | delete | 111.15 |
+| OPSGENIE_INTEGRATIONS_KEY | OpsGenieSettings | secret OPSGENIE__INTEGRATIONS_KEY | 111.4, 111.12 |
+| OPSGENIE_KEY | none | delete | 111.15 |
+| SENTINEL_CUSTOMER_ID | SentinelSettings | file [sentinel] customer_id | 111.12 |
+| SENTINEL_LOG_TYPE | SentinelSettings | file [sentinel] log_type | 111.12 |
+| SENTINEL_SHARED_KEY | SentinelSettings | secret SENTINEL__SHARED_KEY | 111.4, 111.12 |
+| SESSION_SECRET_KEY | ServerSettings (unused field) | delete | 111.7 |
+| SLACK_APP_TOKEN | SlackSettings | secret SLACK__APP_TOKEN | 111.4, 111.9 |
+| SLACK_BOT_TOKEN | SlackSettings | secret SLACK__BOT_TOKEN | 111.4, 111.9 |
+| SLACK_ENABLED | SlackSettings (interim transport switch) | file [slack] enabled until TASK-112 replaces it | 111.9 |
+| SLACK_SECURITY_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
+| SLACK_TOKEN | none | delete | 111.15 |
+| SRE_BOT_EMAIL | GoogleWorkspaceSettings | file [google_workspace] sre_bot_email | 111.10 |
+| SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
+| TRELLO_APP_KEY | TrelloSettings | secret TRELLO__APP_KEY | 111.4, 111.12 |
+| TRELLO_ATIP_BOARD | TrelloSettings | file [trello] atip_board | 111.12 |
+| TRELLO_TOKEN | TrelloSettings | secret TRELLO__TOKEN | 111.4, 111.12 |
+
+## sre-bot-config-infrastructure
+
+| Key | Owning slice | Destination | Subtask |
+| --- | --- | --- | --- |
+| NOTIFY_ONCALL_GROUP_ID | ServerSettings | file [server] notify_oncall_group_id | 111.7 |
+| OPENAI_API_KEY | OpenAISettings | secret OPENAI__API_KEY | 111.4, 111.11 |
+| SLACK_NOTIFY_MGMT_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
+| SLACK_TEAM_ID | SlackSettings (tenant) | file [slack.tenant] team_id | 111.9 |
+| SLACK_USER_TOKEN | SlackSettings | secret SLACK__USER_TOKEN | 111.4, 111.9 |
+| SRE_TEST_CHANNEL_ID | ServerSettings | file [server] sre_test_channel_id | 111.7 |
+
+## Task definition
+
+| Name | Kind today | Owning slice | Destination | Subtask |
+| --- | --- | --- | --- | --- |
+| BACKEND_URL | environment (from the route53 zone) | ServerSettings | file [server] backend_url | 111.7, removed from the task definition in 111.15 |
+| ENVIRONMENT | environment | AppSettings (identity) | platform | - |
+| CORS_ALLOWED_ORIGINS | environment (terraform variable, empty) | SecuritySettings | file [security] cors_allowed_origins | 111.8, removed in 111.15 |
+| FORWARDED_ALLOW_IPS | environment (VPC public subnet CIDRs) | none (uvicorn) | platform | - |
+| SLACK__COMMAND_PREFIX | environment (empty string) | SlackTransportSettings | file [slack_transport] command_prefix (the transport's table; TASK-112 adds its enablement key beside it) | 111.7, removed in 111.15 |
+| GCP_SRE_SERVICE_ACCOUNT_KEY_FILE | secrets: (SSM parameter, value from a terraform variable) | GoogleWorkspaceSettings (tenant) | secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (new parameter whose value is set outside terraform) | 111.4, 111.10 |
+
+## Secrets TASK-111.4 creates
+
+`SLACK__BOT_TOKEN`, `SLACK__APP_TOKEN`, `SLACK__USER_TOKEN`, `GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY`, `OPENAI__API_KEY`, `NOTIFY__SRE_USER_NAME`, `NOTIFY__SRE_CLIENT_SECRET`, `OPSGENIE__INTEGRATIONS_KEY`, `TRELLO__APP_KEY`, `TRELLO__TOKEN`, `SENTINEL__SHARED_KEY`: eleven parameters. `SECURITY__DEV_BYPASS_TOKEN` and `SLACK__SIGNING_SECRET` are not set in production and get no parameter.

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-11 15:36'
-updated_date: '2026-10-15 20:53'
+updated_date: '2026-10-20 23:28'
 labels:
   - phase-5
 dependencies:
@@ -62,6 +62,7 @@ EVENTUAL HOMES (recorded 2026-09-11 so the Google-series pattern of vendor-neutr
 - [ ] #3 packages/aws_platform, modules/aws, modules/provisioning and the migrated jobs are deleted
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning features' settings slices (values in the TOML files); integrations/aws/settings.py keeps only the transport fields the client itself needs
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
+- [ ] #6 The spending sheet id move from the interim [google_resources] table into the aws spending feature slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
 <!-- AC:END -->
 
 ## Implementation Notes

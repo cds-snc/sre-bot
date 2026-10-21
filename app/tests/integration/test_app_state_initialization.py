@@ -50,7 +50,7 @@ def test_app_state_settings_is_valid(app_with_lifespan):
     assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
     assert hasattr(settings, "LOG_LEVEL"), "settings missing LOG_LEVEL"
     assert hasattr(settings, "GIT_SHA"), "settings missing GIT_SHA"
-    assert settings.ENVIRONMENT in {"local", "ci", "dev", "staging", "production"}
+    assert settings.ENVIRONMENT in {"local", "ci", "production"}
 
 
 @pytest.mark.integration

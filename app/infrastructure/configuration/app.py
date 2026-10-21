@@ -12,7 +12,7 @@ class AppSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    ENVIRONMENT: Literal["local", "ci", "dev", "staging", "production"] = "local"
+    ENVIRONMENT: Literal["local", "ci", "production"]
     LOG_LEVEL: str = "INFO"
     GIT_SHA: str = "Unknown"
     WEBHOOK_MAX_BODY_BYTES: int = Field(default=262_144, alias="WEBHOOK_MAX_BODY_BYTES")

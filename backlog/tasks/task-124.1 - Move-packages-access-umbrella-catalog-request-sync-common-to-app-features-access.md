@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-15 17:49'
+updated_date: '2026-10-20 23:28'
 labels:
   - plugin-architecture
   - features
@@ -51,6 +51,7 @@ Added 2026-10-01 (amended decisions/feature-packages.md, umbrella rules 4 and 5)
 - [ ] #6 The umbrella __init__.py is empty; every subdomain has a dotted entry point (access.catalog, access.request, access.sync), and the TASK-18 umbrella contract covers features.access with exhaustive = true
 - [ ] #7 access/sync handlers are async def, and access/sync uses only layout-table names
 - [ ] #8 access/common does no I/O: the runtime-config loaders and their provider live in access/core/ and are imported only through core/api.py; core/ has no entrypoints/, no hookimpls and no entry point; the umbrella layers contract lists core between the subdomains and common
+- [ ] #9 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
 <!-- AC:END -->
 
 ## Implementation Notes

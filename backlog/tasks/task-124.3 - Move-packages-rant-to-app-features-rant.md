@@ -4,7 +4,7 @@ title: Move packages/rant to app/features/rant/
 status: To Do
 assignee: []
 created_date: '2026-09-24 20:01'
-updated_date: '2026-10-15 17:49'
+updated_date: '2026-10-20 23:28'
 labels:
   - plugin-architecture
   - features
@@ -38,4 +38,5 @@ Child of TASK-124. rant imports slack_sdk.WebClient in platforms/slack.py, which
 - [ ] #3 The entry point targets features.<name> (dotted for subdomains) and has an enablement key; the settings slice's non-secret values live in the TOML files
 - [ ] #4 The old packages/ path is deleted; every importer and mock patch string is rewritten; import-linter ignore entries only shrank
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
 <!-- AC:END -->

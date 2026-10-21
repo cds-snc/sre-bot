@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@me'
 created_date: '2026-10-09 16:43'
-updated_date: '2026-10-09 18:43'
+updated_date: '2026-10-20 23:28'
 labels:
   - incident
   - features
@@ -41,6 +41,7 @@ THIS SLICE
 - [x] #3 The entry point incident.scribe targets features.incident.scribe; the import-linter ignore list only renamed entries and did not grow
 - [x] #4 Tests live under tests/unit/features/incident/ and tests/integration/features/incident/ and pass unchanged apart from paths; the legacy_surface suite passes
 - [x] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
 <!-- AC:END -->
 
 ## Implementation Plan

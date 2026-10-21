@@ -4,6 +4,7 @@ title: Pin the legacy webhook admin interactions through the Bolt dispatch bound
 status: To Do
 assignee: []
 created_date: '2026-10-15 20:49'
+updated_date: '2026-10-20 23:35'
 labels:
   - migration
   - testing
@@ -13,6 +14,7 @@ dependencies:
 references:
   - decisions/testing.md
   - decisions/migration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1741'
 parent_task_id: TASK-36.1
 priority: low
 ordinal: 398000

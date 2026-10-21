@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-27 16:07'
-updated_date: '2026-09-24 20:10'
+updated_date: '2026-10-20 23:27'
 labels:
   - architecture
   - layers
@@ -48,5 +48,10 @@ Depends on the secret service capability existing; until then this is the placeh
 created: 2026-09-24 20:10
 ---
 2026-09-24 alignment: decisions/layers.md is deleted; decisions/migration.md's directory table now owns bin/'s disposition (operator tooling, exempt from layer contracts; entry.sh's boot-time secret fetch retires once the secrets contract has an implementation). Per decisions/configuration.md, secret material may instead be injected by the platform at deploy time (ECS task-definition secrets: from Secrets Manager). If that removes entry.sh's fetch without a secrets Protocol, no speculative SecretsService is built. If a Protocol is needed, it is born in app/contracts/ and implemented in app/infrastructure/secrets/.
+---
+
+created: 2026-10-20 23:27
+---
+2026-10-20 (TASK-111 planning, human): folded into TASK-111. Secrets move to task-definition secrets: (one SSM SecureString per key, TASK-111.4) and every non-secret production value moves into the configuration files, so no secret service is built. TASK-111.15 removes entry.sh's SSM fetch (AC3) and sets this task to Done in its PR; AC1 is covered by decisions/migration.md's directory table (comment #1); AC2 and AC4 hold by construction.
 ---
 <!-- COMMENTS:END -->

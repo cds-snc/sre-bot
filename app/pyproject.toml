@@ -93,6 +93,7 @@ known-first-party = [
 
 [tool.mypy]
 python_version = "3.14"
+plugins = ["pydantic.mypy"]
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
@@ -130,6 +131,8 @@ env = [
     # feature enable it explicitly. ACCESS_SYNC_ENABLED=true would make lifespan
     # build the AWS Identity Center adapter (and assume its role) at startup.
     "ACCESS_SYNC_ENABLED=false",
+    # Every test run behaves as the CI environment, locally and in GitHub Actions.
+    "ENVIRONMENT=ci",
     "SLACK_ENABLED=false",
     "SLACK_BOT_TOKEN=xoxb-test-token-for-tests",
     "SLACK_APP_TOKEN=xapp-test-token",

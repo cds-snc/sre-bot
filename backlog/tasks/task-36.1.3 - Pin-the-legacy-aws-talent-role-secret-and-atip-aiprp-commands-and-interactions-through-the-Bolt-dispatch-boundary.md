@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-15 20:49'
+updated_date: '2026-10-20 23:35'
 labels:
   - migration
   - testing
@@ -15,6 +16,7 @@ dependencies:
 references:
   - decisions/testing.md
   - decisions/migration.md
+  - 'https://github.com/cds-snc/sre-bot/issues/1740'
 parent_task_id: TASK-36.1
 priority: medium
 ordinal: 397000

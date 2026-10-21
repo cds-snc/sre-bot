@@ -226,6 +226,47 @@ _Type_ `/sre incident help` _for complete command list_"""
     mock_logger.info.assert_any_call("incident_record_created", incident_id="incident_id")
 
 
+@pytest.mark.parametrize(
+    ("environment", "expected_label"),
+    [("production", "prod"), ("local", "dev"), ("ci", "dev")],
+)
+@patch("modules.incident.core.logger")
+@patch("modules.incident.core.on_call.get_on_call_users_from_folder")
+@patch("modules.incident.core.db_operations")
+@patch("modules.incident.core.meet")
+@patch("modules.incident.core.incident_document")
+@patch("modules.incident.core.incident_folder")
+def test_initiate_resources_creation_labels_record_environment(
+    mock_incident_folder,
+    mock_incident_document,
+    mock_google_meet,
+    mock_db_operations,
+    mock_get_on_call_users_from_folder,
+    mock_logger,
+    environment,
+    expected_label,
+    set_environment,
+):
+    """The stored incident is labelled prod only in production; every other environment stores dev.
+
+    Google, Meet and the database are stubbed; the assertion reads the environment
+    field of the record handed to the database, which is what downstream reports filter on.
+    """
+    set_environment(core.app_settings, environment)
+    _mock_successful_dependencies(
+        mock_incident_folder,
+        mock_incident_document,
+        mock_google_meet,
+        mock_db_operations,
+        mock_get_on_call_users_from_folder,
+    )
+
+    core.initiate_resources_creation(MagicMock(), helper_generate_default_incident_params())
+
+    record = mock_db_operations.create_incident.call_args.args[0]
+    assert record["environment"] == expected_label
+
+
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
