@@ -3,8 +3,9 @@ from typing import Any, Literal
 import arrow
 import structlog
 from botocore.exceptions import BotoCoreError, ClientError
-from slack_bolt import Ack
+from slack_bolt import Ack, Respond
 from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 
 from contracts.operations import OperationResult
 from packages.aws_platform.adapters.config import ConfigAdapter, build_config_adapter
@@ -23,9 +24,14 @@ _HEALTH_CHECK_FAILED_MESSAGE = (
     "⚠️ Could not load the health check. Please try again later.\n"
     "Impossible de charger la vérification de santé. Veuillez réessayer plus tard."
 )
-_ACCOUNTS_LIST_FAILED_MESSAGE = (
-    "⚠️ Could not list AWS accounts. Please try again later.\nImpossible de lister les comptes AWS. Veuillez réessayer plus tard."
+_MODAL_OPEN_FAILED_MESSAGE = (
+    "⚠️ Could not open the account health form. Please try again later.\n"
+    "Impossible d'ouvrir le formulaire de santé du compte. Veuillez réessayer plus tard."
 )
+
+ACCOUNT_SELECT_ACTION_ID = "aws_health_account"
+# Slack rejects an options response holding more than 100 options.
+_MAX_ACCOUNT_OPTIONS = 100
 
 
 def _failure_fields(result: OperationResult[Any]) -> dict[str, Any]:
@@ -220,9 +226,9 @@ def health_view_handler(ack: Ack, body: dict[str, Any], client: WebClient) -> No
     log.info(
         "aws_health_request_received",
     )
-    account_id = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["value"]
+    account_id = body["view"]["state"]["values"]["account"][ACCOUNT_SELECT_ACTION_ID]["selected_option"]["value"]
 
-    account_name = body["view"]["state"]["values"]["account"]["account"]["selected_option"]["text"]["text"]
+    account_name = body["view"]["state"]["values"]["account"][ACCOUNT_SELECT_ACTION_ID]["selected_option"]["text"]["text"]
 
     temporary_blocks = {
         "type": "modal",
@@ -311,53 +317,68 @@ def health_view_handler(ack: Ack, body: dict[str, Any], client: WebClient) -> No
     client.views_update(view_id=view_id, view=blocks)
 
 
-def request_health_modal(client: WebClient, body: dict[str, Any]) -> None:
-    trigger_id = body["trigger_id"]
-    error_view = _error_view("AWS - Account health", _ACCOUNTS_LIST_FAILED_MESSAGE)
+def request_health_modal(client: WebClient, body: dict[str, Any], respond: Respond) -> None:
+    """Open the account selector modal; its options are served by account_options_handler as the user types."""
+    try:
+        client.views_open(
+            trigger_id=body["trigger_id"],
+            view={
+                "type": "modal",
+                "callback_id": "aws_health_view",
+                "title": {"type": "plain_text", "text": "AWS - Account health"},
+                "submit": {"type": "plain_text", "text": "Submit"},
+                "blocks": [
+                    {
+                        "block_id": "account",
+                        "type": "input",
+                        "element": {
+                            "type": "external_select",
+                            "placeholder": {
+                                "type": "plain_text",
+                                "text": "Select an account to view | Choisissez un compte à afficher",
+                            },
+                            "min_query_length": 0,
+                            "action_id": ACCOUNT_SELECT_ACTION_ID,
+                        },
+                        "label": {"type": "plain_text", "text": "Account", "emoji": True},
+                    }
+                ],
+            },
+        )
+    except SlackApiError as error:
+        logger.exception("aws_health_modal_open_failed", slack_error=error.response.get("error"))
+        respond(_MODAL_OPEN_FAILED_MESSAGE)
+
+
+def _is_active(account: dict[str, Any]) -> bool:
+    """Whether an Organizations account is active, preferring State over the retired Status field."""
+    return (account.get("State") or account.get("Status")) == "ACTIVE"
+
+
+def account_options_handler(ack: Ack, body: dict[str, Any]) -> None:
+    """Serve the account selector: active accounts matching the typed text, sorted, capped at Slack's limit.
+
+    A failed listing acknowledges with no options so Slack does not time out.
+    """
+    query = body.get("value", "").strip().lower()
     try:
         accounts_result = build_organizations_adapter().list_organization_accounts()
     except ClientError, BotoCoreError:
         logger.exception("aws_health_accounts_list_failed")
-        client.views_open(trigger_id=trigger_id, view=error_view)
+        ack(options=[])
         return
     if not accounts_result.is_success:
         logger.error("aws_health_accounts_list_failed", **_failure_fields(accounts_result))
-        client.views_open(trigger_id=trigger_id, view=error_view)
+        ack(options=[])
         return
 
     options = [
         {
-            "text": {
-                "type": "plain_text",
-                "text": f"{account['Name']} ({account['Id']})",
-            },
+            "text": {"type": "plain_text", "text": f"{account['Name']} ({account['Id']})"},
             "value": account["Id"],
         }
         for account in accounts_result.data or []
+        if _is_active(account) and (query in account["Name"].lower() or query in account["Id"])
     ]
-    options.sort(key=lambda x: x["text"]["text"].lower())
-    client.views_open(
-        trigger_id=trigger_id,
-        view={
-            "type": "modal",
-            "callback_id": "aws_health_view",
-            "title": {"type": "plain_text", "text": "AWS - Account health"},
-            "submit": {"type": "plain_text", "text": "Submit"},
-            "blocks": [
-                {
-                    "block_id": "account",
-                    "type": "input",
-                    "element": {
-                        "type": "static_select",
-                        "placeholder": {
-                            "type": "plain_text",
-                            "text": "Select an account to view | Choisissez un compte à afficher",
-                        },
-                        "options": options,
-                        "action_id": "account",
-                    },
-                    "label": {"type": "plain_text", "text": "Account", "emoji": True},
-                }
-            ],
-        },
-    )
+    options.sort(key=lambda option: option["text"]["text"].lower())
+    ack(options=options[:_MAX_ACCOUNT_OPTIONS])

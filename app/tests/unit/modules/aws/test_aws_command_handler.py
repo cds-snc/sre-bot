@@ -116,7 +116,7 @@ def test_should_open_health_modal_when_health_command_given(mock_parse_command, 
 
     # Assert
     ack.assert_called_once()
-    mock_request_health_modal.assert_called_once_with(client, body)
+    mock_request_health_modal.assert_called_once_with(client, body, respond)
     respond.assert_not_called()
 
 
