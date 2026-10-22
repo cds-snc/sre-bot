@@ -1,10 +1,10 @@
 ---
 id: TASK-111.5.2
 title: Lower-case the server, dev, Slack transport and app identity settings fields
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T20:23:00Z'
-updated_date: '2026-10-22T17:44:00Z'
+updated_date: '2026-10-22T17:46:00Z'
 labels:
   - configuration
 milestone: m-7
