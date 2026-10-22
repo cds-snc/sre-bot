@@ -30,7 +30,7 @@ import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
-from infrastructure.configuration.app import AppSettings
+from contracts.configuration import HostInfo, host_info
 from infrastructure.logging.formatters import downgrade_transient_socket_mode_errors, mask_sensitive_data
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 
@@ -138,7 +138,7 @@ def _build_base_processors(
 
 
 def configure_logging(
-    settings: AppSettings,
+    settings: HostInfo | None = None,
     log_level: str | None = None,
     logging_settings: LoggingSettings | None = None,
 ) -> BoundLogger:
@@ -151,7 +151,7 @@ def configure_logging(
     - Test environment detection for log suppression
 
     Args:
-        settings: AppSettings instance (REQUIRED). Must be passed explicitly.
+        settings: HostInfo; the installed host facts when not provided.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to logging_settings.log_level if not provided.
         logging_settings: LoggingSettings slice; built from the provider if not provided.
@@ -161,13 +161,10 @@ def configure_logging(
 
     Example:
         # At application startup
-        from infrastructure.configuration.app import get_app_settings
-
-        settings = get_app_settings()
-        logger = configure_logging(settings=settings)
+        logger = configure_logging()
 
         # With overrides for testing
-        logger = configure_logging(settings=settings, log_level="DEBUG")
+        logger = configure_logging(log_level="DEBUG")
     """
 
     # Suppress all logging during tests
@@ -198,7 +195,7 @@ def configure_logging(
         return structlog.stdlib.get_logger()
 
     # Determine production mode
-    prod_mode = settings.environment == "production"
+    prod_mode = (settings or host_info()).environment == "production"
     resolved_logging_settings = logging_settings or get_logging_settings()
 
     # Build processor pipeline per structlog best practices

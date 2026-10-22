@@ -6,9 +6,9 @@ from slack_sdk import WebClient
 from slack_sdk.models import blocks
 from structlog import get_logger
 
+from contracts.configuration import host_info
 from features.incident.drive.adapters import google_drive as incident_drive
 from features.incident.meet.adapters import google_meet as meet
-from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.features.incident import get_incident_settings
 from models.incidents import IncidentPayload
 from modules.incident import (
@@ -19,7 +19,6 @@ from modules.incident import (
 )
 from modules.incident.incident_folder import channel_slug
 
-app_settings = get_app_settings()
 incident_settings = get_incident_settings()
 INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
 SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
@@ -297,7 +296,7 @@ def _create_database_record(
 ) -> None:
     """Create database record for incident if it doesn't exist."""
     try:
-        environment = "prod" if app_settings.environment == "production" else "dev"
+        environment = "prod" if host_info().environment == "production" else "dev"
 
         incident_data = {
             "channel_id": channel_id,
@@ -423,7 +422,7 @@ def initiate_resources_creation(
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
 
     # Create channel
-    environment = "prod" if app_settings.environment == "production" else "dev"
+    environment = "prod" if host_info().environment == "production" else "dev"
 
     oncall = on_call.get_on_call_users_from_folder(client, incident_payload.folder)
 
@@ -562,7 +561,7 @@ def initiate_resources_creation(
         response = client.usergroups_users_list(usergroup=security_group_id)
 
         # Avoid inviting security group users outside production to prevent spam.
-        if response.get("ok") and app_settings.environment == "production":
+        if response.get("ok") and host_info().environment == "production":
             for security_user in response["users"]:
                 if security_user != incident_payload.user_id:
                     users_to_invite.append(security_user)

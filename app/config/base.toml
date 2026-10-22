@@ -5,3 +5,15 @@
 [logging]
 log_level = "INFO"
 redaction_extra_keys = []
+
+[server]
+public_base_url = "http://127.0.0.1:8000"
+sre_test_channel_id = ""
+webhook_max_body_bytes = 262144
+
+[slack_transport]
+command_prefix = ""
+
+[notify_api_key_leak]
+channel_id = ""
+oncall_group_id = ""

@@ -1,4 +1,3 @@
-from server import server
+from server.server import create_app
 
-server_app = server.handler
-app = server_app
+__all__ = ["create_app"]

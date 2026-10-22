@@ -77,12 +77,12 @@ def test_contract_create_incident_conversation_prefix_from_environment(
     }
 
     # In non-production, prefix must include incident-dev-.
-    set_environment(incident_conversation.settings, "local")
+    set_environment("local")
     non_prod_result = incident_conversation.create_incident_conversation(client, "Test Incident")
     assert non_prod_result["channel_name"].startswith("incident-dev-")
 
     # In production, prefix must be incident-.
-    set_environment(incident_conversation.settings, "production")
+    set_environment("production")
     prod_result = incident_conversation.create_incident_conversation(client, "Test Incident")
     assert prod_result["channel_name"].startswith("incident-")
     assert not prod_result["channel_name"].startswith("incident-dev-")

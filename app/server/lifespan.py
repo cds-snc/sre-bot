@@ -1,6 +1,7 @@
 import sys
 import threading
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
+from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from pathlib import Path
 from typing import cast
 
@@ -9,36 +10,25 @@ from fastapi import FastAPI
 from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
-from contracts.configuration import install_configuration_files
+from contracts.configuration import HostInfo
 from contracts.i18n.resources import I18nResourceSpec
 from contracts.services import ServiceScopeOpener
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.configuration.app import AppSettings, get_app_settings
-from infrastructure.configuration.features.sre_ops import (
-    SreOpsSettings,
-    get_sre_ops_settings,
-)
-from infrastructure.configuration.infrastructure.server import (
-    ServerSettings,
-    get_server_settings,
-)
+from infrastructure.configuration.features.sre_ops import SreOpsSettings
 from infrastructure.directory import (
     DirectorySettings,
     get_directory_provider,
-    get_directory_settings,
 )
 from infrastructure.i18n import (
     I18nResourceRegistry,
     TranslationService,
     get_translation_service,
 )
-from infrastructure.logging.settings import LoggingSettings, get_logging_settings
+from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security import get_jwks_manager
-from infrastructure.security.settings import SecuritySettings, get_security_settings
-from integrations.google_workspace.settings import get_google_workspace_settings
+from infrastructure.security.settings import SecuritySettings
 from integrations.slack.provider import get_slack_provider
-from integrations.slack.settings import get_slack_settings
 from jobs import scheduled_tasks
 from modules import (
     atip,
@@ -51,7 +41,7 @@ from modules import (
     sre,
     webhook_helper,
 )
-from server.configuration import load_configuration_files
+from server.configuration import HostConfiguration, IdentitySettings, ServerSettings
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
@@ -67,19 +57,13 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
-def _get_logger_from_app(
-    app_settings: AppSettings,
-    logging_settings: LoggingSettings | None = None,
-) -> BoundLogger:
-    resolved_logging_settings = logging_settings or get_logging_settings()
-    return configure_logging(
-        settings=app_settings,
-        logging_settings=resolved_logging_settings,
-    )
+def _get_logger_from_app(host: HostInfo, logging_settings: LoggingSettings) -> BoundLogger:
+    return configure_logging(settings=host, logging_settings=logging_settings)
 
 
 def _list_configs_from_sections(
-    app_settings: AppSettings,
+    host: HostInfo,
+    identity: IdentitySettings,
     logging_settings: LoggingSettings,
     server_settings: ServerSettings,
     security_settings: SecuritySettings,
@@ -90,11 +74,11 @@ def _list_configs_from_sections(
     config_settings: dict[str, tuple[object, ...]] = {
         "settings": (
             {"LOG_LEVEL": logging_settings.log_level},
-            {"GIT_SHA": app_settings.git_sha},
+            {"GIT_SHA": host.git_sha},
         )
     }
 
-    config_settings["app"] = tuple(app_settings.model_dump().keys())
+    config_settings["identity"] = tuple(identity.model_dump().keys())
     config_settings["server"] = tuple(server_settings.model_dump().keys())
     config_settings["security"] = tuple(security_settings.model_dump().keys())
     config_settings["directory"] = tuple(directory_settings.model_dump().keys())
@@ -125,13 +109,13 @@ def _register_legacy_slack_commands(registrar: SlackCommandRegistrar, logger: Bo
 
 def _start_scheduled_tasks(
     bot: App,
-    app_settings: AppSettings,
+    host: HostInfo,
     logger: BoundLogger,
     service_scopes: ServiceScopeOpener,
 ) -> threading.Event | None:
     # This gate suppresses side-effecting jobs outside production; Tier-2 leases
     # are the duplicate-prevention mechanism across production replicas.
-    if app_settings.environment != "production":
+    if host.environment != "production":
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
@@ -242,36 +226,42 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
     return translation_service
 
 
-@svcs.fastapi.lifespan
-async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None]:
-    # Phase 1: configuration. The identity slice selects the files, which are checked
-    # and installed before any slice on them builds; a bad file fails boot here.
-    app_settings = get_app_settings()
-    configuration_files = load_configuration_files(app_settings.environment)
-    install_configuration_files(configuration_files)
-    server_settings = get_server_settings()
-    security_settings = get_security_settings()
-    directory_settings = get_directory_settings()
-    sre_ops_settings = get_sre_ops_settings()
-    logging_settings = get_logging_settings()
-    # Vendor slices validate with the host slices: an invalid tenant entry fails boot here.
-    get_slack_settings()
-    get_google_workspace_settings()
-    logger = _get_logger_from_app(app_settings, logging_settings)
+def build_lifespan(configuration: HostConfiguration) -> Callable[[FastAPI], AbstractAsyncContextManager[dict[str, object]]]:
+    """Return the app lifespan bound to the configuration the app factory loaded."""
 
-    app.state.settings = app_settings
+    @svcs.fastapi.lifespan
+    async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None]:
+        async with asynccontextmanager(_serve)(app, registry, configuration):
+            yield
+
+    return lifespan
+
+
+async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfiguration) -> AsyncGenerator[None]:
+    # Phase 1 (configuration) ran in the app factory: the files are installed and every host
+    # slice is validated. This phase only reads what it loaded.
+    host = configuration.host_info
+    server_settings = configuration.server
+    security_settings = configuration.security
+    directory_settings = configuration.directory
+    sre_ops_settings = configuration.sre_ops
+    logger = _get_logger_from_app(host, configuration.logging)
+
+    app.state.host_info = host
     app.state.logger = logger
+    registry.register_value(HostInfo, host)
 
     logger.info("application_startup")
     logger.info(
         "configuration_files_loaded",
         phase="configuration",
-        environment=configuration_files.environment,
-        files=[path.name for path in configuration_files.paths],
+        environment=configuration.files.environment,
+        files=[path.name for path in configuration.files.paths],
     )
     _list_configs_from_sections(
-        app_settings,
-        logging_settings,
+        host,
+        configuration.identity,
+        configuration.logging,
         server_settings,
         security_settings,
         directory_settings,
@@ -330,7 +320,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
         scheduled_stop_event = (
             _start_scheduled_tasks(
                 slack_app,
-                app_settings,
+                host,
                 logger,
                 service_scopes,
             )

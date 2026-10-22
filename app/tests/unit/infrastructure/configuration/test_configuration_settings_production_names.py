@@ -35,14 +35,11 @@ from pydantic import SecretStr, ValidationError
 from pydantic_settings import BaseSettings
 
 from infrastructure.audit.settings import AuditSettings
-from infrastructure.configuration.app import AppSettings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
-from infrastructure.configuration.infrastructure.server import DevSettings, ServerSettings
 from infrastructure.coordination.settings import ConditionalWriteSettings
 from infrastructure.directory.settings import DirectorySettings
 from infrastructure.drive.settings import DriveSettings
 from infrastructure.security.settings import SecuritySettings
-from infrastructure.slack.settings import SlackTransportSettings
 from infrastructure.spreadsheets.settings import SpreadsheetSettings
 from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
@@ -54,6 +51,7 @@ from integrations.sentinel.settings import SentinelSettings
 from integrations.slack.settings import SlackSettings
 from integrations.trello.settings import TrelloSettings
 from jobs.settings import SchedulerSettings
+from server.configuration import IdentitySettings
 
 _ISSUER_SENTINEL = (
     '{"https://issuer.sentinel.example":{"jwks_uri":"https://issuer.sentinel.example/jwks",'
@@ -206,20 +204,8 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (SentinelSettings, "SENTINEL_CUSTOMER_ID", "sentinel_customer_id", "sentinel-customer", "sentinel-customer"),
     (SentinelSettings, "SENTINEL_LOG_TYPE", "sentinel_log_type", "SentinelLogs", "SentinelLogs"),
     (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
-    (AppSettings, "ENVIRONMENT", "environment", "production", "production"),
-    (AppSettings, "GIT_SHA", "git_sha", "sentinel-sha", "sentinel-sha"),
-    (AppSettings, "WEBHOOK_MAX_BODY_BYTES", "webhook_max_body_bytes", "1024", 1024),
-    (ServerSettings, "BACKEND_URL", "backend_url", "https://backend.sentinel.example", "https://backend.sentinel.example"),
-    (ServerSettings, "NOTIFY_OPS_CHANNEL_ID", "notify_ops_channel_id", "CSENTINELOPS", "CSENTINELOPS"),
-    (ServerSettings, "NOTIFY_ONCALL_GROUP_ID", "notify_oncall_group_id", "SSENTINELGRP", "SSENTINELGRP"),
-    (ServerSettings, "SRE_TEST_CHANNEL_ID", "sre_test_channel_id", "CSENTINELTEST", "CSENTINELTEST"),
-    (ServerSettings, "GOOGLE_CLIENT_ID", "google_client_id", "sentinel-client-id", "sentinel-client-id"),
-    (ServerSettings, "GOOGLE_CLIENT_SECRET", "google_client_secret", "sentinel-client-secret", "sentinel-client-secret"),
-    (ServerSettings, "SESSION_SECRET_KEY", "secret_key", "sentinel-session-key", "sentinel-session-key"),
-    (ServerSettings, "ACCESS_TOKEN_EXPIRE_MINUTES", "access_token_expire_minutes", "45", 45),
-    (ServerSettings, "ACCESS_TOKEN_MAX_AGE_MINUTES", "access_token_max_age_minutes", "90", 90),
-    (DevSettings, "SLACK_DEV_MSG_CHANNEL", "slack_dev_msg_channel", "CSENTINELDEV", "CSENTINELDEV"),
-    (SlackTransportSettings, "SLACK__COMMAND_PREFIX", "command_prefix", "dev-", "dev-"),
+    (IdentitySettings, "ENVIRONMENT", "environment", "production", "production"),
+    (IdentitySettings, "GIT_SHA", "git_sha", "sentinel-sha", "sentinel-sha"),
 ]
 
 _OPENAI_COMPANION_KEY = "sk-companion"
@@ -460,48 +446,20 @@ def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: 
     assert aws.instance_id == "d-spaced"
 
 
-def test_configuration_settings_app_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configuration_settings_identity_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """The lower-case spelling of ENVIRONMENT is read too."""
     monkeypatch.setenv("environment", "local")
 
-    settings = AppSettings(_env_file=None)  # type: ignore[call-arg]
+    settings = IdentitySettings()
 
     assert settings.environment == "local"
 
 
-def test_configuration_settings_app_upper_case_keyword_accepted() -> None:
-    """A constructor keyword in the environment spelling still sets the lower-case field."""
-    settings = AppSettings(_env_file=None, ENVIRONMENT="local")  # type: ignore[call-arg]
-
-    assert settings.environment == "local"
-
-
-def test_configuration_settings_app_missing_environment_names_field(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_configuration_settings_identity_missing_environment_names_field(monkeypatch: pytest.MonkeyPatch) -> None:
     """A missing ENVIRONMENT fails validation and the error location is the field name."""
     monkeypatch.delenv("ENVIRONMENT", raising=False)
 
     with pytest.raises(ValidationError) as exc_info:
-        AppSettings(_env_file=None)  # type: ignore[call-arg]
+        IdentitySettings()
 
     assert exc_info.value.errors()[0]["loc"] == ("environment",)
-
-
-def test_configuration_settings_app_environment_read_from_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """ENVIRONMENT written to a .env file reaches the lower-case field."""
-    monkeypatch.delenv("ENVIRONMENT", raising=False)
-    env_file = tmp_path / ".env"
-    env_file.write_text("ENVIRONMENT=local\n")
-
-    settings = AppSettings(_env_file=env_file)  # type: ignore[call-arg]
-
-    assert settings.environment == "local"
-
-
-def test_configuration_settings_slack_transport_lower_case_prefix_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lower-case spelling of the SLACK__COMMAND_PREFIX alias is read too."""
-    monkeypatch.delenv("SLACK__COMMAND_PREFIX", raising=False)
-    monkeypatch.setenv("slack__command_prefix", "lower-")
-
-    settings = SlackTransportSettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert settings.command_prefix == "lower-"

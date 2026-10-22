@@ -468,7 +468,7 @@ def test_should_derive_channel_name_prefix_from_environment(
     """Channel names should depend on ENVIRONMENT instead of legacy PREFIX."""
     monkeypatch.setattr(
         atip,
-        "get_app_settings",
+        "host_info",
         lambda: SimpleNamespace(environment=environment, PREFIX=legacy_prefix),
     )
 

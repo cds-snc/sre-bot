@@ -165,10 +165,10 @@ def test_post_event(mock_auth_header, mock_post, notify_settings):
 
 
 # Test the revoke_api_key function when NOTIFY_API_URL is None
-@patch("integrations.notify.client.settings", new_callable=MagicMock)
+@patch("integrations.notify.client.host_info")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_missing_url(mock_logger, mock_settings, notify_settings):
-    mock_settings.environment = "production"
+    mock_settings.return_value.environment = "production"
     notify_settings.notify_api_url = None
     bound_logger_mock = mock_logger.bind.return_value
     result = notify.revoke_api_key("api-key-123", "api-type", "github.com/repo", "test")
@@ -179,10 +179,10 @@ def test_revoke_api_key_missing_url(mock_logger, mock_settings, notify_settings)
 
 # Test successful API key revocation (status code 201)
 @patch("integrations.notify.client.post_event")
-@patch("integrations.notify.client.settings", new_callable=MagicMock)
+@patch("integrations.notify.client.host_info")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_success(mock_logger, mock_settings, mock_post_event, notify_settings):
-    mock_settings.environment = "production"
+    mock_settings.return_value.environment = "production"
     # Mock successful response
     mock_response = MagicMock()
     mock_response.status_code = 201
@@ -218,10 +218,10 @@ def test_revoke_api_key_success(mock_logger, mock_settings, mock_post_event, not
 
 # Test failed API key revocation (non-201 status code)
 @patch("integrations.notify.client.post_event")
-@patch("integrations.notify.client.settings", new_callable=MagicMock)
+@patch("integrations.notify.client.host_info")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_failure(mock_logger, mock_settings, mock_post_event, notify_settings):
-    mock_settings.environment = "production"
+    mock_settings.return_value.environment = "production"
     # Mock failed response
     mock_response = MagicMock()
     mock_response.status_code = 400
@@ -248,10 +248,10 @@ def test_revoke_api_key_failure(mock_logger, mock_settings, mock_post_event, not
 
 # Test API key not found response (status code 200)
 @patch("integrations.notify.client.post_event")
-@patch("integrations.notify.client.settings", new_callable=MagicMock)
+@patch("integrations.notify.client.host_info")
 @patch("integrations.notify.client.logger")
 def test_revoke_api_key_not_found(mock_logger, mock_settings, mock_post_event, notify_settings):
-    mock_settings.environment = "production"
+    mock_settings.return_value.environment = "production"
     notify_settings.notify_api_url = "https://notify.example.com"
     mock_response = MagicMock()
     mock_response.status_code = 200

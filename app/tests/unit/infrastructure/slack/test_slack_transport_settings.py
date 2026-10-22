@@ -1,83 +1,75 @@
-"""Behavior tests for Slack transport settings slice.
+"""Behavior tests for the Slack transport settings slice on the [slack_transport] table.
 
-These tests intentionally encode TASK-45.1 behavior before implementation.
+Settings are built under the installed configuration files; the checked-in
+local and production files are installed explicitly where their values are asserted.
 """
 
-from __future__ import annotations
-
-import importlib
-
 import pytest
-from pydantic import ValidationError
+
+from contracts.configuration import ConfigurationError, install_configuration_files
+from infrastructure.slack.settings import SlackTransportSettings, get_slack_transport_settings
+from server.configuration import load_configuration_files
+
+pytestmark = pytest.mark.unit
 
 
 @pytest.fixture(autouse=True)
-def _clear_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear transport env var so each test controls it explicitly."""
+def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove both spellings so each test controls the environment and the provider cache."""
     monkeypatch.delenv("SLACK__COMMAND_PREFIX", raising=False)
+    monkeypatch.delenv("SLACK_TRANSPORT__COMMAND_PREFIX", raising=False)
+    get_slack_transport_settings.cache_clear()
+    yield
+    get_slack_transport_settings.cache_clear()
 
 
-@pytest.fixture(autouse=True)
-def _clear_provider_cache() -> None:
-    """Keep singleton cache deterministic across test cases."""
-    try:
-        settings_module = importlib.import_module("infrastructure.slack.settings")
-    except ModuleNotFoundError:
-        return
-
-    settings_module.get_slack_transport_settings.cache_clear()
+def test_command_prefix_is_empty_under_the_ci_files() -> None:
+    """The base file sets an empty prefix and ci does not override it."""
+    assert SlackTransportSettings().command_prefix == ""
 
 
-def _load_transport_settings_module():
-    """Load transport settings module with a clear failure message."""
-    try:
-        return importlib.import_module("infrastructure.slack.settings")
-    except ModuleNotFoundError:
-        pytest.fail(
-            "Expected infrastructure.slack.settings to exist for TASK-45.1",
-            pytrace=False,
-        )
+def test_local_file_sets_the_dev_prefix() -> None:
+    """local.toml gives developers the dev- prefix without any environment variable."""
+    install_configuration_files(load_configuration_files("local"))
+
+    assert SlackTransportSettings().command_prefix == "dev-"
 
 
-@pytest.mark.unit
-def test_slack_transport_settings_default_command_prefix_is_empty() -> None:
-    """Default COMMAND_PREFIX should be empty when env var is unset."""
-    settings_module = _load_transport_settings_module()
+def test_production_file_sets_no_prefix() -> None:
+    """production.toml keeps the production commands unprefixed."""
+    install_configuration_files(load_configuration_files("production"))
 
-    settings = settings_module.SlackTransportSettings()
-
-    assert settings.command_prefix == ""
+    assert SlackTransportSettings().command_prefix == ""
 
 
-@pytest.mark.unit
-def test_slack_transport_settings_reads_env_alias(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """SLACK__COMMAND_PREFIX env var should map to COMMAND_PREFIX."""
-    settings_module = _load_transport_settings_module()
+def test_prefixed_environment_variable_overrides_the_file(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACK_TRANSPORT__COMMAND_PREFIX beats the file value."""
+    monkeypatch.setenv("SLACK_TRANSPORT__COMMAND_PREFIX", "env-")
 
-    monkeypatch.setenv("SLACK__COMMAND_PREFIX", "dev-")
-
-    settings = settings_module.SlackTransportSettings()
-
-    assert settings.command_prefix == "dev-"
+    assert SlackTransportSettings().command_prefix == "env-"
 
 
-@pytest.mark.unit
-def test_get_slack_transport_settings_returns_singleton_instance() -> None:
-    """Provider should return the same settings instance per process."""
-    settings_module = _load_transport_settings_module()
+def test_former_slack_command_prefix_name_is_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The retired SLACK__COMMAND_PREFIX name no longer reaches the field."""
+    monkeypatch.setenv("SLACK__COMMAND_PREFIX", "old-")
 
-    first = settings_module.get_slack_transport_settings()
-    second = settings_module.get_slack_transport_settings()
-
-    assert first is second
+    assert SlackTransportSettings().command_prefix == ""
 
 
-@pytest.mark.unit
-def test_slack_transport_settings_invalid_value_fails_validation() -> None:
-    """Invalid config should fail fast with Pydantic validation error."""
-    settings_module = _load_transport_settings_module()
+def test_slice_declares_only_command_prefix_without_alias() -> None:
+    """The table holds command_prefix alone and the field has no alias."""
+    assert set(SlackTransportSettings.model_fields) == {"command_prefix"}
+    field = SlackTransportSettings.model_fields["command_prefix"]
+    assert field.alias is None
+    assert field.validation_alias is None
 
-    with pytest.raises(ValidationError):
-        settings_module.SlackTransportSettings(command_prefix=None)
+
+def test_provider_returns_singleton_instance() -> None:
+    """The provider returns the same settings instance per process."""
+    assert get_slack_transport_settings() is get_slack_transport_settings()
+
+
+def test_invalid_value_fails_validation() -> None:
+    """A non-string prefix fails validation, naming the file and key."""
+    with pytest.raises(ConfigurationError, match="command_prefix"):
+        SlackTransportSettings(command_prefix=None)

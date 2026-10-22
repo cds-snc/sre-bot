@@ -2,7 +2,7 @@
 
 Every owner's settings slice derives from ConfigurationSlice and names its own
 table. The host loads the base file and the ENVIRONMENT file, checks them, and
-installs them here in lifespan's configuration phase before any slice builds
+installs them here in the app factory's configuration phase before any slice builds
 (decisions/configuration.md); a slice built earlier fails instead of silently
 running on defaults. A value resolves from, highest first: constructor
 arguments, the process environment, the .env file, the configuration files
@@ -12,7 +12,7 @@ arguments, the process environment, the .env file, the configuration files
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, ClassVar, Protocol
+from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import ValidationError
 from pydantic.fields import FieldInfo
@@ -38,29 +38,64 @@ class ConfigurationFiles(Protocol):
     def paths(self) -> tuple[Path, ...]: ...
 
 
-@dataclass
-class _Installed:
-    files: ConfigurationFiles | None = None
+@dataclass(frozen=True)
+class HostInfo:
+    """Facts the host establishes at boot and every layer reads: who and where this process is."""
+
+    environment: Literal["local", "ci", "production"]
+    git_sha: str
+    public_base_url: str
 
 
-_installed = _Installed()
+# Process-wide state the app factory sets once, written only by the install functions below
+# (the form asyncio uses for its event loop policy). Slices are built by zero-argument providers
+# and pydantic-settings asks a slice for its sources through a classmethod, so the files cannot
+# travel as an argument; a ContextVar would not reach the worker threads that run sync Bolt
+# handlers. New code resolves HostInfo from the service registry; the accessor serves the
+# readers decisions/dependency-injection.md still tolerates.
+_files: ConfigurationFiles | None = None
+_host: HostInfo | None = None
 
 
 def install_configuration_files(files: ConfigurationFiles) -> None:
     """Install the checked files every slice reads; a later install replaces them."""
-    _installed.files = files
+    global _files
+    _files = files
 
 
 def uninstall_configuration_files() -> None:
     """Remove the installed files, so building a slice fails until the next install."""
-    _installed.files = None
+    global _files
+    _files = None
 
 
 def installed_configuration_files() -> ConfigurationFiles:
     """Return the installed files, or fail when the configuration phase has not run."""
-    if _installed.files is None:
-        raise ConfigurationError("configuration files not loaded: lifespan's configuration phase installs them")
-    return _installed.files
+    if _files is None:
+        raise ConfigurationError("configuration files not loaded: the app factory's configuration phase installs them")
+    return _files
+
+
+def install_host_info(info: HostInfo) -> None:
+    """Install the host facts built by the app factory; a later install replaces them."""
+    global _host
+    _host = info
+
+
+def uninstall_host_info() -> None:
+    """Remove the installed host facts, so reading them fails until the next install."""
+    global _host
+    _host = None
+
+
+def host_info() -> HostInfo:
+    """Return the installed host facts, or fail when the app factory has not run.
+
+    For code not yet on the service registry; new code resolves HostInfo from the registry.
+    """
+    if _host is None:
+        raise ConfigurationError("host info not installed: the app factory (create_app) installs it")
+    return _host
 
 
 def _read(path: Path) -> dict[str, Any]:
@@ -131,9 +166,9 @@ class ConfigurationSlice(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        if _installed.files is None:
+        if _files is None:
             raise ConfigurationError(f"{settings_cls.__name__}: configuration files not loaded before the slice was built")
-        paths = _installed.files.paths
+        paths = _files.paths
         if cls._table not in _read(paths[0]):
             raise ConfigurationError(f"{paths[0]}: [{cls._table}] missing; the base file holds every slice's table")
         toml_settings = TomlConfigSettingsSource(settings_cls, toml_file=list(paths), deep_merge=True)
@@ -143,9 +178,9 @@ class ConfigurationSlice(BaseSettings):
 
 def _locate_file_errors(slice_cls: type[ConfigurationSlice], error: ValidationError) -> list[str]:
     """Name the last installed file setting each failing key of the slice's table."""
-    if _installed.files is None:
+    if _files is None:
         return []
-    tables = [(path, _read(path).get(slice_cls._table, {})) for path in _installed.files.paths]
+    tables = [(path, _read(path).get(slice_cls._table, {})) for path in _files.paths]
     located: list[str] = []
     for detail in error.errors():
         key = str(detail["loc"][0]) if detail["loc"] else ""

@@ -21,9 +21,9 @@ from typing import Any
 import pytest
 from slack_sdk.errors import SlackApiError
 
+from contracts.configuration import host_info
 from models.incidents import IncidentPayload
 from modules.incident import core as incident_core
-from modules.incident import incident_conversation
 
 from .conftest import TRIGGER_ID, USER_ID, LegacyHandlerHarness
 
@@ -112,7 +112,7 @@ def _expected_slug(name: str) -> str:
 
 def _expected_channel_name(name: str) -> str:
     """Environment prefix plus slug, cut to Slack's 80-character channel name limit."""
-    prefix = "incident-dev-" if incident_conversation.settings.environment != "production" else "incident-"
+    prefix = "incident-dev-" if host_info().environment != "production" else "incident-"
     return f"{prefix}{_expected_slug(name)}"[:80]
 
 

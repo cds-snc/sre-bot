@@ -8,11 +8,10 @@ import jwt
 import requests
 import structlog
 
-from infrastructure.configuration.app import get_app_settings
+from contracts.configuration import host_info
 from integrations.notify.settings import get_notify_settings
 
 logger = structlog.get_logger()
-settings = get_app_settings()
 notify_settings = get_notify_settings()
 
 
@@ -113,7 +112,7 @@ def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -
     )
     # get the url and jwt_token
 
-    if settings.environment != "production":
+    if host_info().environment != "production":
         log.info("revoke_api_key_skipped", api_key=api_key)
         return "error"
     url = notify_settings.notify_api_url

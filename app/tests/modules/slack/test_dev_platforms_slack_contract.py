@@ -13,7 +13,7 @@ def test_contract_require_dev_environment_uses_environment_not_prefix():
     payload = MagicMock()
 
     with patch(
-        "modules.dev.platforms.slack.get_app_settings",
+        "modules.dev.platforms.slack.host_info",
         return_value=SimpleNamespace(environment="local"),
     ):
         response = dev_slack._require_dev_environment(payload)
@@ -27,7 +27,7 @@ def test_contract_require_dev_environment_denies_non_local(environment):
     payload = MagicMock()
 
     with patch(
-        "modules.dev.platforms.slack.get_app_settings",
+        "modules.dev.platforms.slack.host_info",
         return_value=SimpleNamespace(environment=environment),
     ):
         response = dev_slack._require_dev_environment(payload)

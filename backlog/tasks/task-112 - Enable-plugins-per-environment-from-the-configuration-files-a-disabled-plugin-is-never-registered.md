@@ -5,8 +5,8 @@ title: >-
   is never registered
 status: To Do
 assignee: []
-created_date: '2026-09-24 19:59'
-updated_date: '2026-10-20 23:27'
+created_date: 2026-09-24 19:59
+updated_date: '2026-10-22T19:06:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -21,7 +21,7 @@ references:
   - decisions/plugins.md
   - decisions/configuration.md
   - decisions/lifecycle.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1655'
+  - https://github.com/cds-snc/sre-bot/issues/1655
 priority: medium
 type: feature
 ordinal: 254000
@@ -45,6 +45,7 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
 - [ ] #6 The SLACK_ENABLED exception is removed from bin/check_settings_key_ownership.py's vendor-enabled rule, and the check passes with an empty allowlist
+- [ ] #7 The Slack transport's enabled and socket_mode keys are in [slack_transport] (decisions/configuration.md, transport-slack.md); SLACK_ENABLED and SLACK_SOCKET_MODE are no longer read, and switching the transport on without the Slack tenant entry or the app token Socket Mode needs fails boot naming the key
 <!-- AC:END -->
 
 ## Implementation Notes

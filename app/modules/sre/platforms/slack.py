@@ -9,9 +9,9 @@ from typing import cast
 import structlog
 from slack_bolt import Ack, Respond
 
+from contracts.configuration import host_info
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.configuration.app import get_app_settings
 from integrations.slack.bootstrap import LegacySlackBootstrap
 from modules.incident import incident_helper
 from modules.sre import webhook_helper
@@ -35,9 +35,8 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
         command="version",
     )
 
-    app_settings = get_app_settings()
     return CommandResponse(
-        message=f"🤖 SRE Bot version: {app_settings.git_sha}",
+        message=f"🤖 SRE Bot version: {host_info().git_sha}",
         ephemeral=True,
     )
 

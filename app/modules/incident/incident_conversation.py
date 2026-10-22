@@ -8,17 +8,14 @@ from slack_sdk.errors import SlackApiError  # type: ignore
 from slack_sdk.web import SlackResponse  # type: ignore
 from structlog import get_logger
 
+from contracts.configuration import host_info
 from features.incident.documents import utils
-from infrastructure.configuration.app import get_app_settings
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from modules.incident import incident_helper, schedule_retro
 from modules.incident.incident_document import (
     update_timeline_section,
 )
-
-settings = get_app_settings()
-
 
 logger = get_logger()
 
@@ -35,7 +32,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
     """
     date_now = datetime.now().strftime("%Y-%m-%d")
     slug = f"{date_now} {incident_name}".strip().replace(" ", "-").lower()
-    channel_name_prefix = "incident-dev-" if settings.environment != "production" else "incident-"
+    channel_name_prefix = "incident-dev-" if host_info().environment != "production" else "incident-"
     base_channel_name = channel_name_prefix + slug
     # Ensure base_channel_name is at most 80 chars
     if len(base_channel_name) > 80:

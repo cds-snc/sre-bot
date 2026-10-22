@@ -113,8 +113,8 @@ def test_hydrate_ip_addresses_links_text_and_block_strings():
         ],
     )
 
-    with patch("modules.webhooks.slack.get_server_settings") as mock_get_settings:
-        mock_get_settings.return_value.backend_url = "https://sre-bot.example.com"
+    with patch("modules.webhooks.slack.host_info") as mock_host_info:
+        mock_host_info.return_value.public_base_url = "https://sre-bot.example.com"
         result = hydrate_ip_addresses(payload)
 
     assert result.text == "source <https://sre-bot.example.com/geolocate/8.8.8.8|8.8.8.8>"

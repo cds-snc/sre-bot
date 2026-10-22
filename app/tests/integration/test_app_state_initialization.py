@@ -23,7 +23,7 @@ def test_app_state_has_all_required_attributes(app_with_lifespan):
     at request time.
     """
     required_attrs = [
-        "settings",
+        "host_info",
         "logger",
         "bot",  # Can be None if Slack not configured, but must exist
         "directory_provider",
@@ -39,25 +39,24 @@ def test_app_state_has_all_required_attributes(app_with_lifespan):
 
 
 @pytest.mark.integration
-def test_app_state_settings_is_valid(app_with_lifespan):
-    """Validate that app-level settings object is properly initialized.
+def test_app_state_host_info_is_valid(app_with_lifespan):
+    """Validate that the host facts are stored on app.state.
 
-    The lifespan should store the narrow app settings slice on app.state.
+    The lifespan should store the HostInfo the app factory built.
     """
-    settings = app_with_lifespan.app.state.settings
+    host = app_with_lifespan.app.state.host_info
 
-    assert settings is not None, "settings must not be None"
-    assert hasattr(settings, "environment"), "settings missing environment"
-    assert hasattr(settings, "git_sha"), "settings missing git_sha"
-    assert settings.environment in {"local", "ci", "production"}
+    assert host is not None, "host_info must not be None"
+    assert host.environment in {"local", "ci", "production"}
+    assert host.git_sha
 
 
 @pytest.mark.integration
-def test_contract_app_state_settings_has_no_legacy_production_property(
+def test_contract_app_state_host_info_has_no_legacy_production_property(
     app_with_lifespan,
 ):
-    """Contract: app.state.settings should not expose the legacy production shim."""
-    settings = app_with_lifespan.app.state.settings
+    """Contract: app.state.host_info should not expose the legacy production shim."""
+    settings = app_with_lifespan.app.state.host_info
     legacy_attr = "is" + "_production"
 
     assert hasattr(settings, "environment"), "settings missing environment"

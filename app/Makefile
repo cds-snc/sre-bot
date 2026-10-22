@@ -1,7 +1,7 @@
 .PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports check-aws-platform-seam check-import-contracts check-fake-coverage check-settings-key-ownership debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-coverage test-new
 
 dev:
-	SLACK__COMMAND_PREFIX="dev-" uv run uvicorn main:server_app --reload
+	ENVIRONMENT=local uv run uvicorn --factory main:create_app --reload
 
 dev-setup: # Requires to be signed in to AWS
 	uv sync
@@ -9,7 +9,7 @@ dev-setup: # Requires to be signed in to AWS
 	sh ../.devcontainer/dynamodb-create.sh
 
 debug:
-	SLACK__COMMAND_PREFIX="dev-" LOGGING__LOG_LEVEL=DEBUG uv run uvicorn main:server_app --reload
+	ENVIRONMENT=local LOGGING__LOG_LEVEL=DEBUG uv run uvicorn --factory main:create_app --reload
 
 fmt:
 	uv run ruff check --fix . $(ARGS)
@@ -120,4 +120,4 @@ backlog-board: # Backlog.md web UI (Kanban board) at http://localhost:6421
 	cd .. && backlog browser --no-open --port 6421
 
 run:
-	uv run uvicorn main:server_app
+	uv run uvicorn --factory main:create_app

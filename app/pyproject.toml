@@ -146,7 +146,6 @@ env = [
     "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
     "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
     "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
-    "NOTIFY_OPS_CHANNEL_ID=C1234567890",
     "NOTIFY_SRE_USER_NAME=NOTIFY_SRE_USER_NAME",
     "NOTIFY_SRE_CLIENT_SECRET=NOTIFY_SRE_CLIENT_SECRET",
     "SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
@@ -229,7 +228,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/plugin-architecture.md Migration and decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",
@@ -302,7 +300,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "integrations.notify.client -> infrastructure.configuration.app",
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",

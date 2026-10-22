@@ -6,13 +6,13 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from main import server_app
+from main import create_app
 
 
 @pytest.fixture
 def test_app():
     """Provide a test client for the FastAPI app."""
-    with TestClient(server_app) as client:
+    with TestClient(create_app()) as client:
         yield client
 
 
