@@ -24,12 +24,12 @@ class AWSSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    AWS_REGION: str = Field(default="ca-central-1")
-    DYNAMODB_ENDPOINT_URL: str | None = Field(
+    aws_region: str = Field(default="ca-central-1")
+    dynamodb_endpoint_url: str | None = Field(
         default=None,
         alias="AWS_ENDPOINT_URL_DYNAMODB",
         description=(
@@ -39,21 +39,21 @@ class AWSSettings(BaseSettings):
         ),
     )
 
-    RETRY_MAX_ATTEMPTS: int = Field(
+    retry_max_attempts: int = Field(
         default=3,
         alias="AWS_RETRY_MAX_ATTEMPTS",
         description="Retries after the initial attempt (botocore max_attempts): 3 means four attempts in total.",
     )
-    RETRY_MODE: RetryMode = Field(default="standard", alias="AWS_RETRY_MODE")
-    CONNECT_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS")
-    READ_TIMEOUT_SECONDS: int = Field(default=10, alias="AWS_READ_TIMEOUT_SECONDS")
-    TRANSIENT_RETRY_AFTER_SECONDS: int = Field(
+    retry_mode: RetryMode = Field(default="standard", alias="AWS_RETRY_MODE")
+    connect_timeout_seconds: int = Field(default=10, alias="AWS_CONNECT_TIMEOUT_SECONDS")
+    read_timeout_seconds: int = Field(default=10, alias="AWS_READ_TIMEOUT_SECONDS")
+    transient_retry_after_seconds: int = Field(
         default=60,
         alias="AWS_TRANSIENT_RETRY_AFTER_SECONDS",
         description="Retry hint attached to transient classifications, in seconds.",
     )
 
-    NOT_FOUND_CODES: list[str] = Field(
+    not_found_codes: list[str] = Field(
         default=[
             "ResourceNotFoundException",
             "NoSuchEntity",
@@ -66,7 +66,7 @@ class AWSSettings(BaseSettings):
         ],
         alias="AWS_NOT_FOUND_CODES",
     )
-    UNAUTHORIZED_CODES: list[str] = Field(
+    unauthorized_codes: list[str] = Field(
         default=[
             "AccessDenied",
             "AccessDeniedException",
@@ -80,7 +80,7 @@ class AWSSettings(BaseSettings):
         ],
         alias="AWS_UNAUTHORIZED_CODES",
     )
-    TRANSIENT_CODES: list[str] = Field(
+    transient_codes: list[str] = Field(
         default=[
             "Throttling",
             "ThrottlingException",
@@ -101,27 +101,27 @@ class AWSSettings(BaseSettings):
         alias="AWS_TRANSIENT_CODES",
     )
 
-    SYSTEM_ADMIN_PERMISSIONS: str = Field(default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
-    VIEW_ONLY_PERMISSIONS: str = Field(default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS")
-    AUDIT_ROLE_ARN: str = Field(default="", alias="AWS_AUDIT_ACCOUNT_ROLE_ARN")
-    ORG_ROLE_ARN: str = Field(default="", alias="AWS_ORG_ACCOUNT_ROLE_ARN")
-    LOGGING_ROLE_ARN: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
-    INSTANCE_ID: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
-    INSTANCE_ARN: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
+    system_admin_permissions: str = Field(default="", alias="AWS_SSO_SYSTEM_ADMIN_PERMISSIONS")
+    view_only_permissions: str = Field(default="", alias="AWS_SSO_VIEW_ONLY_PERMISSIONS")
+    audit_role_arn: str = Field(default="", alias="AWS_AUDIT_ACCOUNT_ROLE_ARN")
+    org_role_arn: str = Field(default="", alias="AWS_ORG_ACCOUNT_ROLE_ARN")
+    logging_role_arn: str = Field(default="", alias="AWS_LOGGING_ACCOUNT_ROLE_ARN")
+    instance_id: str = Field(default="", alias="AWS_SSO_INSTANCE_ID")
+    instance_arn: str = Field(default="", alias="AWS_SSO_INSTANCE_ARN")
 
     @property
-    def SERVICE_ROLE_MAP(self) -> dict[str, str]:
+    def service_role_map(self) -> dict[str, str]:
         """Role ARN assumed for each service or account role name."""
         return {
-            "audit": self.AUDIT_ROLE_ARN,
-            "organizations": self.ORG_ROLE_ARN,
-            "identitystore": self.ORG_ROLE_ARN,
-            "sso-admin": self.ORG_ROLE_ARN,
-            "logging": self.LOGGING_ROLE_ARN,
-            "ce": self.ORG_ROLE_ARN,
-            "config": self.AUDIT_ROLE_ARN,
-            "guardduty": self.LOGGING_ROLE_ARN,
-            "securityhub": self.LOGGING_ROLE_ARN,
+            "audit": self.audit_role_arn,
+            "organizations": self.org_role_arn,
+            "identitystore": self.org_role_arn,
+            "sso-admin": self.org_role_arn,
+            "logging": self.logging_role_arn,
+            "ce": self.org_role_arn,
+            "config": self.audit_role_arn,
+            "guardduty": self.logging_role_arn,
+            "securityhub": self.logging_role_arn,
         }
 
 

@@ -85,7 +85,7 @@ class TestBuildIdentityCenterAdapter:
         assert get_aws_client_calls[1]["retries"] is False
 
     def test_role_arn_from_service_role_map(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Role ARN is read from SERVICE_ROLE_MAP['identitystore']."""
+        """Role ARN is read from service_role_map['identitystore']."""
         monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
         monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
 
@@ -107,7 +107,7 @@ class TestBuildIdentityCenterAdapter:
         ):
             _ = build_identity_center_adapter()
 
-        # Both calls should have the role ARN from SERVICE_ROLE_MAP
+        # Both calls should have the role ARN from service_role_map
         assert get_aws_client_calls[0]["role_arn"] == "arn:aws:iam::123456789012:role/org-role"
         assert get_aws_client_calls[1]["role_arn"] == "arn:aws:iam::123456789012:role/org-role"
 

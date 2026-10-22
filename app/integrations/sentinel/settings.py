@@ -1,7 +1,7 @@
 """Vendor settings for the Azure Sentinel log client.
 
 Exposes ``SentinelSettings`` and the cached ``get_sentinel_settings()`` provider. Each field
-reads the environment variable of the same name.
+reads the environment variable of the same name, matched case-insensitively.
 """
 
 from functools import lru_cache
@@ -14,13 +14,13 @@ class SentinelSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    SENTINEL_CUSTOMER_ID: str | None = None
-    SENTINEL_LOG_TYPE: str = "DevSREBot"
-    SENTINEL_SHARED_KEY: str | None = None
+    sentinel_customer_id: str | None = None
+    sentinel_log_type: str = "DevSREBot"
+    sentinel_shared_key: str | None = None
 
 
 @lru_cache(maxsize=1)

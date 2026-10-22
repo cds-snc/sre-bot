@@ -1,10 +1,10 @@
 ---
 id: TASK-111.5.1
 title: Lower-case the hosting and security settings fields
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T20:23:00Z'
-updated_date: '2026-10-21T21:20:00Z'
+updated_date: '2026-10-22T12:48:00Z'
 labels:
   - configuration
 milestone: m-7

@@ -110,6 +110,6 @@ class CostExplorerAdapter:
 
 
 def build_cost_explorer_adapter() -> CostExplorerAdapter:
-    """Build the adapter with the Cost Explorer role from ``SERVICE_ROLE_MAP``."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("ce") or None
+    """Build the adapter with the Cost Explorer role from ``service_role_map``."""
+    role_arn = get_aws_settings().service_role_map.get("ce") or None
     return CostExplorerAdapter(get_aws_client("ce", role_arn=role_arn))

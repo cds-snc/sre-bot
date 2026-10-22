@@ -11,7 +11,13 @@ Workspace slices follow the same rule: production sets SLACK_APP_TOKEN,
 SLACK_BOT_TOKEN, SLACK_ENABLED, SLACK_TEAM_ID, SLACK_USER_TOKEN,
 GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
 SRE_BOT_EMAIL and GCP_SRE_SERVICE_ACCOUNT_KEY_FILE; the remaining names of those
-slices stay part of the interface.
+slices stay part of the interface. The AWS, OpenAI, Notify, Trello, OpsGenie,
+MaxMind and Sentinel slices likewise: production sets the AWS_*_ACCOUNT_ROLE_ARN
+names (only AWS_ORG_ACCOUNT_ROLE_ARN with a value), the AWS_SSO_* names,
+OPENAI_API_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
+the TRELLO_* names, OPSGENIE_INTEGRATIONS_KEY and the SENTINEL_* names, some of
+them written 'NAME =value' in the .env file; AWS_REGION is injected by the
+platform, and the remaining names stay part of the interface.
 """
 
 from pathlib import Path
@@ -28,8 +34,15 @@ from infrastructure.directory.settings import DirectorySettings
 from infrastructure.drive.settings import DriveSettings
 from infrastructure.security.settings import SecuritySettings
 from infrastructure.spreadsheets.settings import SpreadsheetSettings
+from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
+from integrations.maxmind.settings import MaxMindSettings
+from integrations.notify.settings import NotifySettings
+from integrations.openai.settings import OpenAISettings
+from integrations.opsgenie.settings import OpsGenieSettings
+from integrations.sentinel.settings import SentinelSettings
 from integrations.slack.settings import SlackSettings
+from integrations.trello.settings import TrelloSettings
 from jobs.settings import SchedulerSettings
 
 _ISSUER_SENTINEL = (
@@ -113,6 +126,87 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         '{"inc":{"d":"sentinel-drive"}}',
         {"inc": {"d": "sentinel-drive"}},
     ),
+    (
+        AWSSettings,
+        "AWS_AUDIT_ACCOUNT_ROLE_ARN",
+        "audit_role_arn",
+        "arn:aws:iam::111111111111:role/sentinel-audit",
+        "arn:aws:iam::111111111111:role/sentinel-audit",
+    ),
+    (
+        AWSSettings,
+        "AWS_LOGGING_ACCOUNT_ROLE_ARN",
+        "logging_role_arn",
+        "arn:aws:iam::111111111111:role/sentinel-logging",
+        "arn:aws:iam::111111111111:role/sentinel-logging",
+    ),
+    (
+        AWSSettings,
+        "AWS_ORG_ACCOUNT_ROLE_ARN",
+        "org_role_arn",
+        "arn:aws:iam::111111111111:role/sentinel-org",
+        "arn:aws:iam::111111111111:role/sentinel-org",
+    ),
+    (
+        AWSSettings,
+        "AWS_SSO_INSTANCE_ARN",
+        "instance_arn",
+        "arn:aws:sso:::instance/ssoins-sentinel",
+        "arn:aws:sso:::instance/ssoins-sentinel",
+    ),
+    (AWSSettings, "AWS_SSO_INSTANCE_ID", "instance_id", "d-sentinel", "d-sentinel"),
+    (AWSSettings, "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", "system_admin_permissions", "SentinelAdmin", "SentinelAdmin"),
+    (AWSSettings, "AWS_SSO_VIEW_ONLY_PERMISSIONS", "view_only_permissions", "SentinelView", "SentinelView"),
+    (AWSSettings, "AWS_REGION", "aws_region", "sentinel-region-1", "sentinel-region-1"),
+    (
+        AWSSettings,
+        "AWS_ENDPOINT_URL_DYNAMODB",
+        "dynamodb_endpoint_url",
+        "http://sentinel-dynamodb:8000",
+        "http://sentinel-dynamodb:8000",
+    ),
+    (AWSSettings, "AWS_RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
+    (AWSSettings, "AWS_RETRY_MODE", "retry_mode", "adaptive", "adaptive"),
+    (AWSSettings, "AWS_CONNECT_TIMEOUT_SECONDS", "connect_timeout_seconds", "4", 4),
+    (AWSSettings, "AWS_READ_TIMEOUT_SECONDS", "read_timeout_seconds", "7", 7),
+    (AWSSettings, "AWS_TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", "15", 15),
+    (AWSSettings, "AWS_NOT_FOUND_CODES", "not_found_codes", '["SentinelMissing"]', ["SentinelMissing"]),
+    (AWSSettings, "AWS_UNAUTHORIZED_CODES", "unauthorized_codes", '["SentinelDenied"]', ["SentinelDenied"]),
+    (AWSSettings, "AWS_TRANSIENT_CODES", "transient_codes", '["SentinelBusy"]', ["SentinelBusy"]),
+    (NotifySettings, "NOTIFY_SRE_USER_NAME", "notify_sre_user_name", "sentinel-user", "sentinel-user"),
+    (NotifySettings, "NOTIFY_SRE_CLIENT_SECRET", "notify_sre_client_secret", "sentinel-secret", "sentinel-secret"),
+    (
+        NotifySettings,
+        "NOTIFY_API_URL",
+        "notify_api_url",
+        "https://notify.sentinel.example",
+        "https://notify.sentinel.example",
+    ),
+    (TrelloSettings, "TRELLO_APP_KEY", "trello_app_key", "sentinel-app-key", "sentinel-app-key"),
+    (TrelloSettings, "TRELLO_TOKEN", "trello_token", "sentinel-token", "sentinel-token"),
+    (TrelloSettings, "TRELLO_ATIP_BOARD", "trello_atip_board", "sentinel-board", "sentinel-board"),
+    (
+        OpsGenieSettings,
+        "OPSGENIE_INTEGRATIONS_KEY",
+        "opsgenie_integrations_key",
+        "sentinel-opsgenie-key",
+        "sentinel-opsgenie-key",
+    ),
+    (MaxMindSettings, "MAXMIND_DB_PATH", "maxmind_db_path", "/sentinel/GeoLite2.mmdb", "/sentinel/GeoLite2.mmdb"),
+    (SentinelSettings, "SENTINEL_CUSTOMER_ID", "sentinel_customer_id", "sentinel-customer", "sentinel-customer"),
+    (SentinelSettings, "SENTINEL_LOG_TYPE", "sentinel_log_type", "SentinelLogs", "SentinelLogs"),
+    (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
+]
+
+_OPENAI_COMPANION_KEY = "sk-companion"
+"""OPENAI_API_KEY is required, so every OpenAI row sets it beside the name under test."""
+
+OPENAI_NAMES: list[tuple[str, str, str, Any]] = [
+    ("OPENAI_MODEL", "model", "sentinel-model", "sentinel-model"),
+    ("OPENAI_MAX_OUTPUT_TOKENS", "max_output_tokens", "1234", 1234),
+    ("OPENAI_TEMPERATURE", "temperature", "0.25", 0.25),
+    ("OPENAI_TIMEOUT_SECONDS", "timeout_seconds", "42.5", 42.5),
+    ("OPENAI_BASE_URL", "base_url", "https://ai.sentinel.example", "https://ai.sentinel.example"),
 ]
 
 
@@ -251,3 +345,92 @@ def test_configuration_settings_google_upper_case_keyword_accepted() -> None:
     settings = GoogleWorkspaceSettings(_env_file=None, SRE_BOT_EMAIL="kw@sentinel.example")  # type: ignore[call-arg]
 
     assert settings.sre_bot_email == "kw@sentinel.example"
+
+
+def test_configuration_settings_openai_api_key_reaches_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    """OPENAI_API_KEY sets the required secret field; compared through its secret value."""
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-sentinel")
+
+    settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert isinstance(settings.api_key, SecretStr)
+    assert settings.api_key.get_secret_value() == "sk-sentinel"
+
+
+@pytest.mark.parametrize(
+    ("env_name", "attribute", "raw", "expected"),
+    OPENAI_NAMES,
+    ids=[row[0] for row in OPENAI_NAMES],
+)
+def test_configuration_settings_openai_name_reaches_field(
+    monkeypatch: pytest.MonkeyPatch,
+    env_name: str,
+    attribute: str,
+    raw: str,
+    expected: Any,
+) -> None:
+    """Each OpenAI name sets its field when the required key is present; a default would differ from the sentinel."""
+    monkeypatch.setenv("OPENAI_API_KEY", _OPENAI_COMPANION_KEY)
+    monkeypatch.setenv(env_name, raw)
+
+    settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert getattr(settings, attribute) == expected
+
+
+def test_configuration_settings_aws_org_role_only_maps_services(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With only the org role set, as in production, the org-role services get it and the audit and logging roles stay empty."""
+    org_role = "arn:aws:iam::111111111111:role/sentinel-org"
+    monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", org_role)
+    monkeypatch.delenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", raising=False)
+    monkeypatch.delenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", raising=False)
+
+    role_map = AWSSettings(_env_file=None).service_role_map  # type: ignore[call-arg]
+
+    for service in ("organizations", "identitystore", "sso-admin", "ce"):
+        assert role_map[service] == org_role
+    assert role_map["audit"] == ""
+    assert role_map["logging"] == ""
+
+
+def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lower-case spelling of a Notify name and of an AWS alias is read too."""
+    monkeypatch.setenv("notify_api_url", "https://lower.sentinel.example")
+    monkeypatch.setenv("aws_retry_mode", "adaptive")
+
+    notify = NotifySettings(_env_file=None)  # type: ignore[call-arg]
+    aws = AWSSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert notify.notify_api_url == "https://lower.sentinel.example"
+    assert aws.retry_mode == "adaptive"
+
+
+def test_configuration_settings_aws_bare_field_name_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The bare field name RETRY_MODE is not an environment name; only the AWS_RETRY_MODE alias is."""
+    monkeypatch.setenv("RETRY_MODE", "legacy")
+    monkeypatch.delenv("AWS_RETRY_MODE", raising=False)
+
+    settings = AWSSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.retry_mode == "standard"
+
+
+def test_configuration_settings_aws_upper_case_keyword_accepted() -> None:
+    """A constructor keyword in the environment spelling still sets the lower-case AWS field."""
+    settings = AWSSettings(_env_file=None, AWS_REGION="kw-region")  # type: ignore[call-arg]
+
+    assert settings.aws_region == "kw-region"
+
+
+def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Lines written 'NAME =value', as some production .env lines are, reach a no-alias and an aliased field."""
+    monkeypatch.delenv("SENTINEL_SHARED_KEY", raising=False)
+    monkeypatch.delenv("AWS_SSO_INSTANCE_ID", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("SENTINEL_SHARED_KEY =spaced-shared-key\nAWS_SSO_INSTANCE_ID =d-spaced\n")
+
+    sentinel = SentinelSettings(_env_file=env_file)  # type: ignore[call-arg]
+    aws = AWSSettings(_env_file=env_file)  # type: ignore[call-arg]
+
+    assert sentinel.sentinel_shared_key == "spaced-shared-key"
+    assert aws.instance_id == "d-spaced"

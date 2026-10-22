@@ -13,13 +13,13 @@ from integrations.aws.settings import AWSSettings, get_aws_settings
 pytestmark = pytest.mark.unit
 
 _FEATURE_FIELDS = [
-    ("SYSTEM_ADMIN_PERMISSIONS", "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS"),
-    ("VIEW_ONLY_PERMISSIONS", "AWS_SSO_VIEW_ONLY_PERMISSIONS"),
-    ("AUDIT_ROLE_ARN", "AWS_AUDIT_ACCOUNT_ROLE_ARN"),
-    ("ORG_ROLE_ARN", "AWS_ORG_ACCOUNT_ROLE_ARN"),
-    ("LOGGING_ROLE_ARN", "AWS_LOGGING_ACCOUNT_ROLE_ARN"),
-    ("INSTANCE_ID", "AWS_SSO_INSTANCE_ID"),
-    ("INSTANCE_ARN", "AWS_SSO_INSTANCE_ARN"),
+    ("system_admin_permissions", "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS"),
+    ("view_only_permissions", "AWS_SSO_VIEW_ONLY_PERMISSIONS"),
+    ("audit_role_arn", "AWS_AUDIT_ACCOUNT_ROLE_ARN"),
+    ("org_role_arn", "AWS_ORG_ACCOUNT_ROLE_ARN"),
+    ("logging_role_arn", "AWS_LOGGING_ACCOUNT_ROLE_ARN"),
+    ("instance_id", "AWS_SSO_INSTANCE_ID"),
+    ("instance_arn", "AWS_SSO_INSTANCE_ARN"),
 ]
 
 
@@ -29,20 +29,20 @@ class TestTransportFields:
     def test_defaults_resolve_when_env_is_empty(self) -> None:
         settings = AWSSettings()
 
-        assert settings.AWS_REGION == "ca-central-1"
-        assert settings.RETRY_MAX_ATTEMPTS == 3
-        assert settings.RETRY_MODE == "standard"
-        assert settings.CONNECT_TIMEOUT_SECONDS == 10
-        assert settings.READ_TIMEOUT_SECONDS == 10
+        assert settings.aws_region == "ca-central-1"
+        assert settings.retry_max_attempts == 3
+        assert settings.retry_mode == "standard"
+        assert settings.connect_timeout_seconds == 10
+        assert settings.read_timeout_seconds == 10
 
     @pytest.mark.parametrize(
         ("field", "alias", "raw", "expected"),
         [
-            ("AWS_REGION", "AWS_REGION", "eu-west-1", "eu-west-1"),
-            ("RETRY_MAX_ATTEMPTS", "AWS_RETRY_MAX_ATTEMPTS", "5", 5),
-            ("RETRY_MODE", "AWS_RETRY_MODE", "adaptive", "adaptive"),
-            ("CONNECT_TIMEOUT_SECONDS", "AWS_CONNECT_TIMEOUT_SECONDS", "2", 2),
-            ("READ_TIMEOUT_SECONDS", "AWS_READ_TIMEOUT_SECONDS", "7", 7),
+            ("aws_region", "AWS_REGION", "eu-west-1", "eu-west-1"),
+            ("retry_max_attempts", "AWS_RETRY_MAX_ATTEMPTS", "5", 5),
+            ("retry_mode", "AWS_RETRY_MODE", "adaptive", "adaptive"),
+            ("connect_timeout_seconds", "AWS_CONNECT_TIMEOUT_SECONDS", "2", 2),
+            ("read_timeout_seconds", "AWS_READ_TIMEOUT_SECONDS", "7", 7),
         ],
     )
     def test_reads_from_env_alias(
@@ -57,12 +57,12 @@ class TestEndpointFields:
     """Only a dynamodb-specific local endpoint exists; the global endpoint field is gone."""
 
     def test_dynamodb_endpoint_defaults_to_none(self) -> None:
-        assert AWSSettings().DYNAMODB_ENDPOINT_URL is None
+        assert AWSSettings().dynamodb_endpoint_url is None
 
     def test_dynamodb_endpoint_reads_botocore_native_alias(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("AWS_ENDPOINT_URL_DYNAMODB", "http://dynamodb-local:8000")
 
-        assert AWSSettings().DYNAMODB_ENDPOINT_URL == "http://dynamodb-local:8000"
+        assert AWSSettings().dynamodb_endpoint_url == "http://dynamodb-local:8000"
 
     def test_global_endpoint_field_is_absent(self) -> None:
         assert "AWS_ENDPOINT_URL" not in AWSSettings.model_fields
@@ -73,24 +73,24 @@ class TestClassificationFields:
     """Error-code catalogues and the transient retry hint."""
 
     def test_transient_retry_after_defaults_to_sixty_seconds(self) -> None:
-        assert AWSSettings().TRANSIENT_RETRY_AFTER_SECONDS == 60
+        assert AWSSettings().transient_retry_after_seconds == 60
 
     def test_transient_retry_after_reads_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("AWS_TRANSIENT_RETRY_AFTER_SECONDS", "15")
 
-        assert AWSSettings().TRANSIENT_RETRY_AFTER_SECONDS == 15
+        assert AWSSettings().transient_retry_after_seconds == 15
 
     def test_catalogue_defaults_cover_the_canonical_codes(self) -> None:
         settings = AWSSettings()
 
-        assert {"ResourceNotFoundException", "NoSuchEntity", "NotFoundException"} <= set(settings.NOT_FOUND_CODES)
-        assert {"AccessDenied", "AccessDeniedException", "ExpiredToken"} <= set(settings.UNAUTHORIZED_CODES)
-        assert {"Throttling", "ThrottlingException", "ServiceUnavailable", "InternalServerError"} <= set(settings.TRANSIENT_CODES)
+        assert {"ResourceNotFoundException", "NoSuchEntity", "NotFoundException"} <= set(settings.not_found_codes)
+        assert {"AccessDenied", "AccessDeniedException", "ExpiredToken"} <= set(settings.unauthorized_codes)
+        assert {"Throttling", "ThrottlingException", "ServiceUnavailable", "InternalServerError"} <= set(settings.transient_codes)
 
     def test_catalogues_are_overridable_from_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setenv("AWS_NOT_FOUND_CODES", '["CustomMissing"]')
 
-        assert AWSSettings().NOT_FOUND_CODES == ["CustomMissing"]
+        assert AWSSettings().not_found_codes == ["CustomMissing"]
 
 
 class TestFeatureFields:
@@ -111,7 +111,7 @@ class TestFeatureFields:
         monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:org")
         monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:logging")
 
-        assert AWSSettings().SERVICE_ROLE_MAP == {
+        assert AWSSettings().service_role_map == {
             "audit": "arn:audit",
             "organizations": "arn:org",
             "identitystore": "arn:org",

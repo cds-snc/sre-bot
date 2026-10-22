@@ -63,7 +63,7 @@ class TestBuildSsoAdminAdapter:
             return build_sso_admin_adapter()
 
     def test_single_sso_admin_client_with_org_role(self) -> None:
-        """One get_aws_client('sso-admin') call carries SERVICE_ROLE_MAP['sso-admin']."""
+        """One get_aws_client('sso-admin') call carries service_role_map['sso-admin']."""
         calls: list[dict[str, Any]] = []
 
         adapter = self._build(_sso_admin_client(), calls)

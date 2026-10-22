@@ -76,7 +76,7 @@ If multiple groups normalize to the same token, the adapter returns `AMBIGUOUS_G
 |---|---|
 | `AWS_SSO_INSTANCE_ID` | Read by `build_aws_identity_center_adapter()` from `integrations.aws.settings` and passed to the adapter as its identity store id |
 | IAM permissions | `identitystore:ListUsers`, `identitystore:CreateUser`, `identitystore:DeleteUser`, `identitystore:ListGroups`, `identitystore:ListGroupMembershipsForMember`, `identitystore:CreateGroupMembership`, `identitystore:DeleteGroupMembership` |
-| `AWS_ORG_ACCOUNT_ROLE_ARN` | Role assumed for identitystore calls (`SERVICE_ROLE_MAP["identitystore"]`); when unset, the bot's own credentials are used |
+| `AWS_ORG_ACCOUNT_ROLE_ARN` | Role assumed for identitystore calls (`service_role_map["identitystore"]`); when unset, the bot's own credentials are used |
 | boto3 `identitystore` client | Built by `get_aws_client("identitystore", role_arn=...)` in the factory and injected; the adapter never builds one |
 
 The adapter class does **not** read settings. `build_aws_identity_center_adapter()` reads them once and injects the client and instance id.

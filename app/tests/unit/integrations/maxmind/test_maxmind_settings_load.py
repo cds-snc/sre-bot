@@ -1,7 +1,7 @@
 """Tests for the MaxMind vendor settings slice in integrations/maxmind/settings.py.
 
 Each test removes the slice's environment variables and ignores the .env file,
-so it observes only the values it sets. Field values are asserted by their
+so it observes only the values it sets. Fields are looked up by their lower-cased
 environment variable names, which the slice must keep unchanged.
 """
 
@@ -40,20 +40,20 @@ def test_maxmind_settings_reads_each_field_from_its_env_var(monkeypatch: pytest.
 
     settings = MaxMindSettings(_env_file=None)
 
-    assert getattr(settings, name) == "from-env"
+    assert getattr(settings, name.lower()) == "from-env"
 
 
 def test_maxmind_settings_defaults_apply_when_unset() -> None:
     """With no variables set, every field holds its documented default."""
     settings = MaxMindSettings(_env_file=None)
 
-    assert {name: getattr(settings, name) for name in _DEFAULTS} == _DEFAULTS
+    assert {name: getattr(settings, name.lower()) for name in _DEFAULTS} == _DEFAULTS
 
 
-def test_maxmind_settings_model_config_reads_dotenv_case_sensitively() -> None:
-    """The slice loads .env, matches names case-sensitively and ignores unknown keys."""
+def test_maxmind_settings_model_config_reads_dotenv_case_insensitively() -> None:
+    """The slice loads .env, matches names case-insensitively and ignores unknown keys."""
     config = MaxMindSettings.model_config
 
     assert config.get("env_file") == ".env"
-    assert config.get("case_sensitive") is True
+    assert config.get("case_sensitive") is False
     assert config.get("extra") == "ignore"

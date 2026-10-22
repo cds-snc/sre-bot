@@ -22,7 +22,7 @@ pytestmark = pytest.mark.unit
 def _mock_client(handler, settings) -> httpx.AsyncClient:
     """Build an httpx.AsyncClient wired to a MockTransport handler."""
     return httpx.AsyncClient(
-        base_url=settings.BASE_URL,
+        base_url=settings.base_url,
         transport=httpx.MockTransport(handler),
     )
 
@@ -151,7 +151,7 @@ class TestTemperature:
 
     @pytest.mark.asyncio
     async def test_zero_is_sent_when_opted_into(self, openai_settings, monkeypatch):
-        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.0)
+        monkeypatch.setattr(openai_settings, "temperature", 0.0)
 
         payload = await self._payload_for(openai_settings)
 
@@ -159,7 +159,7 @@ class TestTemperature:
 
     @pytest.mark.asyncio
     async def test_a_configured_temperature_is_used(self, openai_settings, monkeypatch):
-        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.7)
+        monkeypatch.setattr(openai_settings, "temperature", 0.7)
 
         payload = await self._payload_for(openai_settings)
 
@@ -168,12 +168,12 @@ class TestTemperature:
     @pytest.mark.asyncio
     async def test_a_negative_temperature_omits_the_parameter(self, openai_settings, monkeypatch):
         """Some models reject temperature outright, which would fail the call."""
-        monkeypatch.setattr(openai_settings, "TEMPERATURE", -1.0)
+        monkeypatch.setattr(openai_settings, "temperature", -1.0)
 
         payload = await self._payload_for(openai_settings)
 
         assert "temperature" not in payload
-        assert payload["model"] == openai_settings.MODEL
+        assert payload["model"] == openai_settings.model
 
 
 class TestErrorDiagnostics:
@@ -181,7 +181,7 @@ class TestErrorDiagnostics:
 
     @pytest.mark.asyncio
     async def test_the_error_body_and_sent_parameters_are_logged(self, openai_settings, monkeypatch):
-        monkeypatch.setattr(openai_settings, "TEMPERATURE", 0.0)
+        monkeypatch.setattr(openai_settings, "temperature", 0.0)
         body = '{"error": {"message": "Unsupported parameter: temperature", "param": "temperature"}}'
 
         def handler(request: httpx.Request) -> httpx.Response:

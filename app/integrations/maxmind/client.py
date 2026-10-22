@@ -55,7 +55,7 @@ class MaxMindClient:
     """Client for MaxMind GeoIP2 database operations."""
 
     def __init__(self, maxmind_settings: MaxMindSettings) -> None:
-        self._db_path = maxmind_settings.MAXMIND_DB_PATH
+        self._db_path = maxmind_settings.maxmind_db_path
         self._logger = logger.bind(component="maxmind_client")
 
     def geolocate(self, ip_address: str) -> OperationResult:

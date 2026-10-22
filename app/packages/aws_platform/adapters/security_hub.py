@@ -91,6 +91,6 @@ class SecurityHubAdapter:
 
 
 def build_security_hub_adapter() -> SecurityHubAdapter:
-    """Build the adapter with the securityhub role from ``SERVICE_ROLE_MAP``."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("securityhub") or None
+    """Build the adapter with the securityhub role from ``service_role_map``."""
+    role_arn = get_aws_settings().service_role_map.get("securityhub") or None
     return SecurityHubAdapter(get_aws_client("securityhub", role_arn=role_arn))

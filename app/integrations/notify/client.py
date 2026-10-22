@@ -62,8 +62,8 @@ def create_jwt_token(secret, client_id):
 def create_authorization_header():
     """Function to create the authorization header for the Notify API"""
     # get the client_id and secret from the environment variables
-    client_id = notify_settings.NOTIFY_SRE_USER_NAME
-    secret = notify_settings.NOTIFY_SRE_CLIENT_SECRET
+    client_id = notify_settings.notify_sre_user_name
+    secret = notify_settings.notify_sre_client_secret
 
     # If the client_id or secret is missing, raise an error
     if not client_id:
@@ -116,7 +116,7 @@ def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -
     if settings.ENVIRONMENT != "production":
         log.info("revoke_api_key_skipped", api_key=api_key)
         return "error"
-    url = notify_settings.NOTIFY_API_URL
+    url = notify_settings.notify_api_url
 
     if url is None:
         log.error("revoke_api_key_error", error="NOTIFY_API_URL is missing")

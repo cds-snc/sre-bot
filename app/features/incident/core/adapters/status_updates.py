@@ -244,5 +244,5 @@ def build_status_update_store() -> DynamoDbStatusUpdateStore:
     Retries are safe: a replayed conditional put that finds its own item is
     reported as success.
     """
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("dynamodb") or None
+    role_arn = get_aws_settings().service_role_map.get("dynamodb") or None
     return DynamoDbStatusUpdateStore(get_aws_client("dynamodb", role_arn=role_arn))

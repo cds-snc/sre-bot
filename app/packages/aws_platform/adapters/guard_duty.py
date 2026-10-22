@@ -105,6 +105,6 @@ class GuardDutyAdapter:
 
 
 def build_guard_duty_adapter() -> GuardDutyAdapter:
-    """Build the adapter with the guardduty role from ``SERVICE_ROLE_MAP``."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("guardduty") or None
+    """Build the adapter with the guardduty role from ``service_role_map``."""
+    role_arn = get_aws_settings().service_role_map.get("guardduty") or None
     return GuardDutyAdapter(get_aws_client("guardduty", role_arn=role_arn))

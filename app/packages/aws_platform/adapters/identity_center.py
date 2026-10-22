@@ -298,7 +298,7 @@ def build_identity_center_adapter() -> IdentityCenterAdapter:
     retries-disabled one for the non-idempotent creates.
     """
     settings = get_aws_settings()
-    role_arn = settings.SERVICE_ROLE_MAP.get("identitystore") or None
+    role_arn = settings.service_role_map.get("identitystore") or None
     identitystore = get_aws_client("identitystore", role_arn=role_arn)
     identitystore_no_retry = get_aws_client("identitystore", role_arn=role_arn, retries=False)
-    return IdentityCenterAdapter(identitystore, identitystore_no_retry, settings.INSTANCE_ID)
+    return IdentityCenterAdapter(identitystore, identitystore_no_retry, settings.instance_id)

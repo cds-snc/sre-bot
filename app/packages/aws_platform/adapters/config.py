@@ -96,6 +96,6 @@ class ConfigAdapter:
 
 
 def build_config_adapter() -> ConfigAdapter:
-    """Build the adapter with the config role from ``SERVICE_ROLE_MAP``."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("config") or None
+    """Build the adapter with the config role from ``service_role_map``."""
+    role_arn = get_aws_settings().service_role_map.get("config") or None
     return ConfigAdapter(get_aws_client("config", role_arn=role_arn))
