@@ -11,7 +11,7 @@
 7. [outbound-clients.md](outbound-clients.md) — if your feature calls an external service ([sdk-typing.md](sdk-typing.md) covers typing its SDK).
 8. [testing.md](testing.md) — before you open a PR.
 
-Everything else is reference: read it when the topic comes up.
+Everything else is reference: read it when the topic comes up. Procedures for operating the system are runbooks in [`docs/runbooks/`](../docs/runbooks/), linked from the record that decides them ([governance.md](governance.md)).
 
 ## The vision in three sentences
 
@@ -51,6 +51,7 @@ The app is the organisation's internal operations platform, with incident respon
 | [approvals.md](approvals.md) | Generic human-approval workflow capability | target |
 | [oncall.md](oncall.md) | On-call as a capability: schedule sources, who is on call now, incident and usergroup-sync consumers | target |
 | [lifecycle.md](lifecycle.md) | Phased startup, which failures abort boot, credential checks, shutdown across replicas | target |
+| [deployment.md](deployment.md) | Image identity, ECR tag policy, task-definition ownership, rollback and its rehearsal | now |
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |
 | [i18n.md](i18n.md) | EN/FR translation | target |

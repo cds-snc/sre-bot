@@ -26,6 +26,8 @@ The Route53 health check is currently **unwired**: `aws_route53_record.sre_bot` 
 
 Keep all four layers — each answers a genuinely different question (image-local, ECS-container, LB-routing, DNS-external) and none is redundant given ECS's override behavior. The Route53 health check must either (a) feed a `aws_cloudwatch_metric_alarm` with a notification action, giving it a real external-reachability signal distinct from the ALB's inside view, or (b) be removed if that signal isn't wanted — left unwired is not an acceptable end state. Do not loosen the ALB's check interval/thresholds to cut request volume: AWS does not bill per health-check request, and faster failure detection outweighs log-noise concerns (log noise is addressed separately, at the logging layer — [observability.md](observability.md)).
 
+**Grace period.** The ECS service's `health_check_grace_period_seconds` exceeds the measured boot time, and the container check's `startPeriod` stays below it. The deployment circuit breaker counts a task replaced for a failed health check as a deploy failure ([deployment.md](deployment.md)), so a slow but healthy boot must not fail its checks. During the grace period ECS ignores unhealthy load balancer and container checks ([ECS service parameters](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service_definition_parameters.html)).
+
 ## Consequences
 
 - ~35 req/min baseline on `/version` is expected and already budgeted for (rate limit, code comment) — not something to alarm on or "fix" by itself.
@@ -44,3 +46,4 @@ Tickets: TASK-68 (wire or remove the unwired Route53 health check), TASK-53 (the
 
 **Changes:**
 - 2026-09-25: every health check is static and serves as liveness and readiness; no dependency check stands behind the platform checks.
+- 2026-10-22: the service's health-check grace period exceeds boot time, because the circuit breaker counts failed health checks (TASK-111.16).

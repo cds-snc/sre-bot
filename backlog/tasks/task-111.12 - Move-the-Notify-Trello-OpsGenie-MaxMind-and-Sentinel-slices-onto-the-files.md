@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-21T21:08:00Z'
+updated_date: '2026-10-22T13:57:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -12,6 +12,7 @@ dependencies:
   - TASK-111.3
   - TASK-111.4
   - TASK-111.6.2
+  - TASK-111.16
 references:
   - decisions/configuration.md
   - https://github.com/cds-snc/sre-bot/issues/1745

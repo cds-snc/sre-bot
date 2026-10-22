@@ -2,6 +2,11 @@ name: Build and Push to Container Registry
 
 on:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Existing image tag (<sha>-<YYYY-MM-DD>) to deploy without building, for a rollback or a redeploy. Leave empty to build and deploy the selected commit."
+        required: false
+        default: ""
   push:
     branches:
       - main
@@ -11,6 +16,7 @@ on:
       - "terraform/**"
       - "decisions/**"
       - "backlog/**"
+      - "docs/**"
 
 env:
   GITHUB_SHA: ${{ github.sha }}
@@ -22,6 +28,221 @@ permissions:
 
 jobs:
   build:
+    if: github.event_name == 'push' || inputs.image_tag == ''
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+      image_digest: ${{ steps.digest.outputs.image_digest }}
+      built: ${{ steps.existing.outputs.exists == 'false' }}
+    steps:
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@7b6ba63b4f045de61c98a3c1b99fdd08f32b0784 # main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+
+      - name: Configure aws credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@ffc08eae7350b1061d7de219e2135c75561fb680 # master
+        with:
+          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-apply
+          role-session-name: SREBotGitHubActions
+          aws-region: "ca-central-1"
+
+      # Computed once, so the tag cannot change between steps that run either side of midnight
+      - name: Set image tag
+        id: tag
+        run: echo "image_tag=${GITHUB_SHA}-$(date '+%Y-%m-%d')" >> "$GITHUB_OUTPUT"
+
+      # The sha tags are immutable: a rerun on the same commit and day reuses the pushed image
+      - name: Check for an existing image
+        id: existing
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          if aws ecr describe-images --repository-name sre-bot --image-ids imageTag="$IMAGE_TAG" > /dev/null 2> describe-images.err; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ImageNotFoundException describe-images.err; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          else
+            cat describe-images.err >&2
+            exit 1
+          fi
+
+      - name: Download GeoDB from S3
+        if: steps.existing.outputs.exists == 'false'
+        run: |
+          aws s3 cp s3://${{ secrets.GEO_DB_BUCKET }}/GeoLite2-City.tar.gz ./GeoLite2-City.tar.gz
+
+      - name: Login to Amazon ECR
+        if: steps.existing.outputs.exists == 'false'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7 # v1.7.1
+
+      - name: Build container
+        if: steps.existing.outputs.exists == 'false'
+        working-directory: ./
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          docker build \
+          --build-arg git_sha="$GITHUB_SHA" \
+          -t "$REGISTRY/sre-bot:$IMAGE_TAG" \
+          -t "$REGISTRY/sre-bot:latest" .
+
+      # latest moves only after the immutable tag is pushed
+      - name: Push containers to Amazon ECR
+        if: steps.existing.outputs.exists == 'false'
+        working-directory: ./app
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          docker push "$REGISTRY/sre-bot:$IMAGE_TAG"
+          docker push "$REGISTRY/sre-bot:latest"
+
+      - name: Resolve image digest
+        id: digest
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.image_tag }}
+        run: |
+          digest=$(aws ecr describe-images --repository-name sre-bot --image-ids imageTag="$IMAGE_TAG" \
+            --query 'imageDetails[0].imageDigest' --output text)
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::No digest for sre-bot:$IMAGE_TAG"
+            exit 1
+          fi
+          echo "image_digest=$digest" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build
+    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.build.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    # Deploys and rollbacks run one at a time in arrival order; none is dropped
+    concurrency:
+      group: ecs-deploy
+      queue: max
+    steps:
+      - name: Audit DNS requests
+        uses: cds-snc/dns-proxy-action@7b6ba63b4f045de61c98a3c1b99fdd08f32b0784 # main
+        env:
+          DNS_PROXY_FORWARDTOSENTINEL: "true"
+          DNS_PROXY_LOGANALYTICSWORKSPACEID: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          DNS_PROXY_LOGANALYTICSSHAREDKEY: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+
+      - name: Configure aws credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@ffc08eae7350b1061d7de219e2135c75561fb680 # master
+        with:
+          role-to-assume: arn:aws:iam::283582579564:role/sre-bot-apply
+          role-session-name: SREBotGitHubActions
+          aws-region: "ca-central-1"
+
+      # The task definition pins the image by digest, so a rollback runs the previous image
+      - name: Resolve image
+        id: image
+        env:
+          REQUESTED_TAG: ${{ inputs.image_tag }}
+          BUILT_TAG: ${{ needs.build.outputs.image_tag }}
+          BUILT_DIGEST: ${{ needs.build.outputs.image_digest }}
+        run: |
+          if [[ -n "$REQUESTED_TAG" ]]; then
+            if [[ ! "$REQUESTED_TAG" =~ ^[0-9a-f]{40}-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+              echo "::error::image_tag must be <40-character git sha>-<YYYY-MM-DD>"
+              exit 1
+            fi
+            tag="$REQUESTED_TAG"
+            digest=$(aws ecr describe-images --repository-name sre-bot --image-ids imageTag="$tag" \
+              --query 'imageDetails[0].imageDigest' --output text)
+          else
+            tag="$BUILT_TAG"
+            digest="$BUILT_DIGEST"
+          fi
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "::error::No digest for sre-bot:$tag"
+            exit 1
+          fi
+          {
+            echo "tag=$tag"
+            echo "git_sha=${tag:0:40}"
+            echo "image=$REGISTRY/sre-bot@$digest"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Deployed image"
+            echo "- Tag: \`$tag\`"
+            echo "- Digest: \`$digest\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Starts from the family's latest revision, so terraform's task definition changes ship too
+      - name: Render task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@8d79160660ad39c402a16e5fc7cd2a32e8f7d6b7 # v1.9.1
+        with:
+          task-definition-family: sre-bot-task
+          container-name: sre-bot
+          image: ${{ steps.image.outputs.image }}
+
+      # Allow this step to fail so the verify step reports the outcome
+      - name: Deploy to ECS
+        id: deploy
+        continue-on-error: true
+        uses: aws-actions/amazon-ecs-deploy-task-definition@a00d4d57ac0de1a99b39fe469f3d898d38717c2b # v2.6.4
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          cluster: sre-bot-cluster
+          service: sre-bot-service
+          wait-for-service-stability: true
+          wait-for-minutes: 15
+
+      - name: Verify the deployed revision
+        id: verify
+        env:
+          REGISTERED: ${{ steps.deploy.outputs.task-definition-arn }}
+        run: |
+          aws ecs describe-services --cluster sre-bot-cluster --services sre-bot-service > services.json
+          if ! result=$(.github/workflows/scripts/verify-ecs-deployment.sh "$REGISTERED" services.json 2>&1); then
+            echo "message=$result" >> "$GITHUB_OUTPUT"
+            echo "::error::$result"
+            exit 1
+          fi
+          echo "$result"
+
+      - name: Slack Notify Success
+        if: success()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_SUCCESS_WEBHOOK }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
+        run: |
+          jq -n --arg text "✅ ECS deployment for sre-bot succeeded ($IMAGE_TAG)." '{text: $text}' \
+          | curl -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK"
+
+      - name: Slack Notify Failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+          MESSAGE: ${{ steps.verify.outputs.message }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          jq -n --arg text "❌ ECS deployment for sre-bot failed. ${MESSAGE:-See the run.} $RUN_URL" '{text: $text}' \
+          | curl -X POST -H 'Content-type: application/json' --data @- "$SLACK_WEBHOOK"
+
+      - name: Report deployment to Sentinel
+        if: success()
+        uses: cds-snc/sentinel-forward-data-action@765ac36a34b70d87ae77f228c48025a4331b6275 # main
+        with:
+          input_data: '{"product": "sre-bot", "version": "${{ steps.image.outputs.git_sha }}", "repository": "${{ github.repository }}", "environment": "production"}'
+          log_type: CDS_Product_Deployment_Data
+          log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
+          log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
+
+  # Runs beside the deploy so a scanner outage never blocks or fails a deploy
+  sbom:
+    needs: build
+    if: needs.build.outputs.built == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Audit DNS requests
@@ -41,74 +262,15 @@ jobs:
           role-session-name: SREBotGitHubActions
           aws-region: "ca-central-1"
 
-      - name: Download GeoDB from S3
-        run: |
-          aws s3 cp s3://${{ secrets.GEO_DB_BUCKET }}/GeoLite2-City.tar.gz ./GeoLite2-City.tar.gz
-
       - name: Login to Amazon ECR
-        id: login-ecr
         uses: aws-actions/amazon-ecr-login@5a88a04c91d5c6f97aae0d9be790e64d9b1d47b7 # v1.7.1
 
-      - name: Build container
-        working-directory: ./
-        run: |
-          docker build \
-          --build-arg git_sha=$GITHUB_SHA \
-          -t $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'` \
-          -t $REGISTRY/sre-bot:latest .
-
-      - name: Push containers to Amazon ECR
-        working-directory: ./app
-        run: |
-          docker push $REGISTRY/sre-bot:$GITHUB_SHA-`date '+%Y-%m-%d'`
-          docker push $REGISTRY/sre-bot:latest
-
-      - name: Restart ECS
-        run: |
-          aws ecs update-service --cluster sre-bot-cluster --service sre-bot-service --force-new-deployment > /dev/null 2>&1
-      
-     # Allow this step to fail so we can handle success/failure and report it to slack. By default it waits for 10 minutes
-      - name: Wait for ECS Stability
-        id: ecs_wait
-        continue-on-error: true
-        run: |
-          echo "Wait for 15 minutes for ECS to stabilize.."
-          sleep 300 # Sleep for 5 minutes. The ecs wait command waits for an additional 10 minutes
-          aws ecs wait services-stable \
-            --cluster sre-bot-cluster \
-            --services sre-bot-service 
-
-      # Slack notification on successful ECS wait
-      - name: Slack Notify Success
-        if: steps.ecs_wait.outcome == 'success'
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data '{"text": "✅ ECS deployment for sre-bot succeeded!"}' \
-          ${{ secrets.SLACK_SUCCESS_WEBHOOK}}
-
-      # Slack notification on failed ECS wait
-      - name: Slack Notify Failure
-        if: steps.ecs_wait.outcome == 'failure'
-        run: |
-          curl -X POST -H 'Content-type: application/json' \
-          --data '{"text": "❌ ECS deployment for sre-bot failed to stabilize."}' \
-          ${{ secrets.SLACK_WEBHOOK_URL}}
-
-      - name: Report deployment to Sentinel
-        if: steps.ecs_wait.outcome == 'success'
-        uses: cds-snc/sentinel-forward-data-action@765ac36a34b70d87ae77f228c48025a4331b6275 # main
-        with:
-          input_data: '{"product": "sre-bot", "version": "${{ github.sha }}", "repository": "${{ github.repository }}", "environment": "production"}'
-          log_type: CDS_Product_Deployment_Data
-          log_analytics_workspace_id: ${{ secrets.LOG_ANALYTICS_WORKSPACE_ID }}
-          log_analytics_workspace_key: ${{ secrets.LOG_ANALYTICS_WORKSPACE_KEY }}
-
       - name: Docker generate SBOM
-        uses: cds-snc/security-tools/.github/actions/generate-sbom@d123fa2b895f7ef5b400fad333d2101b103b2e64 # v4.0.4 
+        uses: cds-snc/security-tools/.github/actions/generate-sbom@d123fa2b895f7ef5b400fad333d2101b103b2e64 # v4.0.4
         env:
           TRIVY_DB_REPOSITORY: ${{ vars.TRIVY_DB_REPOSITORY }}
         with:
-          docker_image: "${{ env.REGISTRY }}/sre-bot:latest"
+          docker_image: "${{ env.REGISTRY }}/sre-bot:${{ needs.build.outputs.image_tag }}"
           dockerfile_path: "./Dockerfile"
           sbom_name: "sre-bot"
           token: "${{ secrets.GITHUB_TOKEN }}"

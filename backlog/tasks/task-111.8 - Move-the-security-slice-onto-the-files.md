@@ -4,7 +4,7 @@ title: Move the security slice onto the files
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-21T20:23:00Z'
+updated_date: '2026-10-22T13:57:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -12,6 +12,7 @@ dependencies:
   - TASK-111.3
   - TASK-111.4
   - TASK-111.5.1
+  - TASK-111.16
 references:
   - decisions/security.md
   - decisions/configuration.md

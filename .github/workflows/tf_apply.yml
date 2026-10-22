@@ -25,6 +25,10 @@ permissions:
 jobs:
   terragrunt-apply:
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    # Applies run one at a time in arrival order; separate from ecs-deploy (decisions/deployment.md)
+    concurrency:
+      group: terraform-apply
+      queue: max
     strategy:
       fail-fast: false
       matrix:

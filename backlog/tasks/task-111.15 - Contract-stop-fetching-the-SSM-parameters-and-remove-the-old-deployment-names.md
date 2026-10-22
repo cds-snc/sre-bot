@@ -3,8 +3,8 @@ id: TASK-111.15
 title: 'Contract: stop fetching the SSM parameters and remove the old deployment names'
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:25'
-updated_date: '2026-10-21 17:07'
+created_date: 2026-10-20 23:25
+updated_date: '2026-10-22T13:57:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -21,7 +21,7 @@ references:
   - app/bin/entry.sh
   - terraform/templates/sre-bot.json.tpl
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1748'
+  - https://github.com/cds-snc/sre-bot/issues/1748
 parent_task_id: TASK-111
 type: feature
 ordinal: 421000
@@ -41,9 +41,22 @@ Delivers TASK-54 AC3: app/bin/entry.sh no longer fetches sre-bot-config and sre-
 - [ ] #4 The CI workflow and pytest env set no unread variable
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #6 TASK-54's AC3 is checked and TASK-54 is set to Done in this PR
+- [ ] #7 Both subtasks TASK-111.15.1 and TASK-111.15.2 are done
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Both SSM parameters are deleted after the deploy is verified (human)
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-22T13:57:00Z
+
+---
+
+Split into TASK-111.15.1 (entry.sh, task definition; ACs #1, #2, #4, #5 moved there) and TASK-111.15.2 (IAM read, old GCP key parameter, TF_VAR lines, TASK-54 Done; ACs #3, #6 and DoD #1 moved there). Proposed removal of ACs #1 to #6 and DoD #1 from this coordinator, since they now live in the subtasks and would otherwise be checked twice; left in place for the human to decide. Reason for the split: under decisions/deployment.md a terraform task-definition change reaches production only at the next deploy, and removing the IAM read while the previous revision still fetches the blobs would break a rollback.
+
+---
+<!-- COMMENTS:END -->

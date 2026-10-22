@@ -25,7 +25,7 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 
 **Checks are executable or deleted.** Each record's Checks section lists only things a CI step, a lint rule, or a five-minute review can verify. Aspirations are not checks.
 
-**Why vs how.** Decisions record *why* and the binding rule. Long procedural detail (step-by-step recipes, exhaustive tables) belongs in code, tests, or a feature package README — not here. If a record is growing past two pages, it is trying to be a design document; split the decision out and delete the rest.
+**Why vs how.** Decisions record *why* and the binding rule. Step-by-step procedures for operating the system live in `docs/runbooks/`, one how-to per file with a verb-first kebab-case name and frontmatter `title`, `owner`, `last_reviewed` and `decisions` ([Diátaxis how-to guides](https://diataxis.fr/how-to-guides/)). A record links to its runbook and never carries the steps; a runbook links to its record and never carries the rationale. The cascade rule extends to runbooks: a PR that changes a mechanism updates the runbook that operates it. Other `docs/` folders are added only when a second kind of document exists, and planning and handoff material stays in `backlog/docs/`. Other procedural detail (recipes for code, exhaustive tables) belongs in code, tests, or a feature package README — not here. If a record is growing past two pages, it is trying to be a design document; split the decision out and delete the rest.
 
 **Sources.** Cite the current codebase freely — describing reality is required, not forbidden. External sources: at most the two or three that actually ground the decision.
 
@@ -44,3 +44,4 @@ The previous corpus (`docs/adr/`) failed in specific, diagnosed ways: records gr
 **Changes:**
 - 2026-09-10: amendments are made in place, with one short dated sentence per change.
 - 2026-09-24: Migration sections name epic tickets, not subtasks; the backlog owns the breakdown.
+- 2026-10-22: operating procedures live in `docs/runbooks/`, linked from the record that decides them (TASK-111.16).
