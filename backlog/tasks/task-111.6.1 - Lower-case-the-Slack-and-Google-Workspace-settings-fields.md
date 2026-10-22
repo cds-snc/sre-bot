@@ -1,10 +1,10 @@
 ---
 id: TASK-111.6.1
 title: Lower-case the Slack and Google Workspace settings fields
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T21:01:00Z'
-updated_date: '2026-10-21T21:35:00Z'
+updated_date: '2026-10-22T12:49:00Z'
 labels:
   - configuration
 milestone: m-7
