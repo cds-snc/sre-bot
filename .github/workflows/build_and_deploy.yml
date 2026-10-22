@@ -7,6 +7,11 @@ on:
         description: "Existing image tag (<sha>-<YYYY-MM-DD>) to deploy without building, for a rollback or a redeploy. Leave empty to build and deploy the selected commit."
         required: false
         default: ""
+      rehearse_rollback:
+        description: "Rollback rehearsal (off-hours): deploy image_tag with an invalid ENVIRONMENT so boot fails and the circuit breaker rolls back. The run is expected to fail."
+        type: boolean
+        required: false
+        default: false
   push:
     branches:
       - main
@@ -28,7 +33,7 @@ permissions:
 
 jobs:
   build:
-    if: github.event_name == 'push' || inputs.image_tag == ''
+    if: github.event_name == 'push' || (inputs.image_tag == '' && !inputs.rehearse_rollback)
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ steps.tag.outputs.image_tag }}
@@ -44,6 +49,15 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
+
+      # Manual runs and re-runs choose what production runs; a re-run of a job repeats this step
+      - name: Require a repository admin for manual runs and re-runs
+        if: github.event_name == 'workflow_dispatch' || github.run_attempt != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.triggering_actor }}
+        run: .github/workflows/scripts/require-admin.sh "$REPOSITORY" "$ACTOR"
 
       - name: Configure aws credentials using OIDC
         uses: aws-actions/configure-aws-credentials@ffc08eae7350b1061d7de219e2135c75561fb680 # master
@@ -135,6 +149,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
 
+      # Manual runs and re-runs choose what production runs; a re-run of a job repeats this step
+      - name: Require a repository admin for manual runs and re-runs
+        if: github.event_name == 'workflow_dispatch' || github.run_attempt != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ACTOR: ${{ github.triggering_actor }}
+        run: .github/workflows/scripts/require-admin.sh "$REPOSITORY" "$ACTOR"
+
       - name: Configure aws credentials using OIDC
         uses: aws-actions/configure-aws-credentials@ffc08eae7350b1061d7de219e2135c75561fb680 # master
         with:
@@ -147,9 +170,14 @@ jobs:
         id: image
         env:
           REQUESTED_TAG: ${{ inputs.image_tag }}
+          REHEARSE: ${{ inputs.rehearse_rollback }}
           BUILT_TAG: ${{ needs.build.outputs.image_tag }}
           BUILT_DIGEST: ${{ needs.build.outputs.image_digest }}
         run: |
+          if [[ "$REHEARSE" == "true" && -z "$REQUESTED_TAG" ]]; then
+            echo "::error::A rollback rehearsal needs image_tag: the tag of the image running now"
+            exit 1
+          fi
           if [[ -n "$REQUESTED_TAG" ]]; then
             if [[ ! "$REQUESTED_TAG" =~ ^[0-9a-f]{40}-[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
               echo "::error::image_tag must be <40-character git sha>-<YYYY-MM-DD>"
@@ -185,6 +213,7 @@ jobs:
           task-definition-family: sre-bot-task
           container-name: sre-bot
           image: ${{ steps.image.outputs.image }}
+          environment-variables: ${{ inputs.rehearse_rollback && 'ENVIRONMENT=rollback-rehearsal' || '' }}
 
       # Allow this step to fail so the verify step reports the outcome
       - name: Deploy to ECS
@@ -210,6 +239,21 @@ jobs:
             exit 1
           fi
           echo "$result"
+
+      # The rehearsal revision would otherwise be the latest revision, and the next deploy renders from it
+      - name: Deregister the rehearsal revision
+        if: ${{ always() && inputs.rehearse_rollback && steps.deploy.outputs.task-definition-arn != '' }}
+        env:
+          REGISTERED: ${{ steps.deploy.outputs.task-definition-arn }}
+        run: |
+          current=$(aws ecs describe-services --cluster sre-bot-cluster --services sre-bot-service \
+            --query 'services[0].taskDefinition' --output text)
+          if [[ "$current" == "$REGISTERED" ]]; then
+            echo "::error::The service still runs the rehearsal revision ${REGISTERED##*/}; roll back with docs/runbooks/roll-back-a-deployment.md"
+            exit 1
+          fi
+          aws ecs deregister-task-definition --task-definition "$REGISTERED" > /dev/null
+          echo "Deregistered ${REGISTERED##*/}; the service runs ${current##*/}."
 
       - name: Slack Notify Success
         if: success()

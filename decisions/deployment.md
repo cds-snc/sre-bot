@@ -27,11 +27,11 @@ Until TASK-111.16, production ran `sre-bot:latest`. The deploy workflow pushed `
 
 **Serialization.** The deploy job runs in concurrency group `ecs-deploy` with `queue: max`, so deploys and rollbacks run one at a time in arrival order and none is dropped. `tf_apply` has its own group, `terraform-apply`. The two share no group: they write disjoint things, and a shared group would serialize them without ordering them.
 
-**Manual rollback.** For a deploy that boots but misbehaves, run the deploy workflow with an existing image tag. The tag is validated against the format, resolved to its digest in ECR, and no build runs. A rollback leaves `main` unchanged, so the next merge deploys forward again: revert or fix forward first. When the workflow is unavailable, point the service at an earlier revision with the AWS CLI. Procedure: [docs/runbooks/roll-back-a-deployment.md](../docs/runbooks/roll-back-a-deployment.md).
+**Manual rollback.** For a deploy that boots but misbehaves, run the deploy workflow with an existing image tag. Only repository admins may run the workflow manually or re-run it, since either one chooses what production runs; the build and deploy jobs check the role of the actor who triggered the run, on every attempt. Merge deploys stay gated by the `main` ruleset's review. The tag is validated against the format, resolved to its digest in ECR, and no build runs. A rollback leaves `main` unchanged, so the next merge deploys forward again: revert or fix forward first. When the workflow is unavailable, point the service at an earlier revision with the AWS CLI. Procedure: [docs/runbooks/roll-back-a-deployment.md](../docs/runbooks/roll-back-a-deployment.md).
 
 **Retention.** The ECR repository expires nothing. A future lifecycle policy counts images rather than ageing them, and keeps every image an ACTIVE revision references.
 
-**Rehearsal.** Rollback is rehearsed once in production, off-hours, before the first deploy that depends on it, and again whenever this mechanism changes (service deployment settings, grace period, the verify step). The rehearsal deploys a revision with a deploy-coupled defect (an invalid `ENVIRONMENT`) and checks that the old tasks keep serving, the breaker fails the deployment and returns to the previous revision, and the workflow fails and notifies. The date and the measured time to roll back go in the runbook ([AWS REL12-BP05](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_game_days_resiliency.html)).
+**Rehearsal.** Rollback is rehearsed once in production, off-hours, before the first deploy that depends on it, and again whenever this mechanism changes (service deployment settings, grace period, the verify step). Like every production change it runs through the deploy workflow: the `rehearse_rollback` input deploys the running image with an invalid `ENVIRONMENT`, a deploy-coupled defect, and the run deregisters that revision once the service has left it, so the next deploy does not render from it. The rehearsal checks that the old tasks keep serving, the breaker fails the deployment and returns to the previous revision, and the workflow fails and notifies. The date and the measured time to roll back go in the runbook ([AWS REL12-BP05](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_game_days_resiliency.html)).
 
 ## Consequences
 
@@ -47,6 +47,9 @@ Until TASK-111.16, production ran `sre-bot:latest`. The deploy workflow pushed `
 - `terraform/ecr.tf` sets `IMMUTABLE_WITH_EXCLUSION` with `latest` as the only exclusion filter.
 - `build_and_deploy.yml` registers an image referenced by `@sha256:` and runs `verify-ecs-deployment.sh` after the wait. Its deploy job is in group `ecs-deploy`, and `tf_apply.yml` is in group `terraform-apply`.
 - No workflow deploys or SBOM-scans `:latest`.
+- The build and deploy jobs of `build_and_deploy.yml` run `require-admin.sh` for manual runs and re-runs.
 
 **Changes:**
 - 2026-10-22: new record: digest-pinned revisions registered by the deploy workflow, the circuit breaker with rollback, serialized deploys, manual rollback and its rehearsal (TASK-111.16).
+- 2026-10-22: the rehearsal runs through the deploy workflow's `rehearse_rollback` input and deregisters its revision (TASK-111.16).
+- 2026-10-22: only repository admins may run or re-run the deploy workflow manually (TASK-111.16).

@@ -21,7 +21,7 @@ Region `ca-central-1`, cluster `sre-bot-cluster`, service `sre-bot-service`, tas
 
 ## Permissions and tools
 
-- GitHub: permission to run the **Build and Push to Container Registry** workflow (`build_and_deploy.yml`).
+- GitHub: the repository **admin** role. Manual runs and re-runs of `build_and_deploy.yml` fail at "Require a repository admin" for anyone else; ask an admin to run it.
 - AWS CLI fallback: a role with `ecs:DescribeServices`, `ecs:ListTaskDefinitions`, `ecs:DescribeTaskDefinition`, `ecs:UpdateService` and `ecr:DescribeImages` on the production account.
 
 ## Steps
@@ -37,17 +37,23 @@ aws ecr describe-images --region ca-central-1 --repository-name sre-bot \
 
 ### Roll back to an earlier image
 
-1. GitHub, Actions, **Build and Push to Container Registry**, **Run workflow** on `main`, with `image_tag` set to the earlier tag.
+1. Run the workflow on `main` with the earlier tag (or GitHub, Actions, **Build and Push to Container Registry**, **Run workflow**):
+
+   ```bash
+   gh workflow run build_and_deploy.yml --ref main -f image_tag=<git sha>-<YYYY-MM-DD>
+   gh run watch "$(gh run list --workflow build_and_deploy.yml --limit 1 --json databaseId --jq '.[0].databaseId')" --exit-status
+   ```
+
 2. The run checks the tag format, resolves the tag to its digest, builds nothing, and deploys a new revision that pins that digest. It fails if the service does not end on that revision.
 3. `main` is unchanged, so the next merge deploys forward again. Revert or fix forward on `main` before that merge.
 
 ### Redeploy the current image
 
-Run the workflow with `image_tag` set to the tag running now (the latest run summary, or [Find the image tags](#find-the-image-tags)). The new revision starts from the family's latest revision, so it carries the terraform change.
+Run the same command with `image_tag` set to the tag running now (the latest run summary, or [Find the image tags](#find-the-image-tags)). The new revision starts from the family's latest revision, so it carries the terraform change.
 
 ### Roll back to an earlier revision
 
-Use this when the workflow is unavailable, or when the task definition itself is bad.
+Break-glass only: production changes go through the workflow. Use this when the workflow is unavailable, or when the task definition itself is bad. It points the service at a revision that is already registered, so nothing from the local environment reaches production.
 
 ```bash
 aws ecs list-task-definitions --region ca-central-1 --family-prefix sre-bot-task --sort DESC --max-items 5
@@ -87,6 +93,39 @@ Run after every deploy or rollback.
 ## Escalate
 
 If the service does not return to a COMPLETED deployment within 20 minutes, or old tasks stop serving, page the SRE on-call and post in the SRE team channel with the run link and the `describe-services` output. A deployment stalls when the circuit breaker has no COMPLETED deployment to return to. Pointing the service at a known good revision ([Roll back to an earlier revision](#roll-back-to-an-earlier-revision)) starts a new deployment.
+
+## Rehearse a rollback
+
+Off-hours, after announcing it in the SRE team channel: the run is expected to fail and posts a Slack failure.
+
+1. Find the tag running now ([Find the image tags](#find-the-image-tags), or the last successful run summary) and the current revision:
+
+   ```bash
+   aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
+     --query 'services[0].[taskDefinition,deployments[0].rolloutState]' --output text
+   ```
+
+2. Dispatch the rehearsal:
+
+   ```bash
+   gh workflow run build_and_deploy.yml --ref main -f image_tag=<tag running now> -f rehearse_rollback=true
+   ```
+
+3. Watch the deployment events until the service is back on the previous revision; note the times of the deployment start, `deployment failed` (circuit breaker) and `deployment completed` for the rollback:
+
+   ```bash
+   aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
+     --query 'services[0].events[:12].[createdAt,message]' --output table
+   ```
+
+4. Expect the run to fail at **Verify the deployed revision** with "Deployment rolled back (circuit breaker or alarm)", **Deregister the rehearsal revision** to pass, and the Slack failure message. Then confirm the family's latest revision is not the rehearsal one (no `ENVIRONMENT` = `rollback-rehearsal`):
+
+   ```bash
+   aws ecs describe-task-definition --region ca-central-1 --task-definition sre-bot-task \
+     --query 'taskDefinition.[revision,containerDefinitions[0].environment[?name==`ENVIRONMENT`].value | [0]]' --output text
+   ```
+
+5. Run [Verify](#verify) checks 2 to 4, add a row below and update `last_reviewed`.
 
 ## Rehearsals
 
