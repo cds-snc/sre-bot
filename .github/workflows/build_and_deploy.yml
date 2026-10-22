@@ -8,7 +8,7 @@ on:
         required: false
         default: ""
       rehearse_rollback:
-        description: "Rollback rehearsal (off-hours): deploy image_tag with an invalid ENVIRONMENT so boot fails and the circuit breaker rolls back. The run is expected to fail."
+        description: "Rollback rehearsal (announce first): deploy image_tag with an invalid ENVIRONMENT so boot fails and the circuit breaker rolls back. The run is expected to fail."
         type: boolean
         required: false
         default: false
@@ -240,19 +240,21 @@ jobs:
           fi
           echo "$result"
 
-      # The rehearsal revision would otherwise be the latest revision, and the next deploy renders from it
+      # The rehearsal revision would otherwise be the latest revision, and the next deploy renders from it.
+      # Runs even when the run is cancelled; tasks already on the revision keep running after deregistration.
       - name: Deregister the rehearsal revision
         if: ${{ always() && inputs.rehearse_rollback && steps.deploy.outputs.task-definition-arn != '' }}
         env:
           REGISTERED: ${{ steps.deploy.outputs.task-definition-arn }}
+          IMAGE_TAG: ${{ steps.image.outputs.tag }}
         run: |
+          aws ecs deregister-task-definition --task-definition "$REGISTERED" > /dev/null
           current=$(aws ecs describe-services --cluster sre-bot-cluster --services sre-bot-service \
             --query 'services[0].taskDefinition' --output text)
           if [[ "$current" == "$REGISTERED" ]]; then
-            echo "::error::The service still runs the rehearsal revision ${REGISTERED##*/}; roll back with docs/runbooks/roll-back-a-deployment.md"
+            echo "::error::The service still runs the rehearsal revision ${REGISTERED##*/} (now deregistered). Recover: gh workflow run build_and_deploy.yml --ref main -f image_tag=$IMAGE_TAG"
             exit 1
           fi
-          aws ecs deregister-task-definition --task-definition "$REGISTERED" > /dev/null
           echo "Deregistered ${REGISTERED##*/}; the service runs ${current##*/}."
 
       - name: Slack Notify Success

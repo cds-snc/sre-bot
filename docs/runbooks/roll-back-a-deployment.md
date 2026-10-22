@@ -96,36 +96,77 @@ If the service does not return to a COMPLETED deployment within 20 minutes, or o
 
 ## Rehearse a rollback
 
-Off-hours, after announcing it in the SRE team channel: the run is expected to fail and posts a Slack failure.
+Expected impact: none. The old tasks keep serving throughout (minimum healthy 100%), and the rehearsal tasks never pass a health check, so the load balancer never routes to them. Announce it anyway; the run fails by design and posts a Slack failure. Use one terminal so the variables carry over. Merges to `main` queue behind the rehearsal; hold them until it ends.
 
-1. Find the tag running now ([Find the image tags](#find-the-image-tags), or the last successful run summary) and the current revision:
+1. Record the starting point. The running revision is the rollback target the circuit breaker must return to:
+
+   ```bash
+   CURRENT_TD=$(aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
+     --query 'services[0].taskDefinition' --output text); echo "$CURRENT_TD"
+   aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
+     --query 'services[0].deployments[].[status,rolloutState,taskDefinition]' --output table   # one PRIMARY, COMPLETED
+   DIGEST=$(aws ecs describe-task-definition --region ca-central-1 --task-definition "$CURRENT_TD" \
+     --query 'taskDefinition.containerDefinitions[0].image' --output text | cut -d@ -f2); echo "$DIGEST"
+   TAG=$(aws ecr describe-images --region ca-central-1 --repository-name sre-bot --image-ids imageDigest="$DIGEST" \
+     --query 'imageDetails[0].imageTags[?@ != `latest`] | [0]' --output text); echo "$TAG"
+   ```
+
+   Stop if the deployment is not COMPLETED or `TAG` is empty.
+
+2. Start the rehearsal and note the time:
+
+   ```bash
+   date -u +%H:%M:%S
+   gh workflow run build_and_deploy.yml --ref main -f image_tag="$TAG" -f rehearse_rollback=true
+   sleep 15; RUN=$(gh run list --workflow build_and_deploy.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId'); echo "RUN=$RUN"
+   ```
+
+3. Watch the service, every minute or so, until a new deployment on `$CURRENT_TD` is COMPLETED. Expected within about 10 minutes: tasks of the new revision stop at boot, the rehearsal deployment turns FAILED ("circuit breaker"), and a rollback deployment on `$CURRENT_TD` runs, then completes.
 
    ```bash
    aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
-     --query 'services[0].[taskDefinition,deployments[0].rolloutState]' --output text
-   ```
-
-2. Dispatch the rehearsal:
-
-   ```bash
-   gh workflow run build_and_deploy.yml --ref main -f image_tag=<tag running now> -f rehearse_rollback=true
-   ```
-
-3. Watch the deployment events until the service is back on the previous revision; note the times of the deployment start, `deployment failed` (circuit breaker) and `deployment completed` for the rollback:
-
-   ```bash
+     --query 'services[0].deployments[].[status,rolloutState,rolloutStateReason,taskDefinition,runningCount,desiredCount]' --output table
    aws ecs describe-services --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service \
-     --query 'services[0].events[:12].[createdAt,message]' --output table
+     --query 'services[0].events[:10].[createdAt,message]' --output table
+   curl -s -o /dev/null -w '%{http_code}\n' https://sre-bot.cdssandbox.xyz/version   # 200 throughout
    ```
 
-4. Expect the run to fail at **Verify the deployed revision** with "Deployment rolled back (circuit breaker or alarm)", **Deregister the rehearsal revision** to pass, and the Slack failure message. Then confirm the family's latest revision is not the rehearsal one (no `ENVIRONMENT` = `rollback-rehearsal`):
+4. Check the run ended as designed: "Verify the deployed revision" failed with "Deployment rolled back (circuit breaker or alarm)", "Deregister the rehearsal revision" passed, and the Slack failure was posted. Then confirm the family's latest revision is clean again:
 
    ```bash
+   gh run watch "$RUN"
+   gh run view "$RUN" --json jobs --jq '.jobs[]|select(.name=="deploy")|.steps[]|"\(.name): \(.conclusion)"'
    aws ecs describe-task-definition --region ca-central-1 --task-definition sre-bot-task \
-     --query 'taskDefinition.[revision,containerDefinitions[0].environment[?name==`ENVIRONMENT`].value | [0]]' --output text
+     --query 'taskDefinition.[revision,containerDefinitions[0].environment[?name==`ENVIRONMENT`].value | [0]]' --output text   # production
    ```
 
-5. Run [Verify](#verify) checks 2 to 4, add a row below and update `last_reviewed`.
+5. Run [Verify](#verify) checks 2 to 4, add a row to [Rehearsals](#rehearsals) with the times from step 3, and update `last_reviewed`.
+
+**If the service has not returned to `$CURRENT_TD` after 10 minutes** (the old tasks are still serving; nothing is down):
+
+1. Cancel the run. Its deregister step still runs and removes the rehearsal revision:
+
+   ```bash
+   gh run cancel "$RUN"; sleep 20
+   gh run view "$RUN" --json jobs --jq '.jobs[]|select(.name=="deploy")|.steps[]|select(.name|test("Deregister"))|"\(.name): \(.conclusion)"'
+   ```
+
+2. Redeploy the image that was running. It renders from the clean revision and replaces the rehearsal deployment:
+
+   ```bash
+   gh workflow run build_and_deploy.yml --ref main -f image_tag="$TAG"
+   sleep 15; RECOVER=$(gh run list --workflow build_and_deploy.yml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId')
+   gh run watch "$RECOVER" --exit-status
+   ```
+
+3. Break-glass, only if GitHub Actions is unavailable: point the service at the revision that was running. It is already registered, so nothing from the local environment reaches production.
+
+   ```bash
+   aws ecs update-service --region ca-central-1 --cluster sre-bot-cluster --service sre-bot-service --task-definition "$CURRENT_TD" > /dev/null
+   aws ecs wait services-stable --region ca-central-1 --cluster sre-bot-cluster --services sre-bot-service
+   ```
+
+Record what happened in the Rehearsals row either way: a breaker that does not trip on a boot failure is the finding the rehearsal exists to surface.
 
 ## Rehearsals
 

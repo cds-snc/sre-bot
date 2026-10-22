@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-21T20:05:00Z'
-updated_date: '2026-10-22T15:15:00Z'
+updated_date: '2026-10-22T17:12:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -34,7 +34,7 @@ Planning decides, with current sources: how the deploy workflow registers a task
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 aws_ecs_service.main enables deployment_circuit_breaker with rollback
-- [ ] #2 Each deploy runs a task-definition revision whose image is pinned to that build's digest (<registry>/sre-bot@sha256:<digest>) resolved from ECR, so a rollback to the previous revision runs the previous image; tag and digest are in the run summary
+- [x] #2 Each deploy runs a task-definition revision whose image is pinned to that build's digest (<registry>/sre-bot@sha256:<digest>) resolved from ECR, so a rollback to the previous revision runs the previous image; tag and digest are in the run summary
 - [x] #3 terraform and the deploy workflow do not fight over the task definition: a tf apply after a deploy does not revert the running image; track_latest stays false and skip_destroy is true on aws_ecs_task_definition
 - [x] #4 decisions/deployment.md records ownership, image identity, ECR policy and retention, the circuit breaker, serialization, rollback and rehearsal; configuration.md, lifecycle.md (including the corrected breaker counting), health-checks.md and cloud-portability.md link to it; the decisions README lists it; each touched record has a dated Changes line
 - [x] #5 docs/runbooks/roll-back-a-deployment.md documents dispatch rollback (tag validated and resolved to digest), the CLI fallback, redeploying the current image after a terraform task-definition change, and the post-deploy Verify checklist; it links deployment.md and has owner and last_reviewed; governance.md records the docs/runbooks convention
@@ -49,10 +49,10 @@ Planning decides, with current sources: how the deploy workflow registers a task
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [x] #1 Human: after merge, tf_apply succeeded and the in-place UpdateService started no deployment
-- [ ] #2 Human: one happy-path dispatch deploy done, so a workflow-registered COMPLETED revision exists
+- [x] #2 Human: one happy-path dispatch deploy done, so a workflow-registered COMPLETED revision exists
 - [ ] #3 Human: off-hours rehearsal with an invalid-ENVIRONMENT revision: breaker FAILED, rolled back to the previous revision, verify step fails and notifies
 - [ ] #4 Human: rehearsal timings and date recorded in the runbook before TASK-111.5.2 or TASK-111.7 merges
-- [ ] #5 Human: sre-bot-apply IAM permissions confirmed before merge
+- [x] #5 Human: sre-bot-apply IAM permissions confirmed before merge
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -170,6 +170,13 @@ Caveat for the first dispatch: the only COMPLETED rollback target (:36) referenc
 Rehearsal through the workflow (second PR, 2026-10-22): production changes only through the GitHub Actions workflows (Codespace env differs from the secrets), and the only OIDC role in the repo trusts refs/heads/main, so the rehearsal cannot be a local update-service or a branch dispatch. build_and_deploy gains a boolean dispatch input rehearse_rollback: requires image_tag (no build), the render step overrides ENVIRONMENT=rollback-rehearsal (AppSettings.ENVIRONMENT is Literal local/ci/production, read first in the lifespan, so boot aborts), verify fails as expected, then "Deregister the rehearsal revision" (always) deregisters it once the service has left it, because the next deploy renders from the family's latest revision. Render action v1.9.1 replaces an existing variable of the same name (index.js). Needs ecs:DeregisterTaskDefinition on sre-bot-apply. Runbook gains "Rehearse a rollback" with exact commands; deployment.md Rehearsal paragraph and a Changes line. actionlint clean except the known queue key, which GitHub accepted (tf_apply run 39798412641 ran with queue: max).
 
 Admin-only manual deploys (human 2026-10-22, same PR): any of the 45 users with write access or above could dispatch or re-run build_and_deploy (GitHub requires write access to run a workflow manually). Now .github/workflows/scripts/require-admin.sh runs in the build and deploy jobs, after checkout and before AWS credentials, when the event is workflow_dispatch or run_attempt != 1. It reads github.triggering_actor's role_name from repos/<repo>/collaborators/<actor>/permission and fails unless it is admin. It runs per job because "re-run failed jobs" re-runs only the failed job. Merge deploys stay gated by the main ruleset (1 approval, no bypass actors). Tested against the live API: admin passes; write, read and an unknown user are refused. shellcheck clean. The first manual dispatch confirms GITHUB_TOKEN can read the endpoint (metadata read); if it cannot, the check denies everyone (fails closed). The GitHub-enforced version (environment with required reviewers, which changes the OIDC subject) is TASK-160.
+
+Permissions 2026-10-22 (human-run simulate-principal-policy on sre-bot-apply): ecs:RegisterTaskDefinition, ecs:DeregisterTaskDefinition, ecs:DescribeTaskDefinition, ecs:DescribeServices, ecs:UpdateService, ecr:DescribeImages and iam:PassRole on sre-bot-ecs-role all allowed (DoD 5). Trust condition: token.actions.githubusercontent.com:sub StringLike repo:cds-snc/sre-bot:ref:refs/heads/main and repo:cds-snc@30166251/sre-bot@*:ref:refs/heads/main, so a branch dispatch gets no credentials and require-admin.sh changes need an approved PR to main. TASK-160 must add the environment subject to this condition first.
+
+Fix PR #1773 merged 2026-10-22 16:30 UTC (46f8f603). Dispatch 1 (run 39816764103, image_tag 80947e62d87ba0eb6eba2c24914be59c0c5675a7-2026-10-22) started 16:46 UTC: build and sbom skipped; "Require a repository admin" passed with GITHUB_TOKEN (the permission endpoint is readable, so the check does not fail closed for admins); Resolve image and Render passed. Human reports the new tasks running. Pending: the run's verify result and the describe-task-definition/describe-services output for AC #2 and DoD 2; dispatch 2, the same-day rerun (AC #8), boot time (AC #11) and the rehearsal (DoD 3-4) not run yet.
+Dispatch 1 result: run 39816764103 success. Render used sre-bot@sha256:88fc35f816cfc955589c369757624926f97a2d680d99fa6cf9ce147b9ffc1a17 (tag 80947e62d87ba0eb6eba2c24914be59c0c5675a7-2026-10-22, also in the run summary from Resolve image); verify: "The service runs sre-bot-task:37 and its deployment completed."; Slack success and Sentinel ran. Human describe-services: one PRIMARY, COMPLETED, created 16:47 UTC on sre-bot-task:37; production up. AC #2 and DoD 2 checked: :37 is the first digest-pinned COMPLETED rollback target. Open: AC #8 (same-day rerun of a build run), AC #11 (boot time), DoD 3-4 (rehearsal, deferred by the human; gates the 111.5.2 merge).
+
+Rehearsal hardening (third PR, 2026-10-22; the human rehearses in working hours with notice): the deregister step now always deregisters the rehearsal revision, then fails with the recovery command if the service still runs it. Before, it skipped deregistration in that case, so a recovery dispatch would have rendered from the broken revision. AWS: an INACTIVE revision keeps its running tasks and service without disruption. The step runs under always(), so cancelling the run deregisters too. Runbook "Rehearse a rollback" rewritten as the exact sequence (starting point, dispatch, watch, check, record) with recovery: cancel, then redeploy the running tag, then break-glass update-service to the recorded revision. deployment.md: no off-hours requirement; Changes line.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

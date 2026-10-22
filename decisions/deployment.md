@@ -31,7 +31,7 @@ Until TASK-111.16, production ran `sre-bot:latest`. The deploy workflow pushed `
 
 **Retention.** The ECR repository expires nothing. A future lifecycle policy counts images rather than ageing them, and keeps every image an ACTIVE revision references.
 
-**Rehearsal.** Rollback is rehearsed once in production, off-hours, before the first deploy that depends on it, and again whenever this mechanism changes (service deployment settings, grace period, the verify step). Like every production change it runs through the deploy workflow: the `rehearse_rollback` input deploys the running image with an invalid `ENVIRONMENT`, a deploy-coupled defect, and the run deregisters that revision once the service has left it, so the next deploy does not render from it. The rehearsal checks that the old tasks keep serving, the breaker fails the deployment and returns to the previous revision, and the workflow fails and notifies. The date and the measured time to roll back go in the runbook ([AWS REL12-BP05](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_game_days_resiliency.html)).
+**Rehearsal.** Rollback is rehearsed once in production before the first deploy that depends on it, and again whenever this mechanism changes (service deployment settings, grace period, the verify step). Like every production change it runs through the deploy workflow: the `rehearse_rollback` input deploys the running image with an invalid `ENVIRONMENT`, a deploy-coupled defect, and the run always deregisters that revision, even when cancelled, so the next deploy does not render from it. The old tasks keep serving throughout, so it can run in working hours with notice. The rehearsal checks that the old tasks keep serving, the breaker fails the deployment and returns to the previous revision, and the workflow fails and notifies. The date and the measured time to roll back go in the runbook ([AWS REL12-BP05](https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_testing_resiliency_game_days_resiliency.html)).
 
 ## Consequences
 
@@ -53,3 +53,4 @@ Until TASK-111.16, production ran `sre-bot:latest`. The deploy workflow pushed `
 - 2026-10-22: new record: digest-pinned revisions registered by the deploy workflow, the circuit breaker with rollback, serialized deploys, manual rollback and its rehearsal (TASK-111.16).
 - 2026-10-22: the rehearsal runs through the deploy workflow's `rehearse_rollback` input and deregisters its revision (TASK-111.16).
 - 2026-10-22: only repository admins may run or re-run the deploy workflow manually (TASK-111.16).
+- 2026-10-22: the rehearsal always deregisters its revision and may run in working hours with notice (TASK-111.16).
