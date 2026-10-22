@@ -3,10 +3,10 @@ id: TASK-111.16
 title: >-
   Roll back failed deploys: ECS deployment circuit breaker and immutable image
   tags
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T20:05:00Z'
-updated_date: '2026-10-22T14:15:00Z'
+updated_date: '2026-10-22T14:18:00Z'
 labels:
   - configuration
 milestone: m-7
