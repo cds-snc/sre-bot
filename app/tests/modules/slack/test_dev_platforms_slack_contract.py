@@ -14,7 +14,7 @@ def test_contract_require_dev_environment_uses_environment_not_prefix():
 
     with patch(
         "modules.dev.platforms.slack.get_app_settings",
-        return_value=SimpleNamespace(ENVIRONMENT="local"),
+        return_value=SimpleNamespace(environment="local"),
     ):
         response = dev_slack._require_dev_environment(payload)
 
@@ -28,7 +28,7 @@ def test_contract_require_dev_environment_denies_non_local(environment):
 
     with patch(
         "modules.dev.platforms.slack.get_app_settings",
-        return_value=SimpleNamespace(ENVIRONMENT=environment),
+        return_value=SimpleNamespace(environment=environment),
     ):
         response = dev_slack._require_dev_environment(payload)
 

@@ -108,7 +108,7 @@ def test_max_body_size_middleware_configured():
         None,
     )
     assert max_body_middleware is not None
-    assert max_body_middleware.kwargs["max_bytes"] == server.app_settings.WEBHOOK_MAX_BODY_BYTES
+    assert max_body_middleware.kwargs["max_bytes"] == server.app_settings.webhook_max_body_bytes
 
 
 @pytest.mark.unit

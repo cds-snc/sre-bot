@@ -35,7 +35,7 @@ def create_incident_conversation(client: WebClient, incident_name: str):
     """
     date_now = datetime.now().strftime("%Y-%m-%d")
     slug = f"{date_now} {incident_name}".strip().replace(" ", "-").lower()
-    channel_name_prefix = "incident-dev-" if settings.ENVIRONMENT != "production" else "incident-"
+    channel_name_prefix = "incident-dev-" if settings.environment != "production" else "incident-"
     base_channel_name = channel_name_prefix + slug
     # Ensure base_channel_name is at most 80 chars
     if len(base_channel_name) > 80:

@@ -226,6 +226,8 @@ jobs:
           service: sre-bot-service
           wait-for-service-stability: true
           wait-for-minutes: 15
+          # The SDK waiter backs off to 600 s between polls and stops early once one more poll would pass 15 min
+          wait-max-delay-seconds: 30
 
       - name: Verify the deployed revision
         id: verify

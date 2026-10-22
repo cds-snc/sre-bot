@@ -90,7 +90,7 @@ def _list_configs_from_sections(
     config_settings: dict[str, tuple[object, ...]] = {
         "settings": (
             {"LOG_LEVEL": logging_settings.log_level},
-            {"GIT_SHA": app_settings.GIT_SHA},
+            {"GIT_SHA": app_settings.git_sha},
         )
     }
 
@@ -131,7 +131,7 @@ def _start_scheduled_tasks(
 ) -> threading.Event | None:
     # This gate suppresses side-effecting jobs outside production; Tier-2 leases
     # are the duplicate-prevention mechanism across production replicas.
-    if app_settings.ENVIRONMENT != "production":
+    if app_settings.environment != "production":
         logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
         return None
 
@@ -247,7 +247,7 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
     # Phase 1: configuration. The identity slice selects the files, which are checked
     # and installed before any slice on them builds; a bad file fails boot here.
     app_settings = get_app_settings()
-    configuration_files = load_configuration_files(app_settings.ENVIRONMENT)
+    configuration_files = load_configuration_files(app_settings.environment)
     install_configuration_files(configuration_files)
     server_settings = get_server_settings()
     security_settings = get_security_settings()
@@ -322,9 +322,9 @@ async def lifespan(app: FastAPI, registry: svcs.Registry) -> AsyncGenerator[None
                 channel=sre_ops_settings.SRE_OPS_CHANNEL_ID,
                 text="SRE Bot has started up and is ready to receive commands.",
             )
-        if server_settings.SRE_TEST_CHANNEL_ID:
+        if server_settings.sre_test_channel_id:
             app.state.bot.client.chat_postMessage(
-                channel=server_settings.SRE_TEST_CHANNEL_ID,
+                channel=server_settings.sre_test_channel_id,
                 text="SRE Bot has started up in test mode.",
             )
         scheduled_stop_event = (

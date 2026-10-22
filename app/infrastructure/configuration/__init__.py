@@ -20,7 +20,7 @@ Example:
     retry_enabled = retry_settings.enabled
 
     # Check environment
-    if app_settings.ENVIRONMENT == "production":
+    if app_settings.environment == "production":
         # Production-specific logic...
     ```
 """

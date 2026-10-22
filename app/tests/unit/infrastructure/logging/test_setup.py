@@ -92,11 +92,11 @@ class TestConfigureLogging:
 
     def test_configure_logging_production_mode_from_environment(self, mock_settings):
         """configure_logging derives production mode from ENVIRONMENT."""
-        mock_settings.ENVIRONMENT = "production"
+        mock_settings.environment = "production"
         logger = configure_logging(settings=mock_settings)
         assert logger is not None
 
-        mock_settings.ENVIRONMENT = "local"
+        mock_settings.environment = "local"
         logger = configure_logging(settings=mock_settings)
         assert logger is not None
 
@@ -233,7 +233,7 @@ def production_logging(mock_settings, monkeypatch) -> Iterator[io.StringIO]:
     saved_config = structlog.get_config()
     monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
     monkeypatch.setattr(logging_setup, "get_logging_settings", LoggingSettings)
-    mock_settings.ENVIRONMENT = "production"
+    mock_settings.environment = "production"
     configure_logging(settings=mock_settings)
     stream = io.StringIO()
     handler = root.handlers[0]
@@ -320,7 +320,7 @@ class TestConfigureLoggingRealCodePath:
     def test_production_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
         """The real code path builds the pipeline in production mode without raising."""
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
-        mock_settings.ENVIRONMENT = "production"
+        mock_settings.environment = "production"
 
         logger = configure_logging(settings=mock_settings)
 
@@ -330,7 +330,7 @@ class TestConfigureLoggingRealCodePath:
     def test_development_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
         """The real code path builds the pipeline in development mode without raising."""
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
-        mock_settings.ENVIRONMENT = "local"
+        mock_settings.environment = "local"
 
         logger = configure_logging(settings=mock_settings)
 
@@ -340,7 +340,7 @@ class TestConfigureLoggingRealCodePath:
     def test_production_mode_redacts_through_full_pipeline(self, mock_settings, monkeypatch):
         """Secrets are redacted end-to-end when the production pipeline is built for real."""
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
-        mock_settings.ENVIRONMENT = "production"
+        mock_settings.environment = "production"
 
         configure_logging(settings=mock_settings)
         config = structlog.get_config()

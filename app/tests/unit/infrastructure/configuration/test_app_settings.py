@@ -13,7 +13,7 @@ class TestAppSettings:
         """AppSettings should provide stable defaults."""
         settings = AppSettings()
 
-        assert settings.GIT_SHA == "Unknown"
+        assert settings.git_sha == "Unknown"
         assert not hasattr(settings, "LOG_LEVEL")
 
     def test_app_settings_no_legacy_prefix_attribute(self):
@@ -50,7 +50,7 @@ class TestAppSettingsEnvironment:
         with pytest.raises(ValidationError) as exc_info:
             AppSettings(_env_file=None)
 
-        assert exc_info.value.errors()[0]["loc"] == ("ENVIRONMENT",)
+        assert exc_info.value.errors()[0]["loc"] == ("environment",)
         assert exc_info.value.errors()[0]["type"] == "missing"
 
     @pytest.mark.parametrize("value", ["local", "ci", "production"])
@@ -58,7 +58,7 @@ class TestAppSettingsEnvironment:
         """Each environment the app runs in constructs successfully."""
         settings = AppSettings(ENVIRONMENT=value)
 
-        assert value == settings.ENVIRONMENT
+        assert value == settings.environment
 
     @pytest.mark.parametrize("value", ["uat", "dev", "staging", ""])
     def test_environment_invalid_value_raises_validation_error(self, value):
@@ -74,7 +74,7 @@ class TestAppSettingsWebhookMaxBodyBytes:
         """Default cap should match AWS SNS's own 256 KiB publish-size ceiling."""
         settings = AppSettings()
 
-        assert settings.WEBHOOK_MAX_BODY_BYTES == 262_144
+        assert settings.webhook_max_body_bytes == 262_144
 
     def test_webhook_max_body_bytes_configurable_via_env(self, monkeypatch):
         """The cap should be overridable via the WEBHOOK_MAX_BODY_BYTES env var."""
@@ -82,7 +82,7 @@ class TestAppSettingsWebhookMaxBodyBytes:
 
         settings = AppSettings()
 
-        assert settings.WEBHOOK_MAX_BODY_BYTES == 1024
+        assert settings.webhook_max_body_bytes == 1024
 
     def test_contract_app_settings_has_no_legacy_production_property(self):
         """Contract: AppSettings no longer exposes the legacy production shim."""

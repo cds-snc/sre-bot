@@ -24,21 +24,21 @@ class ServerSettings(InfrastructureSettings):
 
         settings = get_server_settings()
 
-        backend_url = settings.BACKEND_URL
-        client_id = settings.GOOGLE_CLIENT_ID
-        token_expire = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+        backend_url = settings.backend_url
+        client_id = settings.google_client_id
+        token_expire = settings.access_token_expire_minutes
         ```
     """
 
-    BACKEND_URL: str = Field(default="http://127.0.0.1:8000", alias="BACKEND_URL")
-    NOTIFY_OPS_CHANNEL_ID: str = Field(default="", alias="NOTIFY_OPS_CHANNEL_ID")
-    NOTIFY_ONCALL_GROUP_ID: str = Field(default="", alias="NOTIFY_ONCALL_GROUP_ID")
-    SRE_TEST_CHANNEL_ID: str = Field(default="", alias="SRE_TEST_CHANNEL_ID")
-    GOOGLE_CLIENT_ID: str | None = Field(default=None, alias="GOOGLE_CLIENT_ID")
-    GOOGLE_CLIENT_SECRET: str | None = Field(default=None, alias="GOOGLE_CLIENT_SECRET")
-    SECRET_KEY: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
-    ACCESS_TOKEN_MAX_AGE_MINUTES: int = 1440  # Defaults to 24 hours
+    backend_url: str = "http://127.0.0.1:8000"
+    notify_ops_channel_id: str = ""
+    notify_oncall_group_id: str = ""
+    sre_test_channel_id: str = ""
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    secret_key: str | None = Field(default=None, alias="SESSION_SECRET_KEY")
+    access_token_expire_minutes: int = 30
+    access_token_max_age_minutes: int = 1440  # Defaults to 24 hours
 
 
 class DevSettings(InfrastructureSettings):
@@ -53,11 +53,11 @@ class DevSettings(InfrastructureSettings):
 
         settings = get_dev_settings()
 
-        dev_channel = settings.SLACK_DEV_MSG_CHANNEL
+        dev_channel = settings.slack_dev_msg_channel
         ```
     """
 
-    SLACK_DEV_MSG_CHANNEL: str = Field(default="", alias="SLACK_DEV_MSG_CHANNEL")
+    slack_dev_msg_channel: str = ""
 
 
 @lru_cache(maxsize=1)

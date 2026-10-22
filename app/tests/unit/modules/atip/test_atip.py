@@ -469,7 +469,7 @@ def test_should_derive_channel_name_prefix_from_environment(
     monkeypatch.setattr(
         atip,
         "get_app_settings",
-        lambda: SimpleNamespace(ENVIRONMENT=environment, PREFIX=legacy_prefix),
+        lambda: SimpleNamespace(environment=environment, PREFIX=legacy_prefix),
     )
 
     ack = MagicMock()

@@ -52,7 +52,7 @@ def register(bot: App) -> None:
             will be registered.
     """
     transport_settings = get_slack_transport_settings()
-    bot.command(f"/{transport_settings.COMMAND_PREFIX}aws")(aws_command)
+    bot.command(f"/{transport_settings.command_prefix}aws")(aws_command)
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
     bot.block_suggestion(aws_account_health.ACCOUNT_SELECT_ACTION_ID)(aws_account_health.account_options_handler)
 

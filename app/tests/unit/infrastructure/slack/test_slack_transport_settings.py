@@ -46,7 +46,7 @@ def test_slack_transport_settings_default_command_prefix_is_empty() -> None:
 
     settings = settings_module.SlackTransportSettings()
 
-    assert settings.COMMAND_PREFIX == ""
+    assert settings.command_prefix == ""
 
 
 @pytest.mark.unit
@@ -60,7 +60,7 @@ def test_slack_transport_settings_reads_env_alias(
 
     settings = settings_module.SlackTransportSettings()
 
-    assert settings.COMMAND_PREFIX == "dev-"
+    assert settings.command_prefix == "dev-"
 
 
 @pytest.mark.unit
@@ -80,4 +80,4 @@ def test_slack_transport_settings_invalid_value_fails_validation() -> None:
     settings_module = _load_transport_settings_module()
 
     with pytest.raises(ValidationError):
-        settings_module.SlackTransportSettings(COMMAND_PREFIX=None)
+        settings_module.SlackTransportSettings(command_prefix=None)

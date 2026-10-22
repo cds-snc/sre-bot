@@ -37,7 +37,7 @@ def handle_version_command(payload: CommandPayload) -> CommandResponse:
 
     app_settings = get_app_settings()
     return CommandResponse(
-        message=f"🤖 SRE Bot version: {app_settings.GIT_SHA}",
+        message=f"🤖 SRE Bot version: {app_settings.git_sha}",
         ephemeral=True,
     )
 

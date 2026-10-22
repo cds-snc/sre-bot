@@ -9,10 +9,10 @@ from modules.webhooks.patterns.aws_sns_notification import api_key_detected
 @pytest.fixture(autouse=True)
 def configure_notify_oncall_group_id():
     """Provide and restore the configured Slack user-group ID for handler tests."""
-    original_group_id = api_key_detected.server_settings.NOTIFY_ONCALL_GROUP_ID
-    api_key_detected.server_settings.NOTIFY_ONCALL_GROUP_ID = "S0123456789"
+    original_group_id = api_key_detected.server_settings.notify_oncall_group_id
+    api_key_detected.server_settings.notify_oncall_group_id = "S0123456789"
     yield
-    api_key_detected.server_settings.NOTIFY_ONCALL_GROUP_ID = original_group_id
+    api_key_detected.server_settings.notify_oncall_group_id = original_group_id
 
 
 def mock_api_key_detected():
@@ -89,7 +89,7 @@ def test_api_key_detected_handler_mentions_configured_oncall_group(revoke_api_ke
 def test_api_key_detected_handler_requires_oncall_group_id(revoke_api_key_mock):
     """The handler rejects delivery when the Slack user-group ID is not configured."""
     revoke_api_key_mock.return_value = "revoked"
-    api_key_detected.server_settings.NOTIFY_ONCALL_GROUP_ID = ""
+    api_key_detected.server_settings.notify_oncall_group_id = ""
 
     with pytest.raises(ValueError, match="NOTIFY_ONCALL_GROUP_ID is not set"):
         api_key_detected.handle_api_key_detected(mock_api_key_detected(), MagicMock())

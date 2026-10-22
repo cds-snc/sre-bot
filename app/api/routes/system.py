@@ -14,7 +14,7 @@ settings = get_app_settings()
 @limiter.limit("50/minute")
 def get_version(request: Request):  # pylint: disable=unused-argument
     """Get the version of the application."""
-    return {"version": settings.GIT_SHA}
+    return {"version": settings.git_sha}
 
 
 @router.get("/health")

@@ -3,10 +3,10 @@ id: TASK-111.16
 title: >-
   Roll back failed deploys: ECS deployment circuit breaker and immutable image
   tags
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T20:05:00Z'
-updated_date: '2026-10-22T17:12:00Z'
+updated_date: '2026-10-22T17:49:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -50,8 +50,8 @@ Planning decides, with current sources: how the deploy workflow registers a task
 <!-- DOD:BEGIN -->
 - [x] #1 Human: after merge, tf_apply succeeded and the in-place UpdateService started no deployment
 - [x] #2 Human: one happy-path dispatch deploy done, so a workflow-registered COMPLETED revision exists
-- [ ] #3 Human: off-hours rehearsal with an invalid-ENVIRONMENT revision: breaker FAILED, rolled back to the previous revision, verify step fails and notifies
-- [ ] #4 Human: rehearsal timings and date recorded in the runbook before TASK-111.5.2 or TASK-111.7 merges
+- [x] #3 Human: off-hours rehearsal with an invalid-ENVIRONMENT revision: breaker FAILED, rolled back to the previous revision, verify step fails and notifies
+- [x] #4 Human: rehearsal timings and date recorded in the runbook before TASK-111.5.2 or TASK-111.7 merges
 - [x] #5 Human: sre-bot-apply IAM permissions confirmed before merge
 <!-- DOD:END -->
 
@@ -177,6 +177,11 @@ Fix PR #1773 merged 2026-10-22 16:30 UTC (46f8f603). Dispatch 1 (run 39816764103
 Dispatch 1 result: run 39816764103 success. Render used sre-bot@sha256:88fc35f816cfc955589c369757624926f97a2d680d99fa6cf9ce147b9ffc1a17 (tag 80947e62d87ba0eb6eba2c24914be59c0c5675a7-2026-10-22, also in the run summary from Resolve image); verify: "The service runs sre-bot-task:37 and its deployment completed."; Slack success and Sentinel ran. Human describe-services: one PRIMARY, COMPLETED, created 16:47 UTC on sre-bot-task:37; production up. AC #2 and DoD 2 checked: :37 is the first digest-pinned COMPLETED rollback target. Open: AC #8 (same-day rerun of a build run), AC #11 (boot time), DoD 3-4 (rehearsal, deferred by the human; gates the 111.5.2 merge).
 
 Rehearsal hardening (third PR, 2026-10-22; the human rehearses in working hours with notice): the deregister step now always deregisters the rehearsal revision, then fails with the recovery command if the service still runs it. Before, it skipped deregistration in that case, so a recovery dispatch would have rendered from the broken revision. AWS: an INACTIVE revision keeps its running tasks and service without disruption. The step runs under always(), so cancelling the run deregisters too. Runbook "Rehearse a rollback" rewritten as the exact sequence (starting point, dispatch, watch, check, record) with recovery: cancel, then redeploy the running tag, then break-glass update-service to the recorded revision. deployment.md: no off-hours requirement; Changes line.
+
+Rehearsal 2026-10-22 (working hours, announced; started from the Actions UI because the Codespace gh token gets HTTP 403 on workflow dispatches): run 39822672570, image_tag of sre-bot-task:37. Admin check passed; Resolve and Render passed; sre-bot-task:38 registered with ENVIRONMENT=rollback-rehearsal and deployed at 17:27:09 UTC. Human-observed: 3 tasks of :38 exited at boot, the circuit breaker failed the deployment and rolled back; the service is on :37 with no further deployment. The deploy action logged "Deployment ... not found after stabilization. The deployment was likely rolled back by the deployment circuit breaker." Service stable at 17:32:15 (about 5 min after the deploy started, inside the 15-minute wait). Verify failed: "Deployment rolled back (circuit breaker or alarm): the service runs sre-bot-task:37, not sre-bot-task:38." Deregister step: "Deregistered sre-bot-task:38; the service runs sre-bot-task:37." Slack failure posted; Sentinel skipped. This settles the open question: a task that starts and then exits at boot counts toward the breaker. DoD 3 and 4 checked (row recorded in the runbook Rehearsals table; the runbook also notes the Codespace gh 403). Still open: AC #8 (same-day rerun of a build run), AC #11 (measured boot time; 60 s grace unchanged).
+Run 39824368985 (17:37 UTC) redeployed the same tag by image_tag (build skipped by design; a new revision :39 with the same digest, so ECS replaced the tasks). AC #8 and AC #11 are evidenced from the TASK-111.5.2 merge deploy (same-day re-run; startup times of its tasks) and recorded in the 111.5.2 notes.
+
+Fix after Done (rides with the TASK-111.5.2 PR): run 39824368985 posted a false Slack failure ("sre-bot-task:39 is IN_PROGRESS, not COMPLETED"). The deploy action's waiter returned TIMEOUT at 17:44:24, about 350 s after the deployment started, although wait-for-minutes is 15. Cause: the SDK services-stable waiter backs off to maxDelay 600 s, and past the backoff ceiling exponentialBackoffWithJitter returns the full 600 s without trimming it to the time left, so runPolling stops as soon as now + 600 s passes the 900 s limit. A normal rollout takes about 6 to 9 minutes (the #1771 deploy took 8.5). Fix: wait-max-delay-seconds: 30 on the deploy step (a v2.6.4 input) so polling continues to the 15-minute limit. sre-bot-task:39 completed afterwards.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

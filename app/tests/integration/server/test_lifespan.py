@@ -179,7 +179,7 @@ def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_setti
     """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""
     # Arrange
     mock_logger = MagicMock()
-    mock_settings.ENVIRONMENT = "production"
+    mock_settings.environment = "production"
     init_mock = MagicMock()
     stop_event = threading.Event()
     run_mock = MagicMock(return_value=stop_event)
@@ -202,7 +202,7 @@ def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production
     """Test that _start_scheduled_tasks skips when ENVIRONMENT is non-production."""
     # Arrange
     mock_logger = MagicMock()
-    mock_settings.ENVIRONMENT = "local"
+    mock_settings.environment = "local"
     init_mock = MagicMock()
     run_mock = MagicMock()
     monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)

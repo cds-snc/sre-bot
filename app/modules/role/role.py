@@ -34,7 +34,7 @@ logger = get_logger()
 
 def register(bot: App):
     transport_settings = get_slack_transport_settings()
-    bot.command(f"/{transport_settings.COMMAND_PREFIX}talent-role")(role_command)
+    bot.command(f"/{transport_settings.command_prefix}talent-role")(role_command)
     bot.view("role_view")(role_view_handler)
     bot.action("role_change_locale")(update_modal_locale)
 
