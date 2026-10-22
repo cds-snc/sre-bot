@@ -3,8 +3,8 @@ id: TASK-72
 title: 'i18n: unbounded t() memoization causes continuous ECS memory growth'
 status: To Do
 assignee: []
-created_date: '2026-08-05 19:48'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-08-05 19:48
+updated_date: '2026-10-22T13:57:00Z'
 labels:
   - i18n
   - reliability
@@ -14,7 +14,7 @@ dependencies: []
 references:
   - decisions/i18n.md
   - app/infrastructure/i18n/factory.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1615'
+  - https://github.com/cds-snc/sre-bot/issues/1615
 priority: high
 ordinal: 123000
 ---
@@ -65,3 +65,9 @@ not decided here.
 - [ ] #3 Existing translation behavior (locale fallback, {{variable}} interpolation, fallback-on-missing-key) is unchanged for all current call sites (app/modules/{atip,incident,role,secret}, packages/geolocate/platforms/slack.py).
 - [ ] #4 mypy and ruff clean; pytest for infrastructure/i18n passes.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+A fargate_memory (or fargate_cpu) change reaches production only at the next deploy: terraform registers a new task-definition revision, but the service ignores task_definition (decisions/deployment.md, TASK-111.16). After tf apply, redeploy the current image per docs/runbooks/roll-back-a-deployment.md.
+<!-- SECTION:NOTES:END -->

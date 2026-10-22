@@ -4,6 +4,7 @@ title: Lower-case the server, dev, Slack transport and app identity settings fie
 status: To Do
 assignee: []
 created_date: '2026-10-21T20:23:00Z'
+updated_date: '2026-10-22T13:57:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -30,5 +31,5 @@ Mechanical, second of two PRs for TASK-111.5: exactly the host slices TASK-111.7
 - [ ] #3 The production-names pin test gains rows for every environment name of these slices (doc-14 inventory plus ENVIRONMENT, GIT_SHA and the deploy-interface names)
 - [ ] #4 No reader in app/, bin/, terraform/ or .github/ uses an old attribute name (rg check recorded in the notes)
 - [ ] #5 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
-- [ ] #6 The implementation notes carry the post-deploy checklist and the rollback path as it stands after TASK-111.16
+- [ ] #6 The implementation notes name the previous image tag and digest and cite docs/runbooks/roll-back-a-deployment.md
 <!-- AC:END -->

@@ -16,6 +16,12 @@ resource "aws_ecs_task_definition" "sre-bot" {
   memory                   = var.fargate_memory
   task_role_arn            = aws_iam_role.sre-bot.arn
 
+  # The deploy workflow registers the revisions the service runs (decisions/deployment.md).
+  # Keep every revision ACTIVE so a rollback target is never deregistered; track_latest
+  # stays false so the workflow's revisions are not drift. The :latest image below is only
+  # the render base: the workflow replaces it with the build's image digest.
+  skip_destroy = true
+
   container_definitions = templatefile("${path.module}/templates/sre-bot.json.tpl", {
     awslogs-group         = aws_cloudwatch_log_group.sre-bot_group.name
     awslogs-region        = "ca-central-1"
@@ -60,6 +66,14 @@ resource "aws_ecs_service" "main" {
     container_port   = 8000
   }
 
+  # Ignore unhealthy load balancer and container checks while a task boots.
+  health_check_grace_period_seconds = 60
+
+  deployment_circuit_breaker {
+    enable   = true
+    rollback = true
+  }
+
   # Enable deployment alarms
   alarms {
     enable      = true
@@ -69,6 +83,11 @@ resource "aws_ecs_service" "main" {
 
   tags = {
     "CostCentre" = var.billing_code
+  }
+
+  # The deploy workflow owns which revision runs (decisions/deployment.md).
+  lifecycle {
+    ignore_changes = [task_definition]
   }
 }
 
