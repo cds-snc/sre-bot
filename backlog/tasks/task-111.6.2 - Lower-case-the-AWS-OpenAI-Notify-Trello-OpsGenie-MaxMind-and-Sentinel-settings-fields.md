@@ -3,10 +3,10 @@ id: TASK-111.6.2
 title: >-
   Lower-case the AWS, OpenAI, Notify, Trello, OpsGenie, MaxMind and Sentinel
   settings fields
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-21T21:01:00Z'
-updated_date: '2026-10-22T12:58:00Z'
+updated_date: '2026-10-22T13:06:00Z'
 labels:
   - configuration
 milestone: m-7
