@@ -56,9 +56,9 @@ class SlackBootstrap:
 
     def create_app(self) -> AsyncApp:
         """Create a Bolt AsyncApp configured from Slack settings."""
-        request_verification_enabled = not self.settings.SOCKET_MODE
+        request_verification_enabled = not self.settings.socket_mode
         app = AsyncApp(
-            token=self.settings.BOT_TOKEN,
+            token=self.settings.bot_token,
             client=self.web,
             request_verification_enabled=request_verification_enabled,
         )
@@ -76,9 +76,9 @@ class LegacySlackBootstrap:
 
     def create_app(self) -> App:
         """Create a Bolt App configured from Slack settings."""
-        request_verification_enabled = not self.settings.SOCKET_MODE
+        request_verification_enabled = not self.settings.socket_mode
         app = App(
-            token=self.settings.BOT_TOKEN,
+            token=self.settings.bot_token,
             client=self.web,
             request_verification_enabled=request_verification_enabled,
         )

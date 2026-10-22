@@ -27,10 +27,10 @@ def make_slack_settings():
         bot_token: str = "xoxb-test",
     ):
         return SimpleNamespace(
-            ENABLED=enabled,
-            SOCKET_MODE=socket_mode,
-            APP_TOKEN=app_token,
-            BOT_TOKEN=bot_token,
+            enabled=enabled,
+            socket_mode=socket_mode,
+            app_token=app_token,
+            bot_token=bot_token,
         )
 
     return _make

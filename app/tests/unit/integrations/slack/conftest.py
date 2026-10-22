@@ -53,11 +53,11 @@ class MockSlackSettings:
         bot_token="xoxb-test",
         signing_secret="test-secret",
     ):
-        self.ENABLED = enabled
-        self.SOCKET_MODE = socket_mode
-        self.APP_TOKEN = app_token
-        self.BOT_TOKEN = bot_token
-        self.SIGNING_SECRET = signing_secret
+        self.enabled = enabled
+        self.socket_mode = socket_mode
+        self.app_token = app_token
+        self.bot_token = bot_token
+        self.signing_secret = signing_secret
 
 
 # ─────────────────────────────────────────────────────────────────────────────

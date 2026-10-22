@@ -35,12 +35,12 @@ def _source(system: WorkplaceSystem, tenant: str | None) -> TenantSource:
 
 
 def _slack(team_id: str | None = None, *, enabled: bool = False) -> SlackSettings:
-    return SlackSettings.model_construct(TEAM_ID=team_id, ENABLED=enabled)
+    return SlackSettings.model_construct(team_id=team_id, enabled=enabled)
 
 
 def _google(customer_id: str | None = None, key_file: str = "") -> GoogleWorkspaceSettings:
     return GoogleWorkspaceSettings.model_construct(
-        GOOGLE_WORKSPACE_CUSTOMER_ID=customer_id, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=key_file
+        google_workspace_customer_id=customer_id, gcp_sre_service_account_key_file=key_file
     )
 
 

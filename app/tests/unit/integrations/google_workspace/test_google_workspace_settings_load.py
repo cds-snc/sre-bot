@@ -33,11 +33,11 @@ def test_provider_returns_one_cached_instance() -> None:
     assert get_google_workspace_settings() is get_google_workspace_settings()
 
 
-def test_slice_reads_the_env_file_case_sensitively_and_ignores_unknown_keys() -> None:
-    """The slice keeps the shared .env loading rules of the vendor slices."""
+def test_slice_reads_the_env_file_case_insensitively_and_ignores_unknown_keys() -> None:
+    """The slice reads the .env file, matches names in any case and ignores unknown keys."""
     config = GoogleWorkspaceSettings.model_config
 
-    assert (config.get("env_file"), config.get("case_sensitive"), config.get("extra")) == (".env", True, "ignore")
+    assert (config.get("env_file"), config.get("case_sensitive"), config.get("extra")) == (".env", False, "ignore")
 
 
 @pytest.mark.usefixtures("google_unused")
@@ -46,12 +46,12 @@ def test_defaults_apply_while_google_is_not_configured() -> None:
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert (
-        settings.GOOGLE_DELEGATED_ADMIN_EMAIL,
-        settings.SRE_BOT_EMAIL,
-        settings.GOOGLE_WORKSPACE_CUSTOMER_ID,
-        settings.GCP_SRE_SERVICE_ACCOUNT_KEY_FILE,
-        settings.GOOGLE_API_NUM_RETRIES,
-        settings.GOOGLE_API_TIMEOUT_SECONDS,
+        settings.google_delegated_admin_email,
+        settings.sre_bot_email,
+        settings.google_workspace_customer_id,
+        settings.gcp_sre_service_account_key_file,
+        settings.google_api_num_retries,
+        settings.google_api_timeout_seconds,
     ) == ("", "", None, "", 3, 10.0)
 
 
@@ -66,18 +66,18 @@ def test_fields_read_their_flat_environment_names(monkeypatch: pytest.MonkeyPatc
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert (
-        settings.GOOGLE_DELEGATED_ADMIN_EMAIL,
-        settings.SRE_BOT_EMAIL,
-        settings.GOOGLE_API_NUM_RETRIES,
-        settings.GOOGLE_API_TIMEOUT_SECONDS,
+        settings.google_delegated_admin_email,
+        settings.sre_bot_email,
+        settings.google_api_num_retries,
+        settings.google_api_timeout_seconds,
     ) == ("admin@example.com", "bot@example.com", 5, 2.5)
 
 
 @pytest.mark.usefixtures("google_unused")
 @pytest.mark.parametrize("timeout", ["0", "-1"])
 def test_a_non_positive_timeout_fails_naming_the_key(monkeypatch: pytest.MonkeyPatch, timeout: str) -> None:
-    """A timeout must be positive, so zero and negative values fail validation."""
+    """A timeout must be positive, so zero and negative values fail validation; the error names the field in any case."""
     monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", timeout)
 
-    with pytest.raises(ValidationError, match="GOOGLE_API_TIMEOUT_SECONDS"):
+    with pytest.raises(ValidationError, match="(?i)GOOGLE_API_TIMEOUT_SECONDS"):
         GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]

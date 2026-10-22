@@ -92,9 +92,9 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
 
     settings = SimpleNamespace(
         tenant=SimpleNamespace(service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}'),
-        SRE_BOT_EMAIL="sre-bot@example.com",
-        GOOGLE_API_NUM_RETRIES=3,
-        GOOGLE_API_TIMEOUT_SECONDS=10.0,
+        sre_bot_email="sre-bot@example.com",
+        google_api_num_retries=3,
+        google_api_timeout_seconds=10.0,
     )
 
     class FakeCredentials:
@@ -144,9 +144,9 @@ def _install_fake_build(
 ) -> Any:
     settings = SimpleNamespace(
         tenant=SimpleNamespace(service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}'),
-        SRE_BOT_EMAIL="sre-bot@example.com",
-        GOOGLE_API_NUM_RETRIES=3,
-        GOOGLE_API_TIMEOUT_SECONDS=timeout_seconds,
+        sre_bot_email="sre-bot@example.com",
+        google_api_num_retries=3,
+        google_api_timeout_seconds=timeout_seconds,
     )
 
     class FakeCredentials:
@@ -258,9 +258,9 @@ def test_request_builder_defaults_and_honors_explicit_retry_count(
 def test_google_workspace_settings_retry_count_defaults_and_reads_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 3
+    assert GoogleWorkspaceSettings().google_api_num_retries == 3
     monkeypatch.setenv("GOOGLE_API_NUM_RETRIES", "7")
-    assert GoogleWorkspaceSettings().GOOGLE_API_NUM_RETRIES == 7
+    assert GoogleWorkspaceSettings().google_api_num_retries == 7
 
 
 @pytest.mark.unit
@@ -395,9 +395,9 @@ def test_google_workspace_settings_timeout_defaults_and_reads_environment(
     The settings class is constructed directly rather than through its cached
     provider so each assertion sees a fresh read of the environment.
     """
-    assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 10.0
+    assert GoogleWorkspaceSettings().google_api_timeout_seconds == 10.0
     monkeypatch.setenv("GOOGLE_API_TIMEOUT_SECONDS", "2.5")
-    assert GoogleWorkspaceSettings().GOOGLE_API_TIMEOUT_SECONDS == 2.5
+    assert GoogleWorkspaceSettings().google_api_timeout_seconds == 2.5
 
 
 @pytest.mark.unit
@@ -424,7 +424,7 @@ def test_build_service_without_a_google_tenant_entry_fails_naming_the_keys(
     google_client_module: Any,
 ) -> None:
     """Without the tenant entry Google is not configured, so building a client names the missing keys."""
-    settings = SimpleNamespace(tenant=None, SRE_BOT_EMAIL="", GOOGLE_API_NUM_RETRIES=3, GOOGLE_API_TIMEOUT_SECONDS=10.0)
+    settings = SimpleNamespace(tenant=None, sre_bot_email="", google_api_num_retries=3, google_api_timeout_seconds=10.0)
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
 
     with pytest.raises(ValueError, match="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"):

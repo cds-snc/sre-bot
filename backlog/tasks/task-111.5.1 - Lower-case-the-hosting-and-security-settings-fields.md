@@ -4,7 +4,7 @@ title: Lower-case the hosting and security settings fields
 status: In Progress
 assignee: []
 created_date: '2026-10-21T20:23:00Z'
-updated_date: '2026-10-21T20:45:00Z'
+updated_date: '2026-10-21T21:20:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -146,6 +146,12 @@ Post-deploy checklist (merging to main deploys; no circuit breaker, :latest unti
 6. Auth: an unauthenticated call to a protected API route returns 401 with WWW-Authenticate, not 500.
 7. CORS: an OPTIONS preflight from an arbitrary Origin gets no Access-Control-Allow-Origin, as before.
 Rollback on any failure: retag the previous <sha>-<date> image as latest and force a new ECS deployment; then revert the merge.
+
+Post-deploy, 2026-10-21 (human): deploy succeeded and new tasks run (checks 1-4). Check 7 passed: OPTIONS preflight from https://example.com to /version returned no Access-Control-Allow-Origin. Check 5 inconclusive: filter-log-events over /ecs/sre-bot-app for the last 24 h found neither security_services_initialized nor the issuer warnings; re-check with aws logs tail. Check 6 not run (no confirmed protected production route).
+
+Post-deploy follow-up 2026-10-21: build_and_deploy run 39674879551 (416a225f) deployed (Restart ECS, Wait for ECS Stability and Slack success all passed at ~21:09 UTC) and then failed only at the post-deploy Docker generate SBOM step (public.ecr.aws trivy-db TOOMANYREQUESTS, unrelated to the change). Baseline issuer_count=1 from the 18:42 UTC boot (previous deploy 1a5f6ab7). aws logs tail --since 3h with filter "security_services" showed only that 18:42 boot; no security_services line from the ~21:0x boot yet: check 5 still open.
+
+Check 5 passed 2026-10-21 (human-run): both new tasks (started 21:01 UTC, digest sha256:30b570f6..., tag 416a225f-2026-10-21 = :latest) logged security_services_initialized with issuer_count=1, equal to the baseline; no security_services_no_issuer_config, issuer_config_not_set or plugin_boot_failed. Warnings/errors in the 2 h after deploy: legacy_api_endpoint_accessed x38 (traffic), access_sync/requests/catalog_disabled x2 each and the slack-bolt 'token will be unused' notice x2 (one per task boot); none relates to a renamed field. Checks 1-5 and 7 passed; check 6 (unauthenticated 401) open or N/A at the human's call.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

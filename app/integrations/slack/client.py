@@ -37,10 +37,10 @@ type SlackActor = Literal["bot", "user"]
 def get_slack_web_client(*, actor: SlackActor = "bot") -> WebClient:
     """Build a sync Web client acting as the bot, or as the admin user whose token it holds."""
     settings = get_slack_settings()
-    retries = settings.RETRY_MAX_ATTEMPTS
+    retries = settings.retry_max_attempts
     return WebClient(
-        token=settings.USER_TOKEN if actor == "user" else settings.BOT_TOKEN,
-        timeout=settings.REQUEST_TIMEOUT_SECONDS,
+        token=settings.user_token if actor == "user" else settings.bot_token,
+        timeout=settings.request_timeout_seconds,
         retry_handlers=[
             ConnectionErrorRetryHandler(max_retry_count=retries),
             RateLimitErrorRetryHandler(max_retry_count=retries),
@@ -52,10 +52,10 @@ def get_slack_web_client(*, actor: SlackActor = "bot") -> WebClient:
 def get_async_slack_web_client() -> AsyncWebClient:
     """Build an async Web client for the bot token."""
     settings = get_slack_settings()
-    retries = settings.RETRY_MAX_ATTEMPTS
+    retries = settings.retry_max_attempts
     return AsyncWebClient(
-        token=settings.BOT_TOKEN,
-        timeout=settings.REQUEST_TIMEOUT_SECONDS,
+        token=settings.bot_token,
+        timeout=settings.request_timeout_seconds,
         retry_handlers=[
             AsyncConnectionErrorRetryHandler(max_retry_count=retries),
             AsyncRateLimitErrorRetryHandler(max_retry_count=retries),
@@ -74,16 +74,16 @@ def classify_slack_error(exc: Exception) -> tuple[OperationStatus, str | None, i
         raise exc
 
     settings = get_slack_settings()
-    if code in settings.UNAUTHORIZED_ERRORS:
+    if code in settings.unauthorized_errors:
         return OperationStatus.UNAUTHORIZED, code, None
-    if code in settings.NOT_FOUND_ERRORS:
+    if code in settings.not_found_errors:
         return OperationStatus.NOT_FOUND, code, None
-    if code in settings.TRANSIENT_ERRORS:
+    if code in settings.transient_errors:
         retry_after = _retry_after_seconds(exc)
         return (
             OperationStatus.TRANSIENT_ERROR,
             code,
-            settings.TRANSIENT_RETRY_AFTER_SECONDS if retry_after is None else retry_after,
+            settings.transient_retry_after_seconds if retry_after is None else retry_after,
         )
 
     raise exc

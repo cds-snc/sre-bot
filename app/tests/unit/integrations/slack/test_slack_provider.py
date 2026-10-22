@@ -251,10 +251,10 @@ class TestInitializeApp:
     def test_initialize_app_missing_app_token(self):
         """Test initialization with missing APP_TOKEN in Socket Mode."""
         settings = MagicMock()
-        settings.ENABLED = True
-        settings.SOCKET_MODE = True
-        settings.APP_TOKEN = None
-        settings.BOT_TOKEN = "xoxb-test"
+        settings.enabled = True
+        settings.socket_mode = True
+        settings.app_token = None
+        settings.bot_token = "xoxb-test"
 
         provider = SlackPlatformProvider(settings=settings)
         result = provider.initialize_app()
@@ -265,10 +265,10 @@ class TestInitializeApp:
     def test_initialize_app_missing_bot_token(self):
         """Test initialization with missing BOT_TOKEN."""
         settings = MagicMock()
-        settings.ENABLED = True
-        settings.SOCKET_MODE = True
-        settings.APP_TOKEN = "xapp-test"
-        settings.BOT_TOKEN = None
+        settings.enabled = True
+        settings.socket_mode = True
+        settings.app_token = "xapp-test"
+        settings.bot_token = None
         provider = SlackPlatformProvider(settings=settings)
         result = provider.initialize_app()
 

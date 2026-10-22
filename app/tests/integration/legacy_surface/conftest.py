@@ -160,7 +160,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
     client = FakeSlackClient()
     app = build_bolt_app(monkeypatch)
-    settings = SimpleNamespace(ENABLED=True, SOCKET_MODE=True, APP_TOKEN="xapp-test", BOT_TOKEN="xoxb-test")
+    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
     provider = SlackPlatformProvider(
         settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter(), command_prefix=command_prefix
     )

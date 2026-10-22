@@ -48,13 +48,13 @@ def test_transport_on_accepts_any_non_blank_team_id(monkeypatch: pytest.MonkeyPa
     """No length or character format is assumed, including ids longer than today's."""
     monkeypatch.setenv("SLACK_TEAM_ID", team_id)
 
-    assert team_id == SlackSettings(_env_file=None).TEAM_ID  # type: ignore[call-arg]
+    assert team_id == SlackSettings(_env_file=None).team_id  # type: ignore[call-arg]
 
 
 @pytest.mark.usefixtures("transport_off")
 def test_transport_off_needs_no_team_id() -> None:
     """With the transport off and no id, Slack is simply not configured."""
-    assert SlackSettings(_env_file=None).TEAM_ID is None  # type: ignore[call-arg]
+    assert SlackSettings(_env_file=None).team_id is None  # type: ignore[call-arg]
 
 
 @pytest.mark.usefixtures("transport_off")
@@ -62,7 +62,7 @@ def test_transport_off_treats_an_empty_team_id_as_absent(monkeypatch: pytest.Mon
     """An empty value (an unset key in a dotenv file) means the entry is absent."""
     monkeypatch.setenv("SLACK_TEAM_ID", "")
 
-    assert SlackSettings(_env_file=None).TEAM_ID is None  # type: ignore[call-arg]
+    assert SlackSettings(_env_file=None).team_id is None  # type: ignore[call-arg]
 
 
 @pytest.mark.usefixtures("transport_off")
@@ -79,7 +79,7 @@ def test_transport_off_keeps_a_present_team_id(monkeypatch: pytest.MonkeyPatch) 
     """A configured workspace id is available whether or not the transport runs."""
     monkeypatch.setenv("SLACK_TEAM_ID", "T0123ABCD")
 
-    assert SlackSettings(_env_file=None).TEAM_ID == "T0123ABCD"  # type: ignore[call-arg]
+    assert SlackSettings(_env_file=None).team_id == "T0123ABCD"  # type: ignore[call-arg]
 
 
 @pytest.mark.usefixtures("transport_off")
