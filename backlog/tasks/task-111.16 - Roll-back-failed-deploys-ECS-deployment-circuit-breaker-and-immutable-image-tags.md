@@ -3,10 +3,10 @@ id: TASK-111.16
 title: >-
   Roll back failed deploys: ECS deployment circuit breaker and immutable image
   tags
-status: Done
+status: In Progress
 assignee: []
 created_date: '2026-10-21T20:05:00Z'
-updated_date: '2026-10-22T14:18:00Z'
+updated_date: '2026-10-22T15:15:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -38,7 +38,7 @@ Planning decides, with current sources: how the deploy workflow registers a task
 - [x] #3 terraform and the deploy workflow do not fight over the task definition: a tf apply after a deploy does not revert the running image; track_latest stays false and skip_destroy is true on aws_ecs_task_definition
 - [x] #4 decisions/deployment.md records ownership, image identity, ECR policy and retention, the circuit breaker, serialization, rollback and rehearsal; configuration.md, lifecycle.md (including the corrected breaker counting), health-checks.md and cloud-portability.md link to it; the decisions README lists it; each touched record has a dated Changes line
 - [x] #5 docs/runbooks/roll-back-a-deployment.md documents dispatch rollback (tag validated and resolved to digest), the CLI fallback, redeploying the current image after a terraform task-definition change, and the post-deploy Verify checklist; it links deployment.md and has owner and last_reviewed; governance.md records the docs/runbooks convention
-- [ ] #6 The PR's tf plan shows only the expected service, ECR repository and state-only task-definition changes; nothing replaced or destroyed; nothing applied before merge
+- [x] #6 The PR's tf plan shows only the expected service, ECR repository and state-only task-definition changes; nothing replaced or destroyed; nothing applied before merge
 - [x] #7 The deploy workflow fails when the service ends on a task definition other than the one this run registered or the PRIMARY deployment rolloutState is FAILED; the Slack message names the rollback (circuit breaker or alarm) and links the run
 - [ ] #8 When the sha tag already exists the job builds and pushes nothing, reuses that digest and leaves latest unmoved; ECR rejects overwriting a sha tag while latest stays pushable
 - [x] #9 The SBOM step scans the deployed tag/digest, and docker_vulnerability_scan.yml accepts an image_tag dispatch input defaulting to latest
@@ -48,7 +48,7 @@ Planning decides, with current sources: how the deploy workflow registers a task
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Human: after merge, tf_apply succeeded and the in-place UpdateService started no deployment
+- [x] #1 Human: after merge, tf_apply succeeded and the in-place UpdateService started no deployment
 - [ ] #2 Human: one happy-path dispatch deploy done, so a workflow-registered COMPLETED revision exists
 - [ ] #3 Human: off-hours rehearsal with an invalid-ENVIRONMENT revision: breaker FAILED, rolled back to the previous revision, verify step fails and notifies
 - [ ] #4 Human: rehearsal timings and date recorded in the runbook before TASK-111.5.2 or TASK-111.7 merges
@@ -160,6 +160,16 @@ ACs left open (need production evidence)
 
 Not run here: tf plan (no AWS credentials).
 Follow-ups (not created): stop pushing latest + plain IMMUTABLE; image signing/provenance; ECR lifecycle policy; EventBridge SERVICE_DEPLOYMENT_FAILED alert; GitHub environment: after reading the sre-bot-apply trust policy.
+
+Merged 2026-10-22 as #1772 (36adb97e, 14:45 UTC). tf_apply run 39798412641, job 119891859541: "Apply complete! Resources: 0 added, 3 changed, 0 destroyed." aws_ecr_repository.sre-bot MUTABLE -> IMMUTABLE_WITH_EXCLUSION + filter latest/WILDCARD; aws_ecs_service.main health_check_grace_period_seconds 0 -> 60, deployment_circuit_breaker enable/rollback false -> true (task_definition not in the diff); aws_ecs_task_definition.sre-bot skip_destroy false -> true, no replacement. AC #6 checked on this. The run stayed "in progress" after its only job completed: GitHub "Incident with Actions Results" (Actions degraded) the same afternoon; the job log was read through the jobs API.
+No build/deploy ran (the merge touched only ignored paths); production still runs the #1771 image 80947e62...-2026-10-22 on terraform's :latest revision. Next: human dispatch deploy once Actions is healthy (DoD 2), then ACs 2, 8, 11 and the rehearsal.
+
+Post-apply check 2026-10-22 (human-run): service breaker enable/rollback true (AWS reports resetOnHealthyTask true, BOUNDED_PERCENT 50), alarms unchanged, grace 60; one PRIMARY deployment, COMPLETED, created 13:54:59 UTC (the #1771 deploy) on sre-bot-task:36, last event steady state 14:03 UTC, nothing after the 14:45 apply: no deployment started (DoD 1). ECR IMMUTABLE_WITH_EXCLUSION, filter latest/WILDCARD. sre-bot-task:36 ACTIVE, image :latest, still the latest revision (skip_destroy registered nothing).
+Caveat for the first dispatch: the only COMPLETED rollback target (:36) references :latest, and a build moves latest before deploying. First dispatch therefore redeploys the running image by tag (image_tag=80947e62d87ba0eb6eba2c24914be59c0c5675a7-2026-10-22: no build, latest unmoved), which makes a digest-pinned COMPLETED target; the build path runs second.
+
+Rehearsal through the workflow (second PR, 2026-10-22): production changes only through the GitHub Actions workflows (Codespace env differs from the secrets), and the only OIDC role in the repo trusts refs/heads/main, so the rehearsal cannot be a local update-service or a branch dispatch. build_and_deploy gains a boolean dispatch input rehearse_rollback: requires image_tag (no build), the render step overrides ENVIRONMENT=rollback-rehearsal (AppSettings.ENVIRONMENT is Literal local/ci/production, read first in the lifespan, so boot aborts), verify fails as expected, then "Deregister the rehearsal revision" (always) deregisters it once the service has left it, because the next deploy renders from the family's latest revision. Render action v1.9.1 replaces an existing variable of the same name (index.js). Needs ecs:DeregisterTaskDefinition on sre-bot-apply. Runbook gains "Rehearse a rollback" with exact commands; deployment.md Rehearsal paragraph and a Changes line. actionlint clean except the known queue key, which GitHub accepted (tf_apply run 39798412641 ran with queue: max).
+
+Admin-only manual deploys (human 2026-10-22, same PR): any of the 45 users with write access or above could dispatch or re-run build_and_deploy (GitHub requires write access to run a workflow manually). Now .github/workflows/scripts/require-admin.sh runs in the build and deploy jobs, after checkout and before AWS credentials, when the event is workflow_dispatch or run_attempt != 1. It reads github.triggering_actor's role_name from repos/<repo>/collaborators/<actor>/permission and fails unless it is admin. It runs per job because "re-run failed jobs" re-runs only the failed job. Merge deploys stay gated by the main ruleset (1 approval, no bypass actors). Tested against the live API: admin passes; write, read and an unknown user are refused. shellcheck clean. The first manual dispatch confirms GITHUB_TOKEN can read the endpoint (metadata read); if it cannot, the check denies everyone (fails closed). The GitHub-enforced version (environment with required reviewers, which changes the OIDC subject) is TASK-160.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
