@@ -1,7 +1,7 @@
 """Vendor settings for the GC Notify API client.
 
 Exposes ``NotifySettings`` and the cached ``get_notify_settings()`` provider. Each field
-reads the environment variable of the same name.
+reads the environment variable of the same name, matched case-insensitively.
 """
 
 from functools import lru_cache
@@ -14,13 +14,13 @@ class NotifySettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    NOTIFY_SRE_USER_NAME: str | None = None
-    NOTIFY_SRE_CLIENT_SECRET: str | None = None
-    NOTIFY_API_URL: str = ""
+    notify_sre_user_name: str | None = None
+    notify_sre_client_secret: str | None = None
+    notify_api_url: str = ""
 
 
 @lru_cache(maxsize=1)

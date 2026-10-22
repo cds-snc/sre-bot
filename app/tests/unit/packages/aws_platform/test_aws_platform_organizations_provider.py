@@ -4,7 +4,7 @@ get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 organizations client with dummy static credentials. The org
 role comes from AWS_ORG_ACCOUNT_ROLE_ARN and the settings cache is cleared
 around each test, so the assertions pin the service name and the role ARN the
-factory reads from SERVICE_ROLE_MAP.
+factory reads from service_role_map.
 """
 
 from collections.abc import Iterator
@@ -53,7 +53,7 @@ class TestBuildOrganizationsAdapter:
             return build_organizations_adapter()
 
     def test_single_organizations_client_with_org_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """One get_aws_client('organizations') call carries SERVICE_ROLE_MAP['organizations']."""
+        """One get_aws_client('organizations') call carries service_role_map['organizations']."""
         monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
         calls: list[dict[str, Any]] = []
 

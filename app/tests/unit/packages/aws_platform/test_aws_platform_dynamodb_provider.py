@@ -3,7 +3,7 @@
 The provider is monkeypatched to record get_aws_client calls and verify routing:
 two calls to get_aws_client('dynamodb', ...), the second with retries=False.
 Environment variables AWS_AUDIT_ACCOUNT_ROLE_ARN, AWS_ORG_ACCOUNT_ROLE_ARN, and
-AWS_LOGGING_ACCOUNT_ROLE_ARN are set to verify that dynamodb has no SERVICE_ROLE_MAP
+AWS_LOGGING_ACCOUNT_ROLE_ARN are set to verify that dynamodb has no service_role_map
 entry and always receives role_arn=None. get_aws_settings cache is cleared before
 and after each test.
 """

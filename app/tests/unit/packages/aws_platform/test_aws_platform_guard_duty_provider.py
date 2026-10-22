@@ -4,7 +4,7 @@ get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 guardduty client with dummy static credentials. The logging
 role comes from AWS_LOGGING_ACCOUNT_ROLE_ARN and the settings cache is cleared
 around each test, so the assertions pin the service name and the role ARN the
-factory reads from SERVICE_ROLE_MAP.
+factory reads from service_role_map.
 """
 
 from collections.abc import Iterator
@@ -53,7 +53,7 @@ class TestBuildGuardDutyAdapter:
             return build_guard_duty_adapter()
 
     def test_single_guard_duty_client_with_logging_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """One get_aws_client('guardduty') call carries SERVICE_ROLE_MAP['guardduty']."""
+        """One get_aws_client('guardduty') call carries service_role_map['guardduty']."""
         monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/logging-role")
         calls: list[dict[str, Any]] = []
 

@@ -1,7 +1,7 @@
 """Vendor settings for the Trello API client.
 
 Exposes ``TrelloSettings`` and the cached ``get_trello_settings()`` provider. Each field
-reads the environment variable of the same name.
+reads the environment variable of the same name, matched case-insensitively.
 """
 
 from functools import lru_cache
@@ -14,13 +14,13 @@ class TrelloSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    TRELLO_APP_KEY: str | None = None
-    TRELLO_TOKEN: str | None = None
-    TRELLO_ATIP_BOARD: str | None = None
+    trello_app_key: str | None = None
+    trello_token: str | None = None
+    trello_atip_board: str | None = None
 
 
 @lru_cache(maxsize=1)

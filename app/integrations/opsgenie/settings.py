@@ -1,7 +1,7 @@
 """Vendor settings for the OpsGenie API client.
 
 Exposes ``OpsGenieSettings`` and the cached ``get_opsgenie_settings()`` provider. Each field
-reads the environment variable of the same name.
+reads the environment variable of the same name, matched case-insensitively.
 """
 
 from functools import lru_cache
@@ -14,11 +14,11 @@ class OpsGenieSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
     )
 
-    OPSGENIE_INTEGRATIONS_KEY: str | None = None
+    opsgenie_integrations_key: str | None = None
 
 
 @lru_cache(maxsize=1)

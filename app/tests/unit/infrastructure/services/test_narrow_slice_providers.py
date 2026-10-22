@@ -27,7 +27,7 @@ class TestMaxMindClientNarrowSlice:
         with tempfile.NamedTemporaryFile(suffix=".mmdb", delete=False) as f:
             db_path = f.name
         try:
-            mock_settings.MAXMIND_DB_PATH = db_path
+            mock_settings.maxmind_db_path = db_path
             client = MaxMindClient(maxmind_settings=mock_settings)
             assert client._db_path == db_path
         finally:

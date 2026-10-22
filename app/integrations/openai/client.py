@@ -25,12 +25,12 @@ def build_openai_client(settings: OpenAISettings | None = None) -> httpx.AsyncCl
     """
     settings = settings or get_openai_settings()
     return httpx.AsyncClient(
-        base_url=settings.BASE_URL,
+        base_url=settings.base_url,
         headers={
-            "Authorization": f"Bearer {settings.API_KEY.get_secret_value()}",
+            "Authorization": f"Bearer {settings.api_key.get_secret_value()}",
             "Content-Type": "application/json",
         },
-        timeout=settings.TIMEOUT_SECONDS,
+        timeout=settings.timeout_seconds,
     )
 
 

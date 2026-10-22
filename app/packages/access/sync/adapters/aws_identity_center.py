@@ -1218,10 +1218,10 @@ def build_aws_identity_center_adapter() -> AwsIdentityCenterAdapter:
 
     Identity Store/Identity Center is centrally managed in the AWS
     Organization's management account, while sre-bot's own task runs in a
-    member account, so identitystore calls assume ``SERVICE_ROLE_MAP``'s org
+    member account, so identitystore calls assume ``service_role_map``'s org
     role when one is configured.
     """
     settings = get_aws_settings()
-    role_arn = settings.SERVICE_ROLE_MAP.get("identitystore") or None
+    role_arn = settings.service_role_map.get("identitystore") or None
     client = get_aws_client("identitystore", role_arn=role_arn)
-    return AwsIdentityCenterAdapter(client, settings.INSTANCE_ID)
+    return AwsIdentityCenterAdapter(client, settings.instance_id)

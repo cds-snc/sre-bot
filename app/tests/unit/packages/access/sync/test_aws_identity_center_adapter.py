@@ -461,8 +461,8 @@ class _FakeAwsSettings:
     """Minimal AwsSettings stand-in for factory-wiring tests."""
 
     def __init__(self, instance_id: str, identitystore_role_arn: str) -> None:
-        self.INSTANCE_ID = instance_id
-        self.SERVICE_ROLE_MAP = {"identitystore": identitystore_role_arn}
+        self.instance_id = instance_id
+        self.service_role_map = {"identitystore": identitystore_role_arn}
 
 
 @pytest.mark.unit
@@ -493,7 +493,7 @@ def test_build_aws_identity_center_adapter_wires_typed_client_no_facade(monkeypa
 
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_assumes_org_role_when_configured(monkeypatch: pytest.MonkeyPatch) -> None:
-    """identitystore must be assumed under SERVICE_ROLE_MAP's org role, not the bot's own credentials."""
+    """identitystore must be assumed under service_role_map's org role, not the bot's own credentials."""
     captured: dict[str, Any] = {}
 
     def _fake_get_aws_client(service_name: str, role_arn: str | None = None) -> MagicMock:
@@ -514,7 +514,7 @@ def test_build_aws_identity_center_adapter_assumes_org_role_when_configured(monk
 
 @pytest.mark.unit
 def test_build_aws_identity_center_adapter_omits_role_arn_when_unset(monkeypatch: pytest.MonkeyPatch) -> None:
-    """When SERVICE_ROLE_MAP has no identitystore role configured, role_arn must be None.
+    """When service_role_map has no identitystore role configured, role_arn must be None.
 
     Prevents a spurious STS AssumeRole call with an empty-string RoleArn in
     default/test configuration.

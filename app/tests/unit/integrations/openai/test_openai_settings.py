@@ -15,12 +15,12 @@ class TestOpenAISettings:
 
         settings = OpenAISettings()
 
-        assert settings.API_KEY.get_secret_value() == "sk-secret"
-        assert settings.MODEL == "gpt-5.6-luna"
-        assert settings.MAX_OUTPUT_TOKENS == 3000
-        assert settings.TEMPERATURE == -1.0
-        assert settings.TIMEOUT_SECONDS == 180.0
-        assert settings.BASE_URL == "https://ai.cdssandbox.xyz"
+        assert settings.api_key.get_secret_value() == "sk-secret"
+        assert settings.model == "gpt-5.6-luna"
+        assert settings.max_output_tokens == 3000
+        assert settings.temperature == -1.0
+        assert settings.timeout_seconds == 180.0
+        assert settings.base_url == "https://ai.cdssandbox.xyz"
 
     def test_overrides_from_env(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")
@@ -29,8 +29,8 @@ class TestOpenAISettings:
 
         settings = OpenAISettings()
 
-        assert settings.MODEL == "gpt-5.4-mini"
-        assert settings.MAX_OUTPUT_TOKENS == 1200
+        assert settings.model == "gpt-5.4-mini"
+        assert settings.max_output_tokens == 1200
 
     def test_api_key_not_exposed_in_repr(self, monkeypatch):
         monkeypatch.setenv("OPENAI_API_KEY", "sk-secret")

@@ -2,7 +2,7 @@
 
 get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 lambda client with dummy static credentials. The Lambda
-adapter calls get_aws_client with role_arn=None (no SERVICE_ROLE_MAP entry),
+adapter calls get_aws_client with role_arn=None (no service_role_map entry),
 and the settings cache is cleared around each test to pin that the factory
 reads from the settings even when role ARN environment variables are set.
 """
@@ -53,7 +53,7 @@ class TestBuildLambdaAdapter:
             return build_lambda_adapter()
 
     def test_single_lambda_client_with_role_arn_none(self) -> None:
-        """One get_aws_client('lambda') call carries role_arn=None (no SERVICE_ROLE_MAP entry)."""
+        """One get_aws_client('lambda') call carries role_arn=None (no service_role_map entry)."""
         calls: list[dict[str, Any]] = []
 
         adapter = self._build_recording(calls)

@@ -27,7 +27,7 @@ class TestBuildOpenAIClient:
 
         assert client.headers["Authorization"] == "Bearer sk-test-key"
         assert client.headers["Content-Type"] == "application/json"
-        assert str(client.base_url).rstrip("/") == openai_settings.BASE_URL
+        assert str(client.base_url).rstrip("/") == openai_settings.base_url
 
 
 class TestClassifyOpenAIError:

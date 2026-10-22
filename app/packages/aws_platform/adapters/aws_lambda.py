@@ -6,7 +6,7 @@ errors with ``classify_aws_error`` and returns ``OperationResult`` at every
 operation. Programmer errors propagate.
 
 Named ``aws_lambda`` rather than ``lambda`` because ``lambda`` is a Python
-keyword. The client is built in-account (no ``SERVICE_ROLE_MAP`` entry), so
+keyword. The client is built in-account (no ``service_role_map`` entry), so
 callers build the adapter with :func:`build_lambda_adapter` at function entry,
 never at import.
 """
@@ -93,6 +93,6 @@ class LambdaAdapter:
 
 
 def build_lambda_adapter() -> LambdaAdapter:
-    """Build the adapter in-account; ``lambda`` has no ``SERVICE_ROLE_MAP`` entry."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("lambda") or None
+    """Build the adapter in-account; ``lambda`` has no ``service_role_map`` entry."""
+    role_arn = get_aws_settings().service_role_map.get("lambda") or None
     return LambdaAdapter(get_aws_client("lambda", role_arn=role_arn))

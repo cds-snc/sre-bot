@@ -2,10 +2,10 @@
 
 get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 config client with dummy static credentials. The config
-role comes from SERVICE_ROLE_MAP["config"], which resolves to AUDIT_ROLE_ARN
+role comes from service_role_map["config"], which resolves to audit_role_arn
 (AWS_AUDIT_ACCOUNT_ROLE_ARN), and the settings cache is cleared around each
 test, so the assertions pin the service name and the role ARN the factory
-reads from SERVICE_ROLE_MAP.
+reads from service_role_map.
 """
 
 from collections.abc import Iterator
@@ -54,7 +54,7 @@ class TestBuildConfigAdapter:
             return build_config_adapter()
 
     def test_single_config_client_with_audit_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """One get_aws_client('config') call carries SERVICE_ROLE_MAP['config']."""
+        """One get_aws_client('config') call carries service_role_map['config']."""
         monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/config-role")
         calls: list[dict[str, Any]] = []
 

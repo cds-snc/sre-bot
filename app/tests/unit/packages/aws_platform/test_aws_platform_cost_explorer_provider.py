@@ -4,7 +4,7 @@ get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 cost-explorer client with dummy static credentials. The Cost
 Explorer role comes from AWS_ORG_ACCOUNT_ROLE_ARN and the settings cache is
 cleared around each test, so the assertions pin the service name 'ce' and the
-role ARN the factory reads from SERVICE_ROLE_MAP.
+role ARN the factory reads from service_role_map.
 """
 
 from collections.abc import Iterator
@@ -53,7 +53,7 @@ class TestBuildCostExplorerAdapter:
             return build_cost_explorer_adapter()
 
     def test_single_cost_explorer_client_with_org_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """One get_aws_client('ce') call carries SERVICE_ROLE_MAP['ce']."""
+        """One get_aws_client('ce') call carries service_role_map['ce']."""
         monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
         calls: list[dict[str, Any]] = []
 

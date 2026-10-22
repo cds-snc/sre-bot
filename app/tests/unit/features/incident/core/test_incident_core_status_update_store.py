@@ -510,7 +510,7 @@ def test_throttling_is_transient_with_a_retry_hint(client: Any) -> None:
         stub.assert_no_pending_responses()
 
     assert result.status is OperationStatus.TRANSIENT_ERROR
-    assert result.retry_after == get_aws_settings().TRANSIENT_RETRY_AFTER_SECONDS
+    assert result.retry_after == get_aws_settings().transient_retry_after_seconds
     assert PROVIDER_DETAIL not in (result.message or "")
 
 
@@ -574,4 +574,4 @@ def test_the_builder_asks_the_shared_factory_for_a_dynamodb_client_only_when_cal
     store = status_updates.build_status_update_store()
 
     assert isinstance(store, DynamoDbStatusUpdateStore)
-    factory.assert_called_once_with("dynamodb", role_arn=get_aws_settings().SERVICE_ROLE_MAP.get("dynamodb") or None)
+    factory.assert_called_once_with("dynamodb", role_arn=get_aws_settings().service_role_map.get("dynamodb") or None)

@@ -111,6 +111,6 @@ class OrganizationsAdapter:
 
 
 def build_organizations_adapter() -> OrganizationsAdapter:
-    """Build the adapter with the organizations role from ``SERVICE_ROLE_MAP``."""
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("organizations") or None
+    """Build the adapter with the organizations role from ``service_role_map``."""
+    role_arn = get_aws_settings().service_role_map.get("organizations") or None
     return OrganizationsAdapter(get_aws_client("organizations", role_arn=role_arn))

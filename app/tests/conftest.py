@@ -436,13 +436,10 @@ def make_mock_settings():
         """Create mock settings with provided overrides."""
         settings = MagicMock()
 
-        # Set common defaults for all packages
-        settings.aws.AWS_REGION = "us-east-1"
-
         # Apply package-specific overrides
         for key, value in overrides.items():
             if "." in key:
-                # Handle nested attributes: 'aws.AWS_REGION' -> settings.aws.AWS_REGION
+                # Handle nested attributes: 'idempotency.IDEMPOTENCY_TTL_SECONDS' -> settings.idempotency.IDEMPOTENCY_TTL_SECONDS
                 parts = key.split(".")
                 obj = settings
                 for part in parts[:-1]:

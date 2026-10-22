@@ -11,7 +11,7 @@ Request and response items keep the low-level ``AttributeValue`` shapes. Only
 the operations legacy callers use are exposed; ``query``, ``delete_item`` and
 ``list_tables`` have no caller and are deliberately not ported.
 
-The clients are built in-account (no ``SERVICE_ROLE_MAP`` entry), so callers
+The clients are built in-account (no ``service_role_map`` entry), so callers
 build the adapter with :func:`build_dynamodb_adapter` at function entry, never
 at import.
 """
@@ -121,12 +121,12 @@ class DynamoDBAdapter:
 
 
 def build_dynamodb_adapter() -> DynamoDBAdapter:
-    """Build the adapter in-account; ``dynamodb`` has no ``SERVICE_ROLE_MAP`` entry.
+    """Build the adapter in-account; ``dynamodb`` has no ``service_role_map`` entry.
 
     Two clients are built per call: a standard-retry client and a
     retries-disabled one for writes that are not replay-safe.
     """
-    role_arn = get_aws_settings().SERVICE_ROLE_MAP.get("dynamodb") or None
+    role_arn = get_aws_settings().service_role_map.get("dynamodb") or None
     client = get_aws_client("dynamodb", role_arn=role_arn)
     client_no_retry = get_aws_client("dynamodb", role_arn=role_arn, retries=False)
     return DynamoDBAdapter(client, client_no_retry)

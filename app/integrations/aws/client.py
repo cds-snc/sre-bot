@@ -146,10 +146,10 @@ def get_aws_client(
     """
     settings = get_aws_settings()
     session = _session_for(settings, role_arn, session_name)
-    endpoint_url = settings.DYNAMODB_ENDPOINT_URL if service_name == "dynamodb" else None
+    endpoint_url = settings.dynamodb_endpoint_url if service_name == "dynamodb" else None
     return session.client(
         service_name,
-        region_name=settings.AWS_REGION,
+        region_name=settings.aws_region,
         config=_build_config(settings, retries=retries),
         endpoint_url=endpoint_url,
     )
@@ -157,17 +157,17 @@ def get_aws_client(
 
 def _build_config(settings: AWSSettings, *, retries: bool) -> Config:
     """Botocore config with explicit retry mode, attempt budget and timeouts."""
-    max_attempts = settings.RETRY_MAX_ATTEMPTS if retries else 0
+    max_attempts = settings.retry_max_attempts if retries else 0
     return Config(
-        retries={"mode": settings.RETRY_MODE, "max_attempts": max_attempts},
-        connect_timeout=settings.CONNECT_TIMEOUT_SECONDS,
-        read_timeout=settings.READ_TIMEOUT_SECONDS,
+        retries={"mode": settings.retry_mode, "max_attempts": max_attempts},
+        connect_timeout=settings.connect_timeout_seconds,
+        read_timeout=settings.read_timeout_seconds,
     )
 
 
 def _session_for(settings: AWSSettings, role_arn: str | None, session_name: str) -> boto3.Session:
     """Ambient-credential session, or one holding credentials assumed for ``role_arn``."""
-    ambient = boto3.Session(region_name=settings.AWS_REGION)
+    ambient = boto3.Session(region_name=settings.aws_region)
     if not role_arn:
         return ambient
 
@@ -177,7 +177,7 @@ def _session_for(settings: AWSSettings, role_arn: str | None, session_name: str)
         aws_access_key_id=credentials["AccessKeyId"],
         aws_secret_access_key=credentials["SecretAccessKey"],
         aws_session_token=credentials["SessionToken"],
-        region_name=settings.AWS_REGION,
+        region_name=settings.aws_region,
     )
 
 
@@ -202,12 +202,12 @@ def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int
         raise exc
 
     settings = get_aws_settings()
-    if code in settings.NOT_FOUND_CODES:
+    if code in settings.not_found_codes:
         return OperationStatus.NOT_FOUND, code, None
-    if code in settings.UNAUTHORIZED_CODES:
+    if code in settings.unauthorized_codes:
         return OperationStatus.UNAUTHORIZED, code, None
-    if code in settings.TRANSIENT_CODES:
-        return OperationStatus.TRANSIENT_ERROR, code, settings.TRANSIENT_RETRY_AFTER_SECONDS
+    if code in settings.transient_codes:
+        return OperationStatus.TRANSIENT_ERROR, code, settings.transient_retry_after_seconds
     if code in ("ConditionalCheckFailedException", "ConflictException"):
         # DynamoDB conditional writes and Identity Store "already exists" conflicts are final outcomes.
         return OperationStatus.PERMANENT_ERROR, code, None

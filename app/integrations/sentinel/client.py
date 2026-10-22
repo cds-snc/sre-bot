@@ -13,9 +13,9 @@ from integrations.sentinel.settings import get_sentinel_settings
 
 logger = structlog.get_logger()
 sentinel_settings = get_sentinel_settings()
-SENTINEL_CUSTOMER_ID = sentinel_settings.SENTINEL_CUSTOMER_ID
-SENTINEL_LOG_TYPE = sentinel_settings.SENTINEL_LOG_TYPE
-SENTINEL_SHARED_KEY = sentinel_settings.SENTINEL_SHARED_KEY
+SENTINEL_CUSTOMER_ID = sentinel_settings.sentinel_customer_id
+SENTINEL_LOG_TYPE = sentinel_settings.sentinel_log_type
+SENTINEL_SHARED_KEY = sentinel_settings.sentinel_shared_key
 
 
 def _json_default(value: Any) -> Any:

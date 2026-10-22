@@ -66,20 +66,20 @@ class OpenAISummarizer:
             max_output_tokens: Optional per-call completion budget. Callers
                 that need substantially more output than a catch-up summary
                 (e.g. structured multi-section drafts) raise it; ``None`` uses
-                the configured ``MAX_OUTPUT_TOKENS``.
+                the configured ``max_output_tokens``.
         """
         payload: dict[str, Any] = {
-            "model": self._settings.MODEL,
-            "max_completion_tokens": max_output_tokens or self._settings.MAX_OUTPUT_TOKENS,
+            "model": self._settings.model,
+            "max_completion_tokens": max_output_tokens or self._settings.max_output_tokens,
             "messages": [
                 {"role": "system", "content": instructions or _DEFAULT_INSTRUCTIONS},
                 {"role": "user", "content": transcript},
             ],
         }
-        if self._settings.TEMPERATURE >= 0:
+        if self._settings.temperature >= 0:
             # Omitted when negative: some models accept no temperature at all,
             # and a rejected parameter fails the whole request.
-            payload["temperature"] = self._settings.TEMPERATURE
+            payload["temperature"] = self._settings.temperature
 
         try:
             async with build_openai_client(self._settings) as client:

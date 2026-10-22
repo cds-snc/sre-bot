@@ -4,7 +4,7 @@ get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 securityhub client with dummy static credentials. The logging
 role comes from AWS_LOGGING_ACCOUNT_ROLE_ARN and the settings cache is cleared
 around each test, so the assertions pin the service name and the role ARN the
-factory reads from SERVICE_ROLE_MAP.
+factory reads from service_role_map.
 """
 
 from collections.abc import Iterator
@@ -53,7 +53,7 @@ class TestBuildSecurityHubAdapter:
             return build_security_hub_adapter()
 
     def test_single_security_hub_client_with_logging_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """One get_aws_client('securityhub') call carries SERVICE_ROLE_MAP['securityhub']."""
+        """One get_aws_client('securityhub') call carries service_role_map['securityhub']."""
         monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/logging-role")
         calls: list[dict[str, Any]] = []
 

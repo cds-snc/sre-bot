@@ -165,12 +165,12 @@ class SsoAdminAdapter:
 
 
 def build_sso_admin_adapter() -> SsoAdminAdapter:
-    """Build the adapter with the sso-admin role from ``SERVICE_ROLE_MAP`` and the SSO instance settings."""
+    """Build the adapter with the sso-admin role from ``service_role_map`` and the SSO instance settings."""
     settings = get_aws_settings()
-    role_arn = settings.SERVICE_ROLE_MAP.get("sso-admin") or None
+    role_arn = settings.service_role_map.get("sso-admin") or None
     return SsoAdminAdapter(
         get_aws_client("sso-admin", role_arn=role_arn),
-        instance_arn=settings.INSTANCE_ARN,
-        system_admin_permissions=settings.SYSTEM_ADMIN_PERMISSIONS,
-        view_only_permissions=settings.VIEW_ONLY_PERMISSIONS,
+        instance_arn=settings.instance_arn,
+        system_admin_permissions=settings.system_admin_permissions,
+        view_only_permissions=settings.view_only_permissions,
     )
