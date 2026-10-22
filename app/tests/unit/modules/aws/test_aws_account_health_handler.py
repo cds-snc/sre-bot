@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError
 from freezegun import freeze_time
+from slack_sdk.errors import SlackApiError
 
 from contracts.operations import OperationResult, OperationStatus
 from modules.aws import aws_account_health
@@ -127,7 +128,9 @@ def view_body() -> dict[str, Any]:
             "state": {
                 "values": {
                     "account": {
-                        "account": {"selected_option": {"value": ACCOUNT_ID, "text": {"text": f"TestAccount ({ACCOUNT_ID})"}}}
+                        "aws_health_account": {
+                            "selected_option": {"value": ACCOUNT_ID, "text": {"text": f"TestAccount ({ACCOUNT_ID})"}}
+                        }
                     }
                 }
             }
@@ -622,64 +625,204 @@ def test_should_propagate_non_aws_errors_from_health_check(mock_get_health, view
 # -- request_health_modal -------------------------------------------------------
 
 
+def _slack_api_error(error: str = "invalid_arguments") -> SlackApiError:
+    """Return the SlackApiError the SDK raises when Slack rejects a call."""
+    return SlackApiError(message="The request to the Slack API failed.", response={"ok": False, "error": error})
+
+
 @pytest.mark.unit
 @patch("modules.aws.aws_account_health.build_organizations_adapter")
-def test_should_open_account_selector_sorted_by_name(mock_build_organizations, slack_client):
-    """The account selector lists every organization account, sorted case-insensitively by label.
+def test_should_open_account_selector_that_loads_options_on_demand(mock_build_organizations, slack_client):
+    """The modal opens with an external select and no embedded options, so its size no longer grows with the organization.
 
-    Stub strategy: a spec'd Organizations adapter returns two accounts out of order.
+    Stub strategy: the Organizations factory is patched only to prove the modal
+    opens without listing accounts; options are served by account_options_handler.
     """
-    # Arrange
-    adapter = MagicMock(spec=OrganizationsAdapter)
-    adapter.list_organization_accounts.return_value = OperationResult.success(
-        data=[{"Id": "222", "Name": "zebra"}, {"Id": "111", "Name": "Alpha"}]
-    )
-    mock_build_organizations.return_value = adapter
-
     # Act
-    aws_account_health.request_health_modal(slack_client, {"trigger_id": "trigger-123"})
+    aws_account_health.request_health_modal(slack_client, {"trigger_id": "trigger-123"}, MagicMock())
 
     # Assert
-    mock_build_organizations.assert_called_once_with()
+    mock_build_organizations.assert_not_called()
     slack_client.views_open.assert_called_once()
     call = slack_client.views_open.call_args
     assert call.kwargs["trigger_id"] == "trigger-123"
     view = call.kwargs["view"]
     assert view["callback_id"] == "aws_health_view"
     assert "submit" in view
-    assert view["blocks"][0]["element"]["options"] == [
-        {"text": {"type": "plain_text", "text": "Alpha (111)"}, "value": "111"},
-        {"text": {"type": "plain_text", "text": "zebra (222)"}, "value": "222"},
-    ]
+    block = view["blocks"][0]
+    assert block["block_id"] == "account"
+    element = block["element"]
+    assert element["type"] == "external_select"
+    assert element["action_id"] == "aws_health_account"
+    assert element["min_query_length"] == 0
+    assert "options" not in element
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.logger")
+def test_should_tell_user_and_log_when_slack_rejects_the_modal(mock_logger, slack_client):
+    """A modal Slack refuses to open is reported to the user with a bilingual message and logged with Slack's error.
+
+    Stub strategy: views_open raises SlackApiError; respond is a double because
+    the response URL reaches the user in any channel, unlike a bot post.
+    """
+    # Arrange
+    slack_client.views_open.side_effect = _slack_api_error()
+    respond = MagicMock()
+
+    # Act
+    aws_account_health.request_health_modal(slack_client, {"trigger_id": "trigger-123"}, respond)
+
+    # Assert
+    respond.assert_called_once()
+    message = respond.call_args.args[0]
+    assert ENGLISH_RETRY in message
+    assert FRENCH_RETRY in message
+    assert any(
+        kwargs.get("slack_error") == "invalid_arguments" for kwargs in _logged(mock_logger, "aws_health_modal_open_failed")
+    )
+
+
+# -- account_options_handler ----------------------------------------------------
+
+
+def _accounts_adapter(mock_build_organizations: MagicMock, accounts: list[dict[str, Any]]) -> MagicMock:
+    """Wire the patched Organizations factory to a spec'd adapter returning ``accounts``."""
+    adapter = MagicMock(spec=OrganizationsAdapter)
+    adapter.list_organization_accounts.return_value = OperationResult.success(data=accounts)
+    mock_build_organizations.return_value = adapter
+    return adapter
+
+
+def _option_labels(ack: MagicMock) -> list[str]:
+    """Return the option labels passed to ack."""
+    return [option["text"]["text"] for option in ack.call_args.kwargs["options"]]
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.build_organizations_adapter")
+def test_should_return_active_accounts_sorted_by_name(mock_build_organizations):
+    """With no query, every active account is offered, sorted case-insensitively by label.
+
+    Stub strategy: accounts mix the State field and the retired Status field, so
+    both shapes Organizations has returned are covered.
+    """
+    # Arrange
+    _accounts_adapter(
+        mock_build_organizations,
+        [
+            {"Id": "222", "Name": "zebra", "State": "ACTIVE"},
+            {"Id": "111", "Name": "Alpha", "Status": "ACTIVE"},
+        ],
+    )
+    ack = MagicMock()
+
+    # Act
+    aws_account_health.account_options_handler(ack, {"value": ""})
+
+    # Assert
+    ack.assert_called_once_with(
+        options=[
+            {"text": {"type": "plain_text", "text": "Alpha (111)"}, "value": "111"},
+            {"text": {"type": "plain_text", "text": "zebra (222)"}, "value": "222"},
+        ]
+    )
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.build_organizations_adapter")
+def test_should_exclude_accounts_that_are_not_active(mock_build_organizations):
+    """Suspended, closed and pending accounts are not offered for a health check.
+
+    Stub strategy: State wins over the retired Status when both are present,
+    because CLOSED accounts still report Status SUSPENDED or stale values.
+    """
+    # Arrange
+    _accounts_adapter(
+        mock_build_organizations,
+        [
+            {"Id": "111", "Name": "live", "State": "ACTIVE"},
+            {"Id": "222", "Name": "closed", "State": "CLOSED", "Status": "ACTIVE"},
+            {"Id": "333", "Name": "suspended", "Status": "SUSPENDED"},
+            {"Id": "444", "Name": "closing", "State": "PENDING_CLOSURE"},
+        ],
+    )
+    ack = MagicMock()
+
+    # Act
+    aws_account_health.account_options_handler(ack, {"value": ""})
+
+    # Assert
+    assert _option_labels(ack) == ["live (111)"]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(("query", "expected"), [("PROD", ["prod-app (111)"]), ("222", ["staging (222)"])], ids=["name", "id"])
+@patch("modules.aws.aws_account_health.build_organizations_adapter")
+def test_should_filter_accounts_by_typed_query(mock_build_organizations, query, expected):
+    """The typed text matches the account name case-insensitively or the account id.
+
+    Stub strategy: two active accounts; the query matches only one of them.
+    """
+    # Arrange
+    _accounts_adapter(
+        mock_build_organizations,
+        [
+            {"Id": "111", "Name": "prod-app", "State": "ACTIVE"},
+            {"Id": "222", "Name": "staging", "State": "ACTIVE"},
+        ],
+    )
+    ack = MagicMock()
+
+    # Act
+    aws_account_health.account_options_handler(ack, {"value": query})
+
+    # Assert
+    assert _option_labels(ack) == expected
+
+
+@pytest.mark.unit
+@patch("modules.aws.aws_account_health.build_organizations_adapter")
+def test_should_cap_options_at_slack_limit(mock_build_organizations):
+    """More than 100 matching accounts are trimmed to the first 100 by label, Slack's limit for one options response.
+
+    Stub strategy: 150 active accounts listed in reverse order, so the
+    assertion also proves the cap applies after sorting.
+    """
+    # Arrange
+    accounts = [{"Id": f"{index:012d}", "Name": f"account-{index:03d}", "State": "ACTIVE"} for index in range(150)]
+    _accounts_adapter(mock_build_organizations, list(reversed(accounts)))
+    ack = MagicMock()
+
+    # Act
+    aws_account_health.account_options_handler(ack, {"value": ""})
+
+    # Assert
+    labels = _option_labels(ack)
+    assert len(labels) == 100
+    assert labels[0] == "account-000 (000000000000)"
+    assert labels[-1] == "account-099 (000000000099)"
 
 
 @pytest.mark.unit
 @patch("modules.aws.aws_account_health.logger")
 @patch("modules.aws.aws_account_health.build_organizations_adapter")
-def test_should_open_error_modal_when_account_list_fails(mock_build_organizations, mock_logger, slack_client):
-    """A failed account listing opens a bilingual error modal with no submit button and logs the classification.
+def test_should_return_no_options_and_log_when_account_list_fails(mock_build_organizations, mock_logger):
+    """A failed account listing still acknowledges with no options, so Slack does not time out, and logs the classification.
 
-    Stub strategy: list_organization_accounts returns a classified UNAUTHORIZED
-    failure, which previously crashed the options comprehension.
+    Stub strategy: list_organization_accounts returns a classified UNAUTHORIZED failure.
     """
     # Arrange
     adapter = MagicMock(spec=OrganizationsAdapter)
     adapter.list_organization_accounts.return_value = _failure()
     mock_build_organizations.return_value = adapter
+    ack = MagicMock()
 
     # Act
-    aws_account_health.request_health_modal(slack_client, {"trigger_id": "trigger-123"})
+    aws_account_health.account_options_handler(ack, {"value": ""})
 
     # Assert
-    slack_client.views_open.assert_called_once()
-    call = slack_client.views_open.call_args
-    assert call.kwargs["trigger_id"] == "trigger-123"
-    view = call.kwargs["view"]
-    assert "submit" not in view
-    assert "close" in view
-    text = _view_text(view)
-    assert ENGLISH_RETRY in text
-    assert FRENCH_RETRY in text
+    ack.assert_called_once_with(options=[])
     assert _logged_failure(mock_logger, "aws_health_accounts_list_failed", "unauthorized")
 
 
@@ -687,25 +830,21 @@ def test_should_open_error_modal_when_account_list_fails(mock_build_organization
 @pytest.mark.parametrize("error", [_client_error(), BotoCoreError()], ids=["client-error", "botocore-error"])
 @patch("modules.aws.aws_account_health.logger")
 @patch("modules.aws.aws_account_health.build_organizations_adapter")
-def test_should_open_error_modal_when_organizations_adapter_raises_aws_error(
-    mock_build_organizations, mock_logger, error, slack_client
+def test_should_return_no_options_and_log_when_organizations_adapter_raises_aws_error(
+    mock_build_organizations, mock_logger, error
 ):
-    """An AWS error raised while building the Organizations adapter opens the bilingual error modal and is logged.
+    """An AWS error raised while building the Organizations adapter acknowledges with no options and is logged.
 
     Stub strategy: the factory raises the botocore exception an eager AssumeRole
-    failure produces, so /aws health never fails silently.
+    failure produces.
     """
     # Arrange
     mock_build_organizations.side_effect = error
+    ack = MagicMock()
 
     # Act
-    aws_account_health.request_health_modal(slack_client, {"trigger_id": "trigger-123"})
+    aws_account_health.account_options_handler(ack, {"value": ""})
 
     # Assert
-    slack_client.views_open.assert_called_once()
-    view = slack_client.views_open.call_args.kwargs["view"]
-    assert "submit" not in view
-    text = _view_text(view)
-    assert ENGLISH_RETRY in text
-    assert FRENCH_RETRY in text
+    ack.assert_called_once_with(options=[])
     assert _logged(mock_logger, "aws_health_accounts_list_failed")
