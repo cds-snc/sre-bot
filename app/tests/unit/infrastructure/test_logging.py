@@ -72,9 +72,9 @@ class TestLoggingConfiguration:
 
     def test_configure_logging_uses_environment_for_production_mode(self, mock_settings):
         """configure_logging derives production mode from ENVIRONMENT."""
-        mock_settings.ENVIRONMENT = "production"
+        mock_settings.environment = "production"
         logger1 = configure_logging(settings=mock_settings)
-        mock_settings.ENVIRONMENT = "local"
+        mock_settings.environment = "local"
         logger2 = configure_logging(settings=mock_settings)
 
         assert logger1 is not None

@@ -198,7 +198,7 @@ def add_environment_info(environment: str):
 
     Example:
         configure_logging(
-            extra_processors=[add_environment_info(settings.ENVIRONMENT)]
+            extra_processors=[add_environment_info(settings.environment)]
         )
     """
 

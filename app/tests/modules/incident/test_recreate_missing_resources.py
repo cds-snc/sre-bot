@@ -42,7 +42,7 @@ def basic_params():
 def test_contract_create_database_record_uses_environment_not_prefix(
     set_environment,
 ):
-    """Database environment value must come from app_settings.ENVIRONMENT."""
+    """Database environment value must come from app_settings.environment."""
     results = {"success": [], "errors": [], "skipped": []}
 
     set_environment(core.app_settings, "dev")

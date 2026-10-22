@@ -112,7 +112,7 @@ def _expected_slug(name: str) -> str:
 
 def _expected_channel_name(name: str) -> str:
     """Environment prefix plus slug, cut to Slack's 80-character channel name limit."""
-    prefix = "incident-dev-" if incident_conversation.settings.ENVIRONMENT != "production" else "incident-"
+    prefix = "incident-dev-" if incident_conversation.settings.environment != "production" else "incident-"
     return f"{prefix}{_expected_slug(name)}"[:80]
 
 

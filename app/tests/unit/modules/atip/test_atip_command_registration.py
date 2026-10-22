@@ -34,13 +34,13 @@ def test_register_builds_atip_command_names_from_command_prefix(
     monkeypatch.setattr(
         atip,
         "get_slack_transport_settings",
-        lambda: SimpleNamespace(COMMAND_PREFIX=command_prefix),
+        lambda: SimpleNamespace(command_prefix=command_prefix),
         raising=False,
     )
     monkeypatch.setattr(
         atip,
         "get_app_settings",
-        lambda: SimpleNamespace(PREFIX=legacy_prefix, ENVIRONMENT="local"),
+        lambda: SimpleNamespace(PREFIX=legacy_prefix, environment="local"),
     )
 
     bot = MagicMock()

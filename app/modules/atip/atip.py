@@ -35,7 +35,7 @@ def register(bot):
     ```
     """
     transport_settings = get_slack_transport_settings()
-    prefix = transport_settings.COMMAND_PREFIX
+    prefix = transport_settings.command_prefix
     bot.command(f"/{prefix}atip")(atip_command)
     bot.command(f"/{prefix}aiprp")(atip_command)
     bot.action("ati_search_width")(atip_width_action)
@@ -399,7 +399,7 @@ def atip_view_handler(ack, body, say, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
-    prefix = "dev-" if app_settings.ENVIRONMENT != "production" else ""
+    prefix = "dev-" if app_settings.environment != "production" else ""
     if prefix:
         slug = f"{prefix}-{slug}"
     response = client.conversations_create(name=f"{slug}")

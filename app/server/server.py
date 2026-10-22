@@ -31,7 +31,7 @@ handler.add_middleware(
 )
 handler.add_middleware(
     MaxBodySizeMiddleware,
-    max_bytes=app_settings.WEBHOOK_MAX_BODY_BYTES,
+    max_bytes=app_settings.webhook_max_body_bytes,
 )
 
 handler.include_router(api_router)

@@ -194,7 +194,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
 @pytest.fixture
 def slack_command_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[SlackCommandHarness]:
     """Harness using the deployment's configured slash-command prefix."""
-    yield build_harness(monkeypatch, get_slack_transport_settings().COMMAND_PREFIX)
+    yield build_harness(monkeypatch, get_slack_transport_settings().command_prefix)
 
 
 @dataclass
@@ -250,7 +250,7 @@ def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHa
     client.replies["users_info"] = {"ok": True, "user": {"id": USER_ID, "locale": "en-US"}}
     client.replies["conversations_create"] = {"ok": True, "channel": {"id": "C0NEWINCIDENT"}}
     app = build_bolt_app(monkeypatch)
-    harness = LegacyHandlerHarness(app=app, client=client, command_prefix=get_slack_transport_settings().COMMAND_PREFIX)
+    harness = LegacyHandlerHarness(app=app, client=client, command_prefix=get_slack_transport_settings().command_prefix)
 
     def route_api_call(web_client: WebClient, api_method: str, **kwargs: Any) -> Any:
         arguments = kwargs.get("json") or kwargs.get("params") or kwargs.get("data") or {}

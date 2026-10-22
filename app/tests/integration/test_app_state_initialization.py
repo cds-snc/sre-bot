@@ -47,9 +47,9 @@ def test_app_state_settings_is_valid(app_with_lifespan):
     settings = app_with_lifespan.app.state.settings
 
     assert settings is not None, "settings must not be None"
-    assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
-    assert hasattr(settings, "GIT_SHA"), "settings missing GIT_SHA"
-    assert settings.ENVIRONMENT in {"local", "ci", "production"}
+    assert hasattr(settings, "environment"), "settings missing environment"
+    assert hasattr(settings, "git_sha"), "settings missing git_sha"
+    assert settings.environment in {"local", "ci", "production"}
 
 
 @pytest.mark.integration
@@ -60,7 +60,7 @@ def test_contract_app_state_settings_has_no_legacy_production_property(
     settings = app_with_lifespan.app.state.settings
     legacy_attr = "is" + "_production"
 
-    assert hasattr(settings, "ENVIRONMENT"), "settings missing ENVIRONMENT"
+    assert hasattr(settings, "environment"), "settings missing environment"
     assert not hasattr(settings, legacy_attr)
 
 

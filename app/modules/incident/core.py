@@ -297,7 +297,7 @@ def _create_database_record(
 ) -> None:
     """Create database record for incident if it doesn't exist."""
     try:
-        environment = "prod" if app_settings.ENVIRONMENT == "production" else "dev"
+        environment = "prod" if app_settings.environment == "production" else "dev"
 
         incident_data = {
             "channel_id": channel_id,
@@ -423,7 +423,7 @@ def initiate_resources_creation(
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
 
     # Create channel
-    environment = "prod" if app_settings.ENVIRONMENT == "production" else "dev"
+    environment = "prod" if app_settings.environment == "production" else "dev"
 
     oncall = on_call.get_on_call_users_from_folder(client, incident_payload.folder)
 
@@ -562,7 +562,7 @@ def initiate_resources_creation(
         response = client.usergroups_users_list(usergroup=security_group_id)
 
         # Avoid inviting security group users outside production to prevent spam.
-        if response.get("ok") and app_settings.ENVIRONMENT == "production":
+        if response.get("ok") and app_settings.environment == "production":
             for security_user in response["users"]:
                 if security_user != incident_payload.user_id:
                     users_to_invite.append(security_user)

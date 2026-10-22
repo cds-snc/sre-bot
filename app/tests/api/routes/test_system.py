@@ -15,7 +15,7 @@ def test_get_version_unkown():
         assert response.json() == {"version": "Unknown"}
 
 
-@patch("api.routes.system.settings.GIT_SHA", "foo")
+@patch("api.routes.system.settings.git_sha", "foo")
 def test_get_version_known():
     with TestClient(test_app) as client:
         response = client.get("/version")

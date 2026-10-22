@@ -14,7 +14,7 @@ from server.configuration import CONFIG_DIR, load_configuration_files
 
 pytestmark = pytest.mark.unit
 
-ENVIRONMENTS = get_args(AppSettings.model_fields["ENVIRONMENT"].annotation)
+ENVIRONMENTS = get_args(AppSettings.model_fields["environment"].annotation)
 
 
 def test_environment_literal_lists_the_three_environments() -> None:

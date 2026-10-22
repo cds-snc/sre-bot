@@ -25,7 +25,7 @@ def test_legacy_slack_commands_and_legacy_handlers_register_sre_command_once(moc
     two paths.
     """
     # Arrange
-    command_prefix = get_slack_transport_settings().COMMAND_PREFIX
+    command_prefix = get_slack_transport_settings().command_prefix
     settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
     provider = SlackPlatformProvider(
         settings=settings,

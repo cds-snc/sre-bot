@@ -37,7 +37,7 @@ def _require_dev_environment(
         CommandResponse with error if not in dev environment, None otherwise
     """
     app_settings = get_app_settings()
-    if app_settings.ENVIRONMENT != "local":
+    if app_settings.environment != "local":
         return CommandResponse(
             message=("This command is only available in the development environment."),
             ephemeral=True,

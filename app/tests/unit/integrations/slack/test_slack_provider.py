@@ -309,7 +309,7 @@ class TestSlackProviderFactory:
                 captured["command_prefix"] = command_prefix
 
         class FakeTransportSettings:
-            COMMAND_PREFIX = "dev-"
+            command_prefix = "dev-"
 
         provider_module.get_slack_provider.cache_clear()
         try:

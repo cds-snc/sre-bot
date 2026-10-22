@@ -25,7 +25,7 @@ class TestServerSettingsSingleton:
     def test_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("BACKEND_URL", "http://example.com:9000")
         settings = ServerSettings()
-        assert settings.BACKEND_URL == "http://example.com:9000"
+        assert settings.backend_url == "http://example.com:9000"
 
 
 class TestDevSettingsSingleton:
@@ -41,7 +41,7 @@ class TestDevSettingsSingleton:
     def test_reads_from_env(self, monkeypatch):
         monkeypatch.setenv("SLACK_DEV_MSG_CHANNEL", "C_TEST123")
         settings = DevSettings()
-        assert settings.SLACK_DEV_MSG_CHANNEL == "C_TEST123"
+        assert settings.slack_dev_msg_channel == "C_TEST123"
 
 
 class TestRetrySettingsSingleton:

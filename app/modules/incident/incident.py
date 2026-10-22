@@ -35,7 +35,7 @@ i18n.set("fallback", "en-US")
 
 def register(bot: App):
     transport_settings = get_slack_transport_settings()
-    bot.command(f"/{transport_settings.COMMAND_PREFIX}incident")(open_create_incident_modal)
+    bot.command(f"/{transport_settings.command_prefix}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)
 

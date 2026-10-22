@@ -22,6 +22,7 @@ Region `ca-central-1`, cluster `sre-bot-cluster`, service `sre-bot-service`, tas
 ## Permissions and tools
 
 - GitHub: the repository **admin** role. Manual runs and re-runs of `build_and_deploy.yml` fail at "Require a repository admin" for anyone else; ask an admin to run it.
+- In a Codespace, `gh` uses the Codespace token, which cannot start workflows (`HTTP 403: Resource not accessible by integration`). Start runs from the workflow page (**Run workflow**, branch `main`, fill the inputs) or log in once with your own account: `env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --web --scopes workflow`, then prefix `gh workflow run` and `gh run cancel` with `env -u GITHUB_TOKEN -u GH_TOKEN`. Reading runs works with either.
 - AWS CLI fallback: a role with `ecs:DescribeServices`, `ecs:ListTaskDefinitions`, `ecs:DescribeTaskDefinition`, `ecs:UpdateService` and `ecr:DescribeImages` on the production account.
 
 ## Steps
@@ -172,4 +173,4 @@ Record what happened in the Rehearsals row either way: a breaker that does not t
 
 | Date | Defect | Time to FAILED | Time to rollback COMPLETED | Notes |
 | --- | --- | --- | --- | --- |
-| | | | | Not rehearsed yet: TASK-111.16 Definition of Done. |
+| 2026-10-22, 17:26 UTC (working hours, announced) | `ENVIRONMENT=rollback-rehearsal` on sre-bot-task:38, image of :37 | 3 tasks exited at boot; FAILED before 17:32 | 17:32:15, about 5 min after the 17:27:09 deploy start; back on sre-bot-task:37 | Run 39822672570. Verify failed with "Deployment rolled back", :38 deregistered, Slack failure posted. Old tasks served throughout. Fits the 15-minute wait; no change. |

@@ -21,7 +21,7 @@ logger = get_logger()
 
 def register(bot):
     transport_settings = get_slack_transport_settings()
-    bot.command(f"/{transport_settings.COMMAND_PREFIX}secret")(secret_command)
+    bot.command(f"/{transport_settings.command_prefix}secret")(secret_command)
     bot.action("secret_change_locale")(handle_change_locale_button)
     bot.view("secret_view")(secret_view_handler)
 

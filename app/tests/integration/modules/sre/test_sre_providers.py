@@ -55,7 +55,7 @@ class TestVersionCommandHandler:
         """Version handler should return Git SHA from settings."""
         # Arrange
         mock_settings = MagicMock()
-        mock_settings.GIT_SHA = "abc123def456"
+        mock_settings.git_sha = "abc123def456"
         monkeypatch.setattr(sre_slack, "get_app_settings", lambda: mock_settings)
 
         payload = CommandPayload(
@@ -77,7 +77,7 @@ class TestVersionCommandHandler:
         """Version handler should work with empty text."""
         # Arrange
         mock_settings = MagicMock()
-        mock_settings.GIT_SHA = "test-sha"
+        mock_settings.git_sha = "test-sha"
         monkeypatch.setattr(sre_slack, "get_app_settings", lambda: mock_settings)
 
         payload = CommandPayload(

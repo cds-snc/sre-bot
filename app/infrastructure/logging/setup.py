@@ -198,7 +198,7 @@ def configure_logging(
         return structlog.stdlib.get_logger()
 
     # Determine production mode
-    prod_mode = settings.ENVIRONMENT == "production"
+    prod_mode = settings.environment == "production"
     resolved_logging_settings = logging_settings or get_logging_settings()
 
     # Build processor pipeline per structlog best practices

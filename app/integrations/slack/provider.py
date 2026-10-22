@@ -1153,6 +1153,6 @@ def get_slack_provider() -> SlackPlatformProvider:
     provider = SlackPlatformProvider(
         settings=settings,
         formatter=formatter,
-        command_prefix=transport_settings.COMMAND_PREFIX,
+        command_prefix=transport_settings.command_prefix,
     )
     return provider

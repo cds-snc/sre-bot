@@ -57,7 +57,7 @@ class TestSettingsStructure:
         retry_settings = get_retry_settings()
 
         assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
-        assert hasattr(server_settings, "BACKEND_URL")
+        assert hasattr(server_settings, "backend_url")
         assert hasattr(retry_settings, "enabled")
         assert hasattr(retry_settings, "backend")
 
@@ -74,8 +74,8 @@ class TestSettingsStructure:
         """Verify AppSettings exposes ENVIRONMENT with an allowed value."""
         settings = get_app_settings()
 
-        assert hasattr(settings, "ENVIRONMENT")
-        assert settings.ENVIRONMENT in {"local", "ci", "production"}
+        assert hasattr(settings, "environment")
+        assert settings.environment in {"local", "ci", "production"}
 
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""

@@ -1,7 +1,7 @@
 """Unit tests for /secret command registration.
 
 Verifies that secret.register() builds the Bolt slash-command name from
-get_slack_transport_settings().COMMAND_PREFIX for both the empty-prefix
+get_slack_transport_settings().command_prefix for both the empty-prefix
 (production) and 'dev-' (dev) cases.
 
 secret.register() also calls bot.action('secret_change_locale') and
@@ -42,7 +42,7 @@ def test_secret_register_builds_command_name_from_command_prefix(
     monkeypatch.setattr(
         secret,
         "get_slack_transport_settings",
-        lambda: SimpleNamespace(COMMAND_PREFIX=command_prefix),
+        lambda: SimpleNamespace(command_prefix=command_prefix),
     )
     bot = MagicMock()
 

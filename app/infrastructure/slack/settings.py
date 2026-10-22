@@ -15,12 +15,12 @@ class SlackTransportSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=True,
+        case_sensitive=False,
         extra="ignore",
         populate_by_name=True,
     )
 
-    COMMAND_PREFIX: str = Field(default="", alias="SLACK__COMMAND_PREFIX")
+    command_prefix: str = Field(default="", alias="SLACK__COMMAND_PREFIX")
 
 
 @lru_cache(maxsize=1)

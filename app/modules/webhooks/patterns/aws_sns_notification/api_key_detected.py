@@ -16,13 +16,13 @@ server_settings = get_server_settings()
 
 def send_message_to_notify_channel(client: WebClient, blocks: list[dict]):
     """Send message to the notification ops channel."""
-    if app_settings.ENVIRONMENT != "production":
-        client.chat_postMessage(channel=server_settings.SRE_TEST_CHANNEL_ID, blocks=blocks)
+    if app_settings.environment != "production":
+        client.chat_postMessage(channel=server_settings.sre_test_channel_id, blocks=blocks)
     else:
-        if not server_settings.NOTIFY_OPS_CHANNEL_ID:
+        if not server_settings.notify_ops_channel_id:
             raise ValueError("NOTIFY_OPS_CHANNEL_ID is not set in server settings")
         # post the message to the notification channel
-        client.chat_postMessage(channel=server_settings.NOTIFY_OPS_CHANNEL_ID, blocks=blocks)
+        client.chat_postMessage(channel=server_settings.notify_ops_channel_id, blocks=blocks)
 
 
 def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
@@ -64,7 +64,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
         service_id = "Unknown"
         api_key_name = "Unknown Key"
 
-    if not server_settings.NOTIFY_ONCALL_GROUP_ID:
+    if not server_settings.notify_oncall_group_id:
         raise ValueError("NOTIFY_ONCALL_GROUP_ID is not set in server settings")
 
     # Attempt to revoke the API key
@@ -93,7 +93,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
                 "text": (
                     f"Notify API Key Name {api_key_name} from service id {service_id} "
                     f"was committed in github file {github_repo}.\n"
-                    f"(cc <!subteam^{server_settings.NOTIFY_ONCALL_GROUP_ID}|notify-oncall>)"
+                    f"(cc <!subteam^{server_settings.notify_oncall_group_id}|notify-oncall>)"
                 ),
             },
         },

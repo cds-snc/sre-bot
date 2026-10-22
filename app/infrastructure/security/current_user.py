@@ -100,13 +100,13 @@ def get_current_user(
     app_settings = get_app_settings()
     bypass_token = security_settings.dev_bypass_token
     if (
-        app_settings.ENVIRONMENT != "production"
+        app_settings.environment != "production"
         and security_settings.dev_bypass_enabled
         and bypass_token is not None
         and bypass_token.get_secret_value()
         and secrets.compare_digest(credentials.credentials.encode(), bypass_token.get_secret_value().encode())
     ):
-        log = logger.bind(bypass="dev_token", environment=app_settings.ENVIRONMENT)
+        log = logger.bind(bypass="dev_token", environment=app_settings.environment)
         log.warning("dev_bypass_token_used")
         return User(
             user_id="dev@local",

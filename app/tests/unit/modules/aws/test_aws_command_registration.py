@@ -1,7 +1,7 @@
 """Unit tests for /aws command registration.
 
 Verifies that aws.register() builds the Bolt slash-command name from
-get_slack_transport_settings().COMMAND_PREFIX for both the empty-prefix
+get_slack_transport_settings().command_prefix for both the empty-prefix
 (production) and 'dev-' (dev) cases, and that it registers exactly one
 Bolt view handler, aws_health_view, and one block_suggestion handler for the
 health account selector.
@@ -39,7 +39,7 @@ def test_aws_register_builds_command_name_from_command_prefix(
     monkeypatch.setattr(
         aws,
         "get_slack_transport_settings",
-        lambda: SimpleNamespace(COMMAND_PREFIX=command_prefix),
+        lambda: SimpleNamespace(command_prefix=command_prefix),
     )
     bot = MagicMock()
 
