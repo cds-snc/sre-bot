@@ -4,7 +4,7 @@ title: Move the Slack slice onto the files, tenant entry included
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T17:00:00Z'
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -14,7 +14,7 @@ dependencies:
   - TASK-111.6.1
   - TASK-111.16
   - TASK-111.17
-  - TASK-112
+  - TASK-112.1
 references:
   - decisions/configuration.md
   - https://github.com/cds-snc/sre-bot/issues/1756
@@ -87,7 +87,8 @@ AC -> step -> test: #1 B2,B3,B4 / T-B1,T-B7 ; #2 B2 / T-B2,T-B8 ; #3 all / gates
 Doubts: (a) pydantic-settings env source with env_prefix SLACK__ + extra=forbid ignores a non-field SLACK__COMMAND_PREFIX -> T-B5 proves it. (b) the ownership check treats [slack.tenant] as part of [slack], as [[security.issuers]] is -> make check-settings-key-ownership. (c) some test silently relied on the pytest env tokens -> red run of the full suite after B4, fixed with explicit kwargs. (d) the SSM SLACK__ values equal the blob's -> G2 match lines; DIFFER blocks the merge.
 Blast radius B: production Slack (socket mode connection, every command and incident flow) if a SLACK__ value or the team id is wrong; HTTP stays up and the ECS circuit breaker will not see it (health stays green), so V-slack checks and the manual Slack checks decide rollback. A boot failure (missing key) is caught by the circuit breaker and rolls back automatically. One git revert restores; the previous image reads the unchanged blob, so rollback is safe until 111.15.
 
-== Merge gates (human; G2 and H2 before implementation) ==
+== Merge gates (human; G2 and H2 done) ==
+G2 and H2 results: SLACK_ENABLED true; SLACK_TEAM_ID T2G2S06PM (in sre-bot-config-infrastructure), the same workspace as the development bot (auth.test), so production.toml and local.toml both set [slack.tenant] team_id = "T2G2S06PM"; SLACK_BOT_TOKEN, SLACK_USER_TOKEN and SLACK_APP_TOKEN equal their /sre-bot/SLACK__<FIELD> SecureStrings; no signing secret in either blob or SSM; baseline since TASK-111.17: the socket-mode notice renders as JSON once per task, slack_app_initialized once per task, configured_systems_built lists slack and google. Re-run zsh /workspace/tmp/deploy-checks.zsh pre at merge for the rollback tag.
 H2 Development workspace id, in a Codespace (read-only auth.test with the shared dev bot token; prints no secret): curl -s -H "Authorization: Bearer $SLACK_BOT_TOKEN" https://slack.com/api/auth.test | jq '{ok, team_id, team, enterprise_id}' > /workspace/.claude-state/delivery/task-111.9/local-team.json  (the agent reads it into local.toml, B3).
 G1 TASK-111.17 merged, deployed and checks.zsh post-logging PASS before this merges; the branch is cut from main after that merge.
 G2 zsh /workspace/.claude-state/delivery/task-111.9/checks.zsh pre (I read the output file): SLACK_ENABLED true; SLACK_TEAM_ID value (goes into production.toml, B3); SLACK_SIGNING_SECRET/SOCKET_MODE and the tuning names unset; BOT/USER/APP "match" for blob vs /sre-bot/SLACK__<FIELD> (any DIFFER or MISSING blocks: set the SSM value through the 111.4 runbook path first); no /sre-bot/SLACK__SIGNING_SECRET; task definition carries the three SLACK__ secrets; baseline notice counts.
@@ -118,3 +119,15 @@ Q3 (TASK-111.17) accepted.
 Q4 All four secrets count for AC #4; the signing secret is absent everywhere today and production keeps booting without it (T-B6 production shape).
 Leak found 2026-10-23 (affects this task's tests; fixed in TASK-111.17): a failing model_validator renders input_value={...} with every field, the tokens included, and ConfigurationSlice.__init__ (contracts/configuration.py:151-157) re-raises or chains (from error) that ValidationError, so uvicorn's boot traceback would carry a Slack token to CloudWatch (reproduced with pydantic 2.14.1). T-B2, T-B3 and T-B8 assert the raised text and every log line contain no token value.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T19:22:00Z
+
+---
+
+2026-10-23: waits on TASK-112.1 only (TASK-112 split into 112.1-112.3). After 112.1 merges, refresh this plan: SLACK_ENABLED/SLACK_SOCKET_MODE are already gone from the Slack slice (B4, B5, B8 interim enabled wording), test_slack_settings_team_id_validate.py keeps only blank-team-id cases (T-B6), and the cross-slice rule messages name their keys from one constants block in server/configuration/host_configuration.py.
+
+---
+<!-- COMMENTS:END -->

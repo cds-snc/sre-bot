@@ -11,7 +11,7 @@ scope: The Slack transport — delivery mode, verification, handler mechanics, e
 
 Slack is the app's primary front door and a first-class part of the process, not an occasional outbound SDK. Six legacy records deferred Slack decisions to a `transport-slack.md` that never existed; this is that record.
 
-Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integrations/slack/provider.py`, while `integrations/slack/bootstrap.py` already builds an `AsyncApp`. The parser, formatter and per-command help also live in `integrations/slack/`. Legacy modules register through a hard-coded list beside pluggy discovery. `infrastructure/slack/settings.py` holds `COMMAND_PREFIX`.
+Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integrations/slack/provider.py`, while `integrations/slack/bootstrap.py` already builds an `AsyncApp`. The parser, formatter and per-command help also live in `integrations/slack/`. Legacy modules register through a hard-coded list beside pluggy discovery. `server/slack/settings.py` holds the `[slack_transport]` slice (`enabled`, `socket_mode`, `command_prefix`); the host passes its values to the provider and installs `SlackTransportInfo` (`contracts/slack/transport.py`) for the legacy modules' command prefix.
 
 ## Decision
 
@@ -26,7 +26,7 @@ Current state: sync Bolt (`App` + `SocketModeHandler` + threads) in `integration
 
 Same builder, same classifier, different credential. The rule: *opens a connection and receives* → runtime, lifespan-managed; *only makes outbound calls* → a cached `AsyncWebClient` from `integrations/slack/`, starts nothing.
 
-**Delivery mode.** Socket Mode by default (no inbound exposure; right for current deployments). HTTP Events mode is selectable with `socket_mode = false` in `[slack_transport]` (TASK-112; until then `SLACK_SOCKET_MODE` on the Slack slice). Settings fail fast at boot if the selected mode's credentials are missing. Running the transport is an enablement key in the configuration files (`[slack_transport]`, with `socket_mode`) ([plugins.md](plugins.md)), and switching it on requires the Slack tenant entry (boot fails naming the key otherwise); switched off, no Slack entry is needed. Until then `SLACK_ENABLED` is the interim switch and `SLACK_TEAM_ID` is required when it is on ([configuration.md](configuration.md)).
+**Delivery mode.** Socket Mode by default (no inbound exposure; right for current deployments). HTTP Events mode is selectable with `socket_mode = false` in `[slack_transport]`. The configuration phase fails boot if the selected mode's credentials are missing (`server/configuration/host_configuration.py`), and Socket Mode without the signing secret logs `slack_signing_secret_not_set_in_socket_mode` at info. Running the transport is an enablement key in the configuration files (`[slack_transport]`, with `socket_mode`) ([plugins.md](plugins.md)), and switching it on requires the Slack tenant entry (boot fails naming the key otherwise); switched off, no Slack entry is needed ([configuration.md](configuration.md)).
 
 **Verification.** In HTTP mode every request is verified before its body is used: `v0=` HMAC-SHA256 with the signing secret, constant-time compare, and `X-Slack-Request-Timestamp` rejected beyond 5 minutes. In Socket Mode the connection handshake carries this; the signing secret is still configured and validated so mode switches are safe. Verification lives in the runtime, never in handlers. After it, the runtime checks every request's `enterprise_id` and `team_id` against the configured Slack tenant entry ([workplace-systems.md](workplace-systems.md) rule 3): a configured id must match, and a request naming an Enterprise org the entry does not name is refused too. A mismatch is refused before any listener runs, with a `slack_tenant_mismatch` error event carrying the expected and received ids, so a wrong entry fails loudly on the first request after a deploy instead of stamping a wrong tenant. In Socket Mode only the installed workspace can send requests, so a mismatch means the entry is wrong.
 
@@ -64,7 +64,8 @@ Same builder, same classifier, different credential. The rule: *opens a connecti
 Tickets: TASK-26 (Slack home consolidation), TASK-33 (async Bolt), TASK-41 (legacy registration list), TASK-24 (one settings home per vendor), TASK-140 (action and view-submission registration).
 
 Tolerated until then:
-- the runtime, parser, formatter and help in `integrations/slack/`, and the transport slice (`[slack_transport]`) in `infrastructure/slack/settings.py`, which moves with the runtime to `server/slack/`;
+- the runtime, parser, formatter and help in `integrations/slack/`, until they move to `server/slack/` (TASK-26.2);
+- the legacy modules reading the command prefix from `SlackTransportInfo` in `contracts/slack/transport.py`, until each is rebuilt;
 - sync `SocketModeHandler` in `provider.py` beside the `AsyncApp` in `bootstrap.py`;
 - dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside the `register_slack_commands(registrar: SlackCommandRegistrar)` hookspec;
 - `slack_sdk.WebClient` imported outside `adapters/` in `packages/oncall_sync/providers.py` and `packages/rant/platforms/slack.py`;
@@ -79,3 +80,5 @@ Tolerated until then:
 - 2026-10-20: the duplicate Slack settings in `infrastructure/configuration/infrastructure/platforms.py` are deleted; `integrations/slack/settings.py` is the only Slack settings slice (TASK-24.3).
 - 2026-10-20: the runtime checks every request's `enterprise_id` and `team_id` against the configured Slack tenant entry and refuses a mismatch with a `slack_tenant_mismatch` error event (TASK-157).
 - 2026-10-22: the transport's settings are the `[slack_transport]` table, apart from the Slack client's `[slack]`; `command_prefix` moves there in TASK-111.7, `enabled` and `socket_mode` in TASK-112 (configuration.md).
+- 2026-10-23: the transport slice moves to `server/slack/settings.py` in TASK-112.1, ahead of the runtime (TASK-26.2); the legacy modules read the command prefix from `SlackTransportInfo` in `contracts/slack/`, and the provider takes its transport values from the host.
+- 2026-10-23: TASK-112.1 shipped: the transport slice is in `server/slack/settings.py` with `enabled` and `socket_mode`; the cross-slice rules run in the configuration phase; `SLACK_ENABLED` and `SLACK_SOCKET_MODE` are no longer read; the transport-slice tolerated item is replaced by the legacy prefix reader.

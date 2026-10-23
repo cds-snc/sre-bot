@@ -32,7 +32,6 @@ def _security_slice_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[
     monkeypatch.setitem(SecuritySettings.model_config, "env_file", None)
     monkeypatch.setitem(SlackSettings.model_config, "env_file", None)
     monkeypatch.setitem(GoogleWorkspaceSettings.model_config, "env_file", None)
-    monkeypatch.setenv("SLACK_ENABLED", "false")
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
     monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
     for field in SecuritySettings.model_fields:

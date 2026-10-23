@@ -20,6 +20,7 @@ from fastapi import FastAPI
 from contracts.configuration import ConfigurationError
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
+from server.slack.settings import get_slack_transport_settings
 from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration
@@ -30,14 +31,16 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     """Build the vendor slices from the environment only, fresh for each test."""
     monkeypatch.setitem(SlackSettings.model_config, "env_file", None)
     monkeypatch.setitem(GoogleWorkspaceSettings.model_config, "env_file", None)
-    monkeypatch.setenv("SLACK_ENABLED", "false")
+    monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
     monkeypatch.delenv("SLACK_TEAM_ID", raising=False)
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
     monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
     get_slack_settings.cache_clear()
+    get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     yield
     get_slack_settings.cache_clear()
+    get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
 
 
@@ -71,8 +74,7 @@ async def _boot_fails_naming(key: str) -> None:
 
 
 async def test_slack_transport_on_without_team_id_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SLACK_ENABLED", "true")
-    monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+    monkeypatch.setenv("SLACK_TRANSPORT__ENABLED", "true")
     monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-token")
 
     await _boot_fails_naming("SLACK_TEAM_ID")

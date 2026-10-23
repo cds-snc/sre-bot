@@ -1,15 +1,15 @@
 """Unit tests for /incident command registration.
 
 Verifies that incident.register() builds the Bolt slash-command name from
-get_slack_transport_settings().command_prefix for both the empty-prefix
+the installed SlackTransportInfo's command_prefix for both the empty-prefix
 (production) and 'dev-' (dev) cases.
 """
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.slack.transport import SlackTransportInfo, install_slack_transport_info
 from modules.incident import incident
 
 
@@ -25,21 +25,14 @@ from modules.incident import incident
         "dev-prefix-registers-slash-dev-incident",
     ],
 )
-def test_incident_register_builds_command_name_from_command_prefix(
-    command_prefix: str, expected_command: str, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_incident_register_builds_command_name_from_command_prefix(command_prefix: str, expected_command: str) -> None:
     """register() prepends COMMAND_PREFIX to the base incident command name.
 
-    Stubs get_slack_transport_settings() so the test is isolated from the
+    Installs the SlackTransportInfo contract so the test is isolated from the
     environment. Asserts bot.command is called once with the full
     slash-command string.
     """
-    monkeypatch.setattr(
-        incident,
-        "get_slack_transport_settings",
-        lambda: SimpleNamespace(command_prefix=command_prefix),
-        raising=False,
-    )
+    install_slack_transport_info(SlackTransportInfo(command_prefix=command_prefix))
     bot = MagicMock()
 
     incident.register(bot)

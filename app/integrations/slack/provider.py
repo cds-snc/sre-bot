@@ -21,7 +21,6 @@ from contracts.operations import ErrorCode, OperationResult, OperationStatus
 from contracts.services import ServiceScopeOpener
 from contracts.slack.models import ArgumentParsingError, CommandPayload, CommandResponse
 from infrastructure.i18n import Locale, TranslationKey, Translator
-from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack import LegacySlackBootstrap
 from integrations.slack.client import classify_slack_error
 from integrations.slack.formatter import SlackBlockKitFormatter
@@ -197,6 +196,7 @@ class SlackPlatformProvider:
         command_prefix: str = "",
         name: str = "slack",
         enabled: bool = True,
+        socket_mode: bool = True,
         version: str = "1.0.0",
         translation_service: Translator | None = None,
     ):
@@ -205,13 +205,17 @@ class SlackPlatformProvider:
         Args:
             settings: SlackSettings instance with tokens and config
             formatter: Optional SlackBlockKitFormatter for response formatting
+            command_prefix: Prefix added to every root slash command ([slack_transport] command_prefix)
             name: Provider name (default: "slack")
+            enabled: Run the transport ([slack_transport] enabled); disabled, initialization is skipped
+            socket_mode: Receive events over Socket Mode ([slack_transport] socket_mode); false is HTTP Events mode
             version: Provider version (default: "1.0.0")
             translation_service: Optional translation service for i18n support
         """
         self._name = name
         self._version = version
         self._enabled = enabled
+        self._socket_mode = socket_mode
         self._logger = logger.bind(provider=name, version=version)
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: dict[str, CommandDefinition] = {}
@@ -242,8 +246,8 @@ class SlackPlatformProvider:
 
         self._logger.info(
             "slack_provider_initialized",
-            socket_mode=settings.socket_mode,
-            enabled=settings.enabled,
+            socket_mode=socket_mode,
+            enabled=enabled,
         )
         self._handler: SocketModeHandler | None = None  # Socket Mode handler reference
         self._socket_thread: threading.Thread | None = None
@@ -276,10 +280,10 @@ class SlackPlatformProvider:
         Returns:
             OperationResult with initialization status
         """
-        log = self._logger.bind(socket_mode=self._settings.socket_mode)
+        log = self._logger.bind(socket_mode=self._socket_mode)
         log.info("initializing_slack_app")
 
-        if not self._settings.enabled:
+        if not self._enabled:
             log.warning("slack_disabled_skipping_init")
             return OperationResult.permanent_error(
                 message="Slack provider is disabled",
@@ -287,7 +291,7 @@ class SlackPlatformProvider:
             )
 
         # Validate required tokens
-        if self._settings.socket_mode and not self._settings.app_token:
+        if self._socket_mode and not self._settings.app_token:
             log.error("missing_app_token")
             return OperationResult.permanent_error(
                 message="APP_TOKEN required for Socket Mode",
@@ -303,7 +307,7 @@ class SlackPlatformProvider:
 
         try:
             # Create Bolt App instance
-            self._app = LegacySlackBootstrap().create_app()
+            self._app = LegacySlackBootstrap().create_app(socket_mode=self._socket_mode)
             self._client = self._app.client
             log.debug("slack_app_created")
 
@@ -314,7 +318,7 @@ class SlackPlatformProvider:
             self._attach_interaction_listeners()
 
             # Prepare Socket Mode handler if enabled (start happens separately)
-            if self._settings.socket_mode:
+            if self._socket_mode:
                 self._handler = SocketModeHandler(
                     self._app,
                     self._settings.app_token,
@@ -326,7 +330,7 @@ class SlackPlatformProvider:
 
             log.info("slack_app_initialized")
             return OperationResult.success(
-                data={"initialized": True, "socket_mode": self._settings.socket_mode},
+                data={"initialized": True, "socket_mode": self._socket_mode},
                 message="Slack app initialization completed",
             )
 
@@ -502,9 +506,9 @@ class SlackPlatformProvider:
 
     def start(self) -> OperationResult:
         """Start Slack Socket Mode if enabled."""
-        log = self._logger.bind(socket_mode=self._settings.socket_mode)
+        log = self._logger.bind(socket_mode=self._socket_mode)
 
-        if not self._settings.socket_mode:
+        if not self._socket_mode:
             log.info("socket_mode_start_skipped")
             return OperationResult.success(message="Socket Mode disabled")
 
@@ -1136,23 +1140,20 @@ class SlackPlatformProvider:
 
 
 @cache
-def get_slack_provider() -> SlackPlatformProvider:
-    """Factory function to create and return a SlackPlatformProvider instance.
+def get_slack_provider(*, enabled: bool, socket_mode: bool, command_prefix: str) -> SlackPlatformProvider:
+    """Return the process-wide SlackPlatformProvider, built from the transport values the host passes.
 
-    This function can be used by the platform service to instantiate the provider
-    based on configuration. It encapsulates the creation logic and allows for
-    easy extension in the future (e.g., if different Slack settings profiles are needed).
+    The host reads them from its [slack_transport] slice in the configuration phase
+    (server/slack/settings.py); this module never reads that slice.
 
     Returns:
-        An instance of SlackPlatformProvider initialized with settings from configuration.
+        The SlackPlatformProvider built with the Slack vendor settings and the transport values.
     """
 
-    settings = get_slack_settings()
-    transport_settings = get_slack_transport_settings()
-    formatter = SlackBlockKitFormatter()
-    provider = SlackPlatformProvider(
-        settings=settings,
-        formatter=formatter,
-        command_prefix=transport_settings.command_prefix,
+    return SlackPlatformProvider(
+        settings=get_slack_settings(),
+        formatter=SlackBlockKitFormatter(),
+        command_prefix=command_prefix,
+        enabled=enabled,
+        socket_mode=socket_mode,
     )
-    return provider

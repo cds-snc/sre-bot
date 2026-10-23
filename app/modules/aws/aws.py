@@ -11,7 +11,7 @@ import structlog
 from slack_bolt import Ack, App, Respond
 from slack_sdk.web import WebClient
 
-from infrastructure.slack.settings import get_slack_transport_settings
+from contracts.slack.transport import slack_transport_info
 from integrations.slack import commands as slack_commands
 from modules.aws import (
     aws_account_health,
@@ -51,7 +51,7 @@ def register(bot: App) -> None:
         bot (SlackBot): The SlackBot instance to which the module
             will be registered.
     """
-    transport_settings = get_slack_transport_settings()
+    transport_settings = slack_transport_info()
     bot.command(f"/{transport_settings.command_prefix}aws")(aws_command)
     bot.view("aws_health_view")(aws_account_health.health_view_handler)
     bot.block_suggestion(aws_account_health.ACCOUNT_SELECT_ACTION_ID)(aws_account_health.account_options_handler)

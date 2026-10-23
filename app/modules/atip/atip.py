@@ -9,7 +9,7 @@ import i18n  # type: ignore
 from structlog import get_logger
 
 from contracts.configuration import host_info
-from infrastructure.slack.settings import get_slack_transport_settings
+from contracts.slack.transport import slack_transport_info
 from integrations import trello
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
@@ -34,7 +34,7 @@ def register(bot):
         atip.register(bot)
     ```
     """
-    transport_settings = get_slack_transport_settings()
+    transport_settings = slack_transport_info()
     prefix = transport_settings.command_prefix
     bot.command(f"/{prefix}atip")(atip_command)
     bot.command(f"/{prefix}aiprp")(atip_command)

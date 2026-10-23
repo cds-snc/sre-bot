@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from contracts.slack.transport import SlackTransportInfo, install_slack_transport_info
 from modules import atip
 
 
@@ -31,12 +32,7 @@ def test_register_builds_atip_command_names_from_command_prefix(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """register() should compose /atip and /aiprp from COMMAND_PREFIX only."""
-    monkeypatch.setattr(
-        atip,
-        "get_slack_transport_settings",
-        lambda: SimpleNamespace(command_prefix=command_prefix),
-        raising=False,
-    )
+    install_slack_transport_info(SlackTransportInfo(command_prefix=command_prefix))
     monkeypatch.setattr(
         atip,
         "host_info",

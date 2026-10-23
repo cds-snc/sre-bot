@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
+from server.slack.settings import get_slack_transport_settings
 
 
 @pytest.mark.integration
@@ -26,7 +26,7 @@ def test_legacy_slack_commands_and_legacy_handlers_register_sre_command_once(moc
     """
     # Arrange
     command_prefix = get_slack_transport_settings().command_prefix
-    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
     provider = SlackPlatformProvider(
         settings=settings,
         formatter=SlackBlockKitFormatter(),

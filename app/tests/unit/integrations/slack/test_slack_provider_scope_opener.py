@@ -16,7 +16,7 @@ pytestmark = pytest.mark.unit
 
 
 def _provider() -> SlackPlatformProvider:
-    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
     return SlackPlatformProvider(settings=settings)
 
 

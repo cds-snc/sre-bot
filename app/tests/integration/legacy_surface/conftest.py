@@ -46,7 +46,6 @@ from features.incident.drive.adapters import google_drive as incident_drive
 from features.incident.scribe import providers as incident_scribe_providers
 from features.incident.scribe import service as incident_scribe_service
 from features.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
-from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.sentinel import client as sentinel_client
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -55,6 +54,7 @@ from modules.slack import webhooks as legacy_webhooks
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
+from server.slack.settings import get_slack_transport_settings
 from tests.factories.incident import incident_scopes
 from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authorize_single_workspace, unpatched_app_init
 
@@ -160,7 +160,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
     client = FakeSlackClient()
     app = build_bolt_app(monkeypatch)
-    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
     provider = SlackPlatformProvider(
         settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter(), command_prefix=command_prefix
     )

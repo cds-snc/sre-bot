@@ -104,7 +104,6 @@ class TestSlackBootstrapAppCreation:
         self,
         monkeypatch,
     ) -> None:
-        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
 
         with patch("integrations.slack.bootstrap.App") as app_cls:
             app_cls.return_value = MagicMock()
@@ -119,14 +118,13 @@ class TestSlackBootstrapAppCreation:
         self,
         monkeypatch,
     ) -> None:
-        monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
         monkeypatch.setenv("SLACK_SIGNING_SECRET", "test-secret")
 
         with patch("integrations.slack.bootstrap.App") as app_cls:
             app_cls.return_value = MagicMock()
 
             bootstrap = LegacySlackBootstrap()
-            bootstrap.create_app()
+            bootstrap.create_app(socket_mode=False)
 
         app_cls.assert_called_once()
         assert app_cls.call_args.kwargs["request_verification_enabled"] is True
@@ -135,7 +133,6 @@ class TestSlackBootstrapAppCreation:
         self,
         monkeypatch,
     ) -> None:
-        monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
 
         with patch("integrations.slack.bootstrap.AsyncApp") as app_cls:
             app_cls.return_value = MagicMock()

@@ -9,7 +9,7 @@ import i18n  # type: ignore
 import requests  # type: ignore
 from structlog import get_logger
 
-from infrastructure.slack.settings import get_slack_transport_settings
+from contracts.slack.transport import slack_transport_info
 from integrations.slack import users as slack_users
 
 i18n.load_path.append("./locales/")
@@ -20,7 +20,7 @@ logger = get_logger()
 
 
 def register(bot):
-    transport_settings = get_slack_transport_settings()
+    transport_settings = slack_transport_info()
     bot.command(f"/{transport_settings.command_prefix}secret")(secret_command)
     bot.action("secret_change_locale")(handle_change_locale_button)
     bot.view("secret_view")(secret_view_handler)

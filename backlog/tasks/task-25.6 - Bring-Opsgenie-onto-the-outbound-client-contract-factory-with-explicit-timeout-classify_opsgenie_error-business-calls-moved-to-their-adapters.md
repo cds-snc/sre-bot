@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-10-23T17:09:00Z'
+updated_date: '2026-10-23T18:48:00Z'
 labels:
   - clients
   - phase-3
@@ -30,7 +30,7 @@ ordinal: 239000
 Every vendor in app/integrations/ conforms to decisions/outbound-clients.md; nothing is tolerated silently.
 
 TODAY. app/integrations/opsgenie/client.py (132 lines):
-- It holds business operations: get_on_call_users, get_on_call_user_for_rotation, create_alert and healthcheck, plus api_get_request/api_post_request on urllib.request, all re-exported from __init__.py.
+request, all re-exported from __init__.py.
 - It has no factory and no classify_opsgenie_error.
 - Its urlopen() calls (lines 121 and 131) pass NO timeout, so a hung Opsgenie blocks the caller indefinitely. outbound-clients.md requires every client to set a per-attempt timeout.
 - Several broad 'except Exception' blocks log and swallow, so programmer errors become data.
@@ -41,16 +41,16 @@ CONSUMERS (re-grep before planning):
 - packages/oncall_sync/adapters/opsgenie.py, a real Path B adapter that already maps OpsGenieAPIError to OnCallSyncError (TASK-146.1 builds the on-call capability over this client, and TASK-146.2 makes oncall_sync a feature over it);
 - modules/incident/on_call.py (get_on_call_users), which TASK-145.7 replaces;
 - jobs/scheduled_tasks.py:141 (the integration healthcheck); TASK-127 decides whether that probe survives, so only its call path migrates here.
-- create_alert has no caller outside its own tests (tests/integrations/opsgenie/test_opsgenie_client.py).
+py).
 
-TARGET. The vendor package exports an authenticated HTTP client factory with an explicit timeout and a retry policy set once at construction (the planner picks the HTTP library; the codebase already uses httpx and requests), classify_opsgenie_error, and nothing else. The on-call operations move into the adapters that need them: the oncall_sync adapter, and an adapter for the legacy incident and healthcheck call sites (a legacy caller may keep a thin module-local helper until TASK-145.7 rebuilds declare). create_alert has no caller, so it is deleted rather than moved.
+TARGET. The vendor package exports an authenticated HTTP client factory with an explicit timeout and a retry policy set once at construction (the planner picks the HTTP library; the codebase already uses httpx and requests), classify_opsgenie_error, and nothing else. The on-call operations move into the adapters that need them: the oncall_sync adapter, and an adapter for the legacy incident and healthcheck call sites (a legacy caller may keep a thin module-local helper until TASK-145.7 rebuilds declare).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/opsgenie/ exports only a client factory (explicit per-attempt timeout, retry configured once at construction) and classify_opsgenie_error; no business operation and no import-time settings read remain in the vendor package
 - [ ] #2 Each consumer calls the client inside try/except + classify_opsgenie_error at its adapter boundary; unexpected exceptions propagate instead of being logged and swallowed
-- [ ] #3 create_alert, which has no caller, is deleted with its tests; no non-idempotent Opsgenie write remains without named replay protection
+- [ ] #3 No non-idempotent Opsgenie write remains without named replay protection
 - [ ] #4 Classification tests cover each mapped failure family plus one unmapped exception propagating; factory tests assert the timeout and retry settings
 - [ ] #5 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->

@@ -20,11 +20,11 @@ from fastapi import FastAPI
 
 from contracts.configuration import ConfigurationError, HostInfo, installed_configuration_files
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
-from infrastructure.slack.settings import get_slack_transport_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from server.configuration import CONFIG_DIR as REAL_CONFIG_DIR
 from server.configuration import get_server_settings, load_host_configuration
 from server.lifespan import build_lifespan
+from server.slack.settings import get_slack_transport_settings
 from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration

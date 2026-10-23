@@ -7,8 +7,8 @@ from slack_sdk import WebClient
 from slack_sdk.models import blocks, views
 from structlog import get_logger
 
+from contracts.slack.transport import slack_transport_info
 from infrastructure.configuration.features.incident import get_incident_settings
-from infrastructure.slack.settings import get_slack_transport_settings
 from integrations.google_workspace.settings import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
@@ -34,7 +34,7 @@ i18n.set("fallback", "en-US")
 
 
 def register(bot: App):
-    transport_settings = get_slack_transport_settings()
+    transport_settings = slack_transport_info()
     bot.command(f"/{transport_settings.command_prefix}incident")(open_create_incident_modal)
     bot.view("incident_view")(submit)
     bot.action("incident_change_locale")(handle_change_locale_button)

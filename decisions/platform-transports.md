@@ -13,7 +13,7 @@ The app accepts work from HTTP and from chat platforms. Platforms are heterogene
 
 Only Slack exists today. This pattern is extracted from one platform, so it is a default, not a validated standard. Building Teams is expected to amend it; treat divergence as information, not violation.
 
-Current state: the Slack runtime (`SlackPlatformProvider`, `bootstrap.py`), parser, formatter and help all live in `app/integrations/slack/`. `app/infrastructure/slack/` holds only `settings.py`. `app/server/` has no platform subpackage.
+Current state: the Slack runtime (`SlackPlatformProvider`, `bootstrap.py`), parser, formatter and help all live in `app/integrations/slack/`. `app/server/slack/` holds only the `[slack_transport]` settings slice (TASK-112.1); the runtime moves there in TASK-26.2.
 
 ## Decision
 
@@ -75,3 +75,4 @@ Tolerated until then:
 - 2026-09-24: runtime moves to `server/<platform>/` and the handler contract to `contracts/`, per plugin-architecture.md; no helper wraps the platform SDK, and interaction toolkits are an open Draft.
 - 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1) and the handler hookspecs are in `contracts/plugins/` (TASK-107); both tolerated items are closed.
 - 2026-10-06: feature entry points receive the SDK's listener arguments; connections and the app stay host-only (TASK-140.1).
+- 2026-10-23: current state: the transport settings live in `server/slack/settings.py`; `infrastructure/slack/` is gone (TASK-112.1).

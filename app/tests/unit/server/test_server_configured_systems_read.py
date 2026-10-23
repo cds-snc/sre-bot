@@ -34,8 +34,8 @@ def _source(system: WorkplaceSystem, tenant: str | None) -> TenantSource:
     return TenantSource(system, lambda: tenant)
 
 
-def _slack(team_id: str | None = None, *, enabled: bool = False) -> SlackSettings:
-    return SlackSettings.model_construct(team_id=team_id, enabled=enabled)
+def _slack(team_id: str | None = None) -> SlackSettings:
+    return SlackSettings.model_construct(team_id=team_id)
 
 
 def _google(customer_id: str | None = None, key_file: str = "") -> GoogleWorkspaceSettings:
@@ -72,9 +72,9 @@ def test_slack_without_a_team_id_is_not_configured() -> None:
     assert slack_tenant(_slack()) is None
 
 
-def test_slack_tenant_entry_counts_with_the_transport_off() -> None:
-    """A tenant entry is what configures a system; SLACK_ENABLED only switches the transport."""
-    assert slack_tenant(_slack("T0123", enabled=False)) == "T0123"
+def test_slack_tenant_entry_configures_the_system() -> None:
+    """A tenant entry is what configures a system; [slack_transport] enabled only switches the transport."""
+    assert slack_tenant(_slack("T0123")) == "T0123"
 
 
 def test_google_tenant_is_the_entry_customer_id() -> None:
@@ -87,7 +87,6 @@ def test_google_without_an_entry_is_not_configured() -> None:
 
 def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """An empty SLACK_TEAM_ID is absent after validation; a set key file and real id configure Google."""
-    monkeypatch.setenv("SLACK_ENABLED", "false")
     monkeypatch.setenv("SLACK_TEAM_ID", "")
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "/run/key.json")
     monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0abc")

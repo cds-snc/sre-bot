@@ -7,7 +7,7 @@ fails here instead of in production. The names are the deploy interface; the
 security slice reads the configuration files and is pinned by its own
 production-values test. The Slack and Google
 Workspace slices follow the same rule: production sets SLACK_APP_TOKEN,
-SLACK_BOT_TOKEN, SLACK_ENABLED, SLACK_TEAM_ID, SLACK_USER_TOKEN,
+SLACK_BOT_TOKEN, SLACK_TEAM_ID, SLACK_USER_TOKEN,
 GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
 SRE_BOT_EMAIL and GCP_SRE_SERVICE_ACCOUNT_KEY_FILE; the remaining names of those
 slices stay part of the interface. The AWS, OpenAI, Notify, Trello, OpsGenie,
@@ -79,7 +79,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (SlackSettings, "SLACK_BOT_TOKEN", "bot_token", "xoxb-sentinel", "xoxb-sentinel"),
     (SlackSettings, "SLACK_USER_TOKEN", "user_token", "xoxp-sentinel", "xoxp-sentinel"),
     (SlackSettings, "SLACK_APP_TOKEN", "app_token", "xapp-sentinel", "xapp-sentinel"),
-    (SlackSettings, "SLACK_SOCKET_MODE", "socket_mode", "false", False),
     (SlackSettings, "SLACK_SIGNING_SECRET", "signing_secret", "sentinel-secret", "sentinel-secret"),
     (SlackSettings, "SLACK_REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds", "17", 17),
     (SlackSettings, "SLACK_RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
@@ -243,15 +242,15 @@ def test_configuration_settings_upper_case_keyword_accepted() -> None:
     assert settings.idempotency_ttl_seconds == 42
 
 
-def test_configuration_settings_slack_enabled_with_team_id_and_app_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SLACK_ENABLED switches the transport on only together with its team id and app token, which the validator requires."""
+def test_configuration_settings_slack_team_id_builds_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACK_TEAM_ID reaches the tenant entry; SLACK_ENABLED and SLACK_SOCKET_MODE are retired and read by no field."""
     monkeypatch.setenv("SLACK_ENABLED", "true")
+    monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
     monkeypatch.setenv("SLACK_TEAM_ID", "TSENTINEL1")
-    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-sentinel")
 
     settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert settings.enabled is True
+    assert not {"enabled", "socket_mode"} & set(SlackSettings.model_fields)
     assert settings.tenant is not None
     assert settings.tenant.team_id == "TSENTINEL1"
 
@@ -278,15 +277,6 @@ def test_configuration_settings_slack_and_google_lower_case_names_accepted(monke
 
     assert slack.bot_token == "xoxb-lower"
     assert google.sre_bot_email == "lower@sentinel.example"
-
-
-def test_configuration_settings_slack_bare_field_name_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The bare field name ENABLED is not an environment name; only the SLACK_ENABLED alias is."""
-    monkeypatch.setenv("ENABLED", "true")
-
-    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert settings.enabled is False
 
 
 def test_configuration_settings_google_upper_case_keyword_accepted() -> None:
