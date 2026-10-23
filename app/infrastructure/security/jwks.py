@@ -21,10 +21,10 @@ def get_issuer_config() -> dict[str, dict[str, Any]]:
     if settings.issuer_config:
         return settings.issuer_config
 
-    log = logger.bind(key="ISSUER_CONFIG", operation="get_issuer_config")
+    log = logger.bind(key="security.issuers", operation="get_issuer_config")
     log.warning(
         "issuer_config_not_set",
-        detail="ISSUER_CONFIG is not set in the security settings",
+        detail="[security] issuers is empty in the security settings",
     )
     return {}
 

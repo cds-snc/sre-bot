@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from contracts.configuration import HostInfo, install_configuration_files, install_host_info
+from contracts.configuration import ConfigurationError, HostInfo, install_configuration_files, install_host_info
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
@@ -39,6 +39,20 @@ def build_host_info(identity: IdentitySettings, server: ServerSettings) -> HostI
     )
 
 
+def refuse_dev_bypass_in_production(host: HostInfo, security: SecuritySettings) -> None:
+    """Fail boot when production would carry the dev bypass flag or token (decisions/security.md).
+
+    The per-request guards already refuse the bypass in production; a flag or token
+    present there is a deploy-coupled defect, so it stops the deploy instead.
+    """
+    if host.environment != "production":
+        return
+    if security.dev_bypass_enabled:
+        raise ConfigurationError("[security] dev_bypass_enabled is true in production; the dev bypass is local only")
+    if security.dev_bypass_token is not None:
+        raise ConfigurationError("SECURITY__DEV_BYPASS_TOKEN is set in production; the dev bypass is local only")
+
+
 def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     """Run the configuration phase once: select, check and install the files, validate every host slice.
 
@@ -57,6 +71,7 @@ def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     get_google_workspace_settings()
     get_notify_api_key_leak_settings()
     host = build_host_info(identity, server)
+    refuse_dev_bypass_in_production(host, security)
     install_host_info(host)
     return HostConfiguration(
         files=files,

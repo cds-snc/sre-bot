@@ -1,24 +1,33 @@
-"""Tests for the security settings slice in infrastructure/security/settings.py.
+"""Tests for the security settings slice on the [security] table.
 
-Each test removes the slice's environment variables and ignores the .env file,
-so it observes only the values it sets. Field values are asserted by their
-environment variable names, which the slice must keep unchanged. The validator
-tests build the slice from keyword arguments and assert the ValidationError
-names the offending key.
+Each test removes the slice's environment variables, both the SECURITY__ names
+and the retired unprefixed ones, and builds the slice without the .env file
+under the installed ci configuration files, so it observes only the files and
+the values it sets. Validator tests assert the error names the offending key.
 """
 
 import json
 from collections.abc import Iterator
 
 import pytest
-from pydantic import SecretStr, ValidationError
+from pydantic import SecretStr
 
+from contracts.configuration import ConfigurationError, ConfigurationSlice
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from server.configuration import IdentitySettings, ServerSettings
 
 pytestmark = pytest.mark.unit
 
-_NAMES = (
+_FIELDS = (
+    "issuers",
+    "cors_allowed_origins",
+    "cors_allowed_methods",
+    "cors_allowed_headers",
+    "dev_bypass_enabled",
+    "dev_bypass_token",
+)
+
+_RETIRED_NAMES = (
     "ISSUER_CONFIG",
     "CORS_ALLOWED_ORIGINS",
     "CORS_ALLOWED_METHODS",
@@ -28,19 +37,20 @@ _NAMES = (
 )
 
 _ISSUER = {
-    "issuer-1": {
-        "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
-        "algorithms": ["RS256"],
-        "audience": "aud-1",
-    }
+    "issuer": "https://issuer.example.com",
+    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+    "algorithms": ["RS256"],
+    "audience": "aud-1",
 }
 
 
 @pytest.fixture(autouse=True)
 def _isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Clear the slice's variables and the cached singleton around each test."""
-    for name in _NAMES:
+    """Clear every spelling of the slice's variables and the cached singleton around each test."""
+    for name in _RETIRED_NAMES:
         monkeypatch.delenv(name, raising=False)
+    for field in _FIELDS:
+        monkeypatch.delenv(f"SECURITY__{field.upper()}", raising=False)
     get_security_settings.cache_clear()
     yield
     get_security_settings.cache_clear()
@@ -51,30 +61,30 @@ def test_security_settings_getter_returns_one_cached_instance() -> None:
     assert get_security_settings() is get_security_settings()
 
 
-def test_security_settings_reads_each_field_from_its_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Each field reads the environment variable of the same name; lists and the issuer map are JSON."""
-    monkeypatch.setenv("ISSUER_CONFIG", json.dumps(_ISSUER))
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["https://frontend.example"]')
-    monkeypatch.setenv("CORS_ALLOWED_METHODS", '["GET"]')
-    monkeypatch.setenv("CORS_ALLOWED_HEADERS", '["Authorization"]')
-    monkeypatch.setenv("DEV_BYPASS_ENABLED", "true")
-    monkeypatch.setenv("DEV_BYPASS_TOKEN", "dev-token")
+def test_security_settings_is_a_slice_on_the_security_table() -> None:
+    """The slice reads the [security] table with the SECURITY__ prefix and rejects unknown keys."""
+    config = SecuritySettings.model_config
 
+    assert issubclass(SecuritySettings, ConfigurationSlice)
+    assert config.get("toml_table_header") == ("security",)
+    assert config.get("env_prefix") == "SECURITY__"
+    assert config.get("extra") == "forbid"
+
+
+@pytest.mark.parametrize("field", _FIELDS)
+def test_security_settings_fields_have_no_alias(field: str) -> None:
+    """Every field is read only under its SECURITY__<FIELD> name: no alias widens it."""
+    info = SecuritySettings.model_fields[field]
+
+    assert info.alias is None
+    assert info.validation_alias is None
+
+
+def test_security_settings_defaults_come_from_the_base_file() -> None:
+    """Under the ci files: no issuers, no origins, GET and POST only, the default headers, the bypass off and no token."""
     settings = SecuritySettings(_env_file=None)
 
-    assert settings.issuer_config == _ISSUER
-    assert settings.cors_allowed_origins == ["https://frontend.example"]
-    assert settings.cors_allowed_methods == ["GET"]
-    assert settings.cors_allowed_headers == ["Authorization"]
-    assert settings.dev_bypass_enabled is True
-    assert settings.dev_bypass_token is not None
-    assert settings.dev_bypass_token.get_secret_value() == "dev-token"
-
-
-def test_security_settings_defaults_apply_when_unset() -> None:
-    """With no variables set: an empty issuer map, no origins, GET and POST only, the bypass off and no token."""
-    settings = SecuritySettings(_env_file=None)
-
+    assert settings.issuers == []
     assert settings.issuer_config == {}
     assert settings.cors_allowed_origins == []
     assert settings.cors_allowed_methods == ["GET", "POST"]
@@ -83,59 +93,94 @@ def test_security_settings_defaults_apply_when_unset() -> None:
     assert settings.dev_bypass_token is None
 
 
-def test_security_settings_unparseable_issuer_config_env_yields_empty_map(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A non-JSON ISSUER_CONFIG value (as the pytest env sets) degrades to no issuers rather than failing."""
-    monkeypatch.setenv("ISSUER_CONFIG", "test-issuer-config")
+def test_security_settings_reads_each_field_from_its_prefixed_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each SECURITY__<FIELD> variable beats the file value; lists and the issuer list are JSON."""
+    monkeypatch.setenv("SECURITY__ISSUERS", json.dumps([_ISSUER]))
+    monkeypatch.setenv("SECURITY__CORS_ALLOWED_ORIGINS", '["https://frontend.example"]')
+    monkeypatch.setenv("SECURITY__CORS_ALLOWED_METHODS", '["GET"]')
+    monkeypatch.setenv("SECURITY__CORS_ALLOWED_HEADERS", '["Authorization"]')
+    monkeypatch.setenv("SECURITY__DEV_BYPASS_ENABLED", "true")
+    monkeypatch.setenv("SECURITY__DEV_BYPASS_TOKEN", "dev-token")
 
     settings = SecuritySettings(_env_file=None)
 
-    assert settings.issuer_config == {}
+    assert settings.issuer_config == {
+        "https://issuer.example.com": {
+            "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+            "algorithms": ["RS256"],
+            "audience": "aud-1",
+        }
+    }
+    assert settings.cors_allowed_origins == ["https://frontend.example"]
+    assert settings.cors_allowed_methods == ["GET"]
+    assert settings.cors_allowed_headers == ["Authorization"]
+    assert settings.dev_bypass_enabled is True
+    assert settings.dev_bypass_token is not None
+    assert settings.dev_bypass_token.get_secret_value() == "dev-token"
+
+
+def test_security_settings_reads_the_bypass_token_from_the_dotenv_file(tmp_path, monkeypatch) -> None:
+    """A developer's .env carries SECURITY__DEV_BYPASS_TOKEN; it reaches the field as a secret."""
+    env_file = tmp_path / ".env"
+    env_file.write_text("SECURITY__DEV_BYPASS_TOKEN=dotenv-token\n")
+
+    settings = SecuritySettings(_env_file=env_file)
+
+    assert settings.dev_bypass_token is not None
+    assert settings.dev_bypass_token.get_secret_value() == "dotenv-token"
 
 
 @pytest.mark.parametrize(
-    ("key", "value"),
+    ("name", "value"),
     [
-        ("CORS_ALLOWED_ORIGINS", ["*"]),
-        ("CORS_ALLOWED_ORIGINS", ["*", "https://frontend.example"]),
-        ("CORS_ALLOWED_METHODS", ["*"]),
-        ("CORS_ALLOWED_HEADERS", ["*"]),
+        ("ISSUER_CONFIG", json.dumps({"https://issuer.example.com": {"jwks_uri": "https://x/jwks", "audience": "a"}})),
+        ("CORS_ALLOWED_ORIGINS", '["https://frontend.example"]'),
+        ("CORS_ALLOWED_METHODS", '["PUT"]'),
+        ("CORS_ALLOWED_HEADERS", '["X-Old"]'),
+        ("DEV_BYPASS_ENABLED", "true"),
+        ("DEV_BYPASS_TOKEN", "old-token"),
     ],
 )
-def test_security_settings_cors_wildcard_raises_naming_the_key(key: str, value: list[str]) -> None:
+def test_security_settings_ignores_the_retired_unprefixed_names(name: str, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The names the previous image reads no longer reach any field, so the file values stand."""
+    monkeypatch.setenv(name, value)
+
+    settings = SecuritySettings(_env_file=None)
+
+    assert settings.issuers == []
+    assert settings.cors_allowed_origins == []
+    assert settings.cors_allowed_methods == ["GET", "POST"]
+    assert settings.cors_allowed_headers == ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
+    assert settings.dev_bypass_enabled is False
+    assert settings.dev_bypass_token is None
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("cors_allowed_origins", ["*"]),
+        ("cors_allowed_origins", ["*", "https://frontend.example"]),
+        ("cors_allowed_methods", ["*"]),
+        ("cors_allowed_headers", ["*"]),
+    ],
+)
+def test_security_settings_cors_wildcard_raises_naming_the_key(field: str, value: list[str]) -> None:
     """A wildcard in any CORS list fails construction, and the error names the list."""
-    with pytest.raises(ValidationError, match=key):
-        SecuritySettings(_env_file=None, **{key: value})
-
-
-def test_security_settings_issuer_without_audience_raises_naming_the_issuer() -> None:
-    """An issuer entry without an audience fails construction, and the error names the issuer."""
-    issuer = {"issuer-1": {"jwks_uri": "https://issuer.example.com/.well-known/jwks.json"}}
-
-    with pytest.raises(ValidationError, match="ISSUER_CONFIG entry for issuer 'issuer-1'"):
-        SecuritySettings(_env_file=None, ISSUER_CONFIG=issuer)
+    with pytest.raises(ConfigurationError, match=field):
+        SecuritySettings(_env_file=None, **{field: value})
 
 
 def test_security_settings_dev_bypass_token_is_masked() -> None:
     """The bypass token is a SecretStr: its value never shows in repr or JSON output."""
-    settings = SecuritySettings(_env_file=None, DEV_BYPASS_TOKEN=SecretStr("dev-token-value"))
+    settings = SecuritySettings(_env_file=None, dev_bypass_token=SecretStr("dev-token-value"))
 
     assert "dev-token-value" not in repr(settings)
     assert "dev-token-value" not in settings.model_dump_json()
 
 
-def test_security_settings_model_config_reads_dotenv_case_insensitively() -> None:
-    """The slice loads .env, matches names case-insensitively and ignores unknown keys."""
-    config = SecuritySettings.model_config
-
-    assert config.get("env_file") == ".env"
-    assert config.get("case_sensitive") is False
-    assert config.get("extra") == "ignore"
-
-
-@pytest.mark.parametrize("name", _NAMES)
-def test_security_keys_are_declared_only_by_the_security_slice(name: str) -> None:
+@pytest.mark.parametrize("field", _FIELDS)
+def test_security_keys_are_declared_only_by_the_security_slice(field: str) -> None:
     """The identity and [server] slices do not declare any security key."""
-    assert name.lower() in SecuritySettings.model_fields
-    assert name not in IdentitySettings.model_fields
-    assert name.lower() not in ServerSettings.model_fields
-    assert name not in ServerSettings.model_fields
+    assert field in SecuritySettings.model_fields
+    assert field not in IdentitySettings.model_fields
+    assert field not in ServerSettings.model_fields

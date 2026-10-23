@@ -16,6 +16,13 @@ from infrastructure.security.settings import SecuritySettings
 
 pytestmark = pytest.mark.unit
 
+_ENTRY = {
+    "issuer": "issuer-1",
+    "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
+    "algorithms": ["RS256"],
+    "audience": "aud-1",
+}
+
 _ISSUER = {
     "issuer-1": {
         "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
@@ -34,8 +41,8 @@ def _fresh_jwks_manager() -> Iterator[None]:
 
 
 def test_get_issuer_config_returns_the_security_slice_issuers() -> None:
-    """The issuers come from SecuritySettings.issuer_config."""
-    settings = SecuritySettings(_env_file=None, ISSUER_CONFIG=_ISSUER)
+    """The issuers come from the slice's issuer list, keyed by issuer."""
+    settings = SecuritySettings(_env_file=None, issuers=[_ENTRY])
 
     with patch("infrastructure.security.jwks.get_security_settings", return_value=settings):
         assert get_issuer_config() == _ISSUER
@@ -44,20 +51,20 @@ def test_get_issuer_config_returns_the_security_slice_issuers() -> None:
 @patch("infrastructure.security.jwks.logger")
 def test_get_issuer_config_warns_naming_the_key_when_unset(mock_logger: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
     """With no issuers configured the result is empty and the warning names the key and operation."""
-    monkeypatch.delenv("ISSUER_CONFIG", raising=False)
+    monkeypatch.delenv("SECURITY__ISSUERS", raising=False)
     settings = SecuritySettings(_env_file=None)
 
     with patch("infrastructure.security.jwks.get_security_settings", return_value=settings):
         assert get_issuer_config() == {}
 
-    mock_logger.bind.assert_called_once_with(key="ISSUER_CONFIG", operation="get_issuer_config")
+    mock_logger.bind.assert_called_once_with(key="security.issuers", operation="get_issuer_config")
     mock_logger.bind.return_value.warning.assert_called_once()
     assert mock_logger.bind.return_value.warning.call_args.args[0] == "issuer_config_not_set"
 
 
 def test_get_jwks_manager_is_built_from_the_security_slice() -> None:
     """The JWKS manager singleton holds the security slice's issuers."""
-    settings = SecuritySettings(_env_file=None, ISSUER_CONFIG=_ISSUER)
+    settings = SecuritySettings(_env_file=None, issuers=[_ENTRY])
 
     with patch("infrastructure.security.jwks.get_security_settings", return_value=settings):
         manager = get_jwks_manager()

@@ -186,5 +186,7 @@ def _locate_file_errors(slice_cls: type[ConfigurationSlice], error: ValidationEr
         key = str(detail["loc"][0]) if detail["loc"] else ""
         files = [path for path, table in tables if key in table]
         if files:
-            located.append(f"{files[-1]}: [{slice_cls._table}] {key}: {detail['msg']}")
+            # The full location names a key inside a nested entry, such as issuers.0.audience.
+            location = ".".join(str(part) for part in detail["loc"])
+            located.append(f"{files[-1]}: [{slice_cls._table}] {location}: {detail['msg']}")
     return located

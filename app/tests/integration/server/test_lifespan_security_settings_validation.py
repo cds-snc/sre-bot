@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from pydantic import ValidationError
 
+from contracts.configuration import ConfigurationError
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
@@ -35,9 +35,8 @@ def _security_slice_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[
     monkeypatch.setenv("SLACK_ENABLED", "false")
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
     monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
-    for name in ("CORS_ALLOWED_ORIGINS", "CORS_ALLOWED_METHODS", "CORS_ALLOWED_HEADERS"):
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.delenv("ISSUER_CONFIG", raising=False)
+    for field in SecuritySettings.model_fields:
+        monkeypatch.delenv(f"SECURITY__{field.upper()}", raising=False)
     caches = (get_security_settings, get_slack_settings, get_google_workspace_settings)
     for cache in caches:
         cache.cache_clear()
@@ -68,7 +67,7 @@ async def _boot_fails_naming(key: str) -> None:
     reached_yield = False
     with ExitStack() as stack:
         core_services, _ = _stub_later_phases(stack)
-        with pytest.raises(ValidationError, match=key):
+        with pytest.raises(ConfigurationError, match=key):
             async with lifespan(FastAPI()):
                 reached_yield = True
 
@@ -77,19 +76,19 @@ async def _boot_fails_naming(key: str) -> None:
 
 
 async def test_wildcard_cors_origin_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["*"]')
+    monkeypatch.setenv("SECURITY__CORS_ALLOWED_ORIGINS", '["*"]')
 
-    await _boot_fails_naming("CORS_ALLOWED_ORIGINS")
+    await _boot_fails_naming("cors_allowed_origins")
 
 
 async def test_issuer_without_audience_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ISSUER_CONFIG", json.dumps({"issuer-1": {"jwks_uri": "https://issuer.example.com/jwks"}}))
+    monkeypatch.setenv("SECURITY__ISSUERS", json.dumps([{"issuer": "issuer-1", "jwks_uri": "https://issuer.example.com/jwks"}]))
 
-    await _boot_fails_naming("ISSUER_CONFIG")
+    await _boot_fails_naming("issuers.0.audience")
 
 
 async def test_valid_security_slice_boots_and_reaches_security_initialization(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", '["https://frontend.example"]')
+    monkeypatch.setenv("SECURITY__CORS_ALLOWED_ORIGINS", '["https://frontend.example"]')
     reached_yield = False
 
     with ExitStack() as stack:

@@ -12,10 +12,9 @@ from fastapi.security import HTTPAuthorizationCredentials
 from jwt import PyJWTError, decode
 
 from infrastructure.security.jwks import JWKSManager
+from infrastructure.security.settings import ASYMMETRIC_ALGORITHMS
 
 logger = structlog.get_logger()
-
-ASYMMETRIC_ALGORITHMS = frozenset({"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"})
 
 
 def get_issuer_from_token(token: str) -> str | None:

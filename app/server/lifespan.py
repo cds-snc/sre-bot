@@ -137,7 +137,7 @@ def _initialize_security_services(
 ) -> None:
     """Pre-initialize JWT/JWKS security infrastructure at startup.
 
-    If ISSUER_CONFIG is not set the application starts in a degraded state:
+    If [security] lists no issuers the application starts in a degraded state:
     authenticated endpoints will return 500 at runtime.  A startup warning is
     logged so the misconfiguration is visible without blocking the process.
     """
@@ -147,7 +147,7 @@ def _initialize_security_services(
     if not issuer_config:
         log.warning(
             "security_services_no_issuer_config",
-            detail="ISSUER_CONFIG not set; authenticated endpoints will fail at runtime",
+            detail="[security] issuers is empty; authenticated endpoints will fail at runtime",
         )
         return
 

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
+updated_date: '2026-10-23T13:43:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -51,3 +52,15 @@ First half of TASK-111.15. app/bin/entry.sh no longer fetches sre-bot-config or 
 <!-- DOD:BEGIN -->
 - [ ] #1 Human: tf_apply succeeded, the dispatch deploy was verified, and the roll-back runbook Verify checklist passed
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T13:43:00Z
+
+---
+
+2026-10-23 (TASK-111.8 planning): after 111.8 the CORS_ALLOWED_ORIGINS env entry is unread; removing it covers terraform/ecs.tf:34, terraform/variables.tf:46 (the cors_allowed_origins variable) and templates/sre-bot.json.tpl:57-58. Merge only after 111.8 is deployed and verified (a 111.8 rollback image reads it).
+
+---
+<!-- COMMENTS:END -->

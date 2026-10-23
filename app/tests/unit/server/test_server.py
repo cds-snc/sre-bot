@@ -70,9 +70,9 @@ def test_cors_middleware_uses_configured_origin_list(monkeypatch):
         "server.configuration.host_configuration.get_security_settings",
         lambda: SecuritySettings(
             _env_file=None,
-            CORS_ALLOWED_ORIGINS=configured_origins,
-            CORS_ALLOWED_METHODS=["GET", "POST"],
-            CORS_ALLOWED_HEADERS=["Authorization", "Content-Type"],
+            cors_allowed_origins=configured_origins,
+            cors_allowed_methods=["GET", "POST"],
+            cors_allowed_headers=["Authorization", "Content-Type"],
         ),
     )
 
@@ -96,7 +96,7 @@ def test_cors_preflight_from_allowed_origin_grants_no_credentials(monkeypatch):
     origin = "https://frontend.example"
     monkeypatch.setattr(
         "server.configuration.host_configuration.get_security_settings",
-        lambda: SecuritySettings(_env_file=None, CORS_ALLOWED_ORIGINS=[origin]),
+        lambda: SecuritySettings(_env_file=None, cors_allowed_origins=[origin]),
     )
 
     response = TestClient(server.create_app()).options(

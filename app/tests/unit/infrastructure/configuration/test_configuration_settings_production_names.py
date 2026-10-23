@@ -3,10 +3,9 @@
 Every row sets one environment variable to a sentinel that differs from the
 field default and builds the slice from the process environment only, so a
 field rename that silently stops reading its name falls back to the default and
-fails here instead of in production. The names are the deploy interface: in
-production ISSUER_CONFIG (from the SSM-delivered .env file) and
-CORS_ALLOWED_ORIGINS (from the task definition) are set; the other names run on
-their defaults today but stay part of the interface. The Slack and Google
+fails here instead of in production. The names are the deploy interface; the
+security slice reads the configuration files and is pinned by its own
+production-values test. The Slack and Google
 Workspace slices follow the same rule: production sets SLACK_APP_TOKEN,
 SLACK_BOT_TOKEN, SLACK_ENABLED, SLACK_TEAM_ID, SLACK_USER_TOKEN,
 GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
@@ -39,7 +38,6 @@ from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.coordination.settings import ConditionalWriteSettings
 from infrastructure.directory.settings import DirectorySettings
 from infrastructure.drive.settings import DriveSettings
-from infrastructure.security.settings import SecuritySettings
 from infrastructure.spreadsheets.settings import SpreadsheetSettings
 from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
@@ -52,11 +50,6 @@ from integrations.slack.settings import SlackSettings
 from integrations.trello.settings import TrelloSettings
 from jobs.settings import SchedulerSettings
 from server.configuration import IdentitySettings
-
-_ISSUER_SENTINEL = (
-    '{"https://issuer.sentinel.example":{"jwks_uri":"https://issuer.sentinel.example/jwks",'
-    '"algorithms":["ES256"],"audience":"sentinel-audience"}}'
-)
 
 PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (AuditSettings, "AUDIT_TABLE_NAME", "audit_table_name", "sentinel_audit", "sentinel_audit"),
@@ -82,29 +75,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (DirectorySettings, "DIRECTORY_REQUIRE_STARTUP_WARMUP", "require_startup_warmup", "true", True),
     (DirectorySettings, "DIRECTORY_CACHE_TTL_SECONDS", "cache_ttl_seconds", "61", 61),
     (DirectorySettings, "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "startup_warmup_timeout_seconds", "3", 3),
-    (
-        SecuritySettings,
-        "ISSUER_CONFIG",
-        "issuer_config",
-        _ISSUER_SENTINEL,
-        {
-            "https://issuer.sentinel.example": {
-                "jwks_uri": "https://issuer.sentinel.example/jwks",
-                "algorithms": ["ES256"],
-                "audience": "sentinel-audience",
-            }
-        },
-    ),
-    (
-        SecuritySettings,
-        "CORS_ALLOWED_ORIGINS",
-        "cors_allowed_origins",
-        '["https://sentinel.example"]',
-        ["https://sentinel.example"],
-    ),
-    (SecuritySettings, "CORS_ALLOWED_METHODS", "cors_allowed_methods", '["PUT"]', ["PUT"]),
-    (SecuritySettings, "CORS_ALLOWED_HEADERS", "cors_allowed_headers", '["X-Sentinel"]', ["X-Sentinel"]),
-    (SecuritySettings, "DEV_BYPASS_ENABLED", "dev_bypass_enabled", "true", True),
     (SlackSettings, "SLACK_TEAM_ID", "team_id", "TSENTINEL1", "TSENTINEL1"),
     (SlackSettings, "SLACK_BOT_TOKEN", "bot_token", "xoxb-sentinel", "xoxb-sentinel"),
     (SlackSettings, "SLACK_USER_TOKEN", "user_token", "xoxp-sentinel", "xoxp-sentinel"),
@@ -241,16 +211,6 @@ def test_configuration_settings_production_name_reaches_field(
     assert getattr(settings, attribute) == expected
 
 
-def test_configuration_settings_dev_bypass_token_reaches_field(monkeypatch: pytest.MonkeyPatch) -> None:
-    """DEV_BYPASS_TOKEN sets the secret field; compared through its secret value."""
-    monkeypatch.setenv("DEV_BYPASS_TOKEN", "sentinel-token")
-
-    settings = SecuritySettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert isinstance(settings.dev_bypass_token, SecretStr)
-    assert settings.dev_bypass_token.get_secret_value() == "sentinel-token"
-
-
 @pytest.mark.parametrize(
     ("settings_class", "env_name"),
     [(DriveSettings, "DRIVE_PROVIDER"), (SpreadsheetSettings, "SPREADSHEET_PROVIDER")],
@@ -265,27 +225,6 @@ def test_configuration_settings_single_value_provider_name_is_read(
 
     with pytest.raises(ValidationError):
         settings_class(_env_file=None)  # type: ignore[call-arg]
-
-
-def test_configuration_settings_production_empty_cors_origins_parse(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The deployed CORS_ALLOWED_ORIGINS value, an encoded empty list, parses to no origins."""
-    monkeypatch.setenv("CORS_ALLOWED_ORIGINS", "[]")
-
-    settings = SecuritySettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert settings.cors_allowed_origins == []
-
-
-def test_configuration_settings_issuer_config_read_from_env_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """ISSUER_CONFIG written to a .env file, as production delivers it, reaches the field."""
-    monkeypatch.delenv("ISSUER_CONFIG", raising=False)
-    env_file = tmp_path / ".env"
-    env_file.write_text(f"ISSUER_CONFIG='{_ISSUER_SENTINEL}'\n")
-
-    settings = SecuritySettings(_env_file=env_file)  # type: ignore[call-arg]
-
-    assert settings.issuer_config is not None
-    assert list(settings.issuer_config) == ["https://issuer.sentinel.example"]
 
 
 def test_configuration_settings_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
