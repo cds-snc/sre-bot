@@ -7,9 +7,7 @@ import ipaddress
 import re
 from urllib.parse import quote
 
-from infrastructure.configuration.infrastructure.server import (
-    get_server_settings,
-)
+from contracts.configuration import host_info
 from integrations.slack.users import (
     replace_users_emails_in_dict,
     replace_users_emails_with_mention,
@@ -47,7 +45,7 @@ def _is_inside_slack_link(text: str, start: int) -> bool:
 
 def _geolocate_url(ip_address: str, base_url: str | None = None) -> str:
     if base_url is None:
-        base_url = get_server_settings().backend_url
+        base_url = host_info().public_base_url
     return f"{base_url.rstrip('/')}/geolocate/{quote(ip_address, safe='')}"
 
 

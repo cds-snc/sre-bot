@@ -1,6 +1,6 @@
 import logging
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -13,7 +13,13 @@ project_root = str(Path(__file__).resolve().parents[1])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from contracts.configuration import ConfigurationFiles, install_configuration_files  # noqa: E402
+from contracts.configuration import (  # noqa: E402
+    ConfigurationFiles,
+    HostInfo,
+    install_configuration_files,
+    install_host_info,
+    uninstall_host_info,
+)
 from integrations.slack.provider import get_slack_provider  # noqa: E402
 from server.configuration import load_configuration_files  # noqa: E402
 from tests.factories.aws import (  # noqa: E402
@@ -76,6 +82,15 @@ def ci_configuration_files() -> ConfigurationFiles:
 def installed_ci_configuration(ci_configuration_files: ConfigurationFiles) -> None:
     """Install the ci files before every test, so a test that installed its own leaves nothing behind."""
     install_configuration_files(ci_configuration_files)
+
+
+@pytest.fixture(autouse=True)
+def installed_ci_host_info() -> Iterator[HostInfo]:
+    """Install a ci HostInfo before every test and remove it after, so no test leaks host facts."""
+    info = HostInfo(environment="ci", git_sha="test-sha", public_base_url="http://127.0.0.1:8000")
+    install_host_info(info)
+    yield info
+    uninstall_host_info()
 
 
 @pytest.fixture(autouse=True)

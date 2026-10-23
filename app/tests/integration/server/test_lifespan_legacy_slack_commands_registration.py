@@ -5,7 +5,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 
-from server.lifespan import _register_legacy_slack_commands, lifespan
+from server.lifespan import _register_legacy_slack_commands
+from tests.factories.lifespan import lifespan
 
 
 @pytest.mark.integration

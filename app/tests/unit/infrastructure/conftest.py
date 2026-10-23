@@ -4,13 +4,13 @@ from unittest.mock import Mock
 
 import pytest
 
-from infrastructure.configuration import AppSettings
+from contracts.configuration import HostInfo
 
 
 @pytest.fixture
 def mock_settings():
-    """Mock Settings instance for testing."""
-    settings = Mock(spec=AppSettings)
+    """Mock HostInfo instance for testing."""
+    settings = Mock(spec=HostInfo)
     settings.environment = "local"
     return settings
 

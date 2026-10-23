@@ -3,16 +3,22 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from contracts.configuration import HostInfo, install_host_info
 from modules.webhooks.patterns.aws_sns_notification import api_key_detected
+from modules.webhooks.patterns.aws_sns_notification.settings import NotifyApiKeyLeakSettings
+
+
+def _use_settings(monkeypatch, channel_id="C0123456789", oncall_group_id="S0123456789"):
+    """Replace the slice getter with a slice built from explicit values (the ci files are installed)."""
+    settings = NotifyApiKeyLeakSettings(channel_id=channel_id, oncall_group_id=oncall_group_id)
+    monkeypatch.setattr(api_key_detected, "get_notify_api_key_leak_settings", lambda: settings)
+    return settings
 
 
 @pytest.fixture(autouse=True)
-def configure_notify_oncall_group_id():
-    """Provide and restore the configured Slack user-group ID for handler tests."""
-    original_group_id = api_key_detected.server_settings.notify_oncall_group_id
-    api_key_detected.server_settings.notify_oncall_group_id = "S0123456789"
-    yield
-    api_key_detected.server_settings.notify_oncall_group_id = original_group_id
+def configured_notify_settings(monkeypatch):
+    """Provide the Notify channel and Slack user-group ID for handler tests."""
+    return _use_settings(monkeypatch)
 
 
 def mock_api_key_detected():
@@ -86,12 +92,34 @@ def test_api_key_detected_handler_mentions_configured_oncall_group(revoke_api_ke
 
 
 @patch("integrations.notify.revoke_api_key")
-def test_api_key_detected_handler_requires_oncall_group_id(revoke_api_key_mock):
+def test_api_key_detected_handler_requires_oncall_group_id(revoke_api_key_mock, monkeypatch):
     """The handler rejects delivery when the Slack user-group ID is not configured."""
     revoke_api_key_mock.return_value = "revoked"
-    api_key_detected.server_settings.notify_oncall_group_id = ""
+    _use_settings(monkeypatch, oncall_group_id="")
 
-    with pytest.raises(ValueError, match="NOTIFY_ONCALL_GROUP_ID is not set"):
+    with pytest.raises(ValueError, match="notify_api_key_leak.oncall_group_id is not set"):
         api_key_detected.handle_api_key_detected(mock_api_key_detected(), MagicMock())
 
     revoke_api_key_mock.assert_not_called()
+
+
+@pytest.mark.parametrize("environment", ["local", "ci", "production"])
+def test_send_message_posts_to_configured_channel_in_every_environment(environment):
+    """The channel comes from the settings alone; the environment does not pick a different one."""
+    install_host_info(HostInfo(environment=environment, git_sha="test-sha", public_base_url="http://127.0.0.1:8000"))
+    client = MagicMock()
+
+    api_key_detected.send_message_to_notify_channel(client, [{"type": "divider"}])
+
+    client.chat_postMessage.assert_called_once_with(channel="C0123456789", blocks=[{"type": "divider"}])
+
+
+def test_send_message_requires_channel_id(monkeypatch):
+    """An empty channel id raises instead of posting nowhere."""
+    _use_settings(monkeypatch, channel_id="")
+    client = MagicMock()
+
+    with pytest.raises(ValueError, match="notify_api_key_leak.channel_id is not set"):
+        api_key_detected.send_message_to_notify_channel(client, [])
+
+    client.chat_postMessage.assert_not_called()

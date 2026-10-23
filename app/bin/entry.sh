@@ -5,4 +5,4 @@ aws ssm get-parameter --region ca-central-1 --with-decryption --name sre-bot-con
 aws ssm get-parameter --region ca-central-1 --with-decryption --name sre-bot-config-infrastructure --query 'Parameter.Value' --output text >> ".env"
 
 echo "Starting server ..."
-exec uvicorn main:server_app --host=0.0.0.0
+exec uvicorn --factory main:create_app --host=0.0.0.0

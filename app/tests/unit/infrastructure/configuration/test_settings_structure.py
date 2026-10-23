@@ -4,7 +4,6 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.configuration.app import get_app_settings
 from infrastructure.configuration.base import (
     FeatureSettings,
     InfrastructureSettings,
@@ -18,16 +17,9 @@ from infrastructure.configuration.features import (
 from infrastructure.configuration.features.aws_ops import (
     get_aws_feature_settings,
 )
-from infrastructure.configuration.infrastructure import (
-    DevSettings,
-    ServerSettings,
-)
 from infrastructure.configuration.infrastructure.retry import (
     RetrySettings,
     get_retry_settings,
-)
-from infrastructure.configuration.infrastructure.server import (
-    get_server_settings,
 )
 from infrastructure.coordination.settings import ConditionalWriteSettings
 
@@ -44,20 +36,16 @@ class TestSettingsStructure:
 
     def test_settings_loads_all_infrastructure_sections(self):
         """Verify infrastructure settings providers load correctly."""
-        server_settings = get_server_settings()
         retry_settings = get_retry_settings()
 
-        assert isinstance(server_settings, ServerSettings)
         assert isinstance(retry_settings, RetrySettings)
 
     def test_settings_preserves_field_access(self):
         """Verify settings values are accessible from narrow providers."""
         aws_feature_settings = get_aws_feature_settings()
-        server_settings = get_server_settings()
         retry_settings = get_retry_settings()
 
         assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
-        assert hasattr(server_settings, "backend_url")
         assert hasattr(retry_settings, "enabled")
         assert hasattr(retry_settings, "backend")
 
@@ -70,13 +58,6 @@ class TestSettingsStructure:
         assert retry.base_delay_seconds >= 1
         assert retry.max_delay_seconds >= retry.base_delay_seconds
 
-    def test_app_settings_environment_field(self):
-        """Verify AppSettings exposes ENVIRONMENT with an allowed value."""
-        settings = get_app_settings()
-
-        assert hasattr(settings, "environment")
-        assert settings.environment in {"local", "ci", "production"}
-
     def test_settings_classes_have_proper_base_classes(self):
         """Verify settings classes inherit from appropriate base classes."""
         # Check inheritance
@@ -86,13 +67,10 @@ class TestSettingsStructure:
         """Verify provider singleton behavior is preserved."""
         retry_settings1 = get_retry_settings()
         retry_settings2 = get_retry_settings()
-        server_settings1 = get_server_settings()
-        server_settings2 = get_server_settings()
         aws_feature_settings1 = get_aws_feature_settings()
         aws_feature_settings2 = get_aws_feature_settings()
 
         assert retry_settings1 is retry_settings2
-        assert server_settings1 is server_settings2
         assert aws_feature_settings1 is aws_feature_settings2
 
     def test_all_feature_settings_classes_instantiable(self):
@@ -115,8 +93,6 @@ class TestSettingsStructure:
         instances = [
             ConditionalWriteSettings(),
             RetrySettings(),
-            ServerSettings(),
-            DevSettings(),
         ]
 
         # Verify they are all instances of InfrastructureSettings

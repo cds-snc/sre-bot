@@ -1,2 +1,6 @@
 # Overrides of base.toml for ENVIRONMENT=ci, key by key.
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
+
+[notify_api_key_leak]
+channel_id = "C033L7RGCT0"
+oncall_group_id = ""

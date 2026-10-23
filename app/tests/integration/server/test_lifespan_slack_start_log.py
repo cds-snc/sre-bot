@@ -14,7 +14,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 
-from server.lifespan import lifespan
+from tests.factories.lifespan import lifespan
 
 
 @pytest.fixture

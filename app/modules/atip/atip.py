@@ -8,7 +8,7 @@ from datetime import datetime
 import i18n  # type: ignore
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
+from contracts.configuration import host_info
 from infrastructure.slack.settings import get_slack_transport_settings
 from integrations import trello
 from integrations.slack import commands as slack_commands
@@ -370,7 +370,6 @@ def atip_width_action(ack):
 
 def atip_view_handler(ack, body, say, client):
     ack()
-    app_settings = get_app_settings()
 
     ati_locale = body["view"]["blocks"][0]["elements"][0]["value"]
     ati_id = body["view"]["state"]["values"]["ati_id"]["ati_id"]["value"]
@@ -399,7 +398,7 @@ def atip_view_handler(ack, body, say, client):
     slug = f"tmp atip {ati_id}".replace(" ", "-").lower()
 
     # Create channel
-    prefix = "dev-" if app_settings.environment != "production" else ""
+    prefix = "dev-" if host_info().environment != "production" else ""
     if prefix:
         slug = f"{prefix}-{slug}"
     response = client.conversations_create(name=f"{slug}")

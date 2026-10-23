@@ -10,26 +10,20 @@ from sns_message_validator import (
     SignatureVerificationFailureException,
 )
 
-from infrastructure.configuration.app import AppSettings
+from contracts.configuration import HostInfo, install_host_info
 from models.webhooks import AwsSnsPayload, WebhookPayload
 from modules.webhooks import aws_sns
 
 
 @pytest.fixture
-def force_production_app_settings(monkeypatch):
-    monkeypatch.setattr(
-        "modules.webhooks.aws_sns.app_settings",
-        AppSettings(ENVIRONMENT="production"),
-    )
+def force_production_app_settings():
+    install_host_info(HostInfo(environment="production", git_sha="test-sha", public_base_url="https://sre-bot.example.com"))
 
 
 @pytest.fixture
-def non_production_app_settings(monkeypatch):
+def non_production_app_settings():
     """Force a non-production environment to prove validation is not environment-gated."""
-    monkeypatch.setattr(
-        "modules.webhooks.aws_sns.app_settings",
-        AppSettings(ENVIRONMENT="local"),
-    )
+    install_host_info(HostInfo(environment="local", git_sha="test-sha", public_base_url="http://127.0.0.1:8000"))
 
 
 @patch("modules.webhooks.aws_sns.log_ops_message")

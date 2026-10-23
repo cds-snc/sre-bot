@@ -39,7 +39,7 @@ def test_register_builds_atip_command_names_from_command_prefix(
     )
     monkeypatch.setattr(
         atip,
-        "get_app_settings",
+        "host_info",
         lambda: SimpleNamespace(PREFIX=legacy_prefix, environment="local"),
     )
 

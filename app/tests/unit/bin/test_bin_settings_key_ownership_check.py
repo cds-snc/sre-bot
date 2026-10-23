@@ -16,12 +16,12 @@ from pydantic import AliasChoices
 from pydantic_settings import BaseSettings
 
 from bin import check_settings_key_ownership as checker
-from infrastructure.configuration.app import AppSettings
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.security.settings import SecuritySettings
 from infrastructure.slack.settings import SlackTransportSettings
 from integrations.slack.settings import SlackSettings
 from packages.access.common.settings import AccessSettings
+from server.configuration import IdentitySettings, ServerSettings
 
 APP_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = APP_ROOT.parent
@@ -546,7 +546,15 @@ def test_source_derivation_matches_pydantic_for_real_settings_classes() -> None:
     Nested sub-field names are the only extra the guard adds, so pydantic's
     top-level names must be a subset and every extra must extend one of them.
     """
-    for cls in (SlackSettings, SlackTransportSettings, AppSettings, AccessSettings, SecuritySettings, LoggingSettings):
+    for cls in (
+        SlackSettings,
+        SlackTransportSettings,
+        IdentitySettings,
+        ServerSettings,
+        AccessSettings,
+        SecuritySettings,
+        LoggingSettings,
+    ):
         derived = _keys(APP_ROOT, f"{cls.__module__}:{cls.__qualname__}")
         expected = _pydantic_env_names(cls)
 

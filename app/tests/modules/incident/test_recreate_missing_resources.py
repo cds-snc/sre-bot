@@ -42,10 +42,10 @@ def basic_params():
 def test_contract_create_database_record_uses_environment_not_prefix(
     set_environment,
 ):
-    """Database environment value must come from app_settings.environment."""
+    """Database environment value must come from the installed HostInfo environment."""
     results = {"success": [], "errors": [], "skipped": []}
 
-    set_environment(core.app_settings, "dev")
+    set_environment("local")
 
     with patch("modules.incident.core.db_operations.create_incident") as mock_create:
         mock_create.return_value = "incident-id"

@@ -58,7 +58,7 @@ def test_lifespan_get_logger_returns_logger(mock_settings):
     # Arrange
 
     # Act
-    logger = _get_logger_from_app(mock_settings)
+    logger = _get_logger_from_app(mock_settings, LoggingSettings())
 
     # Assert
     assert logger is not None
@@ -79,8 +79,11 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
     mock_security_settings.model_dump.return_value = {"issuer_config": {}, "dev_bypass_token": "secret"}
 
     # Act
+    mock_identity = MagicMock()
+    mock_identity.model_dump.return_value = {"environment": "ci", "git_sha": "abc"}
     _list_configs_from_sections(
         mock_settings,
+        mock_identity,
         LoggingSettings(log_level="WARNING"),
         mock_server_settings,
         mock_security_settings,
@@ -111,7 +114,7 @@ def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_set
     mock_configure_logging.return_value = mock_logger
 
     # Act
-    logger = _get_logger_from_app(mock_settings)
+    logger = _get_logger_from_app(mock_settings, LoggingSettings())
 
     # Assert
     # _get_logger_from_app now passes both settings and logging_settings to configure_logging

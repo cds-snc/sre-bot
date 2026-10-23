@@ -5,8 +5,8 @@ title: >-
   owner
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:28'
-updated_date: '2026-10-20 23:36'
+created_date: 2026-10-20 23:28
+updated_date: '2026-10-22T19:06:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -18,7 +18,7 @@ dependencies:
 references:
   - decisions/configuration.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1760'
+  - https://github.com/cds-snc/sre-bot/issues/1760
 type: chore
 ordinal: 423000
 ---
@@ -26,7 +26,7 @@ ordinal: 423000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-TASK-111 empties infrastructure/configuration/ except features/incident.py, features/sre_ops.py and features/aws_ops.py (base.py replaced by the contracts settings base, app.py by the server/configuration identity slice, ServerSettings to server/, retry to its hosting owner; atip and groups deleted in TASK-111.14). Those three move with their features: incident with TASK-145.13, sre_ops with TASK-40, aws_ops with TASK-88. This task deletes the empty package and the tolerated-list item in decisions/configuration.md.
+TASK-111 empties infrastructure/configuration/ except features/incident.py, features/sre_ops.py and features/aws_ops.py: base.py is replaced by the contracts settings base, app.py and ServerSettings move to server/configuration/ behind the contracts HostInfo (TASK-111.7), retry moves to its hosting owner, and atip and groups are deleted in TASK-111.14. Those three move with their features: incident with TASK-145.13, sre_ops with TASK-40, aws_ops with TASK-88. This task deletes the empty package and the tolerated-list item in decisions/configuration.md.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

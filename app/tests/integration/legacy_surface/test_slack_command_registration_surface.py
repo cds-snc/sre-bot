@@ -212,7 +212,7 @@ def test_dev_leaf_outside_the_development_environment_is_refused(
     The environment is the only stubbed input; the refusal proves the dev leaf
     is registered and dispatched, without reaching its Google handler.
     """
-    monkeypatch.setattr("modules.dev.platforms.slack.get_app_settings", lambda: SimpleNamespace(environment="production"))
+    monkeypatch.setattr("modules.dev.platforms.slack.host_info", lambda: SimpleNamespace(environment="production"))
 
     response = slack_command_harness.dispatch("sre", "dev google")
 

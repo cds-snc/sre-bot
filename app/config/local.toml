@@ -1,2 +1,9 @@
 # Overrides of base.toml for ENVIRONMENT=local, key by key.
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
+
+[slack_transport]
+command_prefix = "dev-"
+
+[notify_api_key_leak]
+channel_id = "C033L7RGCT0"
+oncall_group_id = ""

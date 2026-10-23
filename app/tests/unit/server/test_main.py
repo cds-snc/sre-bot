@@ -3,9 +3,9 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
+from main import create_app
 
-client = TestClient(app)
+client = TestClient(create_app())
 
 
 @pytest.mark.unit

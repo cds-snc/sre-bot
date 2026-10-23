@@ -13,9 +13,8 @@ from collections.abc import Iterator
 import pytest
 from pydantic import SecretStr, ValidationError
 
-from infrastructure.configuration.app import AppSettings
-from infrastructure.configuration.infrastructure.server import ServerSettings
 from infrastructure.security.settings import SecuritySettings, get_security_settings
+from server.configuration import IdentitySettings, ServerSettings
 
 pytestmark = pytest.mark.unit
 
@@ -135,7 +134,8 @@ def test_security_settings_model_config_reads_dotenv_case_insensitively() -> Non
 
 @pytest.mark.parametrize("name", _NAMES)
 def test_security_keys_are_declared_only_by_the_security_slice(name: str) -> None:
-    """AppSettings and ServerSettings no longer declare any security key."""
+    """The identity and [server] slices do not declare any security key."""
     assert name.lower() in SecuritySettings.model_fields
-    assert name not in AppSettings.model_fields
+    assert name not in IdentitySettings.model_fields
+    assert name.lower() not in ServerSettings.model_fields
     assert name not in ServerSettings.model_fields

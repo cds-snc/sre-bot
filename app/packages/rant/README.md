@@ -48,7 +48,7 @@ Because `/rant` is a top-level command, it must be declared in the Slack app
 configuration before Slack will deliver it to the bot:
 
 1. Open your Slack app settings → **Slash Commands** → **Create New Command**.
-2. Set the command to `/rant` (matching the deployed `SLACK__COMMAND_PREFIX`).
+2. Set the command to `/rant` (matching the deployed `command_prefix` in `[slack_transport]`).
 3. Point it at the bot. In Socket Mode no request URL is required, but the
    command must still be declared.
 

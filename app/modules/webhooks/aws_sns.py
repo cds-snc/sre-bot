@@ -10,12 +10,10 @@ from sns_message_validator import (
 )
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
 from models.webhooks import AwsSnsPayload, WebhookPayload, WebhookResult
 from modules.ops.notifications import log_ops_message
 from modules.webhooks.aws_sns_notification import process_aws_notification_payload
 
-app_settings = get_app_settings()
 logger = get_logger()
 sns_message_validator = SNSMessageValidator()
 

@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Request
 
-from infrastructure.configuration.app import get_app_settings
+from contracts.configuration import host_info
 from infrastructure.security import get_limiter
 
 router = APIRouter(tags=["System"])
 limiter = get_limiter()
-settings = get_app_settings()
 
 
 # Route53 uses this as a healthcheck every 30 seconds and the alb uses this as a checkpoint every 10 seconds.
@@ -14,7 +13,7 @@ settings = get_app_settings()
 @limiter.limit("50/minute")
 def get_version(request: Request):  # pylint: disable=unused-argument
     """Get the version of the application."""
-    return {"version": settings.git_sha}
+    return {"version": host_info().git_sha}
 
 
 @router.get("/health")

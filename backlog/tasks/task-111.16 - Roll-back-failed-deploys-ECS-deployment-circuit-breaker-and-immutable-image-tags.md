@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-21T20:05:00Z'
-updated_date: '2026-10-22T17:49:00Z'
+updated_date: '2026-10-22T18:19:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -40,10 +40,10 @@ Planning decides, with current sources: how the deploy workflow registers a task
 - [x] #5 docs/runbooks/roll-back-a-deployment.md documents dispatch rollback (tag validated and resolved to digest), the CLI fallback, redeploying the current image after a terraform task-definition change, and the post-deploy Verify checklist; it links deployment.md and has owner and last_reviewed; governance.md records the docs/runbooks convention
 - [x] #6 The PR's tf plan shows only the expected service, ECR repository and state-only task-definition changes; nothing replaced or destroyed; nothing applied before merge
 - [x] #7 The deploy workflow fails when the service ends on a task definition other than the one this run registered or the PRIMARY deployment rolloutState is FAILED; the Slack message names the rollback (circuit breaker or alarm) and links the run
-- [ ] #8 When the sha tag already exists the job builds and pushes nothing, reuses that digest and leaves latest unmoved; ECR rejects overwriting a sha tag while latest stays pushable
+- [x] #8 When the sha tag already exists the job builds and pushes nothing, reuses that digest and leaves latest unmoved; ECR rejects overwriting a sha tag while latest stays pushable
 - [x] #9 The SBOM step scans the deployed tag/digest, and docker_vulnerability_scan.yml accepts an image_tag dispatch input defaulting to latest
 - [x] #10 Concurrency groups ecs-deploy (build_and_deploy deploy job) and terraform-apply (tf_apply.yml) both use queue: max
-- [ ] #11 health_check_grace_period_seconds is set above the measured boot time (measurement in the notes) and the tf plan shows it as an in-place change
+- [x] #11 health_check_grace_period_seconds is set above the measured boot time (measurement in the notes) and the tf plan shows it as an in-place change
 <!-- AC:END -->
 
 ## Definition of Done
@@ -182,6 +182,9 @@ Rehearsal 2026-10-22 (working hours, announced; started from the Actions UI beca
 Run 39824368985 (17:37 UTC) redeployed the same tag by image_tag (build skipped by design; a new revision :39 with the same digest, so ECS replaced the tasks). AC #8 and AC #11 are evidenced from the TASK-111.5.2 merge deploy (same-day re-run; startup times of its tasks) and recorded in the 111.5.2 notes.
 
 Fix after Done (rides with the TASK-111.5.2 PR): run 39824368985 posted a false Slack failure ("sre-bot-task:39 is IN_PROGRESS, not COMPLETED"). The deploy action's waiter returned TIMEOUT at 17:44:24, about 350 s after the deployment started, although wait-for-minutes is 15. Cause: the SDK services-stable waiter backs off to maxDelay 600 s, and past the backoff ceiling exponentialBackoffWithJitter returns the full 600 s without trimming it to the time left, so runPolling stops as soon as now + 600 s passes the 900 s limit. A normal rollout takes about 6 to 9 minutes (the #1771 deploy took 8.5). Fix: wait-max-delay-seconds: 30 on the deploy step (a v2.6.4 input) so polling continues to the 15-minute limit. sre-bot-task:39 completed afterwards.
+Deploy duration: rolling deploys stay IN_PROGRESS for the alarm-rollback bake time (default under 5 minutes) after the new tasks are healthy and the old ones are at 0 (AWS "How CloudWatch alarms detect Amazon ECS deployment failures"). A deploy is about 3-4 minutes of rollout plus the bake, inside the 15-minute wait. The bake time is configurable for rolling deploys if faster deploys are wanted (possible follow-up, not created). Early success criteria (AWS, 2026-09) do not shorten the bake: with 2 tasks and minimum healthy 100 % they equal the default.
+
+Closed 2026-10-22 from the TASK-111.5.2 merge deploy (#1775, 8eaed3d9), human-run, all as expected. AC #8: the same-day "Re-run all jobs" of that push run found the existing <sha>-<date> image, skipped Build container and Push, reused the digest and left latest unmoved; ECR immutability for sha tags is set (IMMUTABLE_WITH_EXCLUSION, filter latest, read 2026-10-22). AC #11: each new task logged "Application startup complete" within the expected bound after startedAt (under about 45 s), so the 60 s health-check grace period stands.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

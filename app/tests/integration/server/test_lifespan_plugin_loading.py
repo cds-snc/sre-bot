@@ -21,8 +21,8 @@ import pytest
 from fastapi import FastAPI
 
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
-from server.lifespan import lifespan
 from server.plugins.manager import get_plugin_manager
+from tests.factories.lifespan import lifespan
 from tests.fixtures.plugin_dists import write_plugin_dist
 
 EXPECTED_PLUGINS = {

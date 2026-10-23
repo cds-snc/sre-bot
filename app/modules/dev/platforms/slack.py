@@ -12,9 +12,9 @@ from typing import Any
 
 import structlog
 
+from contracts.configuration import host_info
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.configuration.app import get_app_settings
 from integrations.slack import LegacySlackBootstrap
 from modules.dev import (
     google,
@@ -36,8 +36,7 @@ def _require_dev_environment(
     Returns:
         CommandResponse with error if not in dev environment, None otherwise
     """
-    app_settings = get_app_settings()
-    if app_settings.environment != "local":
+    if host_info().environment != "local":
         return CommandResponse(
             message=("This command is only available in the development environment."),
             ephemeral=True,

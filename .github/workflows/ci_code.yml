@@ -73,13 +73,8 @@ jobs:
         run: make test
         env:
           ENVIRONMENT: ci
-          SLACK__COMMAND_PREFIX: ""
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          SESSION_SECRET_KEY: ${{ secrets.SESSION_SECRET_KEY }}
           NOTIFY_TEST_KEY: ${{ secrets.NOTIFY_TEST_KEY }}
           NOTIFY_SRE_USER_NAME: ${{ secrets.NOTIFY_SRE_USER_NAME }}
           NOTIFY_SRE_CLIENT_SECRET: ${{ secrets.NOTIFY_SRE_CLIENT_SECRET }}
-          NOTIFY_OPS_CHANNEL_ID: ${{ secrets.NOTIFY_OPS_CHANNEL_ID }}
           SRE_BOT_EMAIL: ${{ secrets.SRE_BOT_EMAIL }}
           AWS_ORG_ACCOUNT_ROLE_ARN: ${{ secrets.AWS_ORG_ACCOUNT_ROLE_ARN }}

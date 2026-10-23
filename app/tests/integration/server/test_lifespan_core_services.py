@@ -19,8 +19,8 @@ import svcs
 from fastapi import FastAPI
 
 from contracts.records import RecordStore
-from server.lifespan import lifespan
 from server.services import CoreService, initialize_core_services
+from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration
 

@@ -7,12 +7,13 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "main:server_app",
+                "--factory",
+                "main:create_app",
                 "--reload"
             ],
             "env": {
-                "LOGLEVEL": "DEBUG",
-                "PREFIX": "dev-"
+                "ENVIRONMENT": "local",
+                "LOGGING__LOG_LEVEL": "DEBUG"
             },
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/app"

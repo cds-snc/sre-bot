@@ -42,7 +42,7 @@ import structlog
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer, SecurityScopes
 
-from infrastructure.configuration import get_app_settings
+from contracts.configuration import host_info
 from infrastructure.security.jwks import JWKSManager, get_jwks_manager
 from infrastructure.security.jwt import validate_jwt_token
 from infrastructure.security.models import AuthPrincipalSource, User
@@ -97,16 +97,16 @@ def get_current_user(
 
     # Non-production static bypass — allows local smoke testing without Backstage.
     security_settings = get_security_settings()
-    app_settings = get_app_settings()
+    host = host_info()
     bypass_token = security_settings.dev_bypass_token
     if (
-        app_settings.environment != "production"
+        host.environment != "production"
         and security_settings.dev_bypass_enabled
         and bypass_token is not None
         and bypass_token.get_secret_value()
         and secrets.compare_digest(credentials.credentials.encode(), bypass_token.get_secret_value().encode())
     ):
-        log = logger.bind(bypass="dev_token", environment=app_settings.environment)
+        log = logger.bind(bypass="dev_token", environment=host.environment)
         log.warning("dev_bypass_token_used")
         return User(
             user_id="dev@local",

@@ -20,7 +20,7 @@ from pydantic import ValidationError
 
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
-from server.lifespan import lifespan
+from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration
 

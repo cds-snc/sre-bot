@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from server.server import handler
+from server.server import create_app
 
 _FAKE_ASSUMED_CREDENTIALS = {
     "AccessKeyId": "ASIATESTASSUMEDKEY",
@@ -166,7 +166,7 @@ def app_with_lifespan(monkeypatch, static_aws_credentials):
     )
 
     # Create client which triggers lifespan context manager
-    with TestClient(handler) as client:
+    with TestClient(create_app()) as client:
         yield client
 
 

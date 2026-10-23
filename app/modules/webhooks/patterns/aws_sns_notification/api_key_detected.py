@@ -3,26 +3,20 @@ import re
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from infrastructure.configuration.app import get_app_settings
-from infrastructure.configuration.infrastructure.server import get_server_settings
 from integrations import notify
 from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import AwsNotificationPattern
+from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 
 logger = get_logger()
-app_settings = get_app_settings()
-server_settings = get_server_settings()
 
 
 def send_message_to_notify_channel(client: WebClient, blocks: list[dict]):
-    """Send message to the notification ops channel."""
-    if app_settings.environment != "production":
-        client.chat_postMessage(channel=server_settings.sre_test_channel_id, blocks=blocks)
-    else:
-        if not server_settings.notify_ops_channel_id:
-            raise ValueError("NOTIFY_OPS_CHANNEL_ID is not set in server settings")
-        # post the message to the notification channel
-        client.chat_postMessage(channel=server_settings.notify_ops_channel_id, blocks=blocks)
+    """Send message to the Notify channel the environment's configuration names."""
+    channel_id = get_notify_api_key_leak_settings().channel_id
+    if not channel_id:
+        raise ValueError("notify_api_key_leak.channel_id is not set")
+    client.chat_postMessage(channel=channel_id, blocks=blocks)
 
 
 def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[dict]:
@@ -64,8 +58,9 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
         service_id = "Unknown"
         api_key_name = "Unknown Key"
 
-    if not server_settings.notify_oncall_group_id:
-        raise ValueError("NOTIFY_ONCALL_GROUP_ID is not set in server settings")
+    oncall_group_id = get_notify_api_key_leak_settings().oncall_group_id
+    if not oncall_group_id:
+        raise ValueError("notify_api_key_leak.oncall_group_id is not set")
 
     # Attempt to revoke the API key
     revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
@@ -93,7 +88,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
                 "text": (
                     f"Notify API Key Name {api_key_name} from service id {service_id} "
                     f"was committed in github file {github_repo}.\n"
-                    f"(cc <!subteam^{server_settings.notify_oncall_group_id}|notify-oncall>)"
+                    f"(cc <!subteam^{oncall_group_id}|notify-oncall>)"
                 ),
             },
         },

@@ -56,7 +56,7 @@ class TestVersionCommandHandler:
         # Arrange
         mock_settings = MagicMock()
         mock_settings.git_sha = "abc123def456"
-        monkeypatch.setattr(sre_slack, "get_app_settings", lambda: mock_settings)
+        monkeypatch.setattr(sre_slack, "host_info", lambda: mock_settings)
 
         payload = CommandPayload(
             text="",
@@ -78,7 +78,7 @@ class TestVersionCommandHandler:
         # Arrange
         mock_settings = MagicMock()
         mock_settings.git_sha = "test-sha"
-        monkeypatch.setattr(sre_slack, "get_app_settings", lambda: mock_settings)
+        monkeypatch.setattr(sre_slack, "host_info", lambda: mock_settings)
 
         payload = CommandPayload(
             text="",

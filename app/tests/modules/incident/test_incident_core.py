@@ -62,7 +62,7 @@ def test_initiate_resources_creation_succeeds(
     mock_logger,
     set_environment,
 ):
-    set_environment(core.app_settings, "production")
+    set_environment("production")
 
     incident_payload = helper_generate_default_incident_params()
     mock_get_on_call_users_from_folder.return_value = [
@@ -252,7 +252,7 @@ def test_initiate_resources_creation_labels_record_environment(
     Google, Meet and the database are stubbed; the assertion reads the environment
     field of the record handed to the database, which is what downstream reports filter on.
     """
-    set_environment(core.app_settings, environment)
+    set_environment(environment)
     _mock_successful_dependencies(
         mock_incident_folder,
         mock_incident_document,
@@ -861,7 +861,7 @@ def test_contract_security_group_invite_uses_environment_not_prefix(
         "users": ["security_user_1", "security_user_2"],
     }
 
-    set_environment(core.app_settings, "local")
+    set_environment("local")
 
     core.initiate_resources_creation(client, incident_payload)
 
@@ -898,7 +898,7 @@ def test_security_incident_without_a_configured_security_group_skips_the_group_i
     mock_incident_document.create_incident_document.return_value = "doc_id"
     mock_db_operations.create_incident.return_value = "incident_id"
     client = MagicMock()
-    set_environment(core.app_settings, "production")
+    set_environment("production")
 
     core.initiate_resources_creation(client, incident_payload)
 

@@ -51,4 +51,4 @@ def test_entry_script_writes_env_and_starts_uvicorn_when_reads_succeed(tmp_path)
 
     assert result.returncode == 0
     assert (tmp_path / ".env").read_text() == "EXAMPLE_KEY=value\nEXAMPLE_KEY=value\n"
-    assert (tmp_path / "uvicorn-started").read_text().startswith("main:server_app")
+    assert (tmp_path / "uvicorn-started").read_text().startswith("--factory main:create_app")
