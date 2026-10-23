@@ -3,8 +3,8 @@ id: TASK-158
 title: Delete GoogleResourcesConfig and the interim google_resources table
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:28'
-updated_date: '2026-10-20 23:36'
+created_date: 2026-10-20 23:28
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -15,9 +15,10 @@ dependencies:
   - TASK-145.12
   - TASK-39
   - TASK-88
+  - TASK-111.10
 references:
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1759'
+  - https://github.com/cds-snc/sre-bot/issues/1759
 type: chore
 ordinal: 422000
 ---

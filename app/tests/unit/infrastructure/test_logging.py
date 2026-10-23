@@ -15,6 +15,7 @@ from unittest.mock import patch
 import pytest
 import structlog
 
+from infrastructure.logging.settings import LoggingSettings
 from infrastructure.logging.setup import (
     _is_test_environment,
     configure_logging,
@@ -51,7 +52,7 @@ class TestLoggingConfiguration:
 
     def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a logger instance."""
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
         # Should return a structlog logger (may be BoundLoggerLazyProxy)
         assert logger is not None
         assert hasattr(logger, "bind")
@@ -59,13 +60,13 @@ class TestLoggingConfiguration:
     def test_configure_logging_in_test_environment(self, mock_settings):
         """configure_logging suppresses logs in test environment."""
         # We're in a test environment, so logging should be at CRITICAL+1
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
         root_level = logging.root.level
         assert root_level == logging.CRITICAL + 1
 
     def test_configure_logging_with_custom_log_level(self, mock_settings):
         """configure_logging accepts custom log level."""
-        logger = configure_logging(settings=mock_settings, log_level="DEBUG")
+        logger = configure_logging(mock_settings.environment, LoggingSettings(), log_level="DEBUG")
         # Should return a logger instance
         assert logger is not None
         assert hasattr(logger, "bind")
@@ -73,9 +74,9 @@ class TestLoggingConfiguration:
     def test_configure_logging_uses_environment_for_production_mode(self, mock_settings):
         """configure_logging derives production mode from ENVIRONMENT."""
         mock_settings.environment = "production"
-        logger1 = configure_logging(settings=mock_settings)
+        logger1 = configure_logging(mock_settings.environment, LoggingSettings())
         mock_settings.environment = "local"
-        logger2 = configure_logging(settings=mock_settings)
+        logger2 = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert logger1 is not None
         assert logger2 is not None
@@ -84,7 +85,7 @@ class TestLoggingConfiguration:
         """Contract: legacy production override is removed from configure_logging."""
         legacy_kwarg = "is" + "_production"
         with pytest.raises(TypeError):
-            configure_logging(settings=mock_settings, **{legacy_kwarg: False})
+            configure_logging(mock_settings.environment, LoggingSettings(), **{legacy_kwarg: False})
 
 
 @pytest.mark.unit

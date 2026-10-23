@@ -2,7 +2,7 @@
 
 import pytest
 
-from contracts.configuration import install_configuration_files
+from contracts.configuration import ConfigurationError, install_configuration_files
 from modules.webhooks.patterns.aws_sns_notification.settings import (
     NotifyApiKeyLeakSettings,
     get_notify_api_key_leak_settings,
@@ -43,7 +43,7 @@ def test_environment_variable_overrides_the_file(monkeypatch: pytest.MonkeyPatch
 
 def test_unknown_key_is_forbidden() -> None:
     """The table holds channel_id and oncall_group_id only."""
-    with pytest.raises(Exception, match="extra"):
+    with pytest.raises(ConfigurationError, match="not_a_key"):
         NotifyApiKeyLeakSettings(not_a_key="x")  # type: ignore[call-arg]
 
 

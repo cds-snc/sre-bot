@@ -5,8 +5,8 @@ title: >-
   capability
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - incident
   - features
@@ -15,8 +15,9 @@ dependencies:
   - TASK-145.6
   - TASK-138
   - TASK-36.1
+  - TASK-111.10
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1688'
+  - https://github.com/cds-snc/sre-bot/issues/1688
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -43,7 +44,7 @@ THIS SLICE
 - [ ] #3 The meeting reference is stored on the record with system, tenant and event id
 - [ ] #4 The pinned schedule flow passes unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The SRE calendar id move from the interim [google_resources] table into the incident postmortem slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #6 The SRE calendar id moves from the interim [google_resources] table into the incident postmortem slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
 <!-- AC:END -->
 
 ## Implementation Plan

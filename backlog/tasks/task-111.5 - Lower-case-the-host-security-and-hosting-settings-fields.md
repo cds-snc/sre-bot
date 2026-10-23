@@ -1,10 +1,10 @@
 ---
 id: TASK-111.5
 title: Lower-case the host, security and hosting settings fields
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-21T20:24:00Z'
+updated_date: '2026-10-23T17:19:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -26,11 +26,11 @@ Mechanical: the fields of AppSettings, ServerSettings, SecuritySettings, SlackTr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Those slices declare lower snake_case fields with case_sensitive=False and read the same environment names as before
-- [ ] #2 No behaviour change: the existing tests pass with only attribute renames
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #4 A parametrized test pins every production environment name per touched slice (doc-14 inventory plus the deploy-interface names): each name set to a sentinel is received by the renamed field, so a silent fallback to a default fails CI
-- [ ] #5 The implementation notes carry the post-deploy checklist (build_and_deploy Slack success, one PRIMARY deployment COMPLETED, no plugin_boot_failed or ERROR in the first minutes of logs, one Slack command in the test channel) and the manual-retag rollback
+- [x] #1 Those slices declare lower snake_case fields with case_sensitive=False and read the same environment names as before
+- [x] #2 No behaviour change: the existing tests pass with only attribute renames
+- [x] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #4 A parametrized test pins every production environment name per touched slice (doc-14 inventory plus the deploy-interface names): each name set to a sentinel is received by the renamed field, so a silent fallback to a default fails CI
+- [x] #5 The implementation notes carry the post-deploy checklist (build_and_deploy Slack success, one PRIMARY deployment COMPLETED, no plugin_boot_failed or ERROR in the first minutes of logs, one Slack command in the test channel) and the manual-retag rollback
 <!-- AC:END -->
 
 ## Implementation Plan

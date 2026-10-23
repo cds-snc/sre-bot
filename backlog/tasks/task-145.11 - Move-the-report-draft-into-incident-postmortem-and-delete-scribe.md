@@ -3,8 +3,8 @@ id: TASK-145.11
 title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 17:51'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - incident
   - features
@@ -14,7 +14,7 @@ dependencies:
   - TASK-145.9
   - TASK-134
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1689'
+  - https://github.com/cds-snc/sre-bot/issues/1689
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -27,9 +27,9 @@ ordinal: 361000
 Layer D2 of TASK-145. Mechanical move: /sre incident draft becomes a postmortem use case and features/incident/scribe is deleted.
 
 THIS SLICE
-- scribe/service.py's draft path becomes postmortem/report.py (fill the report for review) with postmortem/prompt.py (section prompts and metadata rules), the draft settings slice, the incident_draft catalogue and the IncidentDocumentStore use through core's IncidentReport. The command registers under incident.postmortem. It calls the Summarizer directly until TASK-25.10; TASK-134 then moves the generic answer parsing to the capability from here.
+- scribe/service.py's draft path becomes postmortem/report.py (fill the report for review) with postmortem/prompt.py (section prompts and metadata rules), the draft settings slice, the incident_draft catalogue and the IncidentDocumentStore use through core's IncidentReport. The command registers under incident.postmortem. It calls the text-generation capability's structured fill (TASK-25.10, TASK-134) as scribe does before the move.
 - Tests renamed test_incident_postmortem_report_*; mock patch strings rewritten.
-- features/incident/scribe/ is deleted: entry point "incident.scribe" removed from pyproject, the integrations.openai ignore entry renamed to the module that now imports it (one entry, not two), the umbrella layers contract lists response | comms | postmortem above core above common, the umbrella README loses the scribe section.
+- features/incident/scribe/ is deleted: entry point "incident.scribe" removed from pyproject, any import-linter ignore entry naming scribe renamed to the module that now imports it (never added), the umbrella layers contract lists response | comms | postmortem above core above common, the umbrella README loses the scribe section.
 - The report draft is also offered when the status reaches Ready to be Reviewed: response raises the transition through an extension point in common/ and postmortem registers the reaction at startup; no subdomain imports the other. Omit this bullet if it pushes the slice over the size gate and open a follow-up.
 <!-- SECTION:DESCRIPTION:END -->
 

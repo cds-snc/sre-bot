@@ -5,20 +5,23 @@ title: >-
   through core
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:35:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
-  - TASK-145.6
   - TASK-36.1.1
   - TASK-103
+  - TASK-111.10
+  - TASK-111.14
   - TASK-145.5.9
+  - TASK-145.6
   - TASK-157
+  - TASK-111.15.1
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1698'
+  - https://github.com/cds-snc/sre-bot/issues/1698
   - decisions/incident-management.md
 parent_task_id: TASK-145
 priority: medium
@@ -33,16 +36,18 @@ Layer C1 of TASK-145, the first response slice: plugin incident.response. Rebuil
 
 THIS SLICE
 - response/entrypoints/slack.py and slack_views.py: the handlers above, each one service call, registered through the Slack registrar; the alert actions register into the webhooks capability's extension point when it exists, otherwise through the registrar with a later move.
+- The declare submission validates before its single ack. The legacy submit() in modules/incident/incident.py acks twice (an empty body, then response_action=errors), so its validation errors reach Slack only by winning a race; TASK-36.1.1 pins the errors response.
 - response/service.py declare flow: create the record through IncidentStore with severity and the declarer, create the conversation and set its purpose, create the report from the template and bookmark it, create the video call and bookmark it, create the canvas, bookmark the source alert when present, invite the on-call people (ProductCatalog schedule today; the on-call capability with TASK-146.3) and the configured groups, append the list projection row, post the announcement. Each reference is written to the record as it is created; a failed resource leaves the record with that reference empty and the recreate path (TASK-145.8) fills it.
 - The video-call creator moves from features/incident/meet into core/adapters/google_meet.py; meet/ is deleted.
 - The product picker reads ProductCatalog and respects Slack option limits. The severity picker offers none and SEV0 to SEV4 from common/vocabulary: SEV0 is the only new option, and the announcement's severity warning covers it as it covers SEV1 to SEV4.
-- Legacy registration of these surfaces is removed from modules/incident in the same PR; names, fields, replies and i18n keys unchanged, pinned by TASK-36.1. Settings values move to the response slice of common/settings.py; environment variable names unchanged.
+- Legacy registration of these surfaces is removed from modules/incident in the same PR; names, fields, replies and i18n keys unchanged, pinned by TASK-36.1. The declare path reads its settings (the incident announcement channel and the security and Notify management group ids) from the incident response slice in common/settings.py, which TASK-111.15.1 makes their one owner.
 
-RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
+RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 - create sets record_version = RECORD_VERSION and writes the end-state attribute names, never the legacy ones as the record of truth. RECORD_VERSION and OPEN_BUCKET are imported from core/store.py (defined by TASK-145.5.4, where list_open queries OPEN_BUCKET).
 - create sets open_bucket = OPEN_BUCKET and opened_at in the same write. opened_at uses the stored-time formatter format_stored_time in core/adapters/incident_items.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), added by TASK-145.5.8 and shared with TASK-145.8 (reopen) and the TASK-145.5.7 job.
 - References are nested maps per kind (conversation, report, video_call, postmortem_meeting, external_case, source_alert), each {system, tenant, vendor_id, url}, written whole. The conversation map and the top-level channel_id (the by_channel key) are set in one multi-change update.
 - security_incident is a required bool taken from the modal.
+- create relies on put_if_not_exists (TASK-103) reporting created for its own SDK-retried write; every item written through it carries a hidden _rs_write_token attribute that reads strip, and attribute names starting with _rs_ are reserved and rejected.
 - Decide the source_alert shape at planning: a chat alert is a message, so conversation plus message id, like MessageReference.
 - Legacy readers stay live until TASK-145.8: app/models/incidents.py Incident (extra="forbid"; channel_name, teams and report_url required), used by information_display.py, information_update.py and db_operations.py, raises on a new-shape item. Decide at planning: either dual-write the legacy attributes and relax that model to extra="ignore", or ship in the same release as TASK-145.8.
 <!-- SECTION:DESCRIPTION:END -->
@@ -55,10 +60,10 @@ RECORD SHAPE (human, 2026-10-15; decisions/incident-management.md Migration)
 - [ ] #4 The pinned declare and alert-button behaviour passes unchanged
 - [ ] #5 create stamps record_version 1 and writes the end-state attribute names, the nested reference maps and security_incident as a bool from the modal; the conversation map and channel_id are set in one multi-change update
 - [ ] #6 The legacy readers (app/models/incidents.py Incident and its callers) keep working on new items until TASK-145.8, by the option chosen at planning (dual-write with extra="ignore", or the same release as TASK-145.8), and the source_alert shape is recorded in the plan
-- [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from the core/store.py formatter (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
+- [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from format_stored_time in core/adapters/incident_items.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, the declare path is not registered and one startup event names the key, while every other incident command still works (tested)
-- [ ] #10 The incident handbook id move from the interim [google_resources] table into the incident response slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #10 The incident handbook id moves from the interim [google_resources] table into the incident response slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,22 +108,3 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 
 2026-10-20 (SLACK_TEAM_ID review): writers stamp the configured Slack tenant, which TASK-157's runtime guard has verified against the request (decisions/workplace-systems.md rule 3); with SLACK_ENTERPRISE_ID set the tenant is the Enterprise org id. Depends on TASK-157.
 <!-- SECTION:NOTES:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-15 20:07
----
-TASK-103 (2026-10-15): IncidentStore.create can rely on put_if_not_exists reporting created for its own SDK-retried write; every incident item written through it carries a hidden _rs_write_token attribute that reads strip. Attribute names starting with _rs_ are reserved and rejected.
----
-
-created: 2026-10-15 20:53
----
-Legacy submit() in modules/incident/incident.py acks at line 137 and acks again with response_action=errors on validation failure, so Slack never shows the inline errors; the rebuilt declare submission should validate before its single ack. TASK-36.1.1 pins the current behaviour (empty-body ack, no channel).
----
-
-created: 2026-10-15 20:59
----
-Correction to the previous comment: Bolt returns whichever ack is set when its runner first polls (every 10 ms), and the two acks in submit() happen microseconds apart, so the validation errors usually do reach Slack; the double ack makes it a race, not a guaranteed loss. The rebuilt submission should still validate before a single ack. TASK-36.1.1 pins the errors response.
----
-<!-- COMMENTS:END -->

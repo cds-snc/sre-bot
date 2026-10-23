@@ -6,10 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-22T19:22:00Z'
+updated_date: '2026-10-23T18:09:00Z'
 labels:
   - architecture
   - configuration
 dependencies: []
+references:
+  - https://github.com/cds-snc/sre-bot/issues/1783
 priority: low
 ordinal: 433000
 ---

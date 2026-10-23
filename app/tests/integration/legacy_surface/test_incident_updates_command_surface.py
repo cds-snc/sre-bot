@@ -67,7 +67,7 @@ class IncidentStore:
 @pytest.fixture
 def harness(slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch) -> SlackCommandHarness:
     """The command harness with the legacy SRE handler posting through its fake Slack client."""
-    monkeypatch.setattr(sre_slack, "client", slack_command_harness.client)
+    monkeypatch.setattr(sre_slack, "_web_client", lambda: slack_command_harness.client)
     return slack_command_harness
 
 

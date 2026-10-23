@@ -3,8 +3,8 @@ id: TASK-36.3
 title: Pin the legacy scheduled-job entry points
 status: To Do
 assignee: []
-created_date: '2026-09-28 14:36'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-28 14:36
+updated_date: '2026-10-23T17:09:00Z'
 labels:
   - migration
   - testing
@@ -14,7 +14,7 @@ dependencies:
 references:
   - decisions/testing.md
   - decisions/migration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1613'
+  - https://github.com/cds-snc/sre-bot/issues/1613
 parent_task_id: TASK-36
 priority: high
 ordinal: 287000
@@ -23,7 +23,7 @@ ordinal: 287000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Pin the 5 job entry points that call into modules.aws and modules.incident, plus the 2 plugin-registered jobs, as the before/after check for the TASK-52 scheduler move and the TASK-145 and TASK-88 rebuilds. Invoke each job's entry point directly with faked integrations and assert on its observable effects; do not start the scheduler.
+Pin the 5 scheduled-job rows of the TASK-36 inventory (app/tests/integration/legacy_surface/INVENTORY.md, 'Scheduled job entry points'): the 3 legacy jobs scheduled in jobs/scheduled_tasks.py init() (provision_aws_identity_center over modules.aws.identity_center, notify_stale_incident_channels from modules.incident, and spending.execute_spending_data_update_job from modules.aws.spending) and the 2 plugin-registered jobs (access_sync_reconciliation and oncall_sync, registered through the register_background_jobs hookimpl). They are the before/after check for the TASK-52 scheduler move and the TASK-145.9 and TASK-88 rebuilds. Invoke each job's entry point directly with faked integrations and assert on its observable effects; do not start the scheduler. The host-owned Tier-1 jobs (scheduler_heartbeat, integration_healthchecks) are not inventory rows.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

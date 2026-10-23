@@ -4,10 +4,13 @@ title: Carve the GC Notify API-key leak response out of webhooks into its own fe
 status: To Do
 assignee: []
 created_date: '2026-10-22T19:05:00Z'
+updated_date: '2026-10-23T18:09:00Z'
 labels:
   - webhooks
   - configuration
 dependencies: []
+references:
+  - https://github.com/cds-snc/sre-bot/issues/1782
 priority: low
 ordinal: 432000
 ---

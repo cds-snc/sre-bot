@@ -7,10 +7,10 @@ Best Practices (per structlog documentation):
     1. Use structlog.get_logger() to get a logger (standard API)
     2. Use logger.bind(key=value) to add context to a logger
     3. Use bind_request_context() in middleware for request-scoped context
-    4. Use configure_logging() at application startup
+    4. configure_logging() runs once, in the app factory's configuration phase
 
 Public API:
-    - configure_logging(): Initialize logging for the application
+    - configure_logging(environment, logging_settings): Initialize logging for the application
     - bind_request_context(): Context manager for request-scoped logging
     - get_correlation_id(): Get current correlation ID from context
     - set_correlation_id(): Set correlation ID in context
@@ -29,8 +29,8 @@ Example (Best Practice):
         bind_request_context,
     )
 
-    # At application startup
-    configure_logging()
+    # Once, in the app factory's configuration phase
+    configure_logging(identity.environment, get_logging_settings())
 
     # In a module (standard structlog pattern)
     logger = structlog.get_logger()

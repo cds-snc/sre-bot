@@ -5,8 +5,8 @@ title: >-
   close the incident umbrella contract
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 18:20'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:31:00Z'
 labels:
   - incident
   - features
@@ -17,7 +17,7 @@ dependencies:
   - TASK-145.5.7
   - TASK-118
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1691'
+  - https://github.com/cds-snc/sre-bot/issues/1691
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -34,7 +34,7 @@ THIS SLICE
 - Remove every freeze-baseline entry naming app/modules/incident; no baseline grows.
 - app/tests/integration/legacy_surface/INVENTORY.md: every incident row points at its response, comms or postmortem handler and its pinning test; surfaces found outside the original inventory are listed with their disposition.
 - modules/dev/incident.py and the /sre incident dispatcher in modules/sre are repointed or deleted.
-- The legacy item bridge (TASK-145.5.8) and the upgrade job (TASK-145.5.7) are deleted once a production run reports nothing pending. Legacy attributes stay on stored items: no strip pass (human default, 2026-10-15).
+- The legacy item bridge (TASK-145.5.8) and the upgrade job (TASK-145.5.7) are deleted once a production run reports nothing pending. Legacy attributes stay on stored items: no strip pass.
 - decisions/incident-management.md Migration: remove the closed tolerances and add a dated Changes line; decisions/migration.md and feature-packages.md Context lines naming modules/incident are updated.
 <!-- SECTION:DESCRIPTION:END -->
 

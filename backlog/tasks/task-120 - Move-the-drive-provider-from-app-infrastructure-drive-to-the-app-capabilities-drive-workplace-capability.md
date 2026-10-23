@@ -5,8 +5,8 @@ title: >-
   app/capabilities/drive/ workplace capability
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:00'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:00
+updated_date: '2026-10-23T17:35:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -21,7 +21,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
   - decisions/cloud-portability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1663'
+  - https://github.com/cds-snc/sre-bot/issues/1663
 priority: medium
 type: task
 ordinal: 262000
@@ -38,7 +38,7 @@ Scope:
 - move the package into the feature-packages shape (api.py, adapters/, settings.py, README.md with its classification and named feature consumers, and a fake);
 - repoint every consumer to api.py;
 - delete app/infrastructure/drive/ with no re-export.
-Behaviour-preserving. migration.md rule 6: the capability is not widened to reproduce legacy conventions, and legacy modules keep calling what they call today until their surface is rebuilt, except for import-path changes.
+Behaviour-preserving. migration.md rule 6: the capability is not widened to reproduce legacy conventions, and legacy modules keep calling what they call today until their surface is rebuilt, except for import-path changes. The settings class moves; its configuration-file table and environment variable names do not change.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -49,13 +49,5 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 - [ ] #4 app/infrastructure/drive/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DriveProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #7 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages (app/pyproject.toml:209)
 <!-- AC:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-20 23:28
----
-2026-10-20 (TASK-111 planning): TASK-111 moves this slice's values into the configuration files under a table whose name does not depend on the module path, so this move relocates the settings class only; the files and env names stay as they are.
----
-<!-- COMMENTS:END -->

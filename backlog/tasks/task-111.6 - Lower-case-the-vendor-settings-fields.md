@@ -1,10 +1,10 @@
 ---
 id: TASK-111.6
 title: Lower-case the vendor settings fields
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-21T21:08:00Z'
+updated_date: '2026-10-23T17:19:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -26,11 +26,11 @@ Mechanical: the fields of the integrations/<vendor>/settings.py slices (slack, g
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The vendor slices declare lower snake_case fields with case_sensitive=False and read the same environment names as before; only aliases equal to the upper-cased field name are dropped, differing aliases stay for 111.9 to 111.11
-- [ ] #2 AWSSettings.SERVICE_ROLE_MAP becomes service_role_map, so no settings attribute stays upper case
-- [ ] #3 No behaviour change: the existing tests pass with only attribute renames
-- [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #5 Both subtasks TASK-111.6.1 and TASK-111.6.2 are done
+- [x] #1 The vendor slices declare lower snake_case fields with case_sensitive=False and read the same environment names as before; only aliases equal to the upper-cased field name are dropped, differing aliases stay for 111.9 to 111.11
+- [x] #2 AWSSettings.SERVICE_ROLE_MAP becomes service_role_map, so no settings attribute stays upper case
+- [x] #3 No behaviour change: the existing tests pass with only attribute renames
+- [x] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #5 Both subtasks TASK-111.6.1 and TASK-111.6.2 are done
 <!-- AC:END -->
 
 ## Implementation Plan

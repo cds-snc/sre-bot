@@ -69,7 +69,7 @@ Tolerated until closed:
 - `@lru_cache` providers in feature `providers.py` files, and the global cache resets tests need for them;
 - lazy first-call construction for services not yet registered, with warmup done piecemeal in lifespan and `startup_warmup` hookimpls, two of which call the network while building a service (removed by TASK-98 and TASK-128);
 - routes calling provider functions inline instead of taking a container.
-- the process state in `contracts/configuration.py` that the app factory installs once: the configuration files, needed while slices are built by zero-argument providers, and the `host_info()` accessor, read by code not yet on the registry (`modules/`, the Notify client, the request auth dependency, logging setup and the version route) until each reader resolves `HostInfo` from the registry or receives it through its constructor; tests install and uninstall it in a fixture.
+- the process state in `contracts/configuration.py` that the app factory installs once: the configuration files, needed while slices are built by zero-argument providers, and the `host_info()` accessor, read by code not yet on the registry (`modules/`, the Notify client, the request auth dependency and the version route) until each reader resolves `HostInfo` from the registry or receives it through its constructor; tests install and uninstall it in a fixture.
 
 **Changes:**
 - 2026-09-24: replaced cached provider functions with an svcs registry of contract-keyed factories, resolved per call at entry points.
@@ -79,3 +79,4 @@ Tolerated until closed:
 - 2026-10-14: the registry exists for records and coordination, with phase 2, the entry-point convention, the test fixture and contract (k); the coordination registration is the primitive, and consumers build the lease and idempotency facades (TASK-109).
 - 2026-10-15: non-HTTP entry points open a scope through `ServiceScopeOpener` exposed by the Slack registrars and the job registry; resolve-then-pass rule and the Bolt middleware alternative recorded; the in-place line corrected (TASK-145.5.2).
 - 2026-10-22: the registry holds `HostInfo` as a value registered in the lifespan; the `contracts/configuration.py` process state (installed files, `host_info()` accessor) is tolerated for code not yet on the registry (TASK-111.7).
+- 2026-10-23: logging setup no longer reads `host_info()`; the configuration phase passes it the environment (TASK-111.17).

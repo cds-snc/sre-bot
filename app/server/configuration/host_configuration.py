@@ -3,10 +3,20 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from contracts.configuration import ConfigurationError, HostInfo, install_configuration_files, install_host_info
+import structlog
+from pydantic import ValidationError
+
+from contracts.configuration import (
+    ConfigurationError,
+    HostInfo,
+    describe_validation_error,
+    install_configuration_files,
+    install_host_info,
+)
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
+from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.slack.settings import get_slack_settings
@@ -56,16 +66,39 @@ def refuse_dev_bypass_in_production(host: HostInfo, security: SecuritySettings) 
 def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     """Run the configuration phase once: select, check and install the files, validate every host slice.
 
-    Any invalid environment, file, table or key raises here, before the app is built.
+    Logging is configured right after the identity and [logging] slices, so every later
+    configuration event, a failure included, renders through the one pipeline
+    (decisions/observability.md). Any invalid environment, file, table or key raises
+    here, before the app is built.
     """
     identity = get_identity_settings()
     files = load_configuration_files(identity.environment, directory)
     install_configuration_files(files)
+    logging_settings = get_logging_settings()
+    configure_logging(identity.environment, logging_settings)
+    try:
+        return _validate_slices(identity, files, logging_settings)
+    except ValidationError as error:
+        # A slice not yet on the files raises pydantic's error, whose message renders every input value.
+        failure = ConfigurationError(describe_validation_error(error))
+        _log_invalid(failure)
+        raise failure from None
+    except ConfigurationError as error:
+        _log_invalid(error)
+        raise
+
+
+def _log_invalid(error: ConfigurationError) -> None:
+    structlog.get_logger(__name__).critical("configuration_invalid", phase="configuration", error=str(error))
+
+
+def _validate_slices(
+    identity: IdentitySettings, files: TomlConfigurationFiles, logging_settings: LoggingSettings
+) -> HostConfiguration:
     server = get_server_settings()
     security = get_security_settings()
     directory_settings = get_directory_settings()
     sre_ops = get_sre_ops_settings()
-    logging_settings = get_logging_settings()
     # Vendor and feature slices validate with the host slices: an invalid entry fails boot here.
     get_slack_settings()
     get_google_workspace_settings()

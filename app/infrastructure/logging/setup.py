@@ -7,8 +7,8 @@ proper exception formatting, and environment-aware rendering.
 Usage:
     from infrastructure.logging import configure_logging
 
-    # Configure logging at app startup
-    configure_logging()
+    # Configure logging once, in the app factory's configuration phase
+    configure_logging(identity.environment, get_logging_settings())
 
     # Get a logger (standard structlog pattern)
     import structlog
@@ -16,7 +16,7 @@ Usage:
     logger.info("event_name", key="value")
 
 Dependencies:
-    - infrastructure.configuration.Settings
+    - infrastructure.logging.settings.LoggingSettings (the [logging] slice)
 """
 
 import contextlib
@@ -24,15 +24,14 @@ import logging
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
-from contracts.configuration import HostInfo, host_info
 from infrastructure.logging.formatters import downgrade_transient_socket_mode_errors, mask_sensitive_data
-from infrastructure.logging.settings import LoggingSettings, get_logging_settings
+from infrastructure.logging.settings import LoggingSettings
 
 
 def _apply_otel_code_conventions(
@@ -138,33 +137,31 @@ def _build_base_processors(
 
 
 def configure_logging(
-    settings: HostInfo | None = None,
+    environment: Literal["local", "ci", "production"],
+    logging_settings: LoggingSettings,
     log_level: str | None = None,
-    logging_settings: LoggingSettings | None = None,
 ) -> BoundLogger:
     """Configure structured logging with OpenTelemetry semantic conventions.
 
-    Configures structlog with:
+    Called once by the app factory's configuration phase, right after the identity
+    and [logging] slices load, so every later configuration event is rendered by
+    this pipeline (decisions/observability.md). Configures structlog with:
     - OpenTelemetry code attributes (code.file.path, code.function.name, code.line.number)
     - Proper exception formatting with stack traces
     - Context variable merging for correlation IDs
     - Test environment detection for log suppression
 
     Args:
-        settings: HostInfo; the installed host facts when not provided.
+        environment: The deployment environment; production renders JSON, others the console.
+        logging_settings: The [logging] slice.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to logging_settings.log_level if not provided.
-        logging_settings: LoggingSettings slice; built from the provider if not provided.
 
     Returns:
         Configured logger instance
 
     Example:
-        # At application startup
-        logger = configure_logging()
-
-        # With overrides for testing
-        logger = configure_logging(log_level="DEBUG")
+        logger = configure_logging("local", get_logging_settings(), log_level="DEBUG")
     """
 
     # Suppress all logging during tests
@@ -195,12 +192,11 @@ def configure_logging(
         return structlog.stdlib.get_logger()
 
     # Determine production mode
-    prod_mode = (settings or host_info()).environment == "production"
-    resolved_logging_settings = logging_settings or get_logging_settings()
+    prod_mode = environment == "production"
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors = _build_base_processors(logging_settings=resolved_logging_settings)
+    processors = _build_base_processors(logging_settings=logging_settings)
 
     # 6. Final rendering (environment-specific)
     renderers: list[Any] = [structlog.stdlib.ProcessorFormatter.remove_processors_meta]
@@ -234,7 +230,7 @@ def configure_logging(
             processors=renderers,
         )
     )
-    effective_log_level = log_level or resolved_logging_settings.log_level
+    effective_log_level = log_level or logging_settings.log_level
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
     root_logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))

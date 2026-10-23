@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-23T13:43:00Z'
+updated_date: '2026-10-23T18:09:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -26,6 +26,7 @@ references:
   - decisions/configuration.md
   - decisions/deployment.md
   - docs/runbooks/roll-back-a-deployment.md
+  - https://github.com/cds-snc/sre-bot/issues/1778
 parent_task_id: TASK-111.15
 priority: medium
 type: feature
@@ -35,7 +36,9 @@ ordinal: 429000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-First half of TASK-111.15. app/bin/entry.sh no longer fetches sre-bot-config or sre-bot-config-infrastructure, and the task definition drops BACKEND_URL, CORS_ALLOWED_ORIGINS, SLACK__COMMAND_PREFIX and the old GCP_SRE_SERVICE_ACCOUNT_KEY_FILE secret. The IAM read on the two blob parameters stays until TASK-111.15.2, so a task from the previous revision (which still fetches them) keeps working through the deploy and any rollback. Under decisions/deployment.md a terraform task-definition change reaches production only at the next deploy: after merge, tf_apply registers the revision, then a workflow_dispatch deploy runs the current image on it and the running revision is checked (runbook: redeploy the current image after a terraform task-definition change).
+First half of TASK-111.15. app/bin/entry.sh no longer fetches sre-bot-config or sre-bot-config-infrastructure, and the task definition drops BACKEND_URL, CORS_ALLOWED_ORIGINS, SLACK__COMMAND_PREFIX and the old GCP_SRE_SERVICE_ACCOUNT_KEY_FILE secret. Dropping CORS_ALLOWED_ORIGINS removes its entry in terraform/templates/sre-bot.json.tpl, the cors_allowed_origins variable (terraform/variables.tf) and its template argument in terraform/ecs.tf. The IAM read on the two blob parameters stays until TASK-111.15.2, so a task from the previous revision (which still fetches them) keeps working through the deploy and any rollback. Under decisions/deployment.md a terraform task-definition change reaches production only at the next deploy: after merge, tf_apply registers the revision, then a workflow_dispatch deploy runs the current image on it and the running revision is checked (runbook: redeploy the current image after a terraform task-definition change).
+
+The declare-path incident values (announcement channel, security and Notify management group ids) move from the legacy IncidentFeatureSettings (infrastructure/configuration/features/incident.py) to the incident response slice in features/incident/common/settings.py, which becomes the one owner of their table; modules/incident reads them from there, and infrastructure/configuration/features/incident.py is deleted. File keys and values unchanged (decisions/incident-management.md, Settings).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -46,21 +49,10 @@ First half of TASK-111.15. app/bin/entry.sh no longer fetches sre-bot-config or 
 - [ ] #4 The CI workflow and pytest env set no unread variable
 - [ ] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #6 After merge and a dispatch deploy, describe-task-definition of the running revision shows only platform-provided names and the renamed secrets (output in the notes)
+- [ ] #7 IncidentFeatureSettings is gone: the incident response slice in features/incident/common/settings.py owns its table with unchanged keys and values, and modules/incident reads it
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
 - [ ] #1 Human: tf_apply succeeded, the dispatch deploy was verified, and the roll-back runbook Verify checklist passed
 <!-- DOD:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-23T13:43:00Z
-
----
-
-2026-10-23 (TASK-111.8 planning): after 111.8 the CORS_ALLOWED_ORIGINS env entry is unread; removing it covers terraform/ecs.tf:34, terraform/variables.tf:46 (the cors_allowed_origins variable) and templates/sre-bot.json.tpl:57-58. Merge only after 111.8 is deployed and verified (a 111.8 rollback image reads it).
-
----
-<!-- COMMENTS:END -->

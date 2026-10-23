@@ -53,14 +53,10 @@ def test_lifespan_is_test_environment_detects_non_pytest():
 
 
 @pytest.mark.integration
-def test_lifespan_get_logger_returns_logger(mock_settings):
-    """Test that _get_logger returns a configured logger."""
-    # Arrange
+def test_lifespan_get_logger_returns_logger():
+    """The lifespan logger is a structlog logger from the pipeline the configuration phase configured."""
+    logger = _get_logger_from_app()
 
-    # Act
-    logger = _get_logger_from_app(mock_settings, LoggingSettings())
-
-    # Assert
     assert logger is not None
 
 
@@ -106,23 +102,9 @@ def test_lifespan_list_configs_logs_settings(mock_settings):
 
 
 @pytest.mark.integration
-@patch("server.lifespan.configure_logging")
-def test_lifespan_get_logger_configures_logging(mock_configure_logging, mock_settings):
-    """Test that _get_logger calls configure_logging with settings."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_configure_logging.return_value = mock_logger
-
-    # Act
-    logger = _get_logger_from_app(mock_settings, LoggingSettings())
-
-    # Assert
-    # _get_logger_from_app now passes both settings and logging_settings to configure_logging
-    assert mock_configure_logging.call_count == 1
-    call_kwargs = mock_configure_logging.call_args.kwargs
-    assert call_kwargs["settings"] == mock_settings
-    assert "logging_settings" in call_kwargs
-    assert logger == mock_logger
+def test_lifespan_does_not_configure_logging():
+    """Logging is configured once, by the app factory's configuration phase; lifespan only reads the logger."""
+    assert not hasattr(lifespan_module, "configure_logging")
 
 
 @pytest.mark.integration

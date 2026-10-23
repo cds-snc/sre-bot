@@ -1,10 +1,10 @@
 ---
 id: TASK-111.8
 title: Move the security slice onto the files
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T15:33:00Z'
+updated_date: '2026-10-23T16:27:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -41,8 +41,8 @@ issuer_config, cors_allowed_origins/methods/headers and dev_bypass_enabled move 
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Human: pre-merge gates G1-G8 recorded in the notes (111.7 V1-V8 passed, issuer_config hash match, previous image tag, baseline issuer_count)
-- [ ] #2 Human: post-deploy checklist V1-V10 passed
+- [x] #1 Human: pre-merge gates G1-G8 recorded in the notes (111.7 V1-V8 passed, issuer_config hash match, previous image tag, baseline issuer_count)
+- [x] #2 Human: post-deploy checklist V1-V10 passed
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -189,4 +189,21 @@ Correction to the Insights tip: read the results with --output json | jq -r '.st
 2026-10-23, pre-merge gates (human, script check-now.zsh): G2 pass (11 parameters at Version 2, no /sre-bot/SECURITY__). G3 baseline issuer_count 1 (both 111.7 tasks at 13:29 UTC). G4 MATCH. G5 rollback target: sre-bot-task:41, image sre-bot@sha256:28f828355208526a8e8621040cd809ed8a969b69efcf588590bcc4e9c5a662b3 (tag still to read from ECR). G6 pass: ruff clean, mypy 47 (baseline), 5676 passed, contracts 12 kept, key ownership OK. G7 pass: .env.example carries only SECURITY__ names. G1 open: 111.7 V4/V8 (two non-JSON lines in the boot window) and the 111.7 DoD #1 image record.
 
 2026-10-23: G1 pass (111.7 V1-V8 passed, its ACs and DoD checked). G5 rollback tag: image_tag=52282a9c0dc8222825b8335caaecaef8eafd2e72-2026-10-23 (sre-bot-task:41, sha256:28f82835...). G8 is checked at merge, then DoD #1.
+
+2026-10-23, post-deploy (human, check-after-111.8-deploy.zsh). G8 met at the human's merge. Deploy run 39983025496 (3d1f33bd): build, sbom and deploy all success.
+- V2: PRIMARY COMPLETED on sre-bot-task:42, 2 tasks.
+- V3 and V9a: task-definition names unchanged, 0 SECURITY__ names.
+- V4, V5, V9c: both tasks log security_services_initialized with issuer_count 1 (G3 baseline); no error, no non-JSON line, no no-issuer warning, no dev_bypass_token_used.
+- V6 pass: the foreign-origin preflight returns no Access-Control-Allow-Origin. Starlette still lists allow-methods and allow-headers when it rejects a disallowed origin.
+- V7, V8, V9d N/A: the WAF AuthorizedEndpoints rule (terraform/waf.tf:182, allow list in variables.tf:58-70) answers 403 for every /api/v1/* path, so no JWT route is reachable from outside and nothing in production calls one today. Evidence instead: V5, plus the G4 hash match.
+- V9b: no /sre-bot/SECURITY* parameter.
+- V10: /version 3d1f33bdb8aaed7ac962ef71cd942afbae4908f2, /health 200.
+Cleanup:
+- Codespaces secret ISSUER_CONFIG (2025-05-01) still exists and is unread: human deletes it, or recreates it as SECURITY__ISSUERS in list form if someone uses it.
+- Task-definition CORS_ALLOWED_ORIGINS and the blob's ISSUER_CONFIG stay until 111.15.1 and 111.15.2.
+All ACs and DoD checked; Done is the human's move.
+
+2026-10-23: the optional key-set reachability check is N/A from outside AWS. https://backstage.cdssandbox.xyz/api/auth/.well-known/jwks.json and openid-configuration answer 403 with an empty body from the Codespace and from the agent session (Backstage restricts access). This is not a 111.8 regression: the issuer values are byte-identical to the blob (G4). Whether the ECS tasks can fetch the key set is first exercised when an /api/v1 route is opened past the WAF; that PR carries the end-to-end token check.
+
+2026-10-23: the WAF and Backstage findings are carried by TASK-163 (edge allow-list follows the route table; jwks_uri reachability; end-to-end token check). TASK-53 now depends on it.
 <!-- SECTION:NOTES:END -->

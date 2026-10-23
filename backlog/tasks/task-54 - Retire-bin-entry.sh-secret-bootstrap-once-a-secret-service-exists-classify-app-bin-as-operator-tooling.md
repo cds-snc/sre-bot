@@ -5,8 +5,8 @@ title: >-
   app/bin/ as operator tooling
 status: To Do
 assignee: []
-created_date: '2026-07-27 16:07'
-updated_date: '2026-10-20 23:27'
+created_date: 2026-07-27 16:07
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - architecture
   - layers
@@ -16,7 +16,7 @@ dependencies: []
 references:
   - decisions/configuration.md
   - decisions/security.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1358'
+  - https://github.com/cds-snc/sre-bot/issues/1358
   - decisions/migration.md
 priority: medium
 ordinal: 82000
@@ -25,33 +25,13 @@ ordinal: 82000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/layers.md does not account for app/bin/, a top-level directory of operator and dev shell/python tooling (entry.sh container entrypoint, db.sh, seed.sh, dev-token.py, unlock-sync-job.sh, generate_client_usage_matrix.sh). It is not application code and does not belong to any tier, but it is currently load-bearing: the container image runs bin/entry.sh as its entrypoint, which fetches configuration/secrets at boot.
-
-Two things this task settles:
-1. Record app/bin/ as sanctioned operator/dev tooling (not app runtime code, exempt from the three-tier import rule) in the layers.md non-tier-directories section, so it is not mistaken for a stray package to delete.
-2. entry.sh's boot-time secret/config fetching must be retired once a dedicated secret service capability is introduced (a larger change per decisions/configuration.md and decisions/security.md). This task is the acknowledged tracking item for that deprecation: when the secret service lands, entry.sh stops sourcing secrets itself and the entrypoint is simplified or removed.
-
-Depends on the secret service capability existing; until then this is the placeholder that keeps the coupling visible. Needs a human-approved implementation plan (task-planner) before any code.
+app/bin/ is operator and dev tooling (entry.sh container entrypoint, db.sh, seed.sh, dev-token.py, unlock-sync-job.sh, generate_client_usage_matrix.sh and the CI check scripts), not app runtime code and exempt from the layer contracts; decisions/migration.md's directory table records this. entry.sh is the container entrypoint (Dockerfile:77) and still writes the sre-bot-config and sre-bot-config-infrastructure SSM parameters to .env at start. decisions/configuration.md (Secrets): secrets reach the app as SSM SecureString parameters through task-definition secrets: and no container-start script fetches configuration, so no secret service is built. TASK-111.15.1 removes entry.sh's SSM fetch; TASK-111.15.2 checks AC #3 once that deploy is verified. decisions/migration.md's bin/ row still ties the retirement to a secrets contract implementation and is brought in line.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 layers.md non-tier-directories section classifies app/bin/ as operator/dev tooling exempt from the tier import rule (not a stray package slated for deletion)
-- [ ] #2 The dependency of bin/entry.sh on boot-time secret/config fetching is documented as the trigger to retire it once a secret service capability exists
-- [ ] #3 Once the secret service is available, entry.sh no longer sources secrets itself and the container entrypoint is simplified or removed, with the change verified against the deployment manifest
-- [ ] #4 No new secret-fetching logic is added to app/bin/ after the secret service exists
+- [ ] #1 decisions/migration.md's directory table classifies app/bin/ as operator and dev tooling, exempt from the layer contracts
+- [ ] #2 decisions/migration.md's bin/ row states that entry.sh fetches no configuration and secrets come through task-definition secrets: (decisions/configuration.md), not a secrets contract implementation
+- [ ] #3 app/bin/entry.sh fetches no SSM parameter and only starts the app, verified against the running task definition (TASK-111.15.1)
+- [ ] #4 No secret- or configuration-fetching logic exists in app/bin/
 <!-- AC:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-09-24 20:10
----
-2026-09-24 alignment: decisions/layers.md is deleted; decisions/migration.md's directory table now owns bin/'s disposition (operator tooling, exempt from layer contracts; entry.sh's boot-time secret fetch retires once the secrets contract has an implementation). Per decisions/configuration.md, secret material may instead be injected by the platform at deploy time (ECS task-definition secrets: from Secrets Manager). If that removes entry.sh's fetch without a secrets Protocol, no speculative SecretsService is built. If a Protocol is needed, it is born in app/contracts/ and implemented in app/infrastructure/secrets/.
----
-
-created: 2026-10-20 23:27
----
-2026-10-20 (TASK-111 planning, human): folded into TASK-111. Secrets move to task-definition secrets: (one SSM SecureString per key, TASK-111.4) and every non-secret production value moves into the configuration files, so no secret service is built. TASK-111.15 removes entry.sh's SSM fetch (AC3) and sets this task to Done in its PR; AC1 is covered by decisions/migration.md's directory table (comment #1); AC2 and AC4 hold by construction.
----
-<!-- COMMENTS:END -->

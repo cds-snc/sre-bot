@@ -5,8 +5,8 @@ title: >-
   built dark behind a flag
 status: To Do
 assignee: []
-created_date: '2026-10-13 13:59'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-13 13:59
+updated_date: '2026-10-23T17:05:00Z'
 labels:
   - incident
   - features
@@ -15,7 +15,7 @@ dependencies: []
 references:
   - decisions/incident-management.md
   - decisions/workplace-systems.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1705'
+  - https://github.com/cds-snc/sre-bot/issues/1705
 priority: high
 type: feature
 ordinal: 369000
@@ -32,7 +32,7 @@ Target (decisions/incident-management.md, postmortem):
 - No in-app editor and no new editing dependency.
 
 Delivery:
-- Built dark. Every new surface is gated by one incident settings flag, default off, following the access-management pattern (a settings slice with enabled: bool = False and an env var). While it is off, users see today's behaviour exactly: the doc timeline, the doc action-items table and the current draft.
+- Built dark. Every new surface is gated by one incident settings flag, default off, following the access-management pattern (a settings slice field enabled: bool = False). Its key is false in app/config/base.toml and an environment file switches it on (decisions/configuration.md); it is never an environment variable. While it is off, users see today's behaviour exactly: the doc timeline, the doc action-items table and the current draft.
 - A UX design session runs in parallel with the backend slices; slices with user-facing surfaces wait for its output.
 - Turning the flag on is a rollout with an internal comms package, because it changes how people run a postmortem.
 

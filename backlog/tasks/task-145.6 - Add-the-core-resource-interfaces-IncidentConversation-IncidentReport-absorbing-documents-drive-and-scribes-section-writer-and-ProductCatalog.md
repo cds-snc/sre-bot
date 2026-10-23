@@ -5,8 +5,8 @@ title: >-
   (absorbing documents/, drive/ and scribe's section writer) and ProductCatalog
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:29:00Z'
 labels:
   - incident
   - features
@@ -14,8 +14,9 @@ labels:
 dependencies:
   - TASK-145.5
   - TASK-145.5.8
+  - TASK-111.10
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1697'
+  - https://github.com/cds-snc/sre-bot/issues/1697
 parent_task_id: TASK-145
 priority: medium
 type: task
