@@ -133,9 +133,12 @@ env = [
     "ACCESS_SYNC_ENABLED=false",
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
-    "SLACK_BOT_TOKEN=xoxb-test-token-for-tests",
-    "SLACK_APP_TOKEN=xapp-test-token",
-    "SLACK_SIGNING_SECRET=test-signing-secret",
+    # The test run is an unconfigured Slack (ci.toml has no [slack.tenant]): the blanks
+    # override a developer's app/.env and the Codespaces secrets every process inherits.
+    "SLACK__BOT_TOKEN=",
+    "SLACK__USER_TOKEN=",
+    "SLACK__APP_TOKEN=",
+    "SLACK__SIGNING_SECRET=",
     "SRE_DRIVE_ID=SRE_DRIVE_ID",
     "SRE_INCIDENT_FOLDER=SRE_INCIDENT_FOLDER",
     "INCIDENT_TEMPLATE=INCIDENT_TEMPLATE",

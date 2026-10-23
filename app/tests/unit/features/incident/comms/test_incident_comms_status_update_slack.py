@@ -110,7 +110,7 @@ class TestRegisterCommands:
         assert registrar.view_submissions == {}
         skipped = [log for log in logs if log["event"] == "incident_comms_registration_skipped"]
         assert len(skipped) == 1
-        assert skipped[0]["setting"] == "SLACK_TEAM_ID"
+        assert skipped[0]["setting"] == "[slack.tenant] team_id"
         assert (scopes.opened, scopes.closed) == (1, 1)
 
 

@@ -22,10 +22,34 @@ cors_allowed_headers = ["Authorization", "Content-Type", "X-Request-ID", "tracep
 # SECURITY__DEV_BYPASS_ENABLED and SECURITY__DEV_BYPASS_TOKEN in app/.env.
 dev_bypass_enabled = false
 
+[slack]
+# The Slack client's per-call timeout, retry budget and error-code catalogues.
+# Each deployment that works with a workspace names it in [slack.tenant] team_id in
+# its own file; the tokens come from the environment as SLACK__<FIELD>.
+request_timeout_seconds = 10
+retry_max_attempts = 2
+transient_retry_after_seconds = 30
+unauthorized_errors = [
+    "not_authed",
+    "invalid_auth",
+    "account_inactive",
+    "token_revoked",
+    "token_expired",
+    "missing_scope",
+    "no_permission",
+    "not_allowed_token_type",
+    "access_denied",
+    "permission_denied",
+    "ekm_access_denied",
+    "team_access_not_granted",
+]
+not_found_errors = ["channel_not_found", "user_not_found", "users_not_found", "message_not_found", "no_such_subteam"]
+transient_errors = ["ratelimited", "internal_error", "fatal_error", "service_unavailable", "request_timeout"]
+
 [slack_transport]
 # Each deployment that runs Slack switches the transport on in its own file.
 enabled = false
-# Socket Mode needs no inbound exposure; false selects HTTP Events mode, which needs SLACK_SIGNING_SECRET.
+# Socket Mode needs no inbound exposure; false selects HTTP Events mode, which needs SLACK__SIGNING_SECRET.
 socket_mode = true
 command_prefix = ""
 

@@ -68,7 +68,9 @@ def test_usergroup_write_is_issued_via_user_scoped_client(monkeypatch: pytest.Mo
 
 def test_user_scoped_client_retries_through_the_sdk_retry_handlers(monkeypatch: pytest.MonkeyPatch) -> None:
     """The target's client comes from the shared factory, so it carries the SDK retry handlers."""
-    monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TEST")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-bot-token")
+    monkeypatch.setenv("SLACK__USER_TOKEN", "xoxp-user-token")
     get_slack_settings.cache_clear()
     monkeypatch.setattr(slack_adapter, "get_slack_settings", lambda: SimpleNamespace(user_token="xoxp-user-token"))
 
@@ -88,7 +90,7 @@ def test_user_scoped_client_retries_through_the_sdk_retry_handlers(monkeypatch: 
 def test_get_user_group_sync_target_raises_when_user_token_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(slack_adapter, "get_slack_settings", lambda: SimpleNamespace(user_token=""))
 
-    with pytest.raises(ValueError, match="SLACK_USER_TOKEN"):
+    with pytest.raises(ValueError, match="SLACK__USER_TOKEN"):
         providers.get_user_group_sync_target()
 
 

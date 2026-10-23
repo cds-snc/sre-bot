@@ -5,10 +5,12 @@ field default and builds the slice from the process environment only, so a
 field rename that silently stops reading its name falls back to the default and
 fails here instead of in production. The names are the deploy interface; the
 security slice reads the configuration files and is pinned by its own
-production-values test. The Slack and Google
-Workspace slices follow the same rule: production sets SLACK_APP_TOKEN,
-SLACK_BOT_TOKEN, SLACK_TEAM_ID, SLACK_USER_TOKEN,
-GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
+production-values test. The Slack slice
+reads the [slack] table too: its secrets are pinned under their SLACK__<FIELD>
+names (production sets SLACK__BOT_TOKEN, SLACK__USER_TOKEN and SLACK__APP_TOKEN
+as task-definition secrets) beside a tenant entry, and the retired SLACK_<FIELD>
+names are pinned as unread. The Google Workspace slice follows the same rule:
+production sets GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
 SRE_BOT_EMAIL and GCP_SRE_SERVICE_ACCOUNT_KEY_FILE; the remaining names of those
 slices stay part of the interface. The AWS, OpenAI, Notify, Trello, OpsGenie,
 MaxMind and Sentinel slices likewise: production sets the AWS_*_ACCOUNT_ROLE_ARN
@@ -75,17 +77,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (DirectorySettings, "DIRECTORY_REQUIRE_STARTUP_WARMUP", "require_startup_warmup", "true", True),
     (DirectorySettings, "DIRECTORY_CACHE_TTL_SECONDS", "cache_ttl_seconds", "61", 61),
     (DirectorySettings, "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "startup_warmup_timeout_seconds", "3", 3),
-    (SlackSettings, "SLACK_TEAM_ID", "team_id", "TSENTINEL1", "TSENTINEL1"),
-    (SlackSettings, "SLACK_BOT_TOKEN", "bot_token", "xoxb-sentinel", "xoxb-sentinel"),
-    (SlackSettings, "SLACK_USER_TOKEN", "user_token", "xoxp-sentinel", "xoxp-sentinel"),
-    (SlackSettings, "SLACK_APP_TOKEN", "app_token", "xapp-sentinel", "xapp-sentinel"),
-    (SlackSettings, "SLACK_SIGNING_SECRET", "signing_secret", "sentinel-secret", "sentinel-secret"),
-    (SlackSettings, "SLACK_REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds", "17", 17),
-    (SlackSettings, "SLACK_RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
-    (SlackSettings, "SLACK_TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", "41", 41),
-    (SlackSettings, "SLACK_UNAUTHORIZED_ERRORS", "unauthorized_errors", '["sentinel_unauth"]', ["sentinel_unauth"]),
-    (SlackSettings, "SLACK_NOT_FOUND_ERRORS", "not_found_errors", '["sentinel_missing"]', ["sentinel_missing"]),
-    (SlackSettings, "SLACK_TRANSIENT_ERRORS", "transient_errors", '["sentinel_transient"]', ["sentinel_transient"]),
     (
         GoogleWorkspaceSettings,
         "GOOGLE_DELEGATED_ADMIN_EMAIL",
@@ -242,17 +233,69 @@ def test_configuration_settings_upper_case_keyword_accepted() -> None:
     assert settings.idempotency_ttl_seconds == 42
 
 
-def test_configuration_settings_slack_team_id_builds_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SLACK_TEAM_ID reaches the tenant entry; SLACK_ENABLED and SLACK_SOCKET_MODE are retired and read by no field."""
-    monkeypatch.setenv("SLACK_ENABLED", "true")
-    monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
-    monkeypatch.setenv("SLACK_TEAM_ID", "TSENTINEL1")
+SLACK_NAMES: list[tuple[str, str, str, Any]] = [
+    ("SLACK__BOT_TOKEN", "bot_token", "xoxb-sentinel", "xoxb-sentinel"),
+    ("SLACK__USER_TOKEN", "user_token", "xoxp-sentinel", "xoxp-sentinel"),
+    ("SLACK__APP_TOKEN", "app_token", "xapp-sentinel", "xapp-sentinel"),
+    ("SLACK__SIGNING_SECRET", "signing_secret", "sentinel-secret", "sentinel-secret"),
+    ("SLACK__REQUEST_TIMEOUT_SECONDS", "request_timeout_seconds", "17", 17),
+    ("SLACK__RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
+    ("SLACK__TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", "41", 41),
+    ("SLACK__UNAUTHORIZED_ERRORS", "unauthorized_errors", '["sentinel_unauth"]', ["sentinel_unauth"]),
+    ("SLACK__NOT_FOUND_ERRORS", "not_found_errors", '["sentinel_missing"]', ["sentinel_missing"]),
+    ("SLACK__TRANSIENT_ERRORS", "transient_errors", '["sentinel_transient"]', ["sentinel_transient"]),
+]
+"""A secret needs the tenant entry and the tenant entry needs the bot token, so every row sets both beside its name."""
+
+SLACK_RETIRED_NAMES = [
+    "SLACK_TEAM_ID",
+    "SLACK_BOT_TOKEN",
+    "SLACK_USER_TOKEN",
+    "SLACK_APP_TOKEN",
+    "SLACK_SIGNING_SECRET",
+    "SLACK_REQUEST_TIMEOUT_SECONDS",
+    "SLACK_RETRY_MAX_ATTEMPTS",
+    "SLACK_TRANSIENT_RETRY_AFTER_SECONDS",
+    "SLACK_UNAUTHORIZED_ERRORS",
+    "SLACK_NOT_FOUND_ERRORS",
+    "SLACK_TRANSIENT_ERRORS",
+]
+
+
+@pytest.mark.parametrize(("env_name", "attribute", "raw", "expected"), SLACK_NAMES, ids=[row[0] for row in SLACK_NAMES])
+def test_configuration_settings_slack_name_reaches_field(
+    monkeypatch: pytest.MonkeyPatch, env_name: str, attribute: str, raw: str, expected: Any
+) -> None:
+    """The SLACK__<FIELD> name sets the field; a fallback to the default would differ from the sentinel."""
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "TSENTINEL1")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-companion")
+    monkeypatch.setenv(env_name, raw)
 
     settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert not {"enabled", "socket_mode"} & set(SlackSettings.model_fields)
+    assert getattr(settings, attribute) == expected
+
+
+def test_configuration_settings_slack_tenant_name_builds_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACK__TENANT__TEAM_ID reaches the tenant entry, as [slack.tenant] team_id does in the files."""
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "TSENTINEL1")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-companion")
+
+    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
+
     assert settings.tenant is not None
     assert settings.tenant.team_id == "TSENTINEL1"
+
+
+@pytest.mark.parametrize("env_name", SLACK_RETIRED_NAMES)
+def test_configuration_settings_slack_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
+    """The old SLACK_<FIELD> names and SLACK_TEAM_ID are read by no field: the slice builds exactly as without them."""
+    baseline = SlackSettings(_env_file=None).model_dump()  # type: ignore[call-arg]
+    monkeypatch.setenv(env_name, "7" if env_name.endswith(("SECONDS", "ATTEMPTS")) else "TSENTINEL1")
+
+    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.model_dump() == baseline
 
 
 def test_configuration_settings_google_customer_id_and_key_build_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -268,8 +311,9 @@ def test_configuration_settings_google_customer_id_and_key_build_tenant(monkeypa
 
 
 def test_configuration_settings_slack_and_google_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lower-case spelling of a Slack alias and of a Google name is read too."""
-    monkeypatch.setenv("slack_bot_token", "xoxb-lower")
+    """The lower-case spelling of a Slack name and of a Google name is read too."""
+    monkeypatch.setenv("slack__tenant__team_id", "TSENTINEL1")
+    monkeypatch.setenv("slack__bot_token", "xoxb-lower")
     monkeypatch.setenv("sre_bot_email", "lower@sentinel.example")
 
     slack = SlackSettings(_env_file=None)  # type: ignore[call-arg]

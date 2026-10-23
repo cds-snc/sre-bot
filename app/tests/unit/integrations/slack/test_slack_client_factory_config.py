@@ -30,10 +30,11 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture(autouse=True)
 def _slack_transport_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-bot-token")
-    monkeypatch.setenv("SLACK_USER_TOKEN", "xoxp-user-token")
-    monkeypatch.setenv("SLACK_REQUEST_TIMEOUT_SECONDS", "15")
-    monkeypatch.setenv("SLACK_RETRY_MAX_ATTEMPTS", "4")
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TEST")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-bot-token")
+    monkeypatch.setenv("SLACK__USER_TOKEN", "xoxp-user-token")
+    monkeypatch.setenv("SLACK__REQUEST_TIMEOUT_SECONDS", "15")
+    monkeypatch.setenv("SLACK__RETRY_MAX_ATTEMPTS", "4")
 
 
 class TestSyncFactory:

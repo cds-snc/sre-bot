@@ -17,7 +17,7 @@ from structlog.testing import capture_logs
 
 from contracts.workplace import WorkplaceSystem
 from integrations.google_workspace.settings import GoogleWorkspaceSettings
-from integrations.slack.settings import SlackSettings
+from integrations.slack.settings import SlackSettings, SlackTenant
 from server.configured_systems import (
     TENANT_SOURCES,
     StaticConfiguredSystems,
@@ -35,7 +35,7 @@ def _source(system: WorkplaceSystem, tenant: str | None) -> TenantSource:
 
 
 def _slack(team_id: str | None = None) -> SlackSettings:
-    return SlackSettings.model_construct(team_id=team_id)
+    return SlackSettings.model_construct(tenant=SlackTenant(team_id=team_id) if team_id is not None else None)
 
 
 def _google(customer_id: str | None = None, key_file: str = "") -> GoogleWorkspaceSettings:
@@ -86,8 +86,7 @@ def test_google_without_an_entry_is_not_configured() -> None:
 
 
 def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An empty SLACK_TEAM_ID is absent after validation; a set key file and real id configure Google."""
-    monkeypatch.setenv("SLACK_TEAM_ID", "")
+    """Without a [slack.tenant] entry Slack is absent after validation; a set key file and real id configure Google."""
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "/run/key.json")
     monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0abc")
 
