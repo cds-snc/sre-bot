@@ -5,18 +5,17 @@ title: >-
   feature endpoint to its owning surface rebuild
 status: To Do
 assignee: []
-created_date: '2026-07-27 16:07'
-updated_date: '2026-09-28 14:36'
+created_date: 2026-07-27 16:07
+updated_date: '2026-10-23T16:27:00Z'
 labels:
   - architecture
   - layers
 milestone: m-5
 dependencies:
-  - TASK-36.2
-  - TASK-92
+  - TASK-163
 references:
   - decisions/feature-packages.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1357'
+  - https://github.com/cds-snc/sre-bot/issues/1357
   - decisions/migration.md
   - decisions/platform-transports.md
 priority: medium
@@ -41,3 +40,15 @@ Scope:
 - [ ] #3 app/api/ is deleted once its last route has moved, and api is removed from the import-linter root packages
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T16:27:00Z
+
+---
+
+2026-10-23: step 3 (deleting a legacy root route in favour of its /api/v1 home) needs TASK-163 first. The WAF allows only the legacy root paths, so a moved route would answer 403 at the edge, which would break the Backstage geolocate call among others.
+
+---
+<!-- COMMENTS:END -->

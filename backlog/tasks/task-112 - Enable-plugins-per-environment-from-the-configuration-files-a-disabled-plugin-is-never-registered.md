@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-22T19:06:00Z'
+updated_date: '2026-10-23T16:59:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -15,8 +15,7 @@ milestone: m-7
 dependencies:
   - TASK-110
   - TASK-111.3
-  - TASK-111.9
-  - TASK-111.10
+  - TASK-111.17
 references:
   - decisions/plugins.md
   - decisions/configuration.md
@@ -34,7 +33,7 @@ decisions/plugins.md and configuration.md: every entry point has an enablement k
 
 Today which features and jobs run is decided by environment variables and ENVIRONMENT checks in code (for example, scheduled tasks gated on ENVIRONMENT == "production"). This ticket moves plugin switches into the files and deletes the corresponding environment-variable switches and ENVIRONMENT checks for plugins. Runtime flags (OpenFeature with flagd) are out of scope and added only when a feature needs one.
 
-Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vendor client is available when its slice holds a tenant entry carrying the vendor's real tenant id, validated at boot with no network call. TASK-111.9 and TASK-111.10 (2026-10-20) already move the Slack and Google tenant entries into the files. This ticket gives the Slack transport its enablement key in the files, replacing the interim SLACK_ENABLED, so the Slack tenant entry alone says whether the workspace is configured. There is no <VENDOR>_ENABLED key.
+Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vendor client is available when its slice holds a tenant entry carrying the vendor's real tenant id, validated at boot with no network call. This ticket gives the Slack transport its keys in [slack_transport] beside command_prefix: enabled (replacing SLACK_ENABLED; production.toml and local.toml set it true) and socket_mode (replacing SLACK_SOCKET_MODE; default true, set nowhere). The Slack slice then holds only the client's credentials and tenant entry (TASK-111.9 moves it onto [slack] next), so the tenant entry alone says whether the workspace is configured; there is no <VENDOR>_ENABLED key. The rules that join the two slices run in the host's configuration phase (server/configuration/host_configuration.py), not in either slice: the transport on requires the Slack tenant entry (today derived from SLACK_TEAM_ID) and the bot token; Socket Mode requires the app token; HTTP Events mode requires the signing secret; Socket Mode without the signing secret logs slack_signing_secret_not_set_in_socket_mode at info. Production runs Socket Mode with no signing secret, which must keep booting.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -53,12 +52,3 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-20 (SLACK_TEAM_ID review): tenant entries stay validated at boot with no network call; the Slack entry (team id and optional enterprise id, TASK-157) is verified per inbound request by the runtime guard, and a stamping batch job verifies it with auth.test (decisions/workplace-systems.md rule 3). Moving the entries into the files keeps both ids.
 <!-- SECTION:NOTES:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-09-25 15:00
----
-2026-09-25: an enabled feature whose settings slice fails validation is skipped rather than aborting boot (decisions/plugins.md); TASK-126 implements that on top of this ticket. The plugin's configuration table carries only the enablement key: there is no per-plugin boot-failure override.
----
-<!-- COMMENTS:END -->

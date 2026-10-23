@@ -5,8 +5,8 @@ title: >-
   summarize moves in; incident leaves aws_platform
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 18:20'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:35:00Z'
 labels:
   - incident
   - features
@@ -17,7 +17,7 @@ dependencies:
   - TASK-25.10
   - TASK-145.5.7
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1700'
+  - https://github.com/cds-snc/sre-bot/issues/1700
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -31,9 +31,9 @@ Layer C3 of TASK-145. Rebuilds the floppy-disk reaction handlers (message captur
 
 THIS SLICE
 - Timeline capture through IncidentReport and IncidentStore; entries are their own records.
-- Timeline layout in core/store.py (moved out of TASK-145.5.4, human 2026-10-15): timeline_table(name), partition incident_id and sort entry_key, with the table name from the incident core settings; an entry_key helper building <posted_at>#<entry_id> with posted_at as fixed-width ISO-8601 UTC (isoformat(timespec="microseconds"), +00:00, the core/store.py formatter); captured_entry_id, a uuid5 over system, tenant, conversation and message id, so a re-capture writes the same key and put_if_not_exists dedupes; a uuid4 id for manual entries. The vendor message id stays in the entry's source_message reference.
-- The nudge job is registered by response through the background-job hookimpl with its schedule and lease from the response settings slice; the hand import in app/jobs/scheduled_tasks.py is deleted. Stale detection reads the store, not a channel-name pattern; the nudge carries the archive action id and the schedule-postmortem action id from common/vocabulary.
-- summarize: scribe/service.py's summary path becomes response/summary.py with its settings slice, catalogue (incident_summary) and tests renamed test_incident_response_summary_*; the command registers under incident.response. It calls the Summarizer directly until TASK-25.10.
+- Timeline layout in core/store.py: timeline_table(name), partition incident_id and sort entry_key, with the table name from the incident core settings; an entry_key helper building <posted_at>#<entry_id> with posted_at as fixed-width ISO-8601 UTC (isoformat(timespec="microseconds"), +00:00, format_stored_time in core/adapters/incident_items.py); captured_entry_id, a uuid5 over system, tenant, conversation and message id, so a re-capture writes the same key and put_if_not_exists dedupes; a uuid4 id for manual entries. The vendor message id stays in the entry's source_message reference.
+- The nudge job is registered by response through the background-job hookimpl with its schedule and lease from the response settings slice; the hand import in app/jobs/scheduled_tasks.py is deleted. Stale detection reads the store, not a channel-name pattern; it queries the sparse open index through IncidentStore.list_open (open_bucket = OPEN, sort opened_at), never a scan, so a closed incident drops out; the nudge carries the archive action id and the schedule-postmortem action id from common/vocabulary.
+- summarize: scribe/service.py's summary path becomes response/summary.py with its settings slice, catalogue (incident_summary) and tests renamed test_incident_response_summary_*; the command registers under incident.response. It calls the text-generation capability (TASK-25.10).
 - After this slice no module under app/modules/incident imports db_operations or packages.aws_platform; the incident seam baseline entries are removed, which is what TASK-88 needs.
 - Legacy registrations and the job hand import removed in the same PR; pinned by TASK-36.1 (reactions) and TASK-36.3 (job).
 <!-- SECTION:DESCRIPTION:END -->
@@ -89,12 +89,3 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 
 2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 incident legacy upgrade job (which also fills the open index) has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; TASK-145.13 removes the job (updated 2026-10-15). Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
 <!-- SECTION:NOTES:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-13 19:59
----
-2026-10-13 records/incidents layout decision: the timeline table (partition incident_id, sort 'ts#entry_id') is declared with its Terraform by TASK-145.5, which owns the store layout; this task writes and deletes entries through IncidentStore. Stale-channel detection queries the sparse open index (open_bucket = OPEN, sort opened_at) instead of scanning; a closed incident drops out of the index. Plan refresh needed when this is picked up.
----
-<!-- COMMENTS:END -->

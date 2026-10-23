@@ -5,8 +5,8 @@ title: >-
   recreate in incident/response
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-15 20:53'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:35:00Z'
 labels:
   - incident
   - features
@@ -16,7 +16,7 @@ dependencies:
   - TASK-27.2
   - TASK-36.1.2
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1699'
+  - https://github.com/cds-snc/sre-bot/issues/1699
 parent_task_id: TASK-145
 priority: medium
 type: feature
@@ -34,8 +34,10 @@ RULES
 - Severity is set at declare and changed from the update modal (none and SEV0 to SEV4, SEV0 new); it is a record field, never read from a document.
 - The five roles (incident commander, operations lead, communications lead, policy lead, postmortem owner) are stored on the record and shown in the show modal; the report's Drive properties are no longer written. The roles command offers all five; only IC and OL are required.
 - The show modal renders every link from the record's references through the owning adapter, with the stored url as a hint only.
+- IncidentStore.update_field maps to RecordStore.update (TASK-27.2) with a set change and the optional expected guard: a guard that does not hold is a distinct non-error result, and a missing incident is NOT_FOUND. Closed sets the status and removes open_bucket and opened_at in one update, so the sparse open index drops the incident atomically.
+- A write to a Slack view or message that no longer exists (views.update not_found after the user closed the show modal) is an expected outcome, not a listener error, classified as TASK-151 does.
 - The recreate path replaces a missing resource's reference map whole (never patched), guarded on the old channel_id scalar, so a concurrent change wins.
-- Writers set record_version = RECORD_VERSION, imported from core/store.py (TASK-145.5.4), on every item they write in the end-state shape (recreate, reopen); reopen sets open_bucket = OPEN_BUCKET and opened_at through the core/store.py formatter. How an update treats an item still without record_version (before the TASK-145.5.7 job has run) is decided at planning; it never stamps record_version on a partly upgraded item.
+- Writers set record_version = RECORD_VERSION, imported from core/store.py (TASK-145.5.4), on every item they write in the end-state shape (recreate, reopen); reopen sets open_bucket = OPEN_BUCKET and opened_at through format_stored_time (core/adapters/incident_items.py). How an update treats an item still without record_version (before the TASK-145.5.7 job has run) is decided at planning; it never stamps record_version on a partly upgraded item.
 - security_incident (bool) is editable by the coordinator from the update modal. Whether a flip triggers actions (true at declare invites the security group) is decided at planning.
 - Parity rebuild: close keeps today's behaviour (closes all resources and archives the channel). The status lifecycle and close redesign is a separate task, TASK-154.
 - Legacy registrations removed in the same PR; names, fields and replies unchanged apart from the three added role pickers, pinned by TASK-36.1.
@@ -84,17 +86,3 @@ Over the gate as one task (~800 lines); each half about 400.
 ## Blast radius and rollback
 Each subcommand's legacy registration is removed with its rebuild; a revert restores it. Status fan-out is the riskiest path: it writes four systems.
 <!-- SECTION:PLAN:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-13 19:59
----
-2026-10-13 records/incidents layout decision: IncidentStore.update_field maps to RecordStore.update (TASK-27.2) with a set change and the optional expected guard (a guard that does not hold is a distinct non-error result, a missing incident is NOT_FOUND). Status change to Closed sets the status and removes open_bucket and opened_at in one update call (set plus remove changes), so the sparse open index drops the incident atomically; reopening sets them again. Plan refresh needed when this is picked up (update_field step 1).
----
-
-created: 2026-10-14 19:31
----
-2026-10-14 (agent): TASK-151 covers writes to a Slack view or message that no longer exists (e.g. views.update not_found when the user closed the show modal before the status update finished). The rebuilt show/update flow should treat a gone surface as an expected outcome, not a listener error; plan it against TASK-151's classification.
----
-<!-- COMMENTS:END -->

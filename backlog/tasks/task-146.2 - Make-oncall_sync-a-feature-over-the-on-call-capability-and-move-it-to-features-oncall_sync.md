@@ -5,15 +5,15 @@ title: >-
   features/oncall_sync
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:44'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-09 16:44
+updated_date: '2026-10-23T17:05:00Z'
 labels:
   - oncall
   - capabilities
 dependencies:
   - TASK-146.1
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1703'
+  - https://github.com/cds-snc/sre-bot/issues/1703
 parent_task_id: TASK-146
 priority: medium
 type: task
@@ -28,7 +28,7 @@ Layer 2 of TASK-146; supersedes TASK-124.2.
 THIS SLICE
 - oncall_sync resolves current on-call people through capabilities.oncall.api for every rotation in rotations.json (Opsgenie and self-managed alike); its own Opsgenie adapter and ports.py are deleted; the feature-to-feature import of user_rotations is gone.
 - The feature keeps the usergroup projection: adapters/slack.py writes usergroups with the user token (decisions/service-accounts.md), the five-minute job registers through the background-job hookimpl, approved_email_domains filtering stays.
-- Move to app/features/oncall_sync/ in the feature-packages shape (entry point features.oncall_sync, enablement key, settings slice values in the TOML files when TASK-111 has landed); providers.py resolves contracts from the registry and imports nothing from infrastructure/ or server/.
+- Move to app/features/oncall_sync/ in the feature-packages shape (entry point features.oncall_sync, enablement key in the configuration files, settings slice reading its [oncall_sync] table with lower-case fields and extra=forbid per decisions/configuration.md); providers.py resolves contracts from the registry and imports nothing from infrastructure/ or server/.
 - Every importer and mock patch string rewritten; import-linter ignore entries only shrink.
 <!-- SECTION:DESCRIPTION:END -->
 

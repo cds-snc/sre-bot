@@ -5,8 +5,8 @@ title: >-
   dispatch boundary
 status: To Do
 assignee: []
-created_date: '2026-09-28 14:36'
-updated_date: '2026-10-15 20:51'
+created_date: 2026-09-28 14:36
+updated_date: '2026-10-23T17:09:00Z'
 labels:
   - migration
   - testing
@@ -17,7 +17,7 @@ references:
   - decisions/testing.md
   - decisions/migration.md
   - decisions/transport-slack.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1611'
+  - https://github.com/cds-snc/sre-bot/issues/1611
 parent_task_id: TASK-36
 priority: high
 ordinal: 285000
@@ -26,7 +26,7 @@ ordinal: 285000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-TASK-36 pins only the 8 register_slack_commands hookimpls TASK-26.1 rewrites. The legacy surface registered through the hard-coded _register_legacy_handlers() list in app/server/lifespan.py is not yet pinned: 6 slash commands (aws, talent-role, secret, atip and its alias aiprp, incident; /sre is hookimpl-only after TASK-35 and pinned by TASK-36) and 33 interactions (18 actions, 11 views, 4 events), 39 rows in all, as counted in the TASK-36 inventory.
+TASK-36 pins only the 8 register_slack_commands hookimpls TASK-26.1 rewrites. The legacy surface registered through the hard-coded _register_legacy_handlers() list in app/server/lifespan.py (line 93) is not yet pinned: 6 slash commands (aws, talent-role, secret, atip and its alias aiprp, incident; /sre and /sre dev register through _register_legacy_slack_commands and are pinned by TASK-36) and 33 interactions (18 actions, 11 views, 4 events), 39 rows in all, as counted in the TASK-36 inventory (app/tests/integration/legacy_surface/INVENTORY.md).
 
 Coordinator task. The pins are added in app/tests/integration/legacy_surface/ in four slices that reuse the TASK-36 harness: build a real slack_bolt App, register through the real startup step, drive it with App.dispatch(BoltRequest) and assert on ack, response and faked side effects only.
 - TASK-36.1.1: harness extension (legacy-handler registration and action, view and event dispatch), the registration-set test for all 39 rows, and /incident, incident_view, incident_change_locale and handle_incident_action_buttons (gates TASK-145.7). 4 rows.

@@ -5,8 +5,8 @@ title: >-
   and app/capabilities/
 status: To Do
 assignee: []
-created_date: '2026-09-24 19:59'
-updated_date: '2026-10-15 17:48'
+created_date: 2026-09-24 19:59
+updated_date: '2026-10-23T17:09:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -18,7 +18,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
   - decisions/plugins.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1657'
+  - https://github.com/cds-snc/sre-bot/issues/1657
 priority: medium
 type: feature
 ordinal: 256000
@@ -36,7 +36,7 @@ The generator emits, for a feature, a capability or an umbrella subdomain:
 - an empty umbrella __init__.py when creating an umbrella;
 - on request, an umbrella's core/ (the layout without entrypoints/ and hookimpls, with api.py as its public surface, no entry-point line and no enablement key) and common/.
 
-Amended 2026-10-01 to decisions/feature-packages.md umbrella rules 4 and 5: core/ may do I/O but is not a plugin; common/ does no I/O.
+decisions/feature-packages.md umbrella rules 4 and 5: core/ may do I/O but is not a plugin; common/ does no I/O.
 
 Operator tooling lives in app/bin/ (decisions/migration.md). Follow the existing guardrail-script shape: a script, a make target, a CI step.
 <!-- SECTION:DESCRIPTION:END -->

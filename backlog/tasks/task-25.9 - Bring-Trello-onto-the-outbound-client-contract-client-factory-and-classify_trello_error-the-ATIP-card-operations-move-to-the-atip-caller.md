@@ -5,8 +5,8 @@ title: >-
   classify_trello_error; the ATIP card operations move to the atip caller
 status: To Do
 assignee: []
-created_date: '2026-09-18 16:51'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-18 16:51
+updated_date: '2026-10-23T17:32:00Z'
 labels:
   - clients
   - phase-3
@@ -18,7 +18,7 @@ references:
   - app/integrations/trello/client.py
   - app/modules/atip/atip.py
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1605'
+  - https://github.com/cds-snc/sre-bot/issues/1605
 parent_task_id: TASK-25
 priority: low
 ordinal: 242000
@@ -27,13 +27,15 @@ ordinal: 242000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Created 2026-09-18 (human decision: every vendor conforms to decisions/outbound-clients.md).
+Every vendor in app/integrations/ conforms to decisions/outbound-clients.md.
 
-TODAY (verified 2026-09-18). app/integrations/trello/client.py (41 lines) uses the untyped trello.TrelloApi (import marked type: ignore). It exposes get_trello_client plus two ATIP business functions, add_atip_card_to_trello and get_atip_inbox_list_id_in_board. It reads settings at import time, sets no explicit timeout or retry, and has no classify_trello_error.
+TODAY. app/integrations/trello/client.py (28 lines) uses the untyped trello.TrelloApi (import marked type: ignore). It exposes get_trello_client plus two ATIP business functions, add_atip_card_to_trello and get_atip_inbox_list_id_in_board. It reads settings at import time (client.py:7), sets no explicit timeout or retry, and has no classify_trello_error. Settings live in integrations/trello/settings.py (TrelloSettings: trello_app_key, trello_token, trello_atip_board); TASK-111.12 moves that slice onto the configuration files.
 
-CONSUMER (re-grep): modules/atip/atip.py, the only one. TASK-39 (migrate role, secret, atip) later moves that module, so keep its change minimal.
+CONSUMER (re-grep): modules/atip/atip.py:499 (add_atip_card_to_trello), the only one. TASK-39 rebuilds atip into app/features/atip/, and its adapters/ inherit the card operations, so keep the legacy module's change minimal.
 
 DESIGN INPUT FOR THE PLANNER. The TrelloApi library is untyped and exposes no timeout or retry knob. Decide between keeping it (and recording how the timeout and retry rules are met, or where they are a tolerated divergence) and calling Trello's REST API through a typed HTTP client built by the factory. sdk-typing.md prefers typed surfaces but does not require one where none exists.
+
+OUT OF SCOPE. trello_atip_board is an atip feature value, not a vendor setting: TASK-39 moves it into the atip slice.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -43,12 +45,3 @@ DESIGN INPUT FOR THE PLANNER. The TrelloApi library is untyped and exposes no ti
 - [ ] #3 No import-time settings read remains in the vendor package; classification tests cover mapped failure families plus one unmapped exception propagating
 - [ ] #4 ruff, mypy, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-09-24 20:11
----
-2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The ATIP card operations move to the atip caller; TASK-39 rebuilds atip into app/features/atip/, and its adapters/ inherit them.
----
-<!-- COMMENTS:END -->

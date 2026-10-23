@@ -5,8 +5,8 @@ title: >-
   and groups slices
 status: To Do
 assignee: []
-created_date: '2026-10-20 23:25'
-updated_date: '2026-10-20 23:35'
+created_date: 2026-10-20 23:25
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -14,7 +14,7 @@ dependencies:
   - TASK-111.3
 references:
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1747'
+  - https://github.com/cds-snc/sre-bot/issues/1747
 parent_task_id: TASK-111
 type: feature
 ordinal: 420000
@@ -23,7 +23,7 @@ ordinal: 420000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Production sets INCIDENT_CHANNEL, SLACK_SECURITY_USER_GROUP_ID, SLACK_NOTIFY_MGMT_USER_GROUP_ID and SRE_OPS_CHANNEL_ID. Their current slices (infrastructure/configuration/features/incident.py and sre_ops.py) declare a table and case_sensitive=False and read the values from production.toml; field names stay until each package move, which also renames fields, prefixes and sets extra=forbid. AtipSettings (ATIP_ANNOUNCE_CHANNEL) and GroupsFeatureSettings (GROUP_DOMAIN, GROUP_PROVIDERS) have no reader outside their own modules and are deleted with their tests and pytest env entries.
+Production sets INCIDENT_CHANNEL, SLACK_SECURITY_USER_GROUP_ID, SLACK_NOTIFY_MGMT_USER_GROUP_ID and SRE_OPS_CHANNEL_ID. Their current slices (infrastructure/configuration/features/incident.py and sre_ops.py) become ConfigurationSlice subclasses with their own table and case_sensitive=False, and read the channel and group ids from production.toml under lower snake_case keys; their per-field aliases are dropped, since a slice on the files reads only <TABLE>__ names (bin/check_settings_key_ownership.py env-naming). Field names stay until each package move, which also renames fields, prefixes and sets extra=forbid. AtipSettings (ATIP_ANNOUNCE_CHANNEL) and GroupsFeatureSettings (GROUP_DOMAIN, GROUP_PROVIDERS) have no reader outside their own modules and are deleted with their tests and pytest env entries. The sre-bot-config values stay for the rollback image until TASK-111.15.2.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

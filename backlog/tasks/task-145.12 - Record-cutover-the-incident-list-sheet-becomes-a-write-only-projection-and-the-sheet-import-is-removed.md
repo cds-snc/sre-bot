@@ -5,8 +5,8 @@ title: >-
   the sheet import is removed
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:43'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-10-09 16:43
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - incident
   - features
@@ -16,8 +16,9 @@ dependencies:
   - TASK-121
   - TASK-145.9
   - TASK-145.5.7
+  - TASK-111.10
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1690'
+  - https://github.com/cds-snc/sre-bot/issues/1690
 parent_task_id: TASK-145
 priority: medium
 type: task
@@ -30,9 +31,9 @@ ordinal: 362000
 Layer E1 of TASK-145. decisions/workplace-systems.md rule 5 and decisions/incident-management.md: no record of truth in a spreadsheet; a surviving sheet is a write-only projection rebuilt from the records.
 
 THIS SLICE
-- Every remaining read of the incident list sheet (uniqueness check before declare, listings, postmortem inputs) reads IncidentStore instead; the sheet readers are deleted.
+- Every remaining read of the incident list sheet (listings, postmortem inputs) reads IncidentStore instead, and the duplicate-row check before the declare's append is removed; the sheet readers are deleted.
 - The Google Sheet import that creates legacy items (incident_folder.create_missing_incidents, reached from the dev load-incidents command in modules/dev/incident.py) is removed with its tests. After it, no code writes a legacy-shape incident item.
-- The projection writer is one adapter in core/adapters/ behind a narrow IncidentListProjection interface (append row, update status cell), used by response only and never read. A rebuild command or job regenerates the sheet from the store. It uses the spreadsheets capability if TASK-121 has landed, otherwise the existing provider through a single ignore entry removed by TASK-121.
+- The projection writer is one adapter in core/adapters/ behind a narrow IncidentListProjection interface (append row, update status cell), used by response only and never read. A rebuild command or job regenerates the sheet from the store. It uses the spreadsheets capability (TASK-121).
 - /sre incident list reads the store.
 - No backfill here: the legacy data upgrade is the TASK-145.5.7 job. After this slice deploys, that job is rerun per environment, dry run then apply, to upgrade any legacy item the sheet import created since its first run.
 <!-- SECTION:DESCRIPTION:END -->
@@ -43,7 +44,7 @@ THIS SLICE
 - [ ] #2 The sheet import (create_missing_incidents and its caller) is deleted with its tests; no code writes a legacy-shape incident item; the rerun of the TASK-145.5.7 job (dry run then apply, per environment) after deploy is recorded in the notes
 - [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from INCIDENT_CORE__FULL_READ_MAX_ITEMS (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 The incident list sheet id move from the interim [google_resources] table into the incident slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #5 The incident list sheet id moves from the interim [google_resources] table into the incident slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -87,12 +88,3 @@ Sheet consumers see the same rows. Revert restores the sheet reads and the impor
 
 2026-10-20 (TASK-27.5 planning): AC3 rewritten. The whole-table read rule (decisions/cloud-portability.md contract 4) makes listings an index read (list_open) and removes the sheet duplicate-row check; only the rebuild uses read_all.
 <!-- SECTION:NOTES:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-10-13 19:59
----
-2026-10-13 records/incidents layout decision: the full read of the incidents table for the sheet rebuild uses the full-table read shaped by TASK-27.5 (capped or paginated; a rebuild of an unbounded table may need pagination), not a bounded list assumed in advance. Dependency on TASK-27.5 added.
----
-<!-- COMMENTS:END -->

@@ -5,8 +5,8 @@ title: >-
   with Opsgenie and self-managed sources
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:44'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-09 16:44
+updated_date: '2026-10-23T17:05:00Z'
 labels:
   - oncall
   - capabilities
@@ -14,7 +14,7 @@ dependencies:
   - TASK-25.6
   - TASK-114
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1702'
+  - https://github.com/cds-snc/sre-bot/issues/1702
 parent_task_id: TASK-146
 priority: medium
 type: feature
@@ -31,7 +31,7 @@ THIS SLICE
 - domain.py and service.py: the self-managed rotation logic from packages/user_rotations (weekly rotation, weeks per shift, members) as the "rotations" schedule source, selected by the reference's system, never by a setting.
 - adapters/opsgenie.py: the Opsgenie schedule reads from packages/oncall_sync/adapters/opsgenie.py over the TASK-25.6 client, the only importer of integrations.opsgenie; README notes the vendor's end date. adapters/rotations.py: the JSON rotation files. An in-memory fake.
 - entrypoints/slack.py: user_rotations' Slack commands, renamed from platforms/ and made to call one service method each.
-- Entry point and enablement key; packages/user_rotations is deleted and every importer rewritten (oncall_sync's import is replaced in TASK-146.2 in the same stack, or temporarily points at the capability's api).
+- Entry point and enablement key in the configuration files; packages/user_rotations is deleted and every importer rewritten (oncall_sync's user_rotations imports point at the capability's api until TASK-146.2 replaces them).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -41,4 +41,5 @@ THIS SLICE
 - [ ] #3 integrations.opsgenie is imported only by capabilities/oncall/adapters/opsgenie.py
 - [ ] #4 packages/user_rotations no longer exists and no vocabulary from incident or oncall_sync appears in the capability
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #6 With no Opsgenie settings the capability registers and the self-managed source answers (boot test, decisions/oncall.md)
 <!-- AC:END -->

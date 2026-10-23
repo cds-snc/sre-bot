@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-22T13:57:00Z'
+updated_date: '2026-10-23T17:10:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -15,6 +15,7 @@ dependencies:
   - TASK-111.4
   - TASK-111.6.1
   - TASK-111.16
+  - TASK-111.17
 references:
   - decisions/configuration.md
   - https://github.com/cds-snc/sre-bot/issues/1743
@@ -26,12 +27,15 @@ ordinal: 416000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Google non-secret values (delegated admin email, SRE bot email, customer id in the tenant entry, retries and timeouts) move to [google_workspace]; the service-account key is read as a <SLICE>__<FIELD> secret; GOOGLE_RESOURCES becomes a [google_resources] table read by the interim GoogleResourcesConfig until its owners split it; the unread incident_drive_id is deleted.
+The Google Workspace vendor slice (integrations/google_workspace/settings.py) moves onto the configuration files. Non-secret values are read from [google_workspace] (delegated_admin_email, sre_bot_email, api retries and timeout); the fields lose their google_ prefix to match the doc-14 rename map. The tenant entry becomes a nested field read from [google_workspace.tenant]: customer_id in production.toml (the production tenant) and local.toml (the shared development environment), none in ci.toml. The service-account key is read as GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (the production SecureString exists, no terraform change). A tenant entry missing the key, or the key set without a tenant entry, fails boot naming the missing key, and the customer id is never blank or the my_customer alias. extra=forbid. GOOGLE_RESOURCES becomes a [google_resources] table, production ids in production.toml, read by the interim GoogleResourcesConfig until its owners split it (TASK-158 deletes it); the unread incident_drive_id is deleted. GCP_SRE_SERVICE_ACCOUNT_KEY_FILE and the sre-bot-config values stay deployed for the rollback image until TASK-111.15.1 and 111.15.2 remove them.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The Google slice reads its non-secret values, the tenant included, from the files and its key from a <SLICE>__<FIELD> name
-- [ ] #2 GoogleResourcesConfig reads [google_resources] from the files with the same ids production uses; GOOGLE_RESOURCES is no longer read; incident_drive_id is deleted
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #1 The Google slice reads its non-secret values, the tenant customer_id included, from the files and its key only as GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY
+- [ ] #2 A tenant entry missing the key, or the key set without a tenant entry, fails boot naming the missing key; a blank or my_customer customer_id fails boot
+- [ ] #3 GoogleResourcesConfig reads [google_resources] from the files with the same ids production uses; GOOGLE_RESOURCES is no longer read; incident_drive_id is deleted
+- [ ] #4 production.toml values equal the sre-bot-config values they replace, and the GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY SecureString equals the gcp_sre_service_account_key parameter
+- [ ] #5 The old names (GOOGLE_DELEGATED_ADMIN_EMAIL, SRE_BOT_EMAIL, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, GOOGLE_RESOURCES) are no longer read from the environment or .env
+- [ ] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->

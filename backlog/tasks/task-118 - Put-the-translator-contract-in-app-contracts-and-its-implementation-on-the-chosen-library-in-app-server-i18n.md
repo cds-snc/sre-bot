@@ -5,8 +5,8 @@ title: >-
   chosen library, in app/server/i18n/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:00'
-updated_date: '2026-10-15 17:49'
+created_date: 2026-09-24 20:00
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - plugin-architecture
   - i18n
@@ -19,7 +19,7 @@ dependencies:
 references:
   - decisions/i18n.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1661'
+  - https://github.com/cds-snc/sre-bot/issues/1661
 priority: medium
 type: feature
 ordinal: 260000
@@ -28,13 +28,13 @@ ordinal: 260000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/i18n.md: i18n is a framework service. The translator contract lives in app/contracts/, its implementation is host code in app/server/, and features and capabilities depend only on the contract. Catalogues stay in each feature's locales/ and register at startup through the hookspec in contracts (moved by TASK-107).
+decisions/i18n.md: i18n is a framework service. The translator contract lives in app/contracts/, its implementation is host code in app/server/, and features and capabilities depend only on the contract. Catalogues stay in each feature's locales/ and register at startup through the register_i18n_resources hookspec in contracts (contracts/plugins/hookspecs.py).
 
-Today features import TranslationService, Translator, TranslationKey and Locale from app/infrastructure/i18n/ (access, geolocate, incident_draft, incident_summary), as do integrations/slack (moved by TASK-26.2) and server/lifespan.
+Today packages/access/sync, packages/geolocate and features/incident/core/adapters/i18n.py import from app/infrastructure/i18n/ (t, TranslationService, Translator, TranslationKey, Locale), as do integrations/slack (provider.py, formatter.py) and server/lifespan.py.
 
 Scope:
 - define the translator contract;
-- implement it in app/server/i18n/ on the library chosen by the decision ticket;
+- implement it in app/server/i18n/ on the library chosen by the decision ticket (TASK-117);
 - register it in the service registry;
 - repoint every importer;
 - delete app/infrastructure/i18n/ with no re-export.

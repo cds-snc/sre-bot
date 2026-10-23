@@ -5,8 +5,8 @@ title: >-
   use
 status: To Do
 assignee: []
-created_date: '2026-09-17 20:39'
-updated_date: '2026-10-15 17:48'
+created_date: 2026-09-17 20:39
+updated_date: '2026-10-23T17:08:00Z'
 labels:
   - infrastructure
   - reliability
@@ -22,7 +22,7 @@ references:
   - decisions/reliability.md
   - app/infrastructure/coordination/dynamodb.py
   - app/infrastructure/coordination/lease.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1650'
+  - https://github.com/cds-snc/sre-bot/issues/1650
 priority: high
 ordinal: 228000
 ---
@@ -30,34 +30,27 @@ ordinal: 228000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Human decision 2026-09-17, taken while planning TASK-25.2.5.4, backed by a web-research review the same day. Depends on TASK-99: the flip is correct only once the job bodies it exposes are safe to run twice.
+Depends on TASK-99: the flip is correct only once the job bodies it exposes are safe to run twice.
 
-TODAY. claim() in app/infrastructure/coordination/dynamodb.py (moved from infrastructure/idempotency/ by TASK-58.1) returns IN_PROGRESS when the ConsistentRead after a contended conditional put fails with a CLASSIFIED error. The caller therefore skips the run. TASK-25.2.5.4 keeps that behaviour and records in the claim() docstring that it is provisional and lease-scoped.
+CURRENT CODE. ConditionalWriteStore.claim() (infrastructure/coordination/dynamodb.py:100-124) returns INDETERMINATE when the ConsistentRead after a contended conditional put fails with a classified error; an unclassified error re-raises. Each facade resolves INDETERMINATE through its ReadFailurePolicy (contracts/coordination/policy.py), which has only FAIL_CLOSED, and build_lease_store sets FAIL_CLOSED for every lease (infrastructure/coordination/factory.py:25-29). run_if_leased (infrastructure/coordination/lease.py) therefore skips the run, and a singleton job silently does not run for a whole period.
 
-WHY FLIP. decisions/reliability.md holds that a Tier-2 lease is a duplication optimization and never a correctness mechanism, and that duplicate execution is acceptable because bodies are idempotent. Under that doctrine an unreadable re-read means only "cannot confirm exclusivity", not "risk an unsafe duplicate effect", so failing closed buys no correctness and costs availability: the singleton job silently does not run for a whole period. Current lease and idempotent-consumer guidance (reviewed 2026-09-17) agrees for a lease whose body is idempotent, and is explicit that a lock holder must be prepared for its lock to be taken away.
+WHY FLIP. decisions/reliability.md holds that a Tier-2 lease is a duplication optimization and never a correctness mechanism, and that duplicate execution is acceptable because bodies are idempotent. Under that doctrine an unreadable re-read means only 'cannot confirm exclusivity', so failing closed buys no correctness and costs availability. Current lease and idempotent-consumer guidance agrees for a lease whose body is idempotent, and is explicit that a lock holder must be prepared for its lock to be taken away.
 
-WHY IT IS NOT A ONE-LINE CHANGE. Three things have to be handled together:
-1. We reach the re-read only because our conditional put definitively FAILED, so someone else's record exists. Returning NEW tells the caller it holds a lease it provably does not hold. run_if_leased (app/infrastructure/coordination/lease.py) then releases in a finally via an unconditional delete_item, deleting the real holder's claim and potentially cascading to a third holder. Either land the ownership-checked release task created alongside this one first, or make the fail-open path skip the release. Resolved by TASK-102: release and complete are now ownership-checked against the claim token, so a non-holder release is refused.
-2. Fail-open is correct for a LEASE and wrong for DEDUP. If the existing record is COMPLETED and the re-read fails, fail-open re-executes a completed operation and complete() then overwrites the recorded outcome. There is no dedup consumer in production today (the store getter had no production caller, verified 2026-09-17, and TASK-58.2 deleted it) but TASK-37.2 adds one. The policy must therefore be an explicit per-use choice, not one implicit default - see the comment left on TASK-58, which builds the idempotency and lease facades over the one primitive and is where that choice naturally lives.
-3. TASK-25.2.5.4's AC#1 and its unit test pin the current fail-closed behaviour. Both are reworded and inverted here, not deleted quietly.
-
-The unclassified-error path is NOT part of this flip: classify_aws_error re-raises an unknown error code, and an unknown fault is not evidence of anything. It stays a raise.
+SCOPE
+- Add a fail-open member to ReadFailurePolicy; the lease facade resolves INDETERMINATE to 'proceed' under it, and the policy docstring records why.
+- The fail-open lease holds no record it wrote: its release must free nothing. The ownership-checked release (TASK-102) refuses a token that matches no record; how acquire reports a fail-open lease (a token that matches no record, or a marker the caller's release skips) is decided at planning.
+- The IdempotencyStore (dedup) keeps FAIL_CLOSED: fail-open there would re-execute a completed operation and let complete() overwrite its outcome (TASK-37.2 adds the first dedup consumer).
+- packages/access/sync/providers.py also builds its lease through build_lease_store; planning decides whether it flips with the scheduled jobs (its body must then be safe to run twice) or keeps FAIL_CLOSED explicitly.
+- Tests that pin the lease's fail-closed resolution (tests/unit/contracts/coordination/test_coordination_policy.py, test_coordination_lease_store.py, tests/unit/infrastructure/coordination/test_coordination_store_factory.py, test_coordination_run_if_leased.py) are inverted, not deleted.
+- The unclassified-error path is not part of this flip: an unknown fault is not evidence of anything, so it stays a raise.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A classified failure of the ConsistentRead after a contended claim returns NEW for the lease use, and the claim() docstring records why, superseding the fail-closed rationale written by TASK-25.2.5.4
-- [ ] #2 The fail-open path cannot delete or overwrite another holder's record: either release is ownership-checked, or the fail-open claim is marked so the caller's release is skipped
-- [ ] #3 The dedup use keeps fail-closed, and the two policies are an explicit choice at the call site or facade rather than one shared default
+- [ ] #1 Under the lease facade, a classified failure of the contended re-read lets the caller run (fail-open); ReadFailurePolicy's docstring records why fail-open fits a lease whose body is idempotent
+- [ ] #2 A fail-open lease cannot delete or overwrite another holder's record: its release frees nothing (tested against the ownership-checked release)
+- [ ] #3 The IdempotencyStore keeps FAIL_CLOSED; each facade's policy stays an explicit choice at construction, and the access sync lease's policy is stated explicitly
 - [ ] #4 An unclassified error on the re-read still propagates unchanged
-- [ ] #5 TASK-25.2.5.4's AC#1 and its unit test are updated in this PR rather than left contradicting the new behaviour
+- [ ] #5 The tests pinning the lease's fail-closed resolution are updated in this PR rather than left contradicting the new behaviour
+- [ ] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
-
-## Comments
-
-<!-- COMMENTS:BEGIN -->
-created: 2026-09-18 15:27
----
-2026-09-18 (human decision): order is TASK-102, then TASK-58, then TASK-100. TASK-58 creates the per-use read-failure policy in the lease and dedup facades, set at construction. This task then only flips the lease facade to fail-open. AC#3 is satisfied by TASK-58's facade split rather than by a new parameter on today's IdempotencyStore. TASK-101 folds into this task's policy decision afterwards.
----
-<!-- COMMENTS:END -->

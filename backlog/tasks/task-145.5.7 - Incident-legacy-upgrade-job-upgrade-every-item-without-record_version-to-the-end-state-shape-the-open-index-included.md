@@ -5,8 +5,8 @@ title: >-
   end-state shape, the open index included
 status: To Do
 assignee: []
-created_date: '2026-10-14 23:10'
-updated_date: '2026-10-20 18:36'
+created_date: 2026-10-14 23:10
+updated_date: '2026-10-23T17:29:00Z'
 labels:
   - incident
   - features
@@ -20,10 +20,10 @@ dependencies:
 references:
   - decisions/reliability.md
   - decisions/lifecycle.md
-  - 'https://12factor.net/admin-processes'
+  - https://12factor.net/admin-processes
   - >-
     https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/bp-indexes-general-sparse-indexes.html
-  - 'https://github.com/cds-snc/sre-bot/issues/1696'
+  - https://github.com/cds-snc/sre-bot/issues/1696
 parent_task_id: TASK-145.5
 priority: medium
 type: task
@@ -33,7 +33,7 @@ ordinal: 393000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer 12 of Stack K (handoff doc-13). The single legacy data upgrade for the incidents table. Legacy items carry legacy attribute names, bare reference strings, free-text status, no security_incident, no open_bucket or opened_at and no record_version. This job upgrades them all to the end-state shape; it follows the shared legacy backfill rule set in decisions/incident-management.md (Migration).
+Layer 11 of Stack K (handoff doc-13). The single legacy data upgrade for the incidents table. Legacy items carry legacy attribute names, bare reference strings, free-text status, no security_incident, no open_bucket or opened_at and no record_version. This job upgrades them all to the end-state shape; it follows the shared legacy backfill rule set in decisions/incident-management.md (Migration).
 
 WHAT IT DOES
 - Reads the whole incidents table with TASK-27.5's bounded full-table read and selects the items without record_version.
@@ -43,7 +43,7 @@ WHAT IT DOES
 - Status matches the five IncidentStatus values ignoring case and surrounding whitespace (production: 30 `closed` and 1 `reviewed` lowercase of 323 items). Any other value fails the run before apply writes anything, with the list of incident ids and stored values, for a manual fix in the table.
 - A missing legacy security flag becomes security_incident false.
 
-RUNNER (human, 2026-10-15; the shared runner pattern)
+RUNNER (the shared runner pattern, decisions/incident-management.md Migration)
 - An in-app leased Tier-2 job registered by the incident plugin, reached through the ServiceScopeOpener (TASK-145.5.2).
 - A mode setting: off (default, the job is not registered), dry_run, apply.
 - One structured report event per run with counts (scanned, already_upgraded, to_upgrade, upgraded, guard_lost, unmatched_status, pending).
@@ -63,7 +63,7 @@ TIMING
 - [ ] #4 A status outside the five IncidentStatus values (ignoring case and surrounding whitespace) fails the run before any apply write, reporting the incident ids and stored values
 - [ ] #5 One structured report event per run carries the counts; the run procedure (per environment, dry run then apply, after TASK-145.8 deploys and again after TASK-145.12) and the removal owner (TASK-145.13) are recorded; running it is a precondition of TASK-145.9, not of this task
 - [ ] #6 The whole-table read is RecordStore.read_all with max_items from the documented incident core setting INCIDENT_CORE__FULL_READ_MAX_ITEMS (features/incident/common/settings.py, default 10000); past the cap the run fails before any apply write and the report names the cap (decisions/cloud-portability.md contract 4, whole-table reads)
-- [ ] #7 Before apply writes anything, the job calls Slack auth.test and checks that its enterprise_id (when SLACK_ENTERPRISE_ID is set) or team_id equals the configured Slack tenant; a mismatch or a failed call fails the run with the expected and received ids, and dry_run reports the same check (decisions/workplace-systems.md rule 3, TASK-157)
+- [ ] #7 Before apply writes anything, the job calls Slack auth.test and checks that its enterprise_id (when [slack.tenant] enterprise_id is set) or team_id equals the configured Slack tenant; a mismatch or a failed call fails the run with the expected and received ids, and dry_run reports the same check (decisions/workplace-systems.md rule 3, TASK-157)
 - [ ] #8 IncidentStore.find_by_conversation logs a warning naming the stored and requested tenants for each by_channel candidate it drops for its tenant, never dropping one silently (decisions/incident-management.md, Stored form)
 <!-- AC:END -->
 
