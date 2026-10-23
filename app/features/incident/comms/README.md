@@ -48,7 +48,7 @@ form.py | approval.py | history.py | service.py      platform-agnostic; no Slack
   `ConversationReference` under the configured Slack tenant, and passes both
   to the service. Without a configured Slack tenant `register` registers
   nothing and logs `incident_comms_registration_skipped` naming
-  `SLACK_TEAM_ID`.
+  `[slack.tenant] team_id`.
 - `entrypoints/slack_views.py` — the Block Kit view builders, payload parsers,
   action ids (`incident.comms.status_update.*`) and every translated string,
   reached through `core.api.translate` (no comms module imports

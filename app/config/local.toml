@@ -1,6 +1,11 @@
 # Overrides of base.toml for ENVIRONMENT=local, key by key.
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
 
+[slack.tenant]
+# The workspace of the development Slack app every development environment shares
+# (its tokens are the repository's Codespaces secrets SLACK__BOT_TOKEN and SLACK__APP_TOKEN).
+team_id = "T2G2S06PM"
+
 [slack_transport]
 enabled = true
 command_prefix = "dev-"

@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-23T19:20:00Z'
-updated_date: '2026-10-23T19:42:00Z'
+updated_date: '2026-10-23T22:26:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -118,4 +118,6 @@ Human edits (agent cannot read): app/.env.example:26 delete '# SLACK_ENABLED=tru
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23 implemented (TDD). The [slack_transport] slice moved to server/slack/settings.py with enabled (false in base, true in production.toml and local.toml) and socket_mode (true, base only); app/infrastructure/slack/ is deleted. The configuration phase builds the slice, runs validate_slack_transport (server/configuration/host_configuration.py) and installs SlackTransportInfo (contracts/slack/transport.py, HostInfo pattern); the five legacy modules read the prefix from it. Rule messages name keys through a SlackKey StrEnum (constants named *_TOKEN_KEY tripped ruff S105), which TASK-111.9 renames. The provider takes enabled, socket_mode and command_prefix from lifespan (get_slack_provider is keyword-only) and passes socket_mode to LegacySlackBootstrap.create_app(socket_mode=...); its import-linter ignore entry left contracts (a) and (d), and infrastructure.slack left contract (k)'s source list. SlackSettings keeps only the blank-team-id check; a stale SLACK_ENABLED or SLACK_SOCKET_MODE is inert (extra=ignore). The vendor-switch allowlist is gone. Not done from the plan: the enterprise-id-only tenant test, because SlackTenant has no enterprise_id until TASK-157 (the rule reads only slack.tenant). Test churn: stale enabled/socket_mode attributes dropped from SimpleNamespace test doubles; the root conftest installs SlackTransportInfo per test. ADR current-state text updated (transport-slack, platform-transports, platform-entrypoints, configuration, plugins, lifecycle) and doc-14 row SLACK_ENABLED. Gates: ruff All checks passed; make check-import-contracts 12 kept, 0 broken; make check-settings-key-ownership OK; pytest tests --ignore=tests/smoke 5686 passed; mypy 47 errors in 18 files, none on a changed line (touched files modules/role/role.py:322 and modules/incident/incident.py:121 are pre-existing). Developer note: local.toml now runs the transport, so a Codespace without Slack credentials sets SLACK_TRANSPORT__ENABLED=false in app/.env. Human after deploy PASS: delete the Codespaces secret SLACK_ENABLED, remove app/.env.example:26.
+
+2026-10-23 deployed: #1786 (abfcd82a) on sre-bot-task:44; post-transport PASS (/workspace/tmp/deploy-checks/post-transport-20261023T222227Z.txt). Codespaces secret SLACK_ENABLED deleted.
 <!-- SECTION:NOTES:END -->

@@ -44,7 +44,7 @@ The naive unblock — reuse a real employee's personal admin account to mint the
 
 ## Migration
 
-Ticket: TASK-71 (closed: `oncall_sync` writes user groups with its own `SLACK_USER_TOKEN`). No divergence is tolerated; `applies` stays `target` until the Checks are confirmed on `main`.
+Ticket: TASK-71 (closed: `oncall_sync` writes user groups with its own `SLACK__USER_TOKEN`). No divergence is tolerated; `applies` stays `target` until the Checks are confirmed on `main`.
 
 **Changes:**
 - 2026-09-24: Migration records that TASK-71 closed the `oncall_sync` shared-token divergence; privileged credentials are used only in a feature's or capability's `adapters/`.

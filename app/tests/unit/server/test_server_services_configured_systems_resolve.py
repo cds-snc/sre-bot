@@ -14,7 +14,7 @@ import svcs
 
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from integrations.google_workspace.settings import GoogleWorkspaceSettings
-from integrations.slack.settings import SlackSettings
+from integrations.slack.settings import SlackSettings, SlackTenant
 from server.configured_systems import StaticConfiguredSystems
 from server.services import register_core_services
 
@@ -24,7 +24,9 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _stub_settings_and_aws(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("server.services.get_aws_client", MagicMock())
-    monkeypatch.setattr("server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(team_id="T0123"))
+    monkeypatch.setattr(
+        "server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(tenant=SlackTenant(team_id="T0123"))
+    )
     monkeypatch.setattr(
         "server.configured_systems.get_google_workspace_settings",
         lambda: GoogleWorkspaceSettings.model_construct(

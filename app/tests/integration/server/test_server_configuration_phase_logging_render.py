@@ -65,8 +65,9 @@ def _production_phase(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENVIRONMENT", "production")
     monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
-    monkeypatch.delenv("SLACK_TEAM_ID", raising=False)
-    monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
+    monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
+    for field in ("bot_token", "user_token", "app_token", "signing_secret"):
+        monkeypatch.setenv(f"SLACK__{field.upper()}", "")
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
     monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
     monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
@@ -92,18 +93,17 @@ def _events(lines: list[str]) -> list[dict[str, Any]]:
     return [json.loads(line) for line in lines]
 
 
-def _transport_on(directory: Path) -> None:
-    (directory / "production.toml").write_text("[slack_transport]\nenabled = true\n", encoding="utf-8")
+def _transport_on(directory: Path, extra: str = "") -> None:
+    (directory / "production.toml").write_text(f"[slack_transport]\nenabled = true\n{extra}", encoding="utf-8")
 
 
 def test_configuration_phase_event_renders_as_json_in_production(
     _production_phase: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
     """The Slack transport rules' socket-mode notice, emitted while slices validate, is one JSON line at info."""
-    _transport_on(_production_phase)
-    monkeypatch.setenv("SLACK_TEAM_ID", "T0001")
-    monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-bot")
-    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-app")
+    _transport_on(_production_phase, '[slack.tenant]\nteam_id = "T0001"\n')
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-bot")
+    monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-app")
 
     load_host_configuration()
 
@@ -160,10 +160,10 @@ def test_transport_on_without_the_tenant_entry_fails_without_the_token(
 ) -> None:
     """The transport switched on without the Slack tenant entry fails naming its key, with the tokens absent from the error and the log."""
     _transport_on(_production_phase)
-    monkeypatch.setenv("SLACK_BOT_TOKEN", SECRET)
-    monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-app")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", SECRET)
+    monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-app")
 
-    with pytest.raises(ConfigurationError, match="SLACK_TEAM_ID") as raised:
+    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] team_id") as raised:
         load_host_configuration()
 
     lines = _lines(capfd)

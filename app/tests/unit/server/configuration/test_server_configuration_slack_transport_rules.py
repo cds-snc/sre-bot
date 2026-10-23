@@ -12,7 +12,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from contracts.configuration import ConfigurationError
-from integrations.slack.settings import SlackSettings
+from integrations.slack.settings import SlackSettings, SlackTenant
 from server.configuration.host_configuration import validate_slack_transport
 from server.slack.settings import SlackTransportSettings
 
@@ -30,7 +30,8 @@ def _slack(
     app_token: str | None = APP_TOKEN,
     signing_secret: str | None = None,
 ) -> SlackSettings:
-    return SlackSettings.model_construct(team_id=team_id, bot_token=bot_token, app_token=app_token, signing_secret=signing_secret)
+    tenant = SlackTenant(team_id=team_id) if team_id is not None else None
+    return SlackSettings.model_construct(tenant=tenant, bot_token=bot_token, app_token=app_token, signing_secret=signing_secret)
 
 
 def _transport(enabled: bool = True, socket_mode: bool = True) -> SlackTransportSettings:
@@ -51,25 +52,25 @@ def test_transport_off_requires_nothing() -> None:
 
 def test_transport_on_without_the_tenant_entry_fails_naming_the_key() -> None:
     """The transport cannot run without knowing its workspace."""
-    with pytest.raises(ConfigurationError, match="SLACK_TEAM_ID"):
+    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] team_id"):
         validate_slack_transport(_transport(), _slack(team_id=None))
 
 
 def test_transport_on_without_the_bot_token_fails_naming_the_key() -> None:
     """Every Slack call the transport makes needs the bot token."""
-    with pytest.raises(ConfigurationError, match="SLACK_BOT_TOKEN"):
+    with pytest.raises(ConfigurationError, match="SLACK__BOT_TOKEN"):
         validate_slack_transport(_transport(), _slack(bot_token=""))
 
 
 def test_socket_mode_without_the_app_token_fails_naming_the_key() -> None:
     """Socket Mode opens its connection with the app-level token."""
-    with pytest.raises(ConfigurationError, match="SLACK_APP_TOKEN"):
+    with pytest.raises(ConfigurationError, match="SLACK__APP_TOKEN"):
         validate_slack_transport(_transport(), _slack(app_token=None))
 
 
 def test_http_mode_without_the_signing_secret_fails_naming_the_key() -> None:
     """HTTP Events mode verifies every request's signature, so it cannot run without the secret."""
-    with pytest.raises(ConfigurationError, match="SLACK_SIGNING_SECRET"):
+    with pytest.raises(ConfigurationError, match="SLACK__SIGNING_SECRET"):
         validate_slack_transport(_transport(socket_mode=False), _slack(app_token=None))
 
 
@@ -90,6 +91,7 @@ def test_production_shape_boots_and_logs_the_notice_once_at_info() -> None:
     assert len(notices) == 1
     assert notices[0]["log_level"] == "info"
     assert "socket_mode" in str(notices[0]["detail"])
+    assert "SLACK__SIGNING_SECRET" in str(notices[0]["detail"])
 
 
 def test_socket_mode_with_the_signing_secret_logs_no_notice() -> None:

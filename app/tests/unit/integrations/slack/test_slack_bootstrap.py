@@ -26,7 +26,7 @@ from integrations.slack.bootstrap import (
     SlackBootstrap,
     log_listener_error,
 )
-from integrations.slack.settings import SlackSettings
+from integrations.slack.settings import SlackSettings, SlackTenant
 
 pytestmark = pytest.mark.unit
 
@@ -34,9 +34,10 @@ pytestmark = pytest.mark.unit
 @pytest.fixture
 def settings() -> SlackSettings:
     return SlackSettings(
-        SLACK_BOT_TOKEN="xoxb-test-token",
-        SLACK_REQUEST_TIMEOUT_SECONDS=10,
-        SLACK_RETRY_MAX_ATTEMPTS=2,
+        tenant=SlackTenant(team_id="T0TEST"),
+        bot_token="xoxb-test-token",
+        request_timeout_seconds=10,
+        retry_max_attempts=2,
     )
 
 
@@ -49,7 +50,8 @@ class TestSlackBootstrapWebClientConstruction:
         assert isinstance(shield.web, AsyncWebClient)
 
     def test_web_uses_bot_token_from_settings(self, monkeypatch) -> None:
-        monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-real-token")
+        monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TEST")
+        monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-real-token")
 
         shield = SlackBootstrap()
 
@@ -118,7 +120,9 @@ class TestSlackBootstrapAppCreation:
         self,
         monkeypatch,
     ) -> None:
-        monkeypatch.setenv("SLACK_SIGNING_SECRET", "test-secret")
+        monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TEST")
+        monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-test-token")
+        monkeypatch.setenv("SLACK__SIGNING_SECRET", "test-secret")
 
         with patch("integrations.slack.bootstrap.App") as app_cls:
             app_cls.return_value = MagicMock()
