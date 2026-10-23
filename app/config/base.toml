@@ -23,6 +23,10 @@ cors_allowed_headers = ["Authorization", "Content-Type", "X-Request-ID", "tracep
 dev_bypass_enabled = false
 
 [slack_transport]
+# Each deployment that runs Slack switches the transport on in its own file.
+enabled = false
+# Socket Mode needs no inbound exposure; false selects HTTP Events mode, which needs SLACK_SIGNING_SECRET.
+socket_mode = true
 command_prefix = ""
 
 [notify_api_key_leak]

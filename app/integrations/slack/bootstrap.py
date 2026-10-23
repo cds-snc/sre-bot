@@ -54,9 +54,13 @@ class SlackBootstrap:
         self.settings = get_slack_settings()
         self.web: AsyncWebClient = get_async_slack_web_client()
 
-    def create_app(self) -> AsyncApp:
-        """Create a Bolt AsyncApp configured from Slack settings."""
-        request_verification_enabled = not self.settings.socket_mode
+    def create_app(self, socket_mode: bool = True) -> AsyncApp:
+        """Create a Bolt AsyncApp configured from Slack settings.
+
+        Socket Mode authenticates the connection itself, so HTTP request verification
+        runs only in HTTP Events mode (socket_mode false).
+        """
+        request_verification_enabled = not socket_mode
         app = AsyncApp(
             token=self.settings.bot_token,
             client=self.web,
@@ -74,9 +78,13 @@ class LegacySlackBootstrap:
         self.settings = get_slack_settings()
         self.web: WebClient = get_slack_web_client()
 
-    def create_app(self) -> App:
-        """Create a Bolt App configured from Slack settings."""
-        request_verification_enabled = not self.settings.socket_mode
+    def create_app(self, socket_mode: bool = True) -> App:
+        """Create a Bolt App configured from Slack settings.
+
+        Socket Mode authenticates the connection itself, so HTTP request verification
+        runs only in HTTP Events mode (socket_mode false).
+        """
+        request_verification_enabled = not socket_mode
         app = App(
             token=self.settings.bot_token,
             client=self.web,

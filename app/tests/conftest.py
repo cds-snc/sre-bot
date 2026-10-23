@@ -20,6 +20,11 @@ from contracts.configuration import (  # noqa: E402
     install_host_info,
     uninstall_host_info,
 )
+from contracts.slack.transport import (  # noqa: E402
+    SlackTransportInfo,
+    install_slack_transport_info,
+    uninstall_slack_transport_info,
+)
 from integrations.slack.provider import get_slack_provider  # noqa: E402
 from server.configuration import load_configuration_files  # noqa: E402
 from tests.factories.aws import (  # noqa: E402
@@ -91,6 +96,15 @@ def installed_ci_host_info() -> Iterator[HostInfo]:
     install_host_info(info)
     yield info
     uninstall_host_info()
+
+
+@pytest.fixture(autouse=True)
+def installed_slack_transport_info() -> Iterator[SlackTransportInfo]:
+    """Install unprefixed Slack transport facts before every test and remove them after."""
+    info = SlackTransportInfo(command_prefix="")
+    install_slack_transport_info(info)
+    yield info
+    uninstall_slack_transport_info()
 
 
 @pytest.fixture(autouse=True)

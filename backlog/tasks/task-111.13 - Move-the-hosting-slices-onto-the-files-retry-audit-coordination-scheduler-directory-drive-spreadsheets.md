@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T17:10:00Z'
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -27,7 +27,7 @@ ordinal: 419000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The hosting slices (RetrySettings, AuditSettings, ConditionalWriteSettings, SchedulerSettings, DirectorySettings, DriveSettings, SpreadsheetSettings) move onto the files: each becomes a ConfigurationSlice with its own table and <TABLE>__ prefix, declares no per-field alias, sets extra=forbid, and has its defaults written in base.toml. Production sets none of their names (doc-14), so no production value moves. RetrySettings moves from infrastructure/configuration/infrastructure/retry.py to its owner, infrastructure/resilience/retry/, and InfrastructureSettings (infrastructure/configuration/base.py) is deleted once no slice inherits it. TASK-119, TASK-120 and TASK-121 later move the drive, directory and spreadsheets classes without touching the files.
+The hosting slices (RetrySettings, AuditSettings, ConditionalWriteSettings, DirectorySettings, DriveSettings, SpreadsheetSettings) move onto the files: each becomes a ConfigurationSlice with its own table and <TABLE>__ prefix, declares no per-field alias, sets extra=forbid, and has its defaults written in base.toml. Production sets none of their names (doc-14), so no production value moves. RetrySettings moves from infrastructure/configuration/infrastructure/retry.py to its owner, infrastructure/resilience/retry/, and InfrastructureSettings (infrastructure/configuration/base.py) is deleted once no slice inherits it. TASK-119, TASK-120 and TASK-121 later move the drive, directory and spreadsheets classes without touching the files. SchedulerSettings moved to TASK-112.3 on 2026-10-23 (its [scheduler] table gains the enabled run switch there).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

@@ -1,7 +1,7 @@
 """Integration tests for logging in the app factory's configuration phase.
 
 load_host_configuration runs for real against a tmp_path holding the real
-base.toml and an empty environment file, with the working directory moved there
+base.toml and an environment file the test may fill, with the working directory moved there
 so no developer .env file is read and every slice cache cleared around each
 test. The production pipeline is forced by patching _is_test_environment, and
 structlog's logger cache is turned off so module-level loggers do not keep the
@@ -31,6 +31,7 @@ from integrations.slack.settings import get_slack_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from server.configuration import CONFIG_DIR as REAL_CONFIG_DIR
 from server.configuration import get_identity_settings, get_server_settings, load_host_configuration
+from server.slack.settings import get_slack_transport_settings
 
 pytestmark = pytest.mark.integration
 
@@ -44,6 +45,7 @@ _GETTERS: tuple[Callable[[], Any], ...] = (
     get_directory_settings,
     get_sre_ops_settings,
     get_slack_settings,
+    get_slack_transport_settings,
     get_google_workspace_settings,
     get_notify_api_key_leak_settings,
 )
@@ -62,7 +64,7 @@ def _production_phase(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     monkeypatch.setattr("server.configuration.loader.CONFIG_DIR", tmp_path)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setenv("SLACK_ENABLED", "false")
+    monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
     monkeypatch.delenv("SLACK_TEAM_ID", raising=False)
     monkeypatch.delenv("SLACK_SIGNING_SECRET", raising=False)
     monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
@@ -90,12 +92,15 @@ def _events(lines: list[str]) -> list[dict[str, Any]]:
     return [json.loads(line) for line in lines]
 
 
+def _transport_on(directory: Path) -> None:
+    (directory / "production.toml").write_text("[slack_transport]\nenabled = true\n", encoding="utf-8")
+
+
 def test_configuration_phase_event_renders_as_json_in_production(
-    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+    _production_phase: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """The Slack slice's socket-mode notice, emitted while slices validate, is one JSON line at info."""
-    monkeypatch.setenv("SLACK_ENABLED", "true")
-    monkeypatch.setenv("SLACK_SOCKET_MODE", "true")
+    """The Slack transport rules' socket-mode notice, emitted while slices validate, is one JSON line at info."""
+    _transport_on(_production_phase)
     monkeypatch.setenv("SLACK_TEAM_ID", "T0001")
     monkeypatch.setenv("SLACK_BOT_TOKEN", "xoxb-bot")
     monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-app")
@@ -150,11 +155,11 @@ def test_invalid_slice_logs_one_critical_event_and_fails_without_the_value(
     assert SECRET not in "".join(traceback.format_exception(raised.value))
 
 
-def test_invalid_vendor_slice_on_plain_settings_fails_without_the_token(
-    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+def test_transport_on_without_the_tenant_entry_fails_without_the_token(
+    _production_phase: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """A vendor slice not yet on the files fails naming its key, with its tokens absent from the error and the log."""
-    monkeypatch.setenv("SLACK_ENABLED", "true")
+    """The transport switched on without the Slack tenant entry fails naming its key, with the tokens absent from the error and the log."""
+    _transport_on(_production_phase)
     monkeypatch.setenv("SLACK_BOT_TOKEN", SECRET)
     monkeypatch.setenv("SLACK_APP_TOKEN", "xapp-app")
 

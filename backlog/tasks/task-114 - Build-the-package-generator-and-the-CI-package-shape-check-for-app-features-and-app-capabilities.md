@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-23T17:09:00Z'
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - plugin-architecture
   - tooling
 milestone: m-7
 dependencies:
   - TASK-110
-  - TASK-112
+  - TASK-112.2
 references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
@@ -48,3 +48,15 @@ Operator tooling lives in app/bin/ (decisions/migration.md). Follow the existing
 - [ ] #3 Capability packages are checked for README classification and at least one named feature consumer (plugin-architecture.md Checks)
 - [ ] #4 The check is a script under app/bin/ with a make target and a blocking CI step
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T19:22:00Z
+
+---
+
+2026-10-23: waits on TASK-112.2 (plugin key shape: [plugins.<area>] tables mapping entry-point name to bool), not the whole of TASK-112.
+
+---
+<!-- COMMENTS:END -->

@@ -1,37 +1,29 @@
-"""Vendor settings for Slack runtime credentials and delivery mode.
+"""Vendor settings for Slack credentials and the Slack tenant entry.
 
 Exposes `SlackSettings`, its tenant entry `SlackTenant`, and the cached `get_slack_settings()` provider.
 
-`SLACK_ENABLED` is the interim switch for the Slack transport and
-`SLACK_TEAM_ID` the source of the interim Slack tenant entry (`SlackTenant`,
-read through `SlackSettings.tenant`), until TASK-111 makes the entry a nested
-field and TASK-112 moves it to the configuration files
-(decisions/configuration.md). Readers use the entry, never the flat field.
-The entry is the expected tenant; checking each request against it is TASK-157's.
-- The transport switched on fails boot without a non-blank `SLACK_TEAM_ID`.
-- With the transport off the id is optional; an empty value counts as absent
-    and a present one must be non-blank. The id is opaque (Slack documents no
-    format), so no pattern is checked and no network call is made.
+`SLACK_TEAM_ID` is the source of the interim Slack tenant entry (`SlackTenant`,
+read through `SlackSettings.tenant`), until TASK-111.9 moves the entry into the
+[slack] table (decisions/configuration.md). Readers use the entry, never the flat
+field. The entry is the expected tenant; checking each request against it is TASK-157's.
+The id is optional here; an empty value counts as absent and a present one must be
+non-blank. The id is opaque (Slack documents no format), so no pattern is checked
+and no network call is made.
 
-Validation behavior mirrors Slack delivery mode requirements:
-- HTTP Events mode (`SLACK_SOCKET_MODE=false`) fails fast at boot when
-    `SLACK_SIGNING_SECRET` is missing.
-- Socket Mode logs an informational notice when `SLACK_SIGNING_SECRET` is not
-    set, because Socket Mode request authenticity is handled by the connection
-    handshake rather than HTTP request-signature verification.
+Whether and how the transport runs is the [slack_transport] slice
+(server/slack/settings.py). The rules that join the two (the transport switched on
+needs the tenant entry, the bot token and its delivery mode's credential) run in the
+configuration phase (server/configuration/host_configuration.py), not here.
 
-Vendor credentials and transport settings only (tokens, secrets, per-call
-timeout, retry budget, delivery mode, error-code catalogues). Feature-domain
-configuration (channel IDs, user-group IDs) lives with the consuming feature.
+Vendor credentials only (tokens, secrets, per-call timeout, retry budget,
+error-code catalogues). Feature-domain configuration (channel IDs, user-group IDs)
+lives with the consuming feature.
 """
 
 from functools import lru_cache
 
-import structlog
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-logger = structlog.get_logger(__name__)
 
 
 class SlackTenant(BaseModel):
@@ -56,12 +48,10 @@ class SlackSettings(BaseSettings):
         extra="ignore",
     )
 
-    enabled: bool = Field(default=False, alias="SLACK_ENABLED")
-    socket_mode: bool = Field(default=True, alias="SLACK_SOCKET_MODE")
     team_id: str | None = Field(
         default=None,
         alias="SLACK_TEAM_ID",
-        description="Slack workspace (team) id this instance works with, as auth.test returns it; required when SLACK_ENABLED is true.",
+        description="Slack workspace (team) id this instance works with, as auth.test returns it; required when [slack_transport] enabled is true.",
     )
 
     bot_token: str = Field(default="", alias="SLACK_BOT_TOKEN")
@@ -119,26 +109,9 @@ class SlackSettings(BaseSettings):
         return None if value == "" else value
 
     @model_validator(mode="after")
-    def _validate_transport_credentials(self) -> SlackSettings:
+    def _reject_blank_team_id(self) -> SlackSettings:
         if self.team_id is not None and not self.team_id.strip():
             raise ValueError("SLACK_TEAM_ID must not be blank when set")
-        if not self.enabled:
-            return self
-        if self.team_id is None:
-            raise ValueError("SLACK_TEAM_ID is required when SLACK_ENABLED=true")
-        if self.socket_mode and not self.app_token:
-            raise ValueError("SLACK_APP_TOKEN is required when SLACK_SOCKET_MODE=true and SLACK_ENABLED=true")
-        if not self.socket_mode and not self.signing_secret:
-            raise ValueError("SLACK_SIGNING_SECRET is required when SLACK_SOCKET_MODE=false and SLACK_ENABLED=true")
-        if self.socket_mode and not self.signing_secret:
-            logger.info(
-                "slack_signing_secret_not_set_in_socket_mode",
-                detail=(
-                    "SLACK_SIGNING_SECRET is not set. Socket Mode does not need it for request authenticity "
-                    "(the connection handshake carries that), but it must be configured before switching to "
-                    "HTTP Events mode (SLACK_SOCKET_MODE=false), which fails boot without it."
-                ),
-            )
         return self
 
 

@@ -276,7 +276,12 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     _initialize_security_services(security_settings, logger)
     _initialize_directory_provider(app, directory_settings, logger)
 
-    app.state.slack_provider = get_slack_provider()
+    slack_transport = configuration.slack_transport
+    app.state.slack_provider = get_slack_provider(
+        enabled=slack_transport.enabled,
+        socket_mode=slack_transport.socket_mode,
+        command_prefix=slack_transport.command_prefix,
+    )
 
     pm = get_plugin_manager()
     # Any plugin that fails to load stops startup here, before the app serves.

@@ -3,7 +3,7 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from infrastructure.slack.settings import get_slack_transport_settings
+from contracts.slack.transport import slack_transport_info
 from integrations.google_workspace.settings import get_google_resources_config
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
@@ -33,7 +33,7 @@ logger = get_logger()
 
 
 def register(bot: App):
-    transport_settings = get_slack_transport_settings()
+    transport_settings = slack_transport_info()
     bot.command(f"/{transport_settings.command_prefix}talent-role")(role_command)
     bot.view("role_view")(role_view_handler)
     bot.action("role_change_locale")(update_modal_locale)

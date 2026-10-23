@@ -133,7 +133,6 @@ env = [
     "ACCESS_SYNC_ENABLED=false",
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
-    "SLACK_ENABLED=false",
     "SLACK_BOT_TOKEN=xoxb-test-token-for-tests",
     "SLACK_APP_TOKEN=xapp-test-token",
     "SLACK_SIGNING_SECRET=test-signing-secret",
@@ -230,7 +229,6 @@ ignore_imports = [
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",
-    "integrations.slack.provider -> infrastructure.slack.settings",
 ]
 
 [[tool.importlinter.contracts]]
@@ -302,7 +300,6 @@ ignore_imports = [
     "integrations.sentinel.client -> infrastructure.audit.models",
     "integrations.slack.formatter -> infrastructure.i18n",
     "integrations.slack.provider -> infrastructure.i18n",
-    "integrations.slack.provider -> infrastructure.slack.settings",
 ]
 
 [[tool.importlinter.contracts]]
@@ -395,7 +392,7 @@ type = "forbidden"
 # A service family joins forbidden_modules when its contract is registered. The
 # infrastructure siblings are listed one by one: "infrastructure" as a source would
 # flag a family importing its own modules. Direct imports only.
-source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.resilience", "infrastructure.security", "infrastructure.slack", "infrastructure.spreadsheets"]
+source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.resilience", "infrastructure.security", "infrastructure.spreadsheets"]
 forbidden_modules = ["infrastructure.records", "infrastructure.coordination"]
 allow_indirect_imports = true
 unmatched_ignore_imports_alerting = "error"

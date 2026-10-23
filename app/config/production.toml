@@ -1,6 +1,9 @@
 # Overrides of base.toml for ENVIRONMENT=production, key by key.
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
 
+[slack_transport]
+enabled = true
+
 [server]
 public_base_url = "https://sre-bot.cdssandbox.xyz"
 sre_test_channel_id = "C033L7RGCT0"

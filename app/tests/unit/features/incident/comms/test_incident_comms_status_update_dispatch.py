@@ -29,7 +29,7 @@ def scopes() -> FakeServiceScopeOpener:
 
 @pytest.fixture
 def provider(scopes: FakeServiceScopeOpener) -> SlackPlatformProvider:
-    settings: Any = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
+    settings: Any = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
     slack_provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
     slack_provider.set_scope_opener(scopes)
     register(slack_provider)

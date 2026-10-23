@@ -5,8 +5,8 @@ title: >-
   app/server/slack/ with every importer rewritten and no shims
 status: To Do
 assignee: []
-created_date: '2026-09-24 19:58'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-24 19:58
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - plugin-architecture
   - slack
@@ -18,7 +18,7 @@ references:
   - decisions/platform-entrypoints.md
   - decisions/platform-transports.md
   - decisions/transport-slack.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1606'
+  - https://github.com/cds-snc/sre-bot/issues/1606
 parent_task_id: TASK-26
 priority: high
 type: task
@@ -28,7 +28,7 @@ ordinal: 248000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Slice 2 of TASK-26. Moves provider.py (Bolt runtime and Socket Mode lifecycle), bootstrap.py, parser.py, formatter.py, help.py, commands.py and the COMMAND_PREFIX transport settings from app/integrations/slack/ and app/infrastructure/slack/ into app/server/slack/. app/integrations/slack/ is left with the client factory, classify_slack_error and settings (TASK-25.4).
+Slice 2 of TASK-26. Moves provider.py (Bolt runtime and Socket Mode lifecycle), bootstrap.py, parser.py, formatter.py, help.py and commands.py from app/integrations/slack/ into app/server/slack/. app/integrations/slack/ is left with the client factory, classify_slack_error and settings (TASK-25.4). The transport settings already live in app/server/slack/settings.py and app/infrastructure/slack/ is already deleted (TASK-112.1, 2026-10-23); the legacy modules read command_prefix from contracts/slack/transport.py (SlackTransportInfo), so no legacy importer of the transport slice remains.
 
 Mechanical move with no behaviour change. The one behaviour-neutral refactor carried over from the original scope is the parser tokenizer delegating to shlex.split, kept as its own commit.
 

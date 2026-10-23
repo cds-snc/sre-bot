@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T18:48:00Z'
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -25,7 +25,7 @@ ordinal: 418000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>/settings.py) move onto the files, one table each ([notify], [trello], [opsgenie], [maxmind], [sentinel]). The fields lose their vendor prefix to match the doc-14 rename map (notify_api_url -> api_url). Non-secret values (Notify API URL, Trello ATIP board, Sentinel customer id and log type) go in production.toml, the MaxMind database path default in base.toml. Credentials are read only under the published SecureString names: NOTIFY__SRE_USER_NAME, NOTIFY__SRE_CLIENT_SECRET, TRELLO__APP_KEY, TRELLO__TOKEN, OPSGENIE__INTEGRATIONS_KEY, SENTINEL__SHARED_KEY (no terraform change). extra=forbid. The unread OPSGENIE_KEY and MAXMIND_KEY names are not migrated.
+The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>/settings.py) move onto the files, one table each ([notify], [trello], [opsgenie], [maxmind], [sentinel]). The fields lose their vendor prefix to match the doc-14 rename map (notify_api_url -> api_url). Non-secret values (Notify API URL, Trello ATIP board, Sentinel customer id and log type) go in production.toml, the MaxMind database path default in base.toml. Credentials are read only under the published SecureString names: NOTIFY__SRE_USER_NAME, NOTIFY__SRE_CLIENT_SECRET, TRELLO__APP_KEY, TRELLO__TOKEN, OPSGENIE__INTEGRATIONS_KEY, SENTINEL__SHARED_KEY (no terraform change). extra=forbid. The unread OPSGENIE_KEY and MAXMIND_KEY names are not migrated. Ride-along (2026-10-23, TASK-112 AC #3 scoping): integrations/notify/client.py:115 skips the revoke call when ENVIRONMENT is not production; once api_url is set only in production.toml the existing 'api_url missing' branch already stops the call elsewhere, so the ENVIRONMENT check is deleted (decisions/configuration.md: ENVIRONMENT is identity only).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria

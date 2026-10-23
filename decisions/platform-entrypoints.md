@@ -19,7 +19,7 @@ A primary adapter speaks its device's own technology. Netflix Dispatch's Slack p
 
 Current state:
 
-- The Slack runtime lives in `integrations/slack/` (`provider.py::SlackPlatformProvider`, `bootstrap.py`), started from `server/lifespan.py`. `infrastructure/slack/` holds only `settings.py`.
+- The Slack runtime lives in `integrations/slack/` (`provider.py::SlackPlatformProvider`, `bootstrap.py`), started from `server/lifespan.py`. Its `[slack_transport]` slice lives in `server/slack/settings.py`.
 - Feature handlers import Slack models and the argument parser from `integrations.slack`.
 - Features register Slack commands through the `SlackCommandRegistrar` Protocol (`contracts/slack/registrar.py`); no hookspec hands out the Bolt app. Packages cannot register block actions or view submissions; legacy modules call `bot.action` and `bot.view` on the app.
 - Teams is not built (TASK-42, TASK-43).
@@ -77,3 +77,4 @@ Tolerated until then:
 - 2026-09-25: Accepted; an unlinked caller reaches the feature's access policy instead of being refused at the entry point.
 - 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1); its tolerated item is closed.
 - 2026-10-06: business code stays platform-neutral and a platform entry point handles interactions with its native SDK; the registrar covers block actions and view submissions (TASK-140.1).
+- 2026-10-23: current state: the Slack transport settings moved to `server/slack/settings.py` (TASK-112.1).

@@ -13,8 +13,7 @@ decisions/configuration.md "Checks" asks for these, all enforced here:
   - sdk-namespace:  no ``ConfigurationSlice`` reads an ``AWS_*``, ``UVICORN_*`` or
                     ``OTEL_*`` name, which the SDK or runtime reads itself;
   - vendor-enabled: no ``<VENDOR>_ENABLED`` key in ``integrations/`` (a vendor
-                    client is enabled by its tenant entry), with ``SLACK_ENABLED``
-                    excepted until TASK-112;
+                    client is enabled by its tenant entry);
   - environ-read:   no ``os.environ`` / ``os.getenv`` read outside a settings
                     class (``bin/`` developer scripts and tests excepted).
 
@@ -61,9 +60,6 @@ SCANNED_EXCLUSIONS = EXCLUDED_DIR_NAMES | {"tests"}
 
 # Developer scripts read their own environment; they are not app code.
 ENVIRON_EXEMPT_ROOTS = frozenset({"bin"})
-
-# The interim Slack transport switch; TASK-112 replaces it and empties this set.
-ALLOWED_VENDOR_SWITCHES = frozenset({"SLACK_ENABLED"})
 
 # Names the platform sets for the app; they keep their bare names.
 PLATFORM_NAMES = frozenset({"ENVIRONMENT", "GIT_SHA", "FORWARDED_ALLOW_IPS"})
@@ -471,14 +467,14 @@ def find_collisions(claims: Iterable[Claim]) -> list[Collision]:
 
 
 def find_vendor_switches(claims: Iterable[Claim]) -> list[Violation]:
-    """Return each ``<VENDOR>_ENABLED`` key a vendor client slice reads, the allowed switch aside."""
+    """Return each ``<VENDOR>_ENABLED`` key a vendor client slice reads."""
     violations = []
     for claim in claims:
         if claim.source_kind != ENV_SOURCE:
             continue
         key = claim.key.upper()
         in_integrations = claim.owner.split(".", 1)[0] == "integrations"
-        if in_integrations and (key == "ENABLED" or key.endswith("_ENABLED")) and key not in ALLOWED_VENDOR_SWITCHES:
+        if in_integrations and (key == "ENABLED" or key.endswith("_ENABLED")):
             violations.append(
                 Violation(
                     rule="vendor-enabled",

@@ -47,14 +47,10 @@ class MockSlackSettings:
 
     def __init__(
         self,
-        enabled=True,
-        socket_mode=True,
         app_token="xapp-test",
         bot_token="xoxb-test",
         signing_secret="test-secret",
     ):
-        self.enabled = enabled
-        self.socket_mode = socket_mode
         self.app_token = app_token
         self.bot_token = bot_token
         self.signing_secret = signing_secret
@@ -72,15 +68,9 @@ def slack_settings():
 
 
 @pytest.fixture
-def slack_settings_disabled():
-    """Provide mock Slack settings with provider disabled."""
-    return MockSlackSettings(enabled=False)
-
-
-@pytest.fixture
 def slack_settings_http_mode():
-    """Provide mock Slack settings in HTTP webhook mode."""
-    return MockSlackSettings(socket_mode=False, signing_secret="webhook-secret")
+    """Provide mock Slack settings for HTTP Events mode: a signing secret and no app token."""
+    return MockSlackSettings(app_token=None, signing_secret="webhook-secret")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

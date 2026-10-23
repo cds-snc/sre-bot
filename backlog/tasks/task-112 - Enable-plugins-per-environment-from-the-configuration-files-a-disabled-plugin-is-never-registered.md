@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-23T16:59:00Z'
+updated_date: '2026-10-23T19:42:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -43,8 +43,8 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 - [ ] #3 grep finds no environment-variable feature switch or ENVIRONMENT check deciding whether a plugin runs
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
-- [ ] #6 The SLACK_ENABLED exception is removed from bin/check_settings_key_ownership.py's vendor-enabled rule, and the check passes with an empty allowlist
-- [ ] #7 The Slack transport's enabled and socket_mode keys are in [slack_transport] (decisions/configuration.md, transport-slack.md); SLACK_ENABLED and SLACK_SOCKET_MODE are no longer read, and switching the transport on without the Slack tenant entry or the app token Socket Mode needs fails boot naming the key
+- [x] #6 The SLACK_ENABLED exception is removed from bin/check_settings_key_ownership.py's vendor-enabled rule, and the check passes with an empty allowlist
+- [x] #7 The Slack transport's enabled and socket_mode keys are in [slack_transport] (decisions/configuration.md, transport-slack.md); SLACK_ENABLED and SLACK_SOCKET_MODE are no longer read, and switching the transport on without the Slack tenant entry or the app token Socket Mode needs fails boot naming the key
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -52,3 +52,15 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-20 (SLACK_TEAM_ID review): tenant entries stay validated at boot with no network call; the Slack entry (team id and optional enterprise id, TASK-157) is verified per inbound request by the runtime guard, and a stamping batch job verifies it with auth.test (decisions/workplace-systems.md rule 3). Moving the entries into the files keeps both ids.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T19:22:00Z
+
+---
+
+2026-10-23: size gate tripped (~450-550 prod LOC, ~30 files, three subsystems); split into TASK-112.1 (Slack transport keys, contract, host rules; parent ACs #6, #7, SLACK_* part of #3), TASK-112.2 (plugin keys by area, set_blocked; ACs #1, #2, #5) and TASK-112.3 (ACCESS_*_ENABLED, [scheduler] enabled, guard test; AC #3). This task is the coordinator: each AC is checked as the subtask that verifies it lands. Decisions: plugin keys are [plugins.<area>] tables mapping entry-point name to bool; user_rotations under incident response; the scheduler's run switch is [scheduler] enabled (from TASK-111.13); the transport slice moves to server/slack/ with a SlackTransportInfo contract for the legacy command prefix; the Notify ENVIRONMENT check rides in TASK-111.12. Follow-up gap, not created: running the access plugins locally needs an AWS profile with cross-account permissions and is undocumented.
+
+---
+<!-- COMMENTS:END -->

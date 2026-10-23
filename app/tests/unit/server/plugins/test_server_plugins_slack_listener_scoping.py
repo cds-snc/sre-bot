@@ -71,7 +71,7 @@ def run_registration(registrar: SlackCommandRegistrar) -> None:
 
 
 def real_provider() -> SlackPlatformProvider:
-    settings = SimpleNamespace(enabled=True, socket_mode=True, app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
     return SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
 
 

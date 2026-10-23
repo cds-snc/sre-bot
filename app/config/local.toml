@@ -2,6 +2,7 @@
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
 
 [slack_transport]
+enabled = true
 command_prefix = "dev-"
 
 [notify_api_key_leak]

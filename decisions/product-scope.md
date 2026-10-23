@@ -13,11 +13,11 @@ The bot was named for site reliability engineering and the root README described
 
 ## Decision
 
-**One codebase, one deployable, four named product areas.** The bot is the organisation's internal operations platform; incident response is its first-class area. Isolation between areas comes from the plugin architecture, not from repositories: import-linter keeps features independent ([plugin-architecture.md](plugin-architecture.md)), and per-environment enablement ([plugins.md](plugins.md)) switches an area off without a deploy.
+**One codebase, one deployable, four named product areas.** The bot is the organisation's internal operations platform; incident response is its first-class area. Isolation between areas comes from the plugin architecture, not from repositories: import-linter keeps features independent ([plugin-architecture.md](plugin-architecture.md)), and per-environment enablement ([plugins.md](plugins.md)) switches an area off with a configuration change and no code change (the files ship in the image, so it still deploys).
 
 | Area | Packages |
 | --- | --- |
-| Incident response | `incident`, `webhooks`, `oncall` capability, `oncall_sync` |
+| Incident response | `incident`, `webhooks`, `oncall` capability, `oncall_sync`, `user_rotations` (an on-call schedule source, [oncall.md](oncall.md)) |
 | Cloud operations | AWS account health, spending, Lambda surfaces |
 | Platform access | `access` umbrella, AWS Identity Center, Google Workspace provisioning |
 | Workplace utilities | `talent`, ATIP, `secret`, `geolocate`, `rant` |
@@ -39,3 +39,4 @@ The bot was named for site reliability engineering and the root README described
 
 **Changes:**
 - 2026-10-09: Accepted. One app with four areas and written carve-out criteria.
+- 2026-10-23: `user_rotations` is in incident response; area enablement is a configuration change, not a change without a deploy (TASK-112).

@@ -18,10 +18,10 @@ from pydantic_settings import BaseSettings
 from bin import check_settings_key_ownership as checker
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.security.settings import SecuritySettings
-from infrastructure.slack.settings import SlackTransportSettings
 from integrations.slack.settings import SlackSettings
 from packages.access.common.settings import AccessSettings
 from server.configuration import IdentitySettings, ServerSettings
+from server.slack.settings import SlackTransportSettings
 
 APP_ROOT = Path(__file__).resolve().parents[3]
 REPO_ROOT = APP_ROOT.parent
@@ -289,15 +289,15 @@ def test_bare_enabled_key_in_integrations_fails(tmp_path: Path) -> None:
     assert _rules(tmp_path) == ["vendor-enabled"]
 
 
-def test_slack_enabled_is_the_one_allowed_vendor_switch(tmp_path: Path) -> None:
-    """SLACK_ENABLED is the interim transport switch until TASK-112 replaces it."""
+def test_slack_enabled_in_integrations_is_a_vendor_switch(tmp_path: Path) -> None:
+    """The transport switch lives in [slack_transport], so SLACK_ENABLED on the Slack slice now fails."""
     _write(
         tmp_path,
         "integrations/slack/settings.py",
         SETTINGS_IMPORTS + "class Slack(BaseSettings):\n    SLACK_ENABLED: bool = False\n",
     )
 
-    assert _rules(tmp_path) == []
+    assert _rules(tmp_path) == ["vendor-enabled"]
 
 
 def test_enabled_keys_outside_integrations_are_not_vendor_switches(tmp_path: Path) -> None:

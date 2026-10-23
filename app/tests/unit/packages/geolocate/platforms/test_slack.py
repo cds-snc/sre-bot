@@ -94,8 +94,6 @@ def test_geolocate_without_arguments_shows_error():
     """Test that /sre geolocate without arguments returns help text."""
     # Create a mock settings object
     mock_settings = MagicMock()
-    mock_settings.enabled = True
-    mock_settings.socket_mode = True
 
     # Create provider and register geolocate command
     provider = SlackPlatformProvider(settings=mock_settings)

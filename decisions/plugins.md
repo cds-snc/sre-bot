@@ -38,7 +38,7 @@ approvals        = "capabilities.approvals"
 
 Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat per-group name registry cannot collide. An umbrella feature's own package, its `core/` and its `common/` hold no hookimpls and are never entry points ([feature-packages.md](feature-packages.md)).
 
-**Enablement comes from configuration.** Each entry point has an enablement key in the base configuration file; the environment's file may override it ([configuration.md](configuration.md)). The host reads the entry points, skips every plugin disabled in the environment's configuration before registering it (`pm.set_blocked(name)` or filtering the entry-point list), and registers the rest. A disabled plugin registers nothing: no routes, no OpenAPI entries, no strategies, no settings reads. A platform transport (Slack Socket Mode or HTTP host) is host code, not a plugin, and has an enablement key in the configuration files too; a transport switched on without its vendor's tenant entry fails boot naming the missing key, and a transport switched off needs no entry. A vendor client is not a plugin and has no key: its tenant entry enables it ([configuration.md](configuration.md)).
+**Enablement comes from configuration.** Each entry point has an enablement key in the base configuration file, in its product area's `[plugins.<area>]` table; the environment's file may override it ([configuration.md](configuration.md)). The host reads the entry points, skips every plugin disabled in the environment's configuration before registering it (`pm.set_blocked(name)` or filtering the entry-point list), and registers the rest. A disabled plugin registers nothing: no routes, no OpenAPI entries, no strategies, no settings reads. A platform transport (Slack Socket Mode or HTTP host) is host code, not a plugin, and has an enablement key in the configuration files too; a transport switched on without its vendor's tenant entry fails boot naming the missing key, and a transport switched off needs no entry. A vendor client is not a plugin and has no key: its tenant entry enables it ([configuration.md](configuration.md)).
 
 **Extension points collect strategies at startup.** For each capability, in its declared order, the host calls that capability's hookspecs once, collects the returned strategy objects, and passes them to the capability before it initializes. At runtime the capability awaits the strategies' async methods. A plugin reacts to something in another package only through such an extension point, or through a queue contract when the reaction must reach every replica or survive a restart. The in-process event dispatcher and the `register_event_handlers` hookspec are not a supported mechanism.
 
@@ -86,7 +86,6 @@ Code defects abort in every layer: they ship with the image, the old tasks keep 
 Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading), TASK-112 (enablement from configuration), TASK-126 (feature isolation and credential checks). The package moves are listed in [plugin-architecture.md](plugin-architecture.md). `modules/` keeps its hand-written registration until each surface is rebuilt ([migration.md](migration.md)).
 
 Tolerated until closed:
-- `SLACK_ENABLED` as the Slack transport's interim switch until the configuration files exist (TASK-112);
 - a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's settings or credentials;
 - the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
 - plugins under `packages/` rather than `features/`.
@@ -99,3 +98,5 @@ Tolerated until closed:
 - 2026-10-06: TASK-110 replaced the filesystem walk with entry-point loading; an import failure now aborts boot, and that tolerated item is closed.
 - 2026-10-06: Slack hookimpls attach through the registrar Protocol, never the Bolt app, matching platform-entrypoints.md rule 2 (TASK-140.2).
 - 2026-10-15: a platform transport has an enablement key in the configuration files; an invalid vendor slice aborts boot (TASK-153).
+- 2026-10-23: enablement keys sit in one `[plugins.<area>]` table per product area; the host blocks disabled names with `pm.set_blocked` before loading the entry points, so a disabled plugin is never imported (TASK-112.2).
+- 2026-10-23: `[slack_transport] enabled` replaced `SLACK_ENABLED`; that tolerated item is closed (TASK-112.1).

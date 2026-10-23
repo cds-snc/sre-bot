@@ -4,7 +4,7 @@ title: Move the Slack slice onto the files, tenant entry included
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T18:49:00Z'
+updated_date: '2026-10-23T19:22:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -14,7 +14,7 @@ dependencies:
   - TASK-111.6.1
   - TASK-111.16
   - TASK-111.17
-  - TASK-112
+  - TASK-112.1
 references:
   - decisions/configuration.md
   - https://github.com/cds-snc/sre-bot/issues/1756
@@ -119,3 +119,15 @@ Q3 (TASK-111.17) accepted.
 Q4 All four secrets count for AC #4; the signing secret is absent everywhere today and production keeps booting without it (T-B6 production shape).
 Leak found 2026-10-23 (affects this task's tests; fixed in TASK-111.17): a failing model_validator renders input_value={...} with every field, the tokens included, and ConfigurationSlice.__init__ (contracts/configuration.py:151-157) re-raises or chains (from error) that ValidationError, so uvicorn's boot traceback would carry a Slack token to CloudWatch (reproduced with pydantic 2.14.1). T-B2, T-B3 and T-B8 assert the raised text and every log line contain no token value.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T19:22:00Z
+
+---
+
+2026-10-23: waits on TASK-112.1 only (TASK-112 split into 112.1-112.3). After 112.1 merges, refresh this plan: SLACK_ENABLED/SLACK_SOCKET_MODE are already gone from the Slack slice (B4, B5, B8 interim enabled wording), test_slack_settings_team_id_validate.py keeps only blank-team-id cases (T-B6), and the cross-slice rule messages name their keys from one constants block in server/configuration/host_configuration.py.
+
+---
+<!-- COMMENTS:END -->

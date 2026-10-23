@@ -78,9 +78,8 @@ Tolerated until closed:
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
-- scheduled tasks gated on `ENVIRONMENT == "production"` and started from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
+- scheduled tasks gated on `ENVIRONMENT == "production"` (until `[scheduler] enabled`, TASK-112.3) and started from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
 - legacy `modules/` handlers registered by hand after feature registration;
-- `SLACK_ENABLED` as the interim Slack transport switch (phase 6) until the configuration files exist (TASK-112).
 
 **Changes:**
 - 2026-09-24: phases aligned with plugin-architecture (config-file enablement, registry validation, extension-point collection, multi-replica); `applies` corrected to `target`.
@@ -91,3 +90,4 @@ Tolerated until closed:
 - 2026-10-22: the circuit breaker's failure counting follows AWS's two stages; deploys, rollback and its rehearsal are decided in deployment.md (TASK-111.16).
 - 2026-10-22: the configuration phase runs in the app factory (`uvicorn --factory`) before the middleware is built; the lifespan receives the loaded configuration (TASK-111.7).
 - 2026-10-23: logging is configured first in the configuration phase, right after the identity and `[logging]` slices (TASK-111.17).
+- 2026-10-23: the transport's switch is `[slack_transport] enabled`, and its cross-slice rules run in the configuration phase; the `SLACK_ENABLED` tolerated item is closed (TASK-112.1).
