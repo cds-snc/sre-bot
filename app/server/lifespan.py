@@ -5,6 +5,7 @@ from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from pathlib import Path
 from typing import cast
 
+import structlog
 import svcs
 from fastapi import FastAPI
 from slack_bolt import App
@@ -25,7 +26,6 @@ from infrastructure.i18n import (
     get_translation_service,
 )
 from infrastructure.logging.settings import LoggingSettings
-from infrastructure.logging.setup import configure_logging
 from infrastructure.security import get_jwks_manager
 from infrastructure.security.settings import SecuritySettings
 from integrations.slack.provider import get_slack_provider
@@ -57,8 +57,9 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
-def _get_logger_from_app(host: HostInfo, logging_settings: LoggingSettings) -> BoundLogger:
-    return configure_logging(settings=host, logging_settings=logging_settings)
+def _get_logger_from_app() -> BoundLogger:
+    # The configuration phase in the app factory already configured logging.
+    return structlog.stdlib.get_logger()
 
 
 def _list_configs_from_sections(
@@ -245,7 +246,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     security_settings = configuration.security
     directory_settings = configuration.directory
     sre_ops_settings = configuration.sre_ops
-    logger = _get_logger_from_app(host, configuration.logging)
+    logger = _get_logger_from_app()
 
     app.state.host_info = host
     app.state.logger = logger

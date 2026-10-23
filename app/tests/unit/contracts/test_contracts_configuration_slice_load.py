@@ -5,13 +5,17 @@ through install_configuration_files and builds a small slice declared here, so
 only the contract is exercised: no server loader, no app/config files. The
 .env file is disabled on the test slice so the developer's environment never
 leaks in. Assertions read the built values or the ConfigurationError message,
-which must name the file, the table and the key a maintainer has to fix.
+which must name the file, the table and the key a maintainer has to fix, and
+must never carry the value that failed: the rendered traceback, chained causes
+included, is searched for a token-shaped secret.
 """
 
+import traceback
 from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from pydantic import model_validator
 from pydantic_settings import SettingsConfigDict
 
 from contracts.configuration import (
@@ -30,6 +34,26 @@ class _ToolSettings(ConfigurationSlice):
     level: str = "INFO"
     names: tuple[str, ...] = ()
     retries: int = 3
+
+
+class _TokenSettings(ConfigurationSlice):
+    model_config = SettingsConfigDict(toml_table_header=("tool",), env_prefix="TOOL__", env_file=None)
+
+    token: str = ""
+    retries: int = 3
+
+    @model_validator(mode="after")
+    def _token_needs_retries(self) -> _TokenSettings:
+        if self.token and self.retries == 0:
+            raise ValueError("TOOL__TOKEN is set but [tool] retries is 0")
+        return self
+
+
+SECRET = "xoxb-secret-value-0001"
+
+
+def _rendered(error: BaseException) -> str:
+    return "".join(traceback.format_exception(error))
 
 
 @dataclass(frozen=True)
@@ -143,3 +167,42 @@ def test_slice_without_a_table_is_rejected() -> None:
 
         class _Tableless(ConfigurationSlice):
             model_config = SettingsConfigDict(env_prefix="TOOL__")
+
+
+def test_failing_validator_names_the_rule_without_any_input_value(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A model rule's failure names the table and the rule; no field value, the secret included, is rendered."""
+    _install(tmp_path, "[tool]\nretries = 0\n")
+    monkeypatch.setenv("TOOL__TOKEN", SECRET)
+
+    with pytest.raises(ConfigurationError) as raised:
+        _TokenSettings()
+
+    assert "[tool]" in str(raised.value)
+    assert "TOOL__TOKEN is set but [tool] retries is 0" in str(raised.value)
+    assert SECRET not in _rendered(raised.value)
+
+
+def test_bad_type_from_the_environment_names_the_variable_without_its_value(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A wrongly typed environment value names its <TABLE>__<FIELD> variable and never echoes the value."""
+    _install(tmp_path, "[tool]\n")
+    monkeypatch.setenv("TOOL__RETRIES", SECRET)
+
+    with pytest.raises(ConfigurationError) as raised:
+        _TokenSettings()
+
+    assert "TOOL__RETRIES" in str(raised.value)
+    assert SECRET not in _rendered(raised.value)
+
+
+def test_bad_type_in_file_never_chains_the_validation_error(tmp_path: Path) -> None:
+    """The file error stands alone: no chained validation error re-renders the value under it."""
+    _install(tmp_path, f'[tool]\nretries = "{SECRET}"\n')
+
+    with pytest.raises(ConfigurationError) as raised:
+        _TokenSettings()
+
+    assert raised.value.__cause__ is None
+    assert raised.value.__suppress_context__ is True
+    assert SECRET not in _rendered(raised.value)

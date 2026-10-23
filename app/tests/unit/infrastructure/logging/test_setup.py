@@ -48,7 +48,7 @@ class TestConfigureLogging:
 
     def test_configure_logging_returns_bound_logger(self, mock_settings):
         """configure_logging returns a BoundLogger instance."""
-        result = configure_logging(settings=mock_settings)
+        result = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert result is not None
         assert hasattr(result, "info")
@@ -62,10 +62,10 @@ class TestConfigureLogging:
         Mirrors a module-level logger that first logs during one app lifespan and is later
         asserted on with capture_logs after another lifespan has reconfigured structlog.
         """
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
         logger = structlog.get_logger()
         logger.info("first_use")
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         with capture_logs() as entries:
             logger.warning("after_reconfigure")
@@ -74,43 +74,43 @@ class TestConfigureLogging:
 
     def test_configure_logging_default_parameters(self, mock_settings):
         """configure_logging works with default parameters."""
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert logger is not None
 
     def test_configure_logging_with_log_level(self, mock_settings):
         """configure_logging accepts log_level parameter."""
         # In test environment, logging is suppressed, but function should still work
-        logger = configure_logging(settings=mock_settings, log_level="DEBUG")
+        logger = configure_logging(mock_settings.environment, LoggingSettings(), log_level="DEBUG")
         assert logger is not None
 
-        logger = configure_logging(settings=mock_settings, log_level="INFO")
+        logger = configure_logging(mock_settings.environment, LoggingSettings(), log_level="INFO")
         assert logger is not None
 
-        logger = configure_logging(settings=mock_settings, log_level="WARNING")
+        logger = configure_logging(mock_settings.environment, LoggingSettings(), log_level="WARNING")
         assert logger is not None
 
     def test_configure_logging_production_mode_from_environment(self, mock_settings):
         """configure_logging derives production mode from ENVIRONMENT."""
         mock_settings.environment = "production"
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
         assert logger is not None
 
         mock_settings.environment = "local"
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
         assert logger is not None
 
     def test_configure_logging_idempotent(self, mock_settings):
         """Multiple configure_logging calls are safe."""
-        logger1 = configure_logging(settings=mock_settings)
-        logger2 = configure_logging(settings=mock_settings)
+        logger1 = configure_logging(mock_settings.environment, LoggingSettings())
+        logger2 = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert logger1 is not None
         assert logger2 is not None
 
     def test_configure_logging_suppresses_in_test_env(self, mock_settings):
         """In test environment, root logger level is set high to suppress output."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         # In test environment, root logger should be set to suppress output
         root_logger = logging.getLogger()
@@ -124,7 +124,7 @@ class TestLoggingBestPractices:
 
     def test_standard_structlog_pattern(self, mock_settings):
         """Standard structlog.get_logger() pattern works."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         # This is the recommended pattern
         logger = structlog.get_logger()
@@ -135,7 +135,7 @@ class TestLoggingBestPractices:
 
     def test_bind_for_context(self, mock_settings):
         """Use .bind() for adding context."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         logger = structlog.get_logger()
         log = logger.bind(user_id="123", operation="test")
@@ -145,7 +145,7 @@ class TestLoggingBestPractices:
 
     def test_chained_binds(self, mock_settings):
         """Multiple .bind() calls can be chained."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         logger = structlog.get_logger()
         log = logger.bind(request_id="req-123")
@@ -155,7 +155,7 @@ class TestLoggingBestPractices:
 
     def test_logging_methods_dont_raise(self, mock_settings):
         """Logging methods execute without raising exceptions."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         logger = structlog.get_logger()
         log = logger.bind(component="test")
@@ -168,7 +168,7 @@ class TestLoggingBestPractices:
 
     def test_exception_logging(self, mock_settings):
         """Exception logging works correctly."""
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
 
         logger = structlog.get_logger()
 
@@ -232,9 +232,8 @@ def production_logging(mock_settings, monkeypatch) -> Iterator[io.StringIO]:
     saved_handlers, saved_level = root.handlers[:], root.level
     saved_config = structlog.get_config()
     monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
-    monkeypatch.setattr(logging_setup, "get_logging_settings", LoggingSettings)
     mock_settings.environment = "production"
-    configure_logging(settings=mock_settings)
+    configure_logging(mock_settings.environment, LoggingSettings())
     stream = io.StringIO()
     handler = root.handlers[0]
     assert isinstance(handler, logging.StreamHandler)
@@ -322,7 +321,7 @@ class TestConfigureLoggingRealCodePath:
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
         mock_settings.environment = "production"
 
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert logger is not None
         assert isinstance(_root_renderer(), structlog.processors.JSONRenderer)
@@ -332,7 +331,7 @@ class TestConfigureLoggingRealCodePath:
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
         mock_settings.environment = "local"
 
-        logger = configure_logging(settings=mock_settings)
+        logger = configure_logging(mock_settings.environment, LoggingSettings())
 
         assert logger is not None
         assert isinstance(_root_renderer(), structlog.dev.ConsoleRenderer)
@@ -342,7 +341,7 @@ class TestConfigureLoggingRealCodePath:
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
         mock_settings.environment = "production"
 
-        configure_logging(settings=mock_settings)
+        configure_logging(mock_settings.environment, LoggingSettings())
         config = structlog.get_config()
         # Drop the JSONRenderer so capture_logs can inspect the event dict directly.
         processors = config["processors"][:-1]
@@ -357,7 +356,7 @@ class TestConfigureLoggingRealCodePath:
         """With no explicit level, the root logger takes LoggingSettings.log_level."""
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
 
-        configure_logging(settings=mock_settings, logging_settings=LoggingSettings(log_level="WARNING"))
+        configure_logging(mock_settings.environment, LoggingSettings(log_level="WARNING"))
 
         assert logging.getLogger().level == logging.WARNING
 
@@ -366,8 +365,8 @@ class TestConfigureLoggingRealCodePath:
         monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
 
         configure_logging(
-            settings=mock_settings,
-            logging_settings=LoggingSettings(log_level="WARNING"),
+            mock_settings.environment,
+            LoggingSettings(log_level="WARNING"),
             log_level="DEBUG",
         )
 

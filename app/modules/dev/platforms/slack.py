@@ -11,6 +11,7 @@ from collections.abc import Callable
 from typing import Any
 
 import structlog
+from slack_sdk import WebClient
 
 from contracts.configuration import host_info
 from contracts.slack.models import CommandPayload, CommandResponse
@@ -25,7 +26,11 @@ from modules.dev import (
 )
 
 logger = structlog.get_logger()
-client = LegacySlackBootstrap().web
+
+
+def _web_client() -> WebClient:
+    """Build the Slack Web client when a command runs; building it at import would validate settings before logging is configured."""
+    return LegacySlackBootstrap().web
 
 
 def _require_dev_environment(
@@ -88,7 +93,7 @@ def _call_legacy_handler(
     # Call handler with standard signature
     handler(
         *handler_args,
-        client=client,
+        client=_web_client(),
         body=body,
         respond=capture_respond,
         **handler_kwargs,
@@ -208,7 +213,7 @@ def handle_stale_dev_command(payload: CommandPayload) -> CommandResponse:
                 message="Missing channel ID for stale notification.",
                 ephemeral=True,
             )
-        client.chat_postMessage(
+        _web_client().chat_postMessage(
             channel=channel_id,
             text=text,
             attachments=attachments,

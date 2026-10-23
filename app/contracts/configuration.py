@@ -152,10 +152,8 @@ class ConfigurationSlice(BaseSettings):
         try:
             super().__init__(**values)
         except ValidationError as error:
-            located = _locate_file_errors(type(self), error)
-            if not located:
-                raise
-            raise ConfigurationError("; ".join(located)) from error
+            # Raised from None: pydantic renders every input value, secrets included, into its message.
+            raise ConfigurationError(describe_validation_error(error, type(self))) from None
 
     @classmethod
     def settings_customise_sources(
@@ -176,17 +174,31 @@ class ConfigurationSlice(BaseSettings):
         return init_settings, env_settings, own_dotenv_settings, toml_settings, file_secret_settings
 
 
-def _locate_file_errors(slice_cls: type[ConfigurationSlice], error: ValidationError) -> list[str]:
-    """Name the last installed file setting each failing key of the slice's table."""
-    if _files is None:
-        return []
-    tables = [(path, _read(path).get(slice_cls._table, {})) for path in _files.paths]
-    located: list[str] = []
-    for detail in error.errors():
+def describe_validation_error(error: ValidationError, settings_cls: type[BaseSettings] | None = None) -> str:
+    """Name each failing key and the reason, never the value that failed.
+
+    A key set in a configuration file names the last installed file setting it;
+    any other key names its environment variable. pydantic's own message renders
+    every input value, so only the location and the message are read. Without the
+    slice class, the error's title names it.
+    """
+    name = settings_cls.__name__ if settings_cls is not None else error.title
+    table = getattr(settings_cls, "_table", None)
+    tables = [(path, _read(path).get(table, {})) for path in _files.paths] if table and _files is not None else []
+    prefix = str(settings_cls.model_config.get("env_prefix", "")) if settings_cls is not None else ""
+    described: list[str] = []
+    for detail in error.errors(include_input=False, include_url=False):
+        location = ".".join(str(part) for part in detail["loc"])
         key = str(detail["loc"][0]) if detail["loc"] else ""
-        files = [path for path, table in tables if key in table]
+        files = [path for path, values in tables if key and key in values]
         if files:
             # The full location names a key inside a nested entry, such as issuers.0.audience.
-            location = ".".join(str(part) for part in detail["loc"])
-            located.append(f"{files[-1]}: [{slice_cls._table}] {location}: {detail['msg']}")
-    return located
+            described.append(f"{files[-1]}: [{table}] {location}: {detail['msg']}")
+        elif key:
+            variable = f"{prefix}{'__'.join(str(part) for part in detail['loc'])}".upper()
+            scope = f" [{table}]" if table else ""
+            described.append(f"{name}{scope} {location} (environment {variable}): {detail['msg']}")
+        else:
+            scope = f" [{table}]" if table else ""
+            described.append(f"{name}{scope}: {detail['msg']}")
+    return "; ".join(described)

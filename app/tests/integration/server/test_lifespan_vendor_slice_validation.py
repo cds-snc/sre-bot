@@ -5,8 +5,8 @@ directory, the Slack provider, plugins, translation), so only the configuration
 phase does real work. The vendor slices are built from monkeypatched
 environment variables with their caches cleared and the .env file disabled. A
 recording spy replaces socket.connect to show the configuration phase opens no
-connection. An invalid vendor slice must stop startup before the lifespan
-yields and before core services are built.
+connection. An invalid vendor slice must stop startup with a ConfigurationError naming the
+key, before the lifespan yields and before core services are built.
 """
 
 import socket
@@ -16,8 +16,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
-from pydantic import ValidationError
 
+from contracts.configuration import ConfigurationError
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from tests.factories.lifespan import lifespan
@@ -62,7 +62,7 @@ async def _boot_fails_naming(key: str) -> None:
     reached_yield = False
     with ExitStack() as stack:
         core_services = _stub_later_phases(stack)
-        with pytest.raises(ValidationError, match=key):
+        with pytest.raises(ConfigurationError, match=key):
             async with lifespan(FastAPI()):
                 reached_yield = True
 
