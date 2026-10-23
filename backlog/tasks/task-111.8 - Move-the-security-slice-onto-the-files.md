@@ -4,7 +4,7 @@ title: Move the security slice onto the files
 status: In Progress
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T14:15:00Z'
+updated_date: '2026-10-23T15:33:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -30,11 +30,11 @@ issuer_config, cors_allowed_origins/methods/headers and dev_bypass_enabled move 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SecuritySettings reads issuer_config, the CORS lists and dev_bypass_enabled from [security]; production resolves the same values as before
+- [x] #1 SecuritySettings reads issuer_config, the CORS lists and dev_bypass_enabled from [security]; production resolves the same values as before
 - [x] #2 dev_bypass_token is read only as SECURITY__DEV_BYPASS_TOKEN; base.toml keeps the dev bypass off
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [x] #4 Unknown keys in [security] fail boot naming the file, table and key (extra=forbid), and a wildcard in a CORS list or an issuer without audience still fails boot
-- [ ] #5 A production pin test asserts the checked-in files resolve the pre-change values (one issuer with audience, empty CORS origins, default methods/headers, dev bypass off, no token) and that no configuration file carries dev_bypass_token
+- [x] #5 A production pin test asserts the checked-in files resolve the pre-change values (one issuer with audience, empty CORS origins, default methods/headers, dev bypass off, no token) and that no configuration file carries dev_bypass_token
 - [x] #6 issuer_config must be a table and each issuer entry is boot-validated (only jwks_uri, algorithms, audience; https jwks_uri or loopback http; algorithms a non-empty asymmetric subset, RS256 when absent); each failure names the issuer and key (Q1)
 - [x] #7 create_app refuses to build under ENVIRONMENT=production when dev_bypass_enabled is true or a dev_bypass_token is set, naming the key; security.md and configuration.md:17 amended (Q2)
 <!-- AC:END -->
@@ -179,4 +179,14 @@ Open:
 - Human: G4 (append the production entry, hash match), the app/.env.example edit (the agent's read of it is denied), then G1-G3 and G5-G8 at merge. AC #1, #3 and #5 close after G4.
 - Follow-up candidate, not created: ConfigurationSlice attributes an error to the file holding the key even when an env var or keyword argument supplied the bad value (pre-existing, all slices).
 - TASK-116 AC #5 rescoped: readers take the IssuerEntry list and the issuer_config property is deleted.
+
+2026-10-23, G4 done by the human: production.toml carries the one production issuer (https://backstage.cdssandbox.xyz/api/auth, ES256, audience backstage), generated from the sre-bot-config blob. The blob line is 'ISSUER_CONFIG = '...'' with spaces around '=', so the G4 sed in the plan needs the space-tolerant pattern. Re-run: ruff clean, 5676 passed, key ownership OK, contracts 12 kept. All ACs checked. Open for the human: the hash-match result, the app/.env.example edit, G1-G3 and G5-G8 at merge, then V1-V10.
+
+2026-10-23, G2 G4-G8 passed (human), G3 baseline issuer_count = 1 (every boot logged in the window, no missing-issuer warning; the newest boot after the 111.7 deploy is checked as part of G1). filter-log-events over a multi-day window hangs on this log group: use Logs Insights for G3, V4, V5 and V9, e.g. aws logs start-query --region ca-central-1 --log-group-name /ecs/sre-bot-app --start-time $(date -u -d '30 minutes ago' +%s) --end-time $(date -u +%s) --query-string 'filter @message like /security_services|dev_bypass_token_used|ConfigurationError|ValidationError|Traceback/ | sort @timestamp desc | limit 50' --query queryId --output text, then aws logs get-query-results --region ca-central-1 --query-id <id>.
+
+Correction to the Insights tip: read the results with --output json | jq -r '.status, (.results[][] | select(.field == "@message") | .value | (fromjson? // {event: "non-json line"}) | "\(.timestamp // "-")  \(.event)  \(.issuer_count // "")")' (the JMESPath filter form fails to parse).
+
+2026-10-23, pre-merge gates (human, script check-now.zsh): G2 pass (11 parameters at Version 2, no /sre-bot/SECURITY__). G3 baseline issuer_count 1 (both 111.7 tasks at 13:29 UTC). G4 MATCH. G5 rollback target: sre-bot-task:41, image sre-bot@sha256:28f828355208526a8e8621040cd809ed8a969b69efcf588590bcc4e9c5a662b3 (tag still to read from ECR). G6 pass: ruff clean, mypy 47 (baseline), 5676 passed, contracts 12 kept, key ownership OK. G7 pass: .env.example carries only SECURITY__ names. G1 open: 111.7 V4/V8 (two non-JSON lines in the boot window) and the 111.7 DoD #1 image record.
+
+2026-10-23: G1 pass (111.7 V1-V8 passed, its ACs and DoD checked). G5 rollback tag: image_tag=52282a9c0dc8222825b8335caaecaef8eafd2e72-2026-10-23 (sre-bot-task:41, sha256:28f82835...). G8 is checked at merge, then DoD #1.
 <!-- SECTION:NOTES:END -->

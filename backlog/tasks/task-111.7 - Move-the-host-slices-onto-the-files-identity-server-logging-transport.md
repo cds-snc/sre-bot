@@ -1,10 +1,10 @@
 ---
 id: TASK-111.7
 title: 'Move the host slices onto the files: identity, server, logging, transport'
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-22T20:25:00Z'
+updated_date: '2026-10-23T15:35:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -36,14 +36,14 @@ The host reads its facts and values from the files. Identity (ENVIRONMENT, GIT_S
 - [x] #5 infrastructure/configuration/app.py, infrastructure/configuration/infrastructure/server.py, DevSettings, the dead ServerSettings fields and their re-exports are deleted; every reader outside server/ uses the HostInfo accessor; no module-level settings or HostInfo reads remain; the integrations.notify.client import-linter ignore entry is removed
 - [x] #6 create_app() in server/server.py runs the configuration phase once, builds CORS and body-size middleware from validated slices and hands the loaded configuration to the lifespan, which no longer loads or installs files; server/server.py builds nothing at import; entry.sh and the Makefile dev, debug and run targets start uvicorn with --factory main:create_app
 - [x] #7 production.toml sets public_base_url, sre_test_channel_id, the Notify ops channel and on-call group; a test asserts the production, local and ci values
-- [ ] #8 .env.example, the pytest env and the CI workflow use the new names and drop the dead ones
+- [x] #8 .env.example, the pytest env and the CI workflow use the new names and drop the dead ones
 - [x] #9 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Human: ops, oncall and test channel ids supplied for production.toml; pre-merge SSM describe-parameters re-run (11 parameters, Version above 1); previous image tag recorded in the notes
-- [ ] #2 Human: post-deploy checklist V1-V8 passed (including /version SHA, startup message and a Slack command)
+- [x] #1 Human: ops, oncall and test channel ids supplied for production.toml; pre-merge SSM describe-parameters re-run (11 parameters, Version above 1); previous image tag recorded in the notes
+- [x] #2 Human: post-deploy checklist V1-V8 passed (including /version SHA, startup message and a Slack command)
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -171,6 +171,10 @@ Plan approved 2026-10-22 (human) as one PR, a single-PR size-gate exception: abo
 - Google Cloud OAuth client behind GOOGLE_CLIENT_ID, optional, any time: revoke it (APIs and Services, Credentials) once confirmed that Backstage or another app does not share it.
 - AWS SSM blobs sre-bot-config and sre-bot-config-infrastructure: no edits. Their keys NOTIFY_OPS_CHANNEL_ID, NOTIFY_ONCALL_GROUP_ID, SRE_TEST_CHANNEL_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY and SLACK_DEV_MSG_CHANNEL are unread but a rollback image reads them; TASK-111.15.1 stops fetching the blobs and 111.15.2 deletes them through terraform.
 - Task definition env: BACKEND_URL and SLACK__COMMAND_PREFIX are unread; TASK-111.15.1 removes them through terraform.
+
+2026-10-23, post-deploy checks (human, script check-now.zsh). Deploy run 39961216353 (52282a9c): build and deploy success; sbom failed at 'Docker generate SBOM' (known trivy-db rate limit). AC #8: app/.env.example carries none of the retired names. DoD #1: channel ids in production.toml; SSM 11 parameters, all at Version 2. V1 pass. V2: PRIMARY COMPLETED on sre-bot-task:41, 2 tasks. V3: task-definition names as expected. V5: /version 52282a9c0dc8222825b8335caaecaef8eafd2e72, /health 200. V6: startup message in the test and ops channels at 13:29 UTC. V7: /incident and /secret answer with no prefix. Boot events: two tasks at 13:29 UTC, each with security_services_initialized issuer_count 1. V4/V8 open: the boot-window query matched two non-JSON lines, still to identify. DoD #1 open: the pre-deploy image (sre-bot-task:40) still to record.
+
+2026-10-23, closed by the human's checks: V4 and V8 pass. The two non-JSON lines in the boot window are the INFO slack_signing_secret_not_set_in_socket_mode event, one per task; that is expected, since production does not set the signing secret in Socket Mode (doc-14). DoD #1: previous image (revision 40) is sre-bot@sha256:9b7cd14c562c0bc0b65c8132fa8f27c0d1f008a15bd39b847b60081fd03b1799. All ACs and DoD checked; Done is the human's move. Follow-up proposed, not created: the configuration phase now runs in create_app() before the lifespan configures structlog, so its events render in console format instead of JSON (observability.md: one JSON stream; alerts key on JSON fields). Configure logging in create_app() right after the [logging] slice loads.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

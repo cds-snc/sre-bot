@@ -8,3 +8,9 @@ sre_test_channel_id = "C033L7RGCT0"
 [notify_api_key_leak]
 channel_id = "CNWA63606"
 oncall_group_id = "S0BNW0G8CFK"
+
+[[security.issuers]]
+issuer = "https://backstage.cdssandbox.xyz/api/auth"
+jwks_uri = "https://backstage.cdssandbox.xyz/api/auth/.well-known/jwks.json"
+algorithms = ["ES256"]
+audience = "backstage"
