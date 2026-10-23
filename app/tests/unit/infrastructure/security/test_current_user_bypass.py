@@ -27,7 +27,7 @@ def _jwt_failure() -> HTTPException:
 
 
 def _security(enabled: bool) -> SecuritySettings:
-    return SecuritySettings(_env_file=None, DEV_BYPASS_ENABLED=enabled, DEV_BYPASS_TOKEN=SecretStr("dev-token"))
+    return SecuritySettings(_env_file=None, dev_bypass_enabled=enabled, dev_bypass_token=SecretStr("dev-token"))
 
 
 def _app(environment: str) -> HostInfo:
@@ -65,7 +65,7 @@ def test_bypass_denied_when_bypass_disabled(
     mock_host_info,
     mock_validate_jwt_token,
 ) -> None:
-    """Bypass must be denied when DEV_BYPASS_ENABLED is false."""
+    """Bypass must be denied when dev_bypass_enabled is false."""
     mock_get_security_settings.return_value = _security(enabled=False)
     mock_host_info.return_value = _app("local")
     mock_validate_jwt_token.side_effect = _jwt_failure()
@@ -109,8 +109,8 @@ def test_bypass_denied_when_token_unset(
     mock_host_info,
     mock_validate_jwt_token,
 ) -> None:
-    """Bypass must be denied when no DEV_BYPASS_TOKEN is configured, even with the flag on."""
-    mock_get_security_settings.return_value = SecuritySettings(_env_file=None, DEV_BYPASS_ENABLED=True)
+    """Bypass must be denied when no dev_bypass_token is configured, even with the flag on."""
+    mock_get_security_settings.return_value = SecuritySettings(_env_file=None, dev_bypass_enabled=True)
     mock_host_info.return_value = _app("local")
     mock_validate_jwt_token.side_effect = _jwt_failure()
 

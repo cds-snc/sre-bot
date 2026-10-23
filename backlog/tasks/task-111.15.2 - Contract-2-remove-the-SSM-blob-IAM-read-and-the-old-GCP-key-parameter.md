@@ -4,6 +4,7 @@ title: 'Contract 2: remove the SSM blob IAM read and the old GCP key parameter'
 status: To Do
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
+updated_date: '2026-10-23T13:43:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -39,3 +40,15 @@ Second half of TASK-111.15, after the TASK-111.15.1 deploy is verified. Removes 
 <!-- DOD:BEGIN -->
 - [ ] #1 Human: both SSM parameters and the GCP_SRE_SERVICE_ACCOUNT_KEY_FILE GitHub secret are deleted after the deploy is verified
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-23T13:43:00Z
+
+---
+
+2026-10-23 (TASK-111.8 planning): the blob's ISSUER_CONFIG key is read only by images older than 111.8; it goes with sre-bot-config, no separate step.
+
+---
+<!-- COMMENTS:END -->

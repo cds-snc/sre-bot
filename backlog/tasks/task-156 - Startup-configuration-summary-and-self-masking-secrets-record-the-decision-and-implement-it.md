@@ -5,8 +5,8 @@ title: >-
   and implement it
 status: To Do
 assignee: []
-created_date: '2026-10-20 12:31'
-updated_date: '2026-10-20 23:36'
+created_date: 2026-10-20 12:31
+updated_date: '2026-10-23T13:43:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -18,7 +18,7 @@ references:
   - decisions/configuration.md
   - decisions/observability.md
   - decisions/lifecycle.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1757'
+  - https://github.com/cds-snc/sre-bot/issues/1757
 priority: medium
 type: feature
 ordinal: 405000
@@ -51,7 +51,7 @@ Depends on TASK-111, which builds the TOML loader that the summary reports on. E
 - [ ] #1 decisions/configuration.md records the startup identity event, the generated configuration summary (field names, secret presence only, non-secret file values, files loaded, non-secret config hash), secret typing, the WARNING rule for security-weakening settings and the no-config-endpoint rule; observability.md and lifecycle.md link to it
 - [ ] #2 Lifespan's configuration phase emits the summary for every slice it validates, generated from that set rather than a hand-kept list, and _list_configs_from_sections is removed
 - [ ] #3 Every secret field in a settings slice is SecretStr or SecretBytes, and a test asserts no slice repr or model_dump_json shows a secret value
-- [ ] #4 The dev bypass enabled at boot and an empty issuer configuration each log a WARNING naming the setting
+- [ ] #4 Outside production, the dev bypass enabled at boot logs a WARNING naming the setting, and an empty issuer configuration logs a WARNING in every environment (in production the bypass already fails boot, TASK-111.8)
 - [ ] #5 ruff, lint-imports, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
@@ -59,7 +59,18 @@ Depends on TASK-111, which builds the TOML loader that the summary reports on. E
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-20 23:27
+
 ---
+
 2026-10-20 (TASK-111 planning): TASK-111 is split into 111.1 to 111.15; this task needs only the loader (TASK-111.2). Settings fields become lower snake_case (TASK-111.5, 111.6), so the summary prints lower-case keys; secrets reach the app as task-definition secrets named <SLICE>__<FIELD>.
+
+---
+
+created: 2026-10-23T13:43:00Z
+
+---
+
+2026-10-23 (TASK-111.8 planning, proposed): production refuses to boot with the dev bypass flag on or a token set (security.md amendment in 111.8), so AC #4's bypass WARNING applies outside production only.
+
 ---
 <!-- COMMENTS:END -->

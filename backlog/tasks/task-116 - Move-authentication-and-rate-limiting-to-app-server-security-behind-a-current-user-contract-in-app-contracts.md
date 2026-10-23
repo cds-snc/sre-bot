@@ -5,8 +5,8 @@ title: >-
   current-user contract in app/contracts/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:00'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:00
+updated_date: '2026-10-23T14:15:00Z'
 labels:
   - plugin-architecture
   - security
@@ -19,7 +19,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/security.md
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1659'
+  - https://github.com/cds-snc/sre-bot/issues/1659
 priority: medium
 type: task
 ordinal: 258000
@@ -44,13 +44,25 @@ No behaviour change: issuer, audience, algorithm pinning and the dev-bypass doub
 - [ ] #2 JWT/JWKS validation, the dev-bypass guard and the rate limiter live in app/server/security/ with the SecuritySettings slice; app/infrastructure/security/ is deleted with no re-export
 - [ ] #3 Existing auth tests (issuer, audience, pinned algorithms, dev-bypass double guard, CORS) pass unchanged in behaviour
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 JWT and JWKS readers take the IssuerEntry list (TASK-111.8) instead of the issuer_config dict property, which is deleted; the production dev-bypass boot refusal moves with the security code
 <!-- AC:END -->
 
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-20 23:28
+
 ---
+
 2026-10-20 (TASK-111 planning): TASK-111 moves this slice's values into the configuration files under a table whose name does not depend on the module path, so this move relocates the settings class only; the files and env names stay as they are.
+
+---
+
+created: 2026-10-23T13:43:00Z
+
+---
+
+2026-10-23 (TASK-111.8 planning, proposed): 111.8 boot-validates issuer entries inside the dict-typed slice and adds the production dev-bypass refusal in create_app; the typed entry and moving the refusal belong to this move.
+
 ---
 <!-- COMMENTS:END -->

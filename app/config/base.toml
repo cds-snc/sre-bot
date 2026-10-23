@@ -11,6 +11,17 @@ public_base_url = "http://127.0.0.1:8000"
 sre_test_channel_id = ""
 webhook_max_body_bytes = 262144
 
+[security]
+# Trusted JWT issuers: one [[security.issuers]] entry each, with issuer,
+# jwks_uri (https), algorithms (asymmetric) and audience. None by default.
+issuers = []
+cors_allowed_origins = []
+cors_allowed_methods = ["GET", "POST"]
+cors_allowed_headers = ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
+# The dev bypass is for local development only: a developer opts in with
+# SECURITY__DEV_BYPASS_ENABLED and SECURITY__DEV_BYPASS_TOKEN in app/.env.
+dev_bypass_enabled = false
+
 [slack_transport]
 command_prefix = ""
 

@@ -24,11 +24,11 @@ Usage in route handlers:
         ...
 
 Development bypass:
-    Set DEV_BYPASS_ENABLED=true and DEV_BYPASS_TOKEN=<random-string> in your .env
-    (non-production only; both are read from the security settings slice).
+    Set SECURITY__DEV_BYPASS_ENABLED=true and SECURITY__DEV_BYPASS_TOKEN=<random-string>
+    in your .env (non-production only; production refuses to boot with either set).
     Pass that value as the Bearer token to skip JWKS validation entirely.
     A synthetic User is returned. Blocked when ENVIRONMENT == "production"
-    or DEV_BYPASS_ENABLED is False.
+    or dev_bypass_enabled is False.
 
 Slack transport: authentication is handled at the platform layer via Slack signing
 secret verification before command handlers are invoked. The CommandPayload.user_id
@@ -65,8 +65,8 @@ def get_current_user(
     It performs token validation, scope enforcement, and identity resolution
     in a single, composable step.
 
-    In non-production environments, if DEV_BYPASS_ENABLED is true, and
-    DEV_BYPASS_TOKEN is set in the security settings, and the incoming bearer
+    In non-production environments, if dev_bypass_enabled is true, and
+    dev_bypass_token is set in the security settings, and the incoming bearer
     token matches it (compared in constant time), JWKS validation is skipped and
     a synthetic developer User is returned. This bypass is inert in production.
 

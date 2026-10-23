@@ -3,7 +3,7 @@
 
 Generates a self-signed EC key pair, serves the public key as a JWKS endpoint
 on a background HTTP server, and prints a signed JWT that the running SRE Bot
-will accept when ISSUER_CONFIG points at this local server.
+will accept when SECURITY__ISSUERS points at this local server.
 
 Usage:
     python3 bin/dev-token.py
@@ -11,8 +11,8 @@ Usage:
 Then in a separate terminal, configure your .env and start the app:
     DEV_JWKS_PORT defaults to 8001.
 
-.env snippet (add or replace ISSUER_CONFIG):
-    ISSUER_CONFIG={"http://127.0.0.1:8001": {"jwks_uri": "http://127.0.0.1:8001/.well-known/jwks.json", "algorithms": ["ES256"], "audience": "sre-bot-dev"}}
+.env snippet (add or replace SECURITY__ISSUERS):
+    SECURITY__ISSUERS=[{"issuer": "http://127.0.0.1:8001", "jwks_uri": "http://127.0.0.1:8001/.well-known/jwks.json", "algorithms": ["ES256"], "audience": "sre-bot-dev"}]
 
 Then smoke test:
     curl -s -X POST http://localhost:8000/api/v1/access/sync-runs \\
@@ -165,14 +165,15 @@ def main() -> None:
     t.start()
     time.sleep(0.1)  # let the server finish binding
 
-    issuer_config = json.dumps(
-        {
-            ISSUER: {
+    issuers = json.dumps(
+        [
+            {
+                "issuer": ISSUER,
                 "jwks_uri": f"{ISSUER}/.well-known/jwks.json",
                 "algorithms": ["ES256"],
                 "audience": AUDIENCE,
             }
-        }
+        ]
     )
 
     print()
@@ -180,9 +181,9 @@ def main() -> None:
     print("  Local JWKS server running on port", PORT)
     print("=" * 70)
     print()
-    print("1. Add this to your .env (replace any existing ISSUER_CONFIG):")
+    print("1. Add this to your .env (replace any existing SECURITY__ISSUERS):")
     print()
-    print(f"   ISSUER_CONFIG='{issuer_config}'")
+    print(f"   SECURITY__ISSUERS='{issuers}'")
     print()
     print("2. Start the app in another terminal:")
     print()
