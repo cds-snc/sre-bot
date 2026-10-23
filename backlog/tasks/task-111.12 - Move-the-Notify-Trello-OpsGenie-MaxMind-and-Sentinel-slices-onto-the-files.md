@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T17:10:00Z'
+updated_date: '2026-10-23T18:48:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -32,4 +32,5 @@ The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>
 <!-- AC:BEGIN -->
 - [ ] #1 Each of the five slices reads its non-secret values from the files and its credentials from <SLICE>__<FIELD> names
 - [ ] #2 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #3 integrations/opsgenie/ no longer has create_alert (no caller since the Notify key-revocation change): the function, its export and its tests are deleted
 <!-- AC:END -->

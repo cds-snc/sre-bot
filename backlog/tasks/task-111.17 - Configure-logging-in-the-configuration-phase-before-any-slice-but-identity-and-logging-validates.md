@@ -3,10 +3,10 @@ id: TASK-111.17
 title: >-
   Configure logging in the configuration phase, before any slice but identity
   and [logging] validates
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-23T16:42:00Z'
-updated_date: '2026-10-23T18:09:00Z'
+updated_date: '2026-10-23T18:25:00Z'
 labels:
   - configuration
   - observability
