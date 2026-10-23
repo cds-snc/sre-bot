@@ -24,7 +24,9 @@ pytestmark = pytest.mark.unit
 @pytest.fixture(autouse=True)
 def _stub_settings_and_aws(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("server.services.get_aws_client", MagicMock())
-    monkeypatch.setattr("server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(tenant=SlackTenant(team_id="T0123")))
+    monkeypatch.setattr(
+        "server.configured_systems.get_slack_settings", lambda: SlackSettings.model_construct(tenant=SlackTenant(team_id="T0123"))
+    )
     monkeypatch.setattr(
         "server.configured_systems.get_google_workspace_settings",
         lambda: GoogleWorkspaceSettings.model_construct(
