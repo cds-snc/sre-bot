@@ -285,7 +285,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
 
     pm = get_plugin_manager()
     # Any plugin that fails to load stops startup here, before the app serves.
-    load_plugins(pm, logger.bind(phase="plugin_loading"))
+    load_plugins(pm, configuration.disabled_plugins, logger.bind(phase="plugin_loading"))
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters

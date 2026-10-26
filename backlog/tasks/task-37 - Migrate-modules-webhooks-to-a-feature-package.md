@@ -6,15 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-23T17:10:00Z'
+updated_date: '2026-10-26T14:03:00Z'
 labels:
   - migration
   - webhooks
   - phase-4
 milestone: m-4
 dependencies:
-  - TASK-7
-  - TASK-36.2
+  - TASK-168
 references:
   - decisions/webhooks.md
   - decisions/migration.md

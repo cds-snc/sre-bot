@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
+updated_date: '2026-10-26T14:03:00Z'
 labels:
   - incident
 milestone: m-7
 dependencies:
-  - TASK-145
+  - TASK-167
 type: feature
 ordinal: 437000
 ---

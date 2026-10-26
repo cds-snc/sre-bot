@@ -66,7 +66,9 @@ async def test_core_services_phase_runs_before_plugin_loading() -> None:
     with ExitStack() as stack:
         _stub_later_phases(stack)
         stack.enter_context(patch("server.lifespan.initialize_core_services", _record_core_services))
-        stack.enter_context(patch("server.lifespan.load_plugins", side_effect=lambda pm, logger: order.append("plugin_loading")))
+        stack.enter_context(
+            patch("server.lifespan.load_plugins", side_effect=lambda pm, disabled, logger: order.append("plugin_loading"))
+        )
         async with lifespan(FastAPI()):
             pass
 

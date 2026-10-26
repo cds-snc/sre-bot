@@ -60,7 +60,7 @@ def test_access_plugins_register_routes_and_slack_commands_from_interactions() -
     """Access plugins should remain discoverable and register interactions endpoints."""
     get_plugin_manager.cache_clear()
     pm = get_plugin_manager()
-    load_plugins(pm, MagicMock())
+    load_plugins(pm, (), MagicMock())
 
     app = _FakeApp()
     slack_provider = _FakeSlackProvider()

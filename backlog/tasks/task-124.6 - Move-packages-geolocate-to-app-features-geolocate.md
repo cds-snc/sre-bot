@@ -3,8 +3,8 @@ id: TASK-124.6
 title: Move packages/geolocate to app/features/geolocate/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:01'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:01
+updated_date: '2026-10-26T13:45:00Z'
 labels:
   - plugin-architecture
   - features
@@ -18,7 +18,7 @@ dependencies:
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1670'
+  - https://github.com/cds-snc/sre-bot/issues/1670
 parent_task_id: TASK-124
 priority: medium
 type: task
@@ -39,4 +39,5 @@ Child of TASK-124. geolocate puts Slack handlers in platforms/ and has a routes.
 - [ ] #4 The old packages/ path is deleted; every importer and mock patch string is rewritten; import-linter ignore entries only shrank
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
+- [ ] #7 The legacy GET /geolocate/{ip} route (app/api/v1/routes/geolocate.py) no longer imports packages.geolocate: it moves into the plugin's entrypoints/http.py or is retired per TASK-53's route inventory, and its ignore entry in the protected-plugins import contract is removed
 <!-- AC:END -->

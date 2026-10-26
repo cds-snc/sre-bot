@@ -7,6 +7,8 @@ scope: The webhooks ingress capability — placement, the verify→interpret→d
 
 # Webhooks
 
+> **Under reassessment since 2026-10-26 (TASK-168).** The webhooks architecture is reassessed end to end, as the incident and access features are, after the organisation-content decision (TASK-167). Until then this record's Decision is input, not a plan: TASK-37's slices and TASK-47, 48 and 49 are not planned. These invariants stand: nothing registers at import time or by walking a directory or resolving import strings, boot fails on a bad registration, no payload guessing, ingest is idempotent under redelivery.
+
 ## Context
 
 `app/modules/webhooks/` is the organization's single inbound-webhook ingress ([security.md](security.md)), built before the current corpus as an early, incomplete attempt to decouple webhook ingest from Slack. That attempt did not land, and the package accreted several structural antipatterns that no other record sanctions:
@@ -97,3 +99,4 @@ Tolerated until the slices close: the legacy `modules/webhooks` guessers, walk r
 **Changes:**
 - 2026-09-24: Migration names epic tickets only, and the pipeline is a capability whose extension point replaces domain events; handler folder renamed `entrypoints/`.
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-10-26: under reassessment (TASK-168, after TASK-167); TASK-37's slices wait for it; the import-time, no-walk, no-guessing and idempotency invariants stand.

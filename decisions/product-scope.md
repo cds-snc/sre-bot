@@ -15,6 +15,8 @@ The bot was named for site reliability engineering and the root README described
 
 **One codebase, one deployable, four named product areas.** The bot is the organisation's internal operations platform; incident response is its first-class area. Isolation between areas comes from the plugin architecture, not from repositories: import-linter keeps features independent ([plugin-architecture.md](plugin-architecture.md)), and per-environment enablement ([plugins.md](plugins.md)) switches an area off with a configuration change and no code change (the files ship in the image, so it still deploys).
 
+**Built as a framework another organisation can adopt.** The bot runs for one organisation today, but nothing specific to that organisation belongs in its code: deployment values live in the configuration files ([configuration.md](configuration.md)), behaviour comes from plugins ([plugins.md](plugins.md)), and organisation content (webhook sender mappings and message templates, playbooks, the access catalogue, incident templates) is supplied as data in a way TASK-167's design session decides.
+
 | Area | Packages |
 | --- | --- |
 | Incident response | `incident`, `webhooks`, `oncall` capability, `oncall_sync`, `user_rotations` (an on-call schedule source, [oncall.md](oncall.md)) |
@@ -40,3 +42,4 @@ The bot was named for site reliability engineering and the root README described
 **Changes:**
 - 2026-10-09: Accepted. One app with four areas and written carve-out criteria.
 - 2026-10-23: `user_rotations` is in incident response; area enablement is a configuration change, not a change without a deploy (TASK-112).
+- 2026-10-26: the bot is built as a framework another organisation can adopt; organisation-specific content stays out of the code, its pattern decided by TASK-167 (human).

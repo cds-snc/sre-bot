@@ -5,6 +5,8 @@ declared as ``pyproject.toml`` entry points and orchestrates their startup
 lifecycle via hookspecs.
 """
 
+import importlib.metadata
+from collections.abc import Collection
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
@@ -42,27 +44,48 @@ def get_plugin_manager() -> FeaturePluginManager:
     return pm
 
 
-def load_plugins(pm: FeaturePluginManager, logger: BoundLogger) -> None:
-    """Register every feature plugin declared under the ``PLUGIN_NAMESPACE`` entry-point group.
+def installed_plugin_names() -> list[str]:
+    """Return the entry-point names declared under ``PLUGIN_NAMESPACE``, without importing any.
 
-    Errors are not caught: a plugin that fails to import stops startup. Loading
-    is idempotent, since pluggy skips entry points already registered.
+    Reads the same distribution metadata pluggy loads from, so the configuration
+    phase checks the enablement keys against exactly what ``load_plugins`` would load.
+    """
+    return sorted(
+        {
+            entry_point.name
+            for distribution in importlib.metadata.distributions()
+            for entry_point in distribution.entry_points
+            if entry_point.group == PLUGIN_NAMESPACE
+        }
+    )
+
+
+def load_plugins(pm: FeaturePluginManager, disabled: Collection[str], logger: BoundLogger) -> None:
+    """Register every enabled feature plugin declared under the ``PLUGIN_NAMESPACE`` entry-point group.
+
+    Each disabled name is blocked before loading, so pluggy skips its entry point
+    before importing it: a disabled plugin registers nothing and its module never
+    runs. Errors are not caught: a plugin that fails to import stops startup.
+    Loading is idempotent, since pluggy skips entry points already registered.
 
     Args:
         pm: Plugin manager to register the plugins with.
+        disabled: Entry-point names the configuration files switch off.
         logger: Structured logger for startup events.
 
     Raises:
-        RuntimeError: No plugin is registered from the group, which means the
-            project metadata is missing or stale.
+        RuntimeError: The group declares no entry point, which means the project
+            metadata is missing or stale. Every plugin disabled is not an error.
     """
+    if not installed_plugin_names():
+        raise RuntimeError(
+            f"no_plugin_entry_points: no entry points in group {PLUGIN_NAMESPACE!r}; run `uv sync` to install the project"
+        )
+    for blocked in disabled:
+        pm.set_blocked(blocked)
     pm.load_setuptools_entrypoints(PLUGIN_NAMESPACE)
     plugins = sorted(name for plugin, _ in pm.list_plugin_distinfo() if (name := pm.get_name(plugin)) is not None)
-    if not plugins:
-        raise RuntimeError(
-            f"no_plugins_loaded: no entry points in group {PLUGIN_NAMESPACE!r}; run `uv sync` to install the project"
-        )
-    logger.info("feature_plugins_loaded", plugins=plugins)
+    logger.info("feature_plugins_loaded", plugins=plugins, disabled=sorted(disabled))
 
 
 def register_feature_integrations(

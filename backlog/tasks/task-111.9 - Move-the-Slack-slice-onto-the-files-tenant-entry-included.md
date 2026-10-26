@@ -1,10 +1,10 @@
 ---
 id: TASK-111.9
 title: Move the Slack slice onto the files, tenant entry included
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T22:51:00Z'
+updated_date: '2026-10-26T14:45:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -127,6 +127,8 @@ Leak found 2026-10-23 (affects this task's tests; fixed in TASK-111.17): a faili
 2026-10-23, implemented, PR to open (In Progress). SlackSettings is a ConfigurationSlice on [slack] (env_prefix SLACK__, extra=forbid, no aliases): non-secret values in base.toml [slack] (defaults equal the file), tenant a nested SlackTenant read from [slack.tenant] (strips, rejects blank, extra=forbid), team_id field and derived property removed; tokens and signing secret SLACK__<FIELD>, all repr=False, empty counts as unset. One model_validator: tenant without SLACK__BOT_TOKEN fails; any of the four secrets without a tenant fails naming the key. production.toml and local.toml [slack.tenant] team_id = T2G2S06PM (G2 SLACK_TEAM_ID = H2 auth.test), ci.toml none. SlackKey values now [slack.tenant] team_id and SLACK__*; no rule logic change. pytest env blanks the four SLACK__ secrets. Messages renamed (oncall_sync adapter and README, incident comms entrypoint and README). Pin file: Slack rows on SLACK__ names with tenant and bot companions, retired names pinned unread. ADRs: configuration.md (current state, local/ci/Codespaces sentence, tolerated list, Changes line), service-accounts.md name; doc-14 rows. Tests: test_slack_settings.py rewritten (36), test_configuration_files_slack_tenant.py new, lifespan vendor test +2 boot failures with no token in the error or logs, rules test on the new names, call sites moved to tenant=SlackTenant(...); test_slack_settings_team_id_validate.py folded in and deleted. Doubts resolved: SLACK__COMMAND_PREFIX in env and .env does not fail the slice (T-B5); the ownership check accepts [slack.tenant]; no test relied on the pytest env tokens. Gates: ruff ok, mypy 47 = baseline, 5712 passed, contracts 12 kept, key ownership OK. Rollback tag (G5) to re-read at merge with deploy-checks pre: expected abfcd82a47b3a1e780ec09099337cdaeb21a86f9-2026-10-23. Due before merge: app/.env.example edit (human, G4 part 2). After deploy: post-transport PASS and manual Slack checks, then delete the old Codespaces secrets.
 
 Post-deploy: zsh /workspace/tmp/deploy-checks.zsh post-slack-files (new phase: post-transport plus slack_files: no configuration_invalid, configured_systems_built lists slack on every task, task-definition SLACK__ secrets, old blob lines still present for the rollback image).
+
+Post-deploy 2026-10-26 (deploy-checks post-slack-files-20261026T142835Z.txt): sre-bot-task:45, image e34b1a27060ea8c16334f8301b49c153220aaece-2026-10-26; build, sbom and deploy jobs success; rollout COMPLETED; boot_errors, config_phase_json (json=2 console=0), slack_up, transport_switch, slack_files (configuration_invalid 0, slack listed on 2 of 2 tasks), version and health all PASS. Old blob SLACK_* lines and the task-definition SLACK__COMMAND_PREFIX are unread by this image; the blobs go with 111.15, the env name with 111.15.1. Next: human deletes the old Codespaces secrets; human sets Done.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

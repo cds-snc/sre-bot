@@ -17,10 +17,6 @@ from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
     notify_stale_incident_channels,
 )
-from packages.access.sync.providers import (
-    get_access_runtime_config,
-    get_access_sync_coordinator,
-)
 from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 
 logger = get_logger()
@@ -202,12 +198,3 @@ def run_continuously(interval=1):
     continuous_thread = ScheduleThread()
     continuous_thread.start()
     return cease_continuous_run
-
-
-def reconcile_access_sync() -> None:
-    """Run full-platform Access Sync batch sync for all registered platforms."""
-    logger.info("reconcile_access_sync_started", module="scheduled_tasks")
-    coordinator = get_access_sync_coordinator()
-    runtime_config = get_access_runtime_config()
-    for platform in runtime_config.platforms:
-        coordinator.sync_platform(platform=platform, dry_run=False)

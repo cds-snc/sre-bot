@@ -34,7 +34,7 @@ Current state:
 
 | Layer | Holds | May import |
 | --- | --- | --- |
-| `server/` | The host: composition root, lifespan, plugin manager, transport runtimes (Bolt), and the framework services' implementations (i18n, auth, logging setup) | everything |
+| `server/` | The host: composition root, lifespan, plugin manager, transport runtimes (Bolt), and the framework services' implementations (i18n, auth, logging setup) | everything except a plugin's own modules: the host reaches a plugin only through its entry point and the hookspecs, so a disabled plugin is never imported ([plugins.md](plugins.md)) |
 | `features/` | Business feature plugins | `contracts`, capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `capabilities/` | Engines and shared business capabilities (approvals, notifications, audit trail, people and accounts, workplace systems, text generation, on-call) | `contracts`, lower capabilities' `api.py`; its `adapters/` may import `integrations` |
 | `infrastructure/` | Hosting implementations of `contracts` Protocols | `contracts`, `integrations` |
@@ -122,6 +122,7 @@ This record replaces the former three-tier layers record, the capability-package
 - Boot test: every entry point has an enablement key in the base configuration file, and a disabled plugin is never registered.
 - Review: no feature or capability reads an environment variable; configuration arrives through its settings slice.
 - import-linter `forbidden`: nothing outside `server/` imports provider modules; plugins resolve core services through the registry.
+- import-linter `protected`: each entry point's module is imported only from inside itself, by no host, legacy or sibling code; a boot test fails when the protected list and the entry points differ.
 
 ## Migration
 
@@ -154,3 +155,4 @@ Tolerated until then:
 - 2026-10-15: `contracts/services` holds `ServiceScopeOpener` and `ServiceResolver`, the per-invocation scope a Slack handler or job opens; import-linter contract (l) keeps svcs out of `contracts/` (TASK-145.5.2).
 - 2026-10-20: `contracts/` may import pydantic-settings for the settings-slice base; the configuration loader is host code in `server/configuration/` (TASK-111).
 - 2026-10-22: `contracts/configuration.py` holds `HostInfo`, the host facts every layer may read; the identity and server slices are host code in `server/configuration/` (TASK-111.7).
+- 2026-10-26: the host may import everything except a plugin's own modules, enforced by an import-linter `protected` contract over the entry-point modules (TASK-112.2).

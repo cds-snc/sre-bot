@@ -4,10 +4,12 @@ The real lifespan runs on a freshly built plugin manager (the singleton cache
 is cleared around each test). Core services, security, directory, Slack provider
 and feature registration are stubbed so only plugin loading is observed. Failure cases
 swap ``importlib.metadata.distributions`` for a throwaway dist-info
-(``tests.fixtures.plugin_dists``): startup must raise before the lifespan
-yields, because a feature that cannot load must stop the process instead of
-being skipped. The success case reads the real installed metadata and checks
-the registered plugin names against the expected feature list.
+(``tests.fixtures.plugin_dists``) after the configuration phase has run on
+the real metadata, as the app factory runs it before the lifespan: startup must
+raise before the lifespan yields, because a feature that cannot load must stop
+the process instead of being skipped. The success case reads the real installed
+metadata and checks the registered plugin names against the plugins the ci
+files enable; the access plugins, off in base.toml, must not be registered.
 """
 
 import importlib.metadata
@@ -21,14 +23,14 @@ import pytest
 from fastapi import FastAPI
 
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from server.configuration import load_host_configuration
+from server.lifespan import build_lifespan
 from server.plugins.manager import get_plugin_manager
 from tests.factories.lifespan import lifespan
 from tests.fixtures.plugin_dists import write_plugin_dist
 
-EXPECTED_PLUGINS = {
-    "access.catalog",
-    "access.request",
-    "access.sync",
+DISABLED_PLUGINS = {"access.catalog", "access.request", "access.sync"}
+ENABLED_PLUGINS = {
     "geolocate",
     "incident.comms",
     "incident.scribe",
@@ -72,13 +74,14 @@ def _stub_startup(stack: ExitStack, *, stub_translation: bool) -> None:
 async def test_lifespan_aborts_before_yield_when_an_entry_point_fails_to_import(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
+    configuration = load_host_configuration()
     dist = write_plugin_dist(tmp_path, PLUGIN_NAMESPACE, {"broken": "fake_plugin_module_that_does_not_exist"})
     monkeypatch.setattr(importlib.metadata, "distributions", lambda: [dist])
     reached_yield = False
 
     with ExitStack() as stack, pytest.raises(ModuleNotFoundError):
         _stub_startup(stack, stub_translation=True)
-        async with lifespan(FastAPI()):
+        async with build_lifespan(configuration)(FastAPI()):
             reached_yield = True
 
     assert reached_yield is False
@@ -86,6 +89,7 @@ async def test_lifespan_aborts_before_yield_when_an_entry_point_fails_to_import(
 
 @pytest.mark.integration
 async def test_lifespan_aborts_before_yield_when_a_hookimpl_raises(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    configuration = load_host_configuration()
     dist = write_plugin_dist(tmp_path, PLUGIN_NAMESPACE, {"raising": RAISING_MODULE}, {RAISING_MODULE: RAISING_SOURCE})
     monkeypatch.syspath_prepend(str(tmp_path))
     monkeypatch.setattr(importlib.metadata, "distributions", lambda: [dist])
@@ -93,18 +97,20 @@ async def test_lifespan_aborts_before_yield_when_a_hookimpl_raises(monkeypatch: 
 
     with ExitStack() as stack, pytest.raises(RuntimeError, match="fake_plugin_i18n_failed"):
         _stub_startup(stack, stub_translation=False)
-        async with lifespan(FastAPI()):
+        async with build_lifespan(configuration)(FastAPI()):
             reached_yield = True
 
     assert reached_yield is False
 
 
 @pytest.mark.integration
-async def test_lifespan_registers_exactly_the_declared_feature_plugins() -> None:
+async def test_lifespan_registers_exactly_the_enabled_feature_plugins() -> None:
     with ExitStack() as stack:
         _stub_startup(stack, stub_translation=True)
         async with lifespan(FastAPI()):
             pm = get_plugin_manager()
             registered = {pm.get_name(plugin) for plugin, _ in pm.list_plugin_distinfo()}
+            blocked = {name for name in DISABLED_PLUGINS if pm.is_blocked(name)}
 
-    assert registered == EXPECTED_PLUGINS
+    assert registered == ENABLED_PLUGINS
+    assert blocked == DISABLED_PLUGINS

@@ -9,7 +9,7 @@ Use this skill when adding/refactoring package registration and startup behavior
 
 ## Core Checklist
 
-1. Register package capabilities with pluggy via entry-points declared in `pyproject.toml` (`[project.entry-points."<marker_namespace>"]`), loaded once at startup with `pm.load_setuptools_entrypoints(...)` — never via import-time registration, and not via filesystem discovery (the `auto_discover_plugins` walk is being removed per `decisions/plugins.md`). Adding a feature means adding its one entry-point line; discovery is declarative and reviewed, not implicit from disk.
+1. Register package capabilities with pluggy via entry-points declared in `pyproject.toml` (`[project.entry-points."<marker_namespace>"]`), loaded once at startup with `pm.load_setuptools_entrypoints(...)` — never via import-time registration, and not via filesystem discovery (the `auto_discover_plugins` walk is being removed per `decisions/plugins.md`). Adding a feature means adding its one entry-point line and one enablement key, named as the entry point, in its product area's `[plugins.<area>]` table in `app/config/base.toml`, plus its module in the import-linter `protected-plugins` contract; discovery is declarative and reviewed, not implicit from disk. Boot fails on a missing, unknown or duplicated key, and a disabled plugin is blocked before loading, so it is never imported.
 2. Initialize plugin/package resources during lifespan startup.
 3. Keep startup wiring in platform/bootstrap layer, not business modules.
 4. Ensure package contracts are typed and testable.
