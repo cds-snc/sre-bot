@@ -9,14 +9,15 @@
 #   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, Slack up, HTTP,
 #                                               # plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   plugins    [plugins.<area>] enablement and the retired ACCESS_*_ENABLED names (TASK-112.2, TASK-112.3)
+#   scheduler  [scheduler] enabled starts the jobs on every task, the stale-channel job included,
+#              and the retired DEFAULT_TIER2_LEASE_TTL_SECONDS name (TASK-112.4)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(plugins)
+TASK_CHECKS=(scheduler)
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -122,15 +123,26 @@ if [[ $phase == post ]]; then
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
 
-  if (( ${checks[(Ie)plugins]} )); then  # TASK-112.2, TASK-112.3
-    section "Plugin enablement from [plugins.<area>] (TASK-112.2)"
-    li $since 'filter event = "feature_plugins_loaded" | fields @timestamp, plugins, disabled | limit 4'
-    loaded=$(li_count $since 'filter event = "feature_plugins_loaded" and @message like /"disabled": ?\["access.catalog", ?"access.request", ?"access.sync"\]/ and @message like /"plugins": ?\["geolocate", ?"incident.comms", ?"incident.scribe", ?"oncall_sync", ?"rant", ?"user_rotations"\]/')
-    print "feature_plugins_loaded with the six plugins and access disabled: $loaded (tasks=$tasks)"
-    print "no_plugin_entry_points or enablement errors: $(li_count $since 'filter @message like /no_plugin_entry_points|has no enablement key|names no installed entry point/')"
-    print "access log lines since the deploy (expected 0, the plugins are not imported): $(li_count $since 'filter logger like /packages.access/')"
-    [[ $loaded -ge $tasks ]] && result plugins PASS || result plugins "FAIL (loaded=$loaded tasks=$tasks; read the plugins and disabled fields above)"
-    for n in ACCESS_SYNC_ENABLED ACCESS_REQUESTS_ENABLED ACCESS_CATALOG_ENABLED; do print "$n in (unread since TASK-112.3): $(blob_where $n)"; done
+  if (( ${checks[(Ie)scheduler]} )); then  # TASK-112.4
+    section "Scheduler from [scheduler] enabled, independent of the Slack transport (TASK-112.4)"
+    started=$(li_count $since 'filter event = "scheduled_tasks_started"')
+    skipped=$(li_count $since 'filter event = "scheduled_tasks_skipped"')
+    stale=$(li_count $since 'filter event = "scheduled_job_skipped" and job_name = "notify_stale_incident_channels"')
+    print "scheduled_tasks_started: $started (tasks=$tasks); scheduled_tasks_skipped: $skipped (expected 0)"
+    print "scheduled_job_skipped for notify_stale_incident_channels: $stale (expected 0, production has [slack.tenant])"
+    li $since 'filter event = "feature_background_job_scheduled" | stats count() as n by job_name, cadence'
+    age=$(( $(date -u +%s) - since ))
+    beating=$(li $since 'filter event = "running_scheduler_heartbeat" | stats count_distinct(@logStream) as n' | jq -r '.n // 0' | head -1)
+    print "tasks with a running_scheduler_heartbeat: ${beating:-0} (heartbeat every 5 minutes; window ${age}s)"
+    if [[ $started -ge $tasks && $skipped == 0 && $stale == 0 ]]; then
+      if [[ ${beating:-0} -ge $tasks ]]; then result scheduler PASS
+      elif (( age < 360 )); then result scheduler "CHECK (rerun after 6 minutes for the heartbeat)"
+      else result scheduler "FAIL (no heartbeat on every task: ${beating:-0}/$tasks)"; fi
+    else
+      result scheduler "FAIL (started=$started tasks=$tasks skipped=$skipped stale_skipped=$stale)"
+    fi
+    print "DEFAULT_TIER2_LEASE_TTL_SECONDS in (unread since TASK-112.4): $(blob_where DEFAULT_TIER2_LEASE_TTL_SECONDS)"
+    print "SCHEDULER__* in (expected none; production.toml sets [scheduler]): $(blob_where 'SCHEDULER__[A-Z0-9_]+')"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

@@ -8,6 +8,9 @@ team_id = "T2G2S06PM"
 [slack_transport]
 enabled = true
 
+[scheduler]
+enabled = true
+
 [server]
 public_base_url = "https://sre-bot.cdssandbox.xyz"
 sre_test_channel_id = "C033L7RGCT0"

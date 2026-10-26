@@ -131,6 +131,9 @@ env = [
     # plugin enable it explicitly. access.sync switched on from app/.env would make
     # lifespan build the AWS Identity Center adapter (and assume its role) at startup.
     'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
+    # Likewise the scheduler: SCHEDULER__ENABLED=true in app/.env would start the real
+    # jobs thread in every lifespan test. Tests that need it enable it explicitly.
+    "SCHEDULER__ENABLED=false",
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
     # The test run is an unconfigured Slack (ci.toml has no [slack.tenant]): the blanks

@@ -30,6 +30,7 @@ from infrastructure.security import get_jwks_manager
 from infrastructure.security.settings import SecuritySettings
 from integrations.slack.provider import get_slack_provider
 from jobs import scheduled_tasks
+from jobs.settings import SchedulerSettings
 from modules import (
     atip,
     aws,
@@ -109,18 +110,17 @@ def _register_legacy_slack_commands(registrar: SlackCommandRegistrar, logger: Bo
 
 
 def _start_scheduled_tasks(
-    bot: App,
-    host: HostInfo,
+    scheduler: SchedulerSettings,
     logger: BoundLogger,
     service_scopes: ServiceScopeOpener,
 ) -> threading.Event | None:
-    # This gate suppresses side-effecting jobs outside production; Tier-2 leases
-    # are the duplicate-prevention mechanism across production replicas.
-    if host.environment != "production":
-        logger.info("scheduled_tasks_skipped", reason="environment_is_not_production")
+    # [scheduler] enabled is the run switch; Tier-2 leases are the duplicate-prevention
+    # mechanism across replicas.
+    if not scheduler.enabled:
+        logger.info("scheduled_tasks_skipped", reason="scheduler_disabled")
         return None
 
-    scheduled_tasks.init(bot, register_background_jobs, service_scopes)
+    scheduled_tasks.init(register_background_jobs, service_scopes)
     stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
     logger.info("scheduled_tasks_started")
     return stop_event
@@ -323,22 +323,10 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
                 channel=server_settings.sre_test_channel_id,
                 text="SRE Bot has started up in test mode.",
             )
-        scheduled_stop_event = (
-            _start_scheduled_tasks(
-                slack_app,
-                host,
-                logger,
-                service_scopes,
-            )
-            if not _is_test_environment()
-            else None
-        )
-
     else:
         logger.warning("slack_provider_app_unavailable", reason="initialization_failed")
         app.state.bot = None
         app.state.socket_mode_handler = None
-        scheduled_stop_event = None
 
     if not _is_test_environment():
         start_slack_result = app.state.slack_provider.start()
@@ -350,7 +338,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     else:
         logger.info("slack_provider_start_skipped", reason="test_environment")
 
-    app.state.scheduled_stop_event = scheduled_stop_event
+    # Phase 6 starts the scheduler alongside the transports, never through one of them.
+    app.state.scheduled_stop_event = _start_scheduled_tasks(configuration.scheduler, logger, service_scopes)
 
     yield
 

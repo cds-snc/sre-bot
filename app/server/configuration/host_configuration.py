@@ -22,6 +22,7 @@ from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
+from jobs.settings import SchedulerSettings, get_scheduler_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from server.configuration.identity import IdentitySettings, get_identity_settings
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
@@ -53,6 +54,7 @@ class HostConfiguration:
     sre_ops: SreOpsSettings
     logging: LoggingSettings
     slack_transport: SlackTransportSettings
+    scheduler: SchedulerSettings
     disabled_plugins: frozenset[str]
 
 
@@ -146,6 +148,7 @@ def _validate_slices(
     # Vendor and feature slices validate with the host slices: an invalid entry fails boot here.
     slack_transport = get_slack_transport_settings()
     validate_slack_transport(slack_transport, get_slack_settings())
+    scheduler = get_scheduler_settings()
     get_google_workspace_settings()
     get_notify_api_key_leak_settings()
     plugins = get_plugins_settings()
@@ -164,5 +167,6 @@ def _validate_slices(
         sre_ops=sre_ops,
         logging=logging_settings,
         slack_transport=slack_transport,
+        scheduler=scheduler,
         disabled_plugins=plugins.disabled(),
     )

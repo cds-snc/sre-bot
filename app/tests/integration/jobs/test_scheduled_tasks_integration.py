@@ -9,10 +9,20 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from contracts.operations import OperationResult
+from integrations.slack.settings import SlackTenant
 from jobs import scheduled_tasks
 
 
+@pytest.fixture
+def slack_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Configure a [slack.tenant] entry so the stale-channel job is scheduled."""
+    settings = MagicMock()
+    settings.tenant = SlackTenant(team_id="T0000TEST")
+    monkeypatch.setattr("jobs.scheduled_tasks.get_slack_settings", lambda: settings)
+
+
 @pytest.mark.integration
+@pytest.mark.usefixtures("slack_tenant")
 class TestScheduledTasksInitialization:
     """Integration tests for scheduled tasks initialization."""
 
@@ -28,9 +38,7 @@ class TestScheduledTasksInitialization:
         - AWS Identity Center provisioning (every 2 hours)
         - Spending data generation (daily at 00:00)
         """
-        bot = MagicMock()
-
-        scheduled_tasks.init(bot, MagicMock(), MagicMock())
+        scheduled_tasks.init(MagicMock(), MagicMock())
 
         # Count schedule.do() calls - one per task
         do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]
@@ -44,9 +52,7 @@ class TestScheduledTasksInitialization:
         - Daily tasks scheduled with .at()
         - Interval-based tasks with correct durations
         """
-        bot = MagicMock()
-
-        scheduled_tasks.init(bot, MagicMock(), MagicMock())
+        scheduled_tasks.init(MagicMock(), MagicMock())
 
         # Verify daily task times were called (at least once each)
         daily_do_calls = [call for call in mock_schedule.mock_calls if ".day.at(" in str(call) and ".do(" in str(call)]
@@ -59,9 +65,6 @@ class TestScheduledTasksInitialization:
         # Verify 2-hour interval
         hours_do_calls = [call for call in mock_schedule.mock_calls if ".hours.do(" in str(call)]
         assert len(hours_do_calls) >= 1  # At least one 2-hour task
-        # Verify bot.client was passed
-        client_mentions = [call for call in mock_schedule.mock_calls if "client=" in str(call)]
-        assert len(client_mentions) >= 1
 
     @patch("jobs.scheduled_tasks.schedule")
     def test_init_uses_safe_run_wrapper(self, mock_schedule) -> None:
@@ -71,9 +74,7 @@ class TestScheduledTasksInitialization:
         Since safe_run wraps the functions, we verify at least one
         do() call references the safe_run mechanism.
         """
-        bot = MagicMock()
-
-        scheduled_tasks.init(bot, MagicMock(), MagicMock())
+        scheduled_tasks.init(MagicMock(), MagicMock())
 
         # Tasks should be registered and scheduled
         do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]

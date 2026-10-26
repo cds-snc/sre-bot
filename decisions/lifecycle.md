@@ -17,7 +17,7 @@ Current code (`app/server/lifespan.py`):
 - Loads plugins from the `pyproject.toml` entry points (`load_plugins`); a plugin that fails to import aborts boot.
 - Collects i18n resources through `register_i18n_resources`, then initializes the translator strictly; failure aborts boot.
 - Calls `register_slack_commands`, `register_routes` and `startup_warmup`; features construct their services lazily or inside `startup_warmup`. `access/request` and `access/sync` subscribe to in-process events there.
-- Registers legacy `modules/` handlers by hand, starts scheduled tasks only when `ENVIRONMENT == "production"` (Tier-2 jobs take a lease from the coordination contract), then starts Socket Mode.
+- Registers legacy `modules/` handlers by hand and starts Socket Mode, then starts scheduled tasks when `[scheduler] enabled` (true in production only), whether or not the Slack app initialised (Tier-2 jobs take a lease from the coordination contract).
 - On shutdown, stops scheduled tasks, then the Slack provider.
 
 Phases are logged with a `phase` field, but there is no single ordered sequence, no eager service validation, and plugin load errors are not fatal.
@@ -78,7 +78,7 @@ Tolerated until closed:
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
-- scheduled tasks gated on `ENVIRONMENT == "production"` and started only once the Slack app has initialised, with the Bolt app handed to the legacy stale-channel job (until `[scheduler] enabled` and the transport-independent start, TASK-112.4), from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
+- legacy scheduled jobs hand-imported by `jobs/scheduled_tasks.py` (the stale-channel job until TASK-145.9), with leases from the coordination contract;
 - legacy `modules/` handlers registered by hand after feature registration;
 
 **Changes:**
@@ -92,3 +92,4 @@ Tolerated until closed:
 - 2026-10-23: logging is configured first in the configuration phase, right after the identity and `[logging]` slices (TASK-111.17).
 - 2026-10-23: the transport's switch is `[slack_transport] enabled`, and its cross-slice rules run in the configuration phase; the `SLACK_ENABLED` tolerated item is closed (TASK-112.1).
 - 2026-10-26: the scheduler starting inside the Slack branch is listed as tolerated; phase 6 starts it independent of the transports (TASK-112.4).
+- 2026-10-26: `[scheduler] enabled` starts the scheduler after the transports, independent of the Slack app; the stale-channel job uses the Slack Web API client and runs only with `[slack.tenant]`; that tolerated item is closed (TASK-112.4).

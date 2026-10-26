@@ -301,12 +301,101 @@ def test_slack_enabled_in_integrations_is_a_vendor_switch(tmp_path: Path) -> Non
 
 
 def test_enabled_keys_outside_integrations_are_not_vendor_switches(tmp_path: Path) -> None:
-    """Feature switches are a TASK-112 concern; this rule covers vendor clients only."""
+    """The vendor rule covers vendor clients only; a plugin's own toggle is judged by the plugin-switch rule."""
+    _write(
+        tmp_path,
+        "packages/access/settings.py",
+        SETTINGS_IMPORTS
+        + "class Access(BaseSettings):\n    model_config = SettingsConfigDict(env_prefix='ACCESS_SYNC_')\n"
+        + "    reconciliation_enabled: bool = False\n",
+    )
+
+    assert _rules(tmp_path) == []
+
+
+# Plugin and scheduler switches
+
+
+@pytest.mark.parametrize("root", ["server/plugins", "packages/access", "features/incident", "jobs"])
+def test_flat_enabled_field_in_a_plugin_or_host_tree_fails(tmp_path: Path, root: str) -> None:
+    """A plugin or the scheduler runs on a configuration-file key, never on a flat <NAME>_ENABLED switch."""
+    _write(
+        tmp_path,
+        f"{root}/settings.py",
+        SETTINGS_IMPORTS
+        + "class Switch(BaseSettings):\n    model_config = SettingsConfigDict(env_prefix='ACCESS_SYNC_')\n"
+        + "    enabled: bool = False\n",
+    )
+
+    violations = checker.find_violations(tmp_path)
+
+    assert [violation.rule for violation in violations] == ["plugin-switch"]
+    assert "enabled" in violations[0].message
+
+
+def test_unprefixed_name_enabled_field_is_a_plugin_switch(tmp_path: Path) -> None:
+    """ACCESS_SYNC_ENABLED as a bare field is the same switch under another spelling."""
     _write(
         tmp_path,
         "packages/access/settings.py",
         SETTINGS_IMPORTS + "class Access(BaseSettings):\n    ACCESS_SYNC_ENABLED: bool = False\n",
     )
+
+    assert _rules(tmp_path) == ["plugin-switch"]
+
+
+def test_enabled_key_on_a_configuration_slice_is_not_a_plugin_switch(tmp_path: Path) -> None:
+    """A slice's enabled key lives in a configuration-file table, which is where a run switch belongs."""
+    _tree_with_contract(tmp_path)
+    _write(tmp_path, "jobs/settings.py", _slice("Scheduler", "scheduler", "    enabled: bool = False\n"))
+    _write(tmp_path, "config/base.toml", "[scheduler]\nenabled = false\n")
+
+    assert _rules(tmp_path) == []
+
+
+def test_enabled_fields_outside_the_plugin_and_host_trees_are_not_judged(tmp_path: Path) -> None:
+    """Infrastructure capabilities and legacy modules are outside the plugin-switch rule."""
+    body = "    model_config = SettingsConfigDict(env_prefix='{}_')\n    enabled: bool = True\n"
+    _write(tmp_path, "infrastructure/retry.py", SETTINGS_IMPORTS + "class Retry(BaseSettings):\n" + body.format("RETRY"))
+    _write(tmp_path, "modules/legacy.py", SETTINGS_IMPORTS + "class Legacy(BaseSettings):\n" + body.format("LEGACY"))
+
+    assert _rules(tmp_path) == []
+
+
+@pytest.mark.parametrize(
+    ("relative", "source"),
+    [
+        ("server/lifespan.py", "def start(host):\n    if host.environment != 'production':\n        return\n"),
+        ("server/plugins/manager.py", "def load(environment):\n    return environment == 'production'\n"),
+        ("packages/access/plugin.py", "def on(settings):\n    return settings.ENVIRONMENT in ('production',)\n"),
+        ("features/incident/jobs.py", "import os\n\ndef on():\n    return 'prod' == os.environ['ENVIRONMENT']\n"),
+        ("jobs/scheduled_tasks.py", "import os\n\ndef on():\n    return os.getenv('ENVIRONMENT') == 'production'\n"),
+    ],
+)
+def test_environment_comparison_in_a_plugin_or_host_tree_fails(tmp_path: Path, relative: str, source: str) -> None:
+    """Whether a plugin or the scheduler runs is a configuration-file key, never the environment name."""
+    _write(tmp_path, relative, source)
+
+    violations = [violation for violation in checker.find_violations(tmp_path) if violation.rule != "environ-read"]
+
+    assert [violation.rule for violation in violations] == ["environment-gate"]
+    assert violations[0].location.startswith(f"{relative}:")
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["server/configuration/host_configuration.py", "modules/incident/legacy.py", "infrastructure/logging/setup.py"],
+)
+def test_environment_comparison_outside_the_plugin_and_host_trees_passes(tmp_path: Path, relative: str) -> None:
+    """The configuration phase's dev-bypass refusal and legacy modules are excluded by path."""
+    _write(tmp_path, relative, "def refuse(host):\n    return host.environment == 'production'\n")
+
+    assert _rules(tmp_path) == []
+
+
+def test_reading_the_environment_name_without_comparing_it_passes(tmp_path: Path) -> None:
+    """Logging or passing the environment name decides nothing."""
+    _write(tmp_path, "server/lifespan.py", "def log(logger, host):\n    logger.info('boot', environment=host.environment)\n")
 
     assert _rules(tmp_path) == []
 

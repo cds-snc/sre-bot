@@ -3,10 +3,10 @@ id: TASK-112.4
 title: >-
   Scheduler run switch [scheduler] enabled, started independent of the Slack
   transport; guard against env and ENVIRONMENT plugin switches
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-26T15:04:00Z'
-updated_date: '2026-10-26T16:39:00Z'
+updated_date: '2026-10-26T17:48:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -41,18 +41,18 @@ This task:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 [scheduler] enabled decides whether scheduled jobs start (false in base, ci and local; true in production); server/lifespan.py has no ENVIRONMENT comparison; production still starts its scheduled jobs (test pins production.toml)
-- [ ] #2 The scheduler starts in the transport phase independent of the Slack app: it starts with the Slack transport off or its app unavailable, receives no Bolt app, and has no _is_test_environment() guard (tests)
-- [ ] #3 The stale-incident-channels job uses the integrations/slack Web API client and is registered only when [slack.tenant] is configured; otherwise a skip is logged with the reason (tests)
-- [ ] #4 A CI check fails on a flat settings 'enabled' switch or an ENVIRONMENT comparison deciding whether a plugin or the scheduler runs in server/lifespan.py, server/plugins/, packages/, features/ or jobs/ (bin check tests)
-- [ ] #5 decisions/reliability.md, lifecycle.md and plugins.md record the switch, the transport-independent start and the guard; TASK-111.13 no longer lists the scheduler
-- [ ] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass; make check-import-contracts and make check-settings-key-ownership pass
+- [x] #1 [scheduler] enabled decides whether scheduled jobs start (false in base, ci and local; true in production); server/lifespan.py has no ENVIRONMENT comparison; production still starts its scheduled jobs (test pins production.toml)
+- [x] #2 The scheduler starts in the transport phase independent of the Slack app: it starts with the Slack transport off or its app unavailable, receives no Bolt app, and has no _is_test_environment() guard (tests)
+- [x] #3 The stale-incident-channels job uses the integrations/slack Web API client and is registered only when [slack.tenant] is configured; otherwise a skip is logged with the reason (tests)
+- [x] #4 A CI check fails on a flat settings 'enabled' switch or an ENVIRONMENT comparison deciding whether a plugin or the scheduler runs in server/lifespan.py, server/plugins/, packages/, features/ or jobs/ (bin check tests)
+- [x] #5 decisions/reliability.md, lifecycle.md and plugins.md record the switch, the transport-independent start and the guard; TASK-111.13 no longer lists the scheduler
+- [x] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass; make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-STATUS: written 2026-10-26 from TASK-112.3's Slice B, revised after the human asked that the scheduler not depend on the Slack app; awaiting approval. Branch from main after TASK-112.3 merges.
+STATUS: written 2026-10-26 from TASK-112.3's Slice B, revised after the human asked that the scheduler not depend on the Slack app; APPROVED 2026-10-26 (human). Branch from main c3de2f3c (TASK-112.3 merged as #1789). Deploy check: named task check 'scheduler' in bin/deploy-checks.zsh, which deletes the 'plugins' check (112.2 and 112.3 Done).
 
 CALL SITES (app/)
 jobs/settings.py:8-17 SchedulerSettings(InfrastructureSettings), flat DEFAULT_TIER2_LEASE_TTL_SECONDS; reader jobs/scheduled_tasks.py:15,88 (get_scheduler_settings name kept). jobs/scheduled_tasks.py:99 init(bot, register_plugin_jobs, service_scopes); :112-115 notify_stale_incident_channels scheduled with client=bot.client (the only use of bot). server/lifespan.py:111-124 _start_scheduled_tasks(bot, host, ...) with host.environment != "production" at :119; :327-336 start nested in the "slack app available" branch, guarded by _is_test_environment() at :333; :338-342 else branch sets scheduled_stop_event None; :343 Slack start guard STAYS; :55 _is_test_environment stays. server/configuration/host_configuration.py (_validate_slices / HostConfiguration, next to slack_transport). integrations/slack/client.py:37 get_slack_web_client(); integrations/slack/settings.py:69 tenant (None = Slack unconfigured). bin/check_settings_key_ownership.py. Tests: tests/unit/jobs/test_jobs_settings.py, tests/unit/infrastructure/configuration/test_configuration_settings_production_names.py:66, tests/unit/bin/test_bin_settings_key_ownership_check.py, tests/integration/server/test_lifespan.py:163 and lifespan tests asserting scheduled_tasks_skipped.
@@ -88,4 +88,6 @@ DEPLOY CHECK (new phase post-scheduler, human extends /workspace/tmp/deploy-chec
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-26: the deploy checks are versioned in bin/deploy-checks.zsh (TASK-112.3); this task's post-deploy check is a named task check 'scheduler' (zsh bin/deploy-checks.zsh post scheduler), not a post-scheduler phase, and it deletes the 'plugins' check if 112.2 and 112.3 are Done by then.
+
+2026-10-26 implementation (plan approved by the human 2026-10-26; working tree on main c3de2f3c, branch task-112.4-scheduler to be created by the human). SchedulerSettings is the [scheduler] ConfigurationSlice (enabled false in base, true in production.toml; default_tier2_lease_ttl_seconds 1800); DEFAULT_TIER2_LEASE_TTL_SECONDS retired (pin row deleted; audit HINTS entry so env-checks says delete, not a SCHEDULER__ rename). HostConfiguration carries the slice; lifespan starts the scheduler after the Slack block with no ENVIRONMENT comparison, no Bolt app and no _is_test_environment() guard (the Slack start guard stays). init(register_plugin_jobs, service_scopes); the stale-channel job runs notify_stale_incident_channels_job, which builds the integrations/slack Web API client per run, scheduled only with [slack.tenant], else scheduled_job_skipped reason=slack_not_configured. Two rules in bin/check_settings_key_ownership.py: plugin-switch (a non-slice settings class under server/lifespan.py, server/plugins/, packages/, features/, jobs/ declaring an enabled field, or a <NAME>_enabled field without env_prefix; ACCESS_SYNC_RECONCILIATION_ENABLED, a prefixed in-plugin job toggle, passes: TASK-166's) and environment-gate (any comparison against environment/ENVIRONMENT there). Implementation decision: pytest-env pins SCHEDULER__ENABLED=false, as 112.3 pins the access plugins off, so a developer's app/.env never starts the real jobs thread in tests (configuration.md Changes). ADRs: lifecycle.md current state and tolerated item closed, plugins.md Checks wording matches the rule, reliability.md and configuration.md Changes. Deploy check: named task check 'scheduler' in bin/deploy-checks.zsh; the 'plugins' check is deleted (112.2 and 112.3 Done). Gates: ruff clean; mypy 47 errors = baseline, none in touched files; pytest tests --ignore=tests/smoke 5778 passed (was 5751); make check-import-contracts 13 kept; make check-settings-key-ownership OK. Human: make env-checks before merge (no SCHEDULER__* or DEFAULT_TIER2_LEASE_TTL_SECONDS in app/.env.example, app/.env, Codespaces, blobs); pre at merge; after deploy zsh bin/deploy-checks.zsh post scheduler (rerun after 6 minutes for the heartbeat). Parent TASK-112 ACs 3 and 4 checked.
 <!-- SECTION:NOTES:END -->

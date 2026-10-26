@@ -53,6 +53,12 @@ enabled = false
 socket_mode = true
 command_prefix = ""
 
+[scheduler]
+# Each deployment that runs the scheduled jobs switches them on in its own file;
+# a developer opts in with SCHEDULER__ENABLED=true in app/.env.
+enabled = false
+default_tier2_lease_ttl_seconds = 1800
+
 [notify_api_key_leak]
 channel_id = ""
 oncall_group_id = ""

@@ -66,6 +66,7 @@ HINTS = {
     "SLACK_SOCKET_MODE": "[slack_transport] socket_mode",
     "SLACK_TEAM_ID": "[slack.tenant] team_id",
     "ISSUER_CONFIG": "[[security.issuers]]",
+    "DEFAULT_TIER2_LEASE_TTL_SECONDS": "[scheduler] default_tier2_lease_ttl_seconds",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one

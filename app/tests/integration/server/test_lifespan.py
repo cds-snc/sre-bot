@@ -1,7 +1,6 @@
 """Integration tests for server.lifespan module."""
 
 import sys
-import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,7 +13,6 @@ from server.lifespan import (
     _is_test_environment,
     _list_configs_from_sections,
     _register_legacy_handlers,
-    _start_scheduled_tasks,
     _stop_scheduled_tasks,
 )
 
@@ -157,53 +155,6 @@ def test_lifespan_stop_scheduled_tasks_sets_event():
 
     # Assert
     mock_event.set.assert_called_once()
-
-
-@pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_runs_when_environment_is_prod(mock_settings, mock_bot, monkeypatch):
-    """Test that _start_scheduled_tasks starts when ENVIRONMENT is production."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_settings.environment = "production"
-    init_mock = MagicMock()
-    stop_event = threading.Event()
-    run_mock = MagicMock(return_value=stop_event)
-    service_scopes = MagicMock(name="scope_opener")
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
-
-    # Act
-    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger, service_scopes)
-
-    # Assert
-    assert result is stop_event
-    init_mock.assert_called_once_with(mock_bot, lifespan_module.register_background_jobs, service_scopes)
-    run_mock.assert_called_once()
-    mock_logger.info.assert_called_with("scheduled_tasks_started")
-
-
-@pytest.mark.integration
-def test_lifespan_start_scheduled_tasks_skips_when_environment_is_not_production(mock_settings, mock_bot, monkeypatch):
-    """Test that _start_scheduled_tasks skips when ENVIRONMENT is non-production."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_settings.environment = "local"
-    init_mock = MagicMock()
-    run_mock = MagicMock()
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.init", init_mock)
-    monkeypatch.setattr("server.lifespan.scheduled_tasks.run_continuously", run_mock)
-
-    # Act
-    result = _start_scheduled_tasks(mock_bot, mock_settings, mock_logger, MagicMock(name="scope_opener"))
-
-    # Assert
-    assert result is None
-    init_mock.assert_not_called()
-    run_mock.assert_not_called()
-    mock_logger.info.assert_called_with(
-        "scheduled_tasks_skipped",
-        reason="environment_is_not_production",
-    )
 
 
 @pytest.mark.integration
