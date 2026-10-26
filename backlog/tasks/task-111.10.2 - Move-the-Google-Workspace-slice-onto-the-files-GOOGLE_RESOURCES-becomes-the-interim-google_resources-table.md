@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-26T18:29:00Z'
-updated_date: '2026-10-26T21:23:00Z'
+updated_date: '2026-10-26T21:46:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -29,7 +29,7 @@ The Google Workspace slice (integrations/google_workspace/settings.py) reads [go
 <!-- AC:BEGIN -->
 - [x] #1 The Google slice reads its non-secret values from the files and its whole tenant entry only from the environment: GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public) and GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (secret); no configuration file holds the tenant table, a customer id, a key, an email or a Drive id
 - [x] #2 A customer id without the key, or the key or the delegated user set without a customer id, fails boot naming the variable; a blank or my_customer customer id fails boot; no message or log line carries the key, the customer id or the delegated user's value
-- [ ] #3 The three /sre-bot/GOOGLE_WORKSPACE__TENANT__* SecureStrings equal the values they replace: the GOOGLE_WORKSPACE_CUSTOMER_ID and SRE_BOT_EMAIL lines and the gcp_sre_service_account_key parameter (pre google: all three MATCH)
+- [x] #3 The three /sre-bot/GOOGLE_WORKSPACE__TENANT__* SecureStrings equal the values they replace: the GOOGLE_WORKSPACE_CUSTOMER_ID and SRE_BOT_EMAIL lines and the gcp_sre_service_account_key parameter (pre google: all three MATCH)
 - [x] #4 The old names (GOOGLE_DELEGATED_ADMIN_EMAIL, SRE_BOT_EMAIL, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, GOOGLE_API_NUM_RETRIES, GOOGLE_API_TIMEOUT_SECONDS) are no longer read from the environment or .env; google_delegated_admin_email is deleted
 - [x] #5 Authlib and google-auth-oauthlib are removed from the dependencies (imported nowhere)
 - [x] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
@@ -124,4 +124,8 @@ D5 Authlib and google-auth-oauthlib, leftovers of the pickle-string OAuth admin 
 2026-10-26 customer id: one Google Workspace customer for the organization (human), so production.toml and local.toml name the same [google_workspace.tenant] customer_id, written from the Codespace's GOOGLE_WORKSPACE_CUSTOMER_ID; the files test pins one RECORDED_CUSTOMER_ID. Final gates: ruff clean, format clean; mypy 47 = baseline; pytest 5801 passed; import contracts 13 kept; key ownership OK. ACs 1, 2, 4, 5, 6 checked; AC 3 is the merge gate (pre google: production blob customer id equals the files, key and delegated user MATCH). Human: the .claude/settings.json deny rule Read(./**/.env.*) also blocks app/.env.example (auto mode refuses self-modification of settings), so the .env.example lines stay with the human.
 
 2026-10-26 customer id made non-public (human, after research: Google shows it only to domain-settings admins in the Admin console and support will not give it out; no documented public derivation; DNS shows only that the domain uses Google Workspace). The tenant entry is now environment only: GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID joins the key and the delegated user (repr=False); production.toml and local.toml name no tenant; the files test asserts no file names the tenant table or a customer id; pytest-env blanks the customer id; pre google compares all three parameters by hash and prints none. configuration.md non-public rule names the customer id; doc-14 row and the thirteenth parameter. Parallel prerequisite, reviewed without a task: branch tf-google-customer-id-parameter (worktree /home/vscode/worktrees/sre-bot-tf-customer-id) adds GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID to sre_bot_secret_names in terraform/ssm.tf (parameter, task-definition injection, IAM read); it must be merged, applied and deployed and its value put-parameter'd before this PR merges, else boot fails on the key without a customer id. Gates: ruff and format clean, mypy 47 = baseline, pytest 5800 passed, contracts 13 kept, key ownership OK. ACs 1, 2, 4, 5, 6 checked; AC 3 is the merge gate.
+
+2026-10-26 merge gate: pre google 21:37Z (tmp/deploy-checks/pre-google-20261026T213759Z.txt) google_pre PASS: CUSTOMER_ID, SERVICE_ACCOUNT_KEY and DELEGATED_USER_EMAIL all MATCH their old values; GOOGLE_DELEGATED_ADMIN_EMAIL still a sre-bot-config line (inert, goes with the blob), GOOGLE_API_* in no blob. Rollback image_tag bcbfe9377fa2174cf51cc132dbd8d59fb8aaa669-2026-10-26 (sre-bot-task running revision). Codespaces secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID set (human); no Actions secret needed (CI blanks the tenant). All six ACs checked; DoD after the deploy.
+
+2026-10-26 pre at merge 21:44Z (tmp/deploy-checks/pre-20261026T214442Z.txt): running sre-bot-task:50, rollback image_tag bcbfe9377fa2174cf51cc132dbd8d59fb8aaa669-2026-10-26 unchanged.
 <!-- SECTION:NOTES:END -->

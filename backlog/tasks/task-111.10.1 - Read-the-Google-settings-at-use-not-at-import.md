@@ -1,10 +1,10 @@
 ---
 id: TASK-111.10.1
 title: Read the Google settings at use, not at import
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T18:29:00Z'
-updated_date: '2026-10-26T19:50:00Z'
+updated_date: '2026-10-26T21:47:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -28,12 +28,12 @@ Nine modules (modules/incident x5, modules/role, modules/dev, features/incident/
 - [x] #1 No module calls a Google settings provider at import time: importing server.server, the legacy incident, role and dev modules and both Google adapters succeeds with both providers raising
 - [x] #2 Every reader gets the same ids and delegation email as before (module tests repatched on the providers, assertions unchanged); the unused INCIDENT_LIST in modules/dev/incident.py is deleted
 - [x] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #4 The delegation subject's parameter /sre-bot/GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL exists (terraform, placeholder) and is injected by the task definition, unread; the non-public value rule is in decisions/configuration.md and doc-14 names the new destinations
+- [x] #4 The delegation subject's parameter /sre-bot/GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL exists (terraform, placeholder) and is injected by the task definition, unread; the non-public value rule is in decisions/configuration.md and doc-14 names the new destinations
 <!-- AC:END -->
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Deployed; zsh bin/deploy-checks.zsh post PASS and the manual checks recorded: /sre incident product list shows the product folders; /incident with no text opens the creation modal with the folders and the handbook link, then cancelled
+- [x] #1 Deployed; zsh bin/deploy-checks.zsh post PASS and the manual checks recorded: /sre incident product list shows the product folders; /incident with no text opens the creation modal with the folders and the handbook link, then cancelled
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -92,4 +92,8 @@ Implemented 2026-10-26 on main 736d57bd (#1790 merged); plan approved by the hum
 - AC #4 waits on production evidence: tf_apply on merge, then H-A1 (put-parameter of the SRE_BOT_EMAIL value, Codespaces secret).
 
 Merge gate 2026-10-26 19:28Z: pre run, rollback image_tag 736d57bda3e2e5c48943878528b4bd24170f5f3d-2026-10-26 (sre-bot-task:48, rollout COMPLETED, configured_systems slack and google); env-checks GOOGLE_WORKSPACE__ shows the delegated user's parameter missing, as expected before tf_apply.
+
+2026-10-26 AC #4 verified: merged as #1791 (bcbfe937); tf_apply success created /sre-bot/GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL and registered the task-definition revision that injects it (unread); the human put-parameter'd the SRE_BOT_EMAIL value (env-checks 20:39Z: the twelve /sre-bot parameters set, none placeholder); configuration.md non-public rule and doc-14 rows landed in the PR. Deployed (build and deploy success; sbom on the trivy-db rate limit). Remaining: DoD (zsh bin/deploy-checks.zsh post and the two manual checks).
+
+2026-10-26 DoD: zsh bin/deploy-checks.zsh post 21:40Z (tmp/deploy-checks/post-20261026T214035Z.txt) on the bcbfe937 image: rollout, boot_errors, runtime_errors (0 other, 0 reconnects), slack_up and version PASS. Manual (human): /incident with no text opened the modal with the folders and the handbook link, cancelled; /sre incident product list failed once with expired_trigger_id and worked on retry. Not this change: list_folders_view (modules/incident/incident_folder.py) lists Drive before views.open, and the first, cold Google call outlasts Slack's 3-second trigger_id; the fix (open a loading modal first, then views.update, as modules/incident/incident.py does) rides in TASK-111.10.3, which touches the same read. Ready for Done (human).
 <!-- SECTION:NOTES:END -->

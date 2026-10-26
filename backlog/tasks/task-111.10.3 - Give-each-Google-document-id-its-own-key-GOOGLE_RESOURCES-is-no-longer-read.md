@@ -4,6 +4,7 @@ title: Give each Google document id its own key; GOOGLE_RESOURCES is no longer r
 status: To Do
 assignee: []
 created_date: '2026-10-26T18:55:00Z'
+updated_date: '2026-10-26T21:45:00Z'
 labels:
   - configuration
   - security
@@ -30,4 +31,5 @@ GOOGLE_RESOURCES packs the incident, talent, AWS spending and calendar ids into 
 - [ ] #2 No configuration file holds a Drive, document, sheet or calendar id
 - [ ] #3 Each production value equals the id in the sre-bot-config GOOGLE_RESOURCES line it replaces (compared without printing it)
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #5 /sre incident product list opens a loading modal before the Drive read and fills it with views.update, so a cold Google call no longer outlasts Slack's 3-second trigger_id (expired_trigger_id seen after the 111.10.1 deploy)
 <!-- AC:END -->
