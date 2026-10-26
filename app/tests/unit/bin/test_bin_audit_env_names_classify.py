@@ -58,6 +58,19 @@ def test_developer_names_get_one_action(name: str, state: str, action: str) -> N
     assert _action("file app/.env", name, state) == action
 
 
+def test_a_parameter_destination_set_ahead_of_its_reader_is_kept() -> None:
+    ctx = Context(
+        current=CTX.current,
+        doc14={"SRE_BOT_EMAIL": ("secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "111.10.2")},
+    )
+
+    verdict = classify("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "present", ctx)
+
+    assert verdict.action == "none"
+    assert "SRE_BOT_EMAIL" in verdict.reason
+    assert _action("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__UNKNOWN", "present", ctx) == "delete"
+
+
 def test_the_real_setup_scripts_read_the_geodb_bucket() -> None:
     assert ".devcontainer/maxmind-create.sh" in setup_references()["GEO_DB_BUCKET"]
 
@@ -75,6 +88,23 @@ def test_a_superseded_google_id_names_the_secret_that_holds_it_now() -> None:
 
 def test_a_retired_switch_points_to_its_configuration_key() -> None:
     assert "[slack_transport] enabled" in classify("file app/.env", "SLACK_ENABLED", "set", CTX).reason
+
+
+@pytest.mark.parametrize(
+    ("name", "destination"),
+    [
+        ("SRE_BOT_EMAIL", "secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL"),
+        ("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"),
+        ("GOOGLE_WORKSPACE_CUSTOMER_ID", "secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID"),
+        ("GOOGLE_API_NUM_RETRIES", "[google_workspace] api_num_retries"),
+        ("GOOGLE_API_TIMEOUT_SECONDS", "[google_workspace] api_timeout_seconds"),
+    ],
+)
+def test_a_retired_google_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert destination in verdict.reason
 
 
 def test_the_retired_flat_lease_ttl_is_deleted_for_its_scheduler_key_not_renamed() -> None:

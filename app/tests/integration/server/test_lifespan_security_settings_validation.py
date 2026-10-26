@@ -32,8 +32,9 @@ def _security_slice_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[
     monkeypatch.setitem(SecuritySettings.model_config, "env_file", None)
     monkeypatch.setitem(SlackSettings.model_config, "env_file", None)
     monkeypatch.setitem(GoogleWorkspaceSettings.model_config, "env_file", None)
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
-    monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "")
     for field in SecuritySettings.model_fields:
         monkeypatch.delenv(f"SECURITY__{field.upper()}", raising=False)
     caches = (get_security_settings, get_slack_settings, get_google_workspace_settings)

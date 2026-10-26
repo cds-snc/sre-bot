@@ -6,7 +6,11 @@ from infrastructure.drive.models import DriveFile
 from packages.talent.adapters import google_drive
 
 
-@patch.object(google_drive, "get_google_workspace_settings", new=lambda: SimpleNamespace(sre_bot_email="bot@example.test"))
+@patch.object(
+    google_drive,
+    "get_google_workspace_settings",
+    new=lambda: SimpleNamespace(tenant=SimpleNamespace(delegated_user_email="bot@example.test")),
+)
 @patch("packages.talent.adapters.google_drive.get_drive_provider")
 def test_create_role_folder_success(mock_get_provider):
     provider = MagicMock()
@@ -23,6 +27,18 @@ def test_create_role_folder_success(mock_get_provider):
     )
 
 
+@patch.object(google_drive, "get_google_workspace_settings", new=lambda: SimpleNamespace(tenant=None))
+@patch("packages.talent.adapters.google_drive.get_drive_provider")
+def test_create_role_folder_without_a_google_tenant_names_no_delegated_user(mock_get_provider):
+    provider = MagicMock()
+    provider.create_folder.return_value = OperationResult.success(data=DriveFile(id="folder-1", name="Alpha"))
+    mock_get_provider.return_value = provider
+
+    google_drive.create_role_folder("Alpha", "parent-folder")
+
+    provider.create_folder.assert_called_once_with("Alpha", "parent-folder", delegated_user_email=None)
+
+
 @patch("packages.talent.adapters.google_drive.get_drive_provider")
 def test_create_role_folder_failure_returns_none(mock_get_provider):
     provider = MagicMock()
@@ -35,7 +51,11 @@ def test_create_role_folder_failure_returns_none(mock_get_provider):
     assert google_drive.create_role_folder("Alpha", "parent-folder") is None
 
 
-@patch.object(google_drive, "get_google_workspace_settings", new=lambda: SimpleNamespace(sre_bot_email="bot@example.test"))
+@patch.object(
+    google_drive,
+    "get_google_workspace_settings",
+    new=lambda: SimpleNamespace(tenant=SimpleNamespace(delegated_user_email="bot@example.test")),
+)
 @patch("packages.talent.adapters.google_drive.get_drive_provider")
 def test_copy_template_to_role_folder_success(mock_get_provider):
     provider = MagicMock()

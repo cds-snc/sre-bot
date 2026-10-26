@@ -242,10 +242,12 @@ def test_sheets_factory_resource_inherits_configured_retry_default(
 ) -> None:
     captured: dict[str, Any] = {}
     settings = SimpleNamespace(
-        tenant=SimpleNamespace(service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}'),
-        sre_bot_email="sre-bot@example.com",
-        google_api_num_retries=3,
-        google_api_timeout_seconds=10.0,
+        tenant=SimpleNamespace(
+            service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
+            delegated_user_email="sre-bot@example.com",
+        ),
+        api_num_retries=3,
+        api_timeout_seconds=10.0,
     )
 
     class FakeCredentials:

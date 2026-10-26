@@ -68,8 +68,9 @@ def _production_phase(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
         monkeypatch.setenv(f"SLACK__{field.upper()}", "")
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
-    monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "")
     monkeypatch.setattr("infrastructure.logging.setup._is_test_environment", lambda: False)
     configure = structlog.configure
     monkeypatch.setattr(structlog, "configure", lambda **kw: configure(**{**kw, "cache_logger_on_first_use": False}))

@@ -137,7 +137,8 @@ def _build_service(
     if tenant is None:
         logger.error("google_workspace_not_configured", api_name=api_name, api_version=api_version)
         raise ValueError(
-            "Google Workspace is not configured: set GCP_SRE_SERVICE_ACCOUNT_KEY_FILE and GOOGLE_WORKSPACE_CUSTOMER_ID"
+            "Google Workspace is not configured: set [google_workspace.tenant] customer_id and "
+            "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"
         )
 
     try:
@@ -148,7 +149,7 @@ def _build_service(
 
     creds = service_account.Credentials.from_service_account_info(creds_info)
 
-    delegation_email = delegated_user_email or settings.sre_bot_email or None
+    delegation_email = delegated_user_email or tenant.delegated_user_email
     if delegation_email:
         creds = creds.with_subject(delegation_email)
 
@@ -163,10 +164,10 @@ def _build_service(
     return build(
         api_name,
         api_version,
-        http=_build_authorized_http(creds, settings.google_api_timeout_seconds),
+        http=_build_authorized_http(creds, settings.api_timeout_seconds),
         cache_discovery=False,
         static_discovery=True,
-        requestBuilder=_build_request_builder(settings.google_api_num_retries),
+        requestBuilder=_build_request_builder(settings.api_num_retries),
     )
 
 

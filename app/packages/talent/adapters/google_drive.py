@@ -23,10 +23,13 @@ def _log_failure(event: str, result: OperationResult[Any]) -> None:
     )
 
 
+def _delegated_user_email() -> str | None:
+    tenant = get_google_workspace_settings().tenant
+    return tenant.delegated_user_email if tenant is not None else None
+
+
 def create_role_folder(name: str, parent_folder_id: str) -> dict[str, Any] | None:
-    result = get_drive_provider().create_folder(
-        name, parent_folder_id, delegated_user_email=get_google_workspace_settings().sre_bot_email
-    )
+    result = get_drive_provider().create_folder(name, parent_folder_id, delegated_user_email=_delegated_user_email())
     if not result.is_success:
         _log_failure("talent_drive_create_folder_failed", result)
         return None
@@ -46,7 +49,7 @@ def copy_template_to_role_folder(
         name,
         templates_folder_id,
         destination_folder_id,
-        delegated_user_email=get_google_workspace_settings().sre_bot_email,
+        delegated_user_email=_delegated_user_email(),
     )
     if not result.is_success:
         _log_failure("talent_drive_copy_template_failed", result)

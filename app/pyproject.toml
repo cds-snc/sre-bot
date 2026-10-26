@@ -4,7 +4,6 @@ version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
     "arrow>=1.4.0",
-    "Authlib>=1.9.1",
     "aws-sns-message-validator>=0.0.5",
     "blinker>=1.9.0",
     "boto3>=1.43.116",
@@ -13,7 +12,6 @@ dependencies = [
     "geoip2>=5.3.0",
     "google-api-python-client>=2.201.0",
     "google-auth-httplib2>=0.4.4",
-    "google-auth-oauthlib>=1.5.0",
     "google-api-core>=2.42.0",
     "google-auth>=2.62.0",
     "httpx>=0.28.1",
@@ -136,12 +134,16 @@ env = [
     "SCHEDULER__ENABLED=false",
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
-    # The test run is an unconfigured Slack (ci.toml has no [slack.tenant]): the blanks
-    # override a developer's app/.env and the Codespaces secrets every process inherits.
+    # The test run is an unconfigured Slack and Google (ci.toml has no [slack.tenant]; the
+    # Google tenant is environment only): the blanks override a developer's app/.env and the
+    # Codespaces secrets every process inherits.
     "SLACK__BOT_TOKEN=",
     "SLACK__USER_TOKEN=",
     "SLACK__APP_TOKEN=",
     "SLACK__SIGNING_SECRET=",
+    "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID=",
+    "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY=",
+    "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL=",
     "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
     "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
     "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
@@ -156,8 +158,6 @@ env = [
     "TRELLO_APP_KEY=TRELLO_APP_KEY",
     "TRELLO_TOKEN=TRELLO_TOKEN",
     "TRELLO_ATIP_BOARD=TRELLO_ATIP_BOARD",
-    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE=GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    "GOOGLE_WORKSPACE_CUSTOMER_ID=C0test0id",
     "GROUP_PROVIDERS={{\"google\": {{\"enabled\": true, \"primary\": true}}}}",
 ]
 norecursedirs = ["tests/smoke"]

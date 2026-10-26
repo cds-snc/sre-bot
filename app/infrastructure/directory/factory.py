@@ -54,7 +54,7 @@ def get_directory_provider() -> DirectoryProvider:
         tenant = workspace_settings.tenant
         get_service = partial(
             get_admin_directory_service,
-            delegated_user_email=workspace_settings.sre_bot_email or None,
+            delegated_user_email=tenant.delegated_user_email if tenant is not None else None,
         )
         return build_google_directory_provider(
             get_service=get_service,

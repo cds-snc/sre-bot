@@ -53,6 +53,13 @@ enabled = false
 socket_mode = true
 command_prefix = ""
 
+[google_workspace]
+# The Google API client's retries and per-attempt timeout. The tenant entry is never in
+# a file: its customer id and delegated user (non-public values) and its service-account
+# key (a secret) come from the environment as GOOGLE_WORKSPACE__TENANT__<FIELD>.
+api_num_retries = 3
+api_timeout_seconds = 10.0
+
 [scheduler]
 # Each deployment that runs the scheduled jobs switches them on in its own file;
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.

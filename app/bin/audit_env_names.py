@@ -67,6 +67,11 @@ HINTS = {
     "SLACK_TEAM_ID": "[slack.tenant] team_id",
     "ISSUER_CONFIG": "[[security.issuers]]",
     "DEFAULT_TIER2_LEASE_TTL_SECONDS": "[scheduler] default_tier2_lease_ttl_seconds",
+    "SRE_BOT_EMAIL": "secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL",
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE": "secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY",
+    "GOOGLE_WORKSPACE_CUSTOMER_ID": "secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID",
+    "GOOGLE_API_NUM_RETRIES": "[google_workspace] api_num_retries",
+    "GOOGLE_API_TIMEOUT_SECONDS": "[google_workspace] api_timeout_seconds",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
@@ -92,7 +97,7 @@ SUPERSEDED = {
 }
 
 FILE_DESTINATION = re.compile(r"(?:production\.toml |file )\[([a-z0-9_.]+)\] ?([a-z0-9_]*)")
-SECRET_DESTINATION = re.compile(r"secret ([A-Z0-9_]+)")
+PARAMETER_DESTINATION = re.compile(r"secret ([A-Z0-9_]+)")
 WORKFLOW_REFERENCE = re.compile(r"\b(?:secrets|vars)\.([A-Za-z0-9_]+)")
 # Developer setup that reads the environment: devcontainer files, Makefiles and shell scripts.
 SETUP_FILES = (".devcontainer/*", "Makefile", "app/Makefile", "app/bin/*.sh", "bin/*.sh")
@@ -203,6 +208,11 @@ def _is_runtime(name: str) -> bool:
     return name in RUNTIME or name.startswith(RUNTIME_PREFIXES)
 
 
+def staged_parameters(ctx: Context) -> dict[str, str]:
+    """doc-14's /sre-bot/<NAME> parameter destinations, each mapped to the old name that moves there."""
+    return {m[1]: old for old, (destination, _) in ctx.doc14.items() if (m := PARAMETER_DESTINATION.match(destination))}
+
+
 def _developer(name: str, state: str, ctx: Context) -> Verdict:
     """An env-file line or a Codespaces secret: what a developer's process would read."""
     read = name in ctx.current or _is_runtime(name) or name in ctx.setup_refs
@@ -217,6 +227,8 @@ def _developer(name: str, state: str, ctx: Context) -> Verdict:
         return Verdict("none", "read by the platform, an SDK or uvicorn")
     if files := ctx.setup_refs.get(name):
         return Verdict("none", f"read by developer setup: {', '.join(files)}")
+    if old := staged_parameters(ctx).get(name):
+        return Verdict("none", f"staged ahead of its reader: doc-14 moves {old} to this secret")
     if name in HINTS:
         return Verdict("delete", f"retired; set {HINTS[name]} instead")
     if name in SUPERSEDED:
@@ -253,7 +265,7 @@ def _production_blob(name: str, ctx: Context) -> Verdict:
             if "structured" in destination:
                 return Verdict("none", f"migrated to [{match[1]}] (restructured: {', '.join(sorted(table))}); {BLOB_END}")
             return Verdict("check", f"not read, and production [{match[1]}] has no {match[2]}: fix doc-14 or the config")
-        if match := SECRET_DESTINATION.match(destination):
+        if match := PARAMETER_DESTINATION.match(destination):
             status = ctx.parameter_states.get(match[1], "missing")
             if status == "set":
                 return Verdict("none", f"migrated to secret {match[1]}; {BLOB_END}")
@@ -274,7 +286,7 @@ def classify(source: str, name: str, state: str, ctx: Context) -> Verdict:
 
 def parameter_rows(ctx: Context) -> list[tuple[str, str, Verdict]]:
     """The /sre-bot/<NAME> parameters doc-14 names (migration part)."""
-    wanted = sorted({m[1] for destination, _ in ctx.doc14.values() if (m := SECRET_DESTINATION.match(destination))})
+    wanted = sorted(staged_parameters(ctx))
     rows = []
     for name in wanted:
         state = ctx.parameter_states.get(name, "missing")

@@ -12,11 +12,11 @@ event names systems and never carries a tenant id.
 """
 
 import pytest
-from pydantic import ValidationError
 from structlog.testing import capture_logs
 
+from contracts.configuration import ConfigurationError
 from contracts.workplace import WorkplaceSystem
-from integrations.google_workspace.settings import GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings, GoogleWorkspaceTenant
 from integrations.slack.settings import SlackSettings, SlackTenant
 from server.configured_systems import (
     TENANT_SOURCES,
@@ -38,10 +38,9 @@ def _slack(team_id: str | None = None) -> SlackSettings:
     return SlackSettings.model_construct(tenant=SlackTenant(team_id=team_id) if team_id is not None else None)
 
 
-def _google(customer_id: str | None = None, key_file: str = "") -> GoogleWorkspaceSettings:
-    return GoogleWorkspaceSettings.model_construct(
-        google_workspace_customer_id=customer_id, gcp_sre_service_account_key_file=key_file
-    )
+def _google(customer_id: str | None = None) -> GoogleWorkspaceSettings:
+    tenant = GoogleWorkspaceTenant(customer_id=customer_id, service_account_key="{}") if customer_id is not None else None
+    return GoogleWorkspaceSettings.model_construct(tenant=tenant)
 
 
 def test_configured_sources_are_returned_in_source_order() -> None:
@@ -78,7 +77,7 @@ def test_slack_tenant_entry_configures_the_system() -> None:
 
 
 def test_google_tenant_is_the_entry_customer_id() -> None:
-    assert google_tenant(_google(" C0abc ", key_file="/run/key.json")) == "C0abc"
+    assert google_tenant(_google(" C0abc ")) == "C0abc"
 
 
 def test_google_without_an_entry_is_not_configured() -> None:
@@ -86,9 +85,9 @@ def test_google_without_an_entry_is_not_configured() -> None:
 
 
 def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Without a [slack.tenant] entry Slack is absent after validation; a set key file and real id configure Google."""
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "/run/key.json")
-    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0abc")
+    """Without a [slack.tenant] entry Slack is absent after validation; a tenant entry and its key configure Google."""
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C0abc")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", "{}")
 
     assert slack_tenant(SlackSettings(_env_file=None)) is None  # type: ignore[call-arg]
     assert google_tenant(GoogleWorkspaceSettings(_env_file=None)) == "C0abc"  # type: ignore[call-arg]
@@ -96,11 +95,11 @@ def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch
 
 def test_an_invalid_google_entry_fails_before_any_tenant_is_read(monkeypatch: pytest.MonkeyPatch) -> None:
     """A customer id without its key is a present entry missing a secret, so the slice never builds."""
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
-    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0abc")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", "")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C0abc")
     source = TenantSource(WorkplaceSystem.GOOGLE, lambda: google_tenant(GoogleWorkspaceSettings(_env_file=None)))  # type: ignore[call-arg]
 
-    with pytest.raises(ValidationError, match="GCP_SRE_SERVICE_ACCOUNT_KEY_FILE"):
+    with pytest.raises(ConfigurationError, match="GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"):
         read_configured_systems([source])
 
 
