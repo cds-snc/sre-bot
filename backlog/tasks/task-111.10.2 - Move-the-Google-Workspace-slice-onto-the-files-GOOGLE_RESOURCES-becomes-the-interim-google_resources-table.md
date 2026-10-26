@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T18:29:00Z'
-updated_date: '2026-10-26T18:54:00Z'
+updated_date: '2026-10-26T19:50:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -99,7 +99,7 @@ G5 zsh bin/env-checks.zsh --all GOOGLE_ GCP_ SRE_BOT_EMAIL from this branch: bot
 H1 local.toml customer_id: the agent reads GOOGLE_WORKSPACE_CUSTOMER_ID from the Codespace environment (the only value read; no key, email or id).
 
 == Post-deploy ==
-zsh bin/deploy-checks.zsh post google. Manual: /incident product list shows the product folders (Drive read through the key and the delegated user), and /incident declare opens with the handbook link. Rollback on FAIL: build_and_deploy with image_tag=<G2 tag> (docs/runbooks/roll-back-a-deployment.md), then revert.
+zsh bin/deploy-checks.zsh post google. Manual: /sre incident product list shows the product folders (a Drive read through the key and the delegated user; the safe read, since /incident takes its text as a new incident title); /incident with no text opens the creation modal with the product folders and the handbook link, then cancel it (nothing is created until submit). Rollback on FAIL: build_and_deploy with image_tag=<G2 tag> (docs/runbooks/roll-back-a-deployment.md), then revert.
 
 == Cleanup (after the post-deploy PASS) ==
 - Codespaces: gh secret delete GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_WORKSPACE_CUSTOMER_ID, SRE_BOT_EMAIL (--app codespaces -R cds-snc/sre-bot); GOOGLE_RESOURCES stays until 111.10.3. Confirm with env-checks.

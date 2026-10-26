@@ -4,7 +4,7 @@ title: Read the Google settings at use, not at import
 status: In Progress
 assignee: []
 created_date: '2026-10-26T18:29:00Z'
-updated_date: '2026-10-26T19:09:00Z'
+updated_date: '2026-10-26T19:50:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -33,7 +33,7 @@ Nine modules (modules/incident x5, modules/role, modules/dev, features/incident/
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Deployed; zsh bin/deploy-checks.zsh post PASS and the manual checks (/incident product list, the declare modal's handbook link) recorded
+- [ ] #1 Deployed; zsh bin/deploy-checks.zsh post PASS and the manual checks recorded: /sre incident product list shows the product folders; /incident with no text opens the creation modal with the folders and the handbook link, then cancelled
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -76,7 +76,7 @@ Terraform: one new SecureString with the placeholder and one more secrets: entry
 
 == Merge gate and checks ==
 H-A1 (human, after tf_apply succeeds): aws ssm put-parameter --region ca-central-1 --name /sre-bot/GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL --type SecureString --overwrite --value '<the SRE_BOT_EMAIL value from sre-bot-config>' (with the core-services profile, as for the 111.4 values); confirm: zsh bin/env-checks.zsh GOOGLE_WORKSPACE__ shows the parameter set, not placeholder. Also: Codespaces secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL from the current SRE_BOT_EMAIL Codespaces value (gh secret set ... --app codespaces -R cds-snc/sre-bot).
-Gates from app/: ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts, make check-settings-key-ownership. zsh bin/deploy-checks.zsh pre at merge for the rollback tag. After deploy: zsh bin/deploy-checks.zsh post (generic: rollout, boot errors, Slack up, HTTP); no task check. Manual: /incident product list shows the product folders (a Drive read of incident_folder_id at use), and the /incident declare modal opens with the handbook link.
+Gates from app/: ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts, make check-settings-key-ownership. zsh bin/deploy-checks.zsh pre at merge for the rollback tag. After deploy: zsh bin/deploy-checks.zsh post (generic: rollout, boot errors, Slack up, HTTP); no task check. Manual: /sre incident product list shows the product folders (a Drive read of incident_folder_id at use; the safe read, since /incident takes its text as a new incident title); /incident with no text opens the creation modal with the product folders and the handbook link, then cancel it (nothing is created until submit).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -90,4 +90,6 @@ Implemented 2026-10-26 on main 736d57bd (#1790 merged); plan approved by the hum
 - Gates: ruff check and format clean; mypy 47 = baseline (the two in touched files, role.py locale and incident.py chat_getPermalink, are on unchanged lines); pytest 5779 passed; import contracts 13 kept; key ownership OK.
 - Found and queued: import-time settings reads in the Trello, OpsGenie, Sentinel and Notify clients (AC added to 111.12) and in modules/incident core.py and incident.py (AC added to 111.14).
 - AC #4 waits on production evidence: tf_apply on merge, then H-A1 (put-parameter of the SRE_BOT_EMAIL value, Codespaces secret).
+
+Merge gate 2026-10-26 19:28Z: pre run, rollback image_tag 736d57bda3e2e5c48943878528b4bd24170f5f3d-2026-10-26 (sre-bot-task:48, rollout COMPLETED, configured_systems slack and google); env-checks GOOGLE_WORKSPACE__ shows the delegated user's parameter missing, as expected before tf_apply.
 <!-- SECTION:NOTES:END -->

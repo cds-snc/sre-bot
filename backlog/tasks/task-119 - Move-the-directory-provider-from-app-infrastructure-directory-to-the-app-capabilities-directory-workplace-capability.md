@@ -5,8 +5,8 @@ title: >-
   app/capabilities/directory/ workplace capability
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:00'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:00
+updated_date: '2026-10-26T19:31:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -21,7 +21,7 @@ references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
   - decisions/cloud-portability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1662'
+  - https://github.com/cds-snc/sre-bot/issues/1662
 priority: medium
 type: task
 ordinal: 261000
@@ -43,12 +43,12 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/capabilities/directory/ matches the feature-packages layout for a capability (the TASK-114 shape check is green); its README states the classification and at least one feature consumer
-- [ ] #2 Consumers import only app/capabilities/directory/api.py; only its adapters/ import app.integrations
-- [ ] #3 An in-memory fake of the api.py Protocol lives in the package and is exercised by tests, as the cloud-portability.md fake contract requires for externally facing capability Protocols
-- [ ] #4 app/infrastructure/directory/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DirectoryProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #1 Consumers import only app/capabilities/directory/api.py; only its adapters/ import app.integrations
+- [ ] #2 An in-memory fake of the api.py Protocol lives in the package and is exercised by tests, as the cloud-portability.md fake contract requires for externally facing capability Protocols
+- [ ] #3 app/infrastructure/directory/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
+- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DirectoryProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #6 app/capabilities/directory/ matches the feature-packages layout for a capability (the TASK-114 shape check is green); its README states the classification, its purpose (the people directory) and at least two feature consumers (decisions/workplace-systems.md Checks, 2026-10-26)
 <!-- AC:END -->
 
 ## Comments

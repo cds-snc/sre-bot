@@ -1,12 +1,13 @@
 ---
 id: TASK-169
 title: >-
-  Design session: Google Workspace credential model (domain-wide delegation,
-  scopes per caller, keyless federation from ECS)
+  Design session: Google Workspace integration shape and credential model
+  (purpose-named ports, domain-wide delegation, scopes per caller, keyless
+  federation from ECS)
 status: To Do
 assignee: []
 created_date: '2026-10-26T18:40:00Z'
-updated_date: '2026-10-26T18:52:00Z'
+updated_date: '2026-10-26T19:32:00Z'
 labels:
   - security
   - configuration
@@ -40,4 +41,11 @@ The session reviews what Google Workspace, GCP and Google Cloud Identity offer t
 - [ ] #5 The no-cost availability review is recorded with current Google sources: which Workspace, Admin SDK, Cloud Identity and GCP features the plan relies on, whether each needs an API enabled or a paid tier, and what the project has enabled today
 - [ ] #6 Every call that needs a delegated user is named with the reason (an API that refuses service-account tokens, or data that must belong to a user), and every other call moves off delegation or has a recorded reason to stay
 - [ ] #7 The pickle-string OAuth path is confirmed unused end to end, and its remaining traces are assigned for deletion (TF_VAR_google_oauth_pickle_string and GOOGLE_PICKLE_STRING in TASK-111.15.2, Authlib and google-auth-oauthlib in TASK-111.10.2)
+- [ ] #8 The integration shape is decided and written into the tasks: integrations/google_workspace/ is the one Google gateway (client, credentials, tenant, retries, error classification, shared helpers); the people directory is the Google-backed workplace capability (TASK-119); TASK-120 and 121 are re-scoped to purpose-named ports owned by their consumers (incident report through TASK-145.6, talent role folders, AWS spending, the incident list projection), and TASK-138 is held or re-scoped, each with its reason
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-26 (human approved): integration shape folded in. The session also confirms which Google-backed operations are workplace capabilities (the people directory, TASK-119, confirmed by its ~14 consumers and Microsoft Entra beside Google) and which become purpose-named ports owned by their consumers over integrations/google_workspace/ (drive and spreadsheets: TASK-120, 121; calendar: TASK-138 held), per decisions/workplace-systems.md as amended 2026-10-26. Lands before TASK-120, 121, 138 and 145.6 (dependencies added); TASK-119 does not wait on it.
+<!-- SECTION:NOTES:END -->
