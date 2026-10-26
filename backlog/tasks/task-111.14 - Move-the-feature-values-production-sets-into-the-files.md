@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-10-26T19:09:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -32,4 +32,5 @@ Production sets INCIDENT_CHANNEL, SLACK_SECURITY_USER_GROUP_ID, SLACK_NOTIFY_MGM
 - [ ] #2 AtipSettings and GroupsFeatureSettings, their getters, exports, tests and env entries are deleted
 - [ ] #3 No feature value remains needed from the SSM parameters
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #5 Every reader of the incident feature slice builds it at use, not at import (found 2026-10-26 in TASK-111.10.1: modules/incident/core.py:22 and modules/incident/incident.py:22 read get_incident_settings() at import, and a slice on the files fails closed before the app factory installs them); a fresh-interpreter import test proves the provider cache stays empty
 <!-- AC:END -->

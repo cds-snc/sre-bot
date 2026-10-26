@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from contracts.operations import OperationResult
@@ -5,6 +6,7 @@ from infrastructure.drive.models import DriveFile
 from packages.talent.adapters import google_drive
 
 
+@patch.object(google_drive, "get_google_workspace_settings", new=lambda: SimpleNamespace(sre_bot_email="bot@example.test"))
 @patch("packages.talent.adapters.google_drive.get_drive_provider")
 def test_create_role_folder_success(mock_get_provider):
     provider = MagicMock()
@@ -17,7 +19,7 @@ def test_create_role_folder_success(mock_get_provider):
     provider.create_folder.assert_called_once_with(
         "Alpha",
         "parent-folder",
-        delegated_user_email=google_drive.BOT_EMAIL,
+        delegated_user_email="bot@example.test",
     )
 
 
@@ -33,6 +35,7 @@ def test_create_role_folder_failure_returns_none(mock_get_provider):
     assert google_drive.create_role_folder("Alpha", "parent-folder") is None
 
 
+@patch.object(google_drive, "get_google_workspace_settings", new=lambda: SimpleNamespace(sre_bot_email="bot@example.test"))
 @patch("packages.talent.adapters.google_drive.get_drive_provider")
 def test_copy_template_to_role_folder_success(mock_get_provider):
     provider = MagicMock()
@@ -52,7 +55,7 @@ def test_copy_template_to_role_folder_success(mock_get_provider):
         "Candidate doc",
         "templates-folder",
         "folder-1",
-        delegated_user_email=google_drive.BOT_EMAIL,
+        delegated_user_email="bot@example.test",
     )
 
 

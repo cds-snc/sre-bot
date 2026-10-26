@@ -29,7 +29,7 @@ Current state:
   - the artifact's stored reference;
   - the platform a conversation started on.
 
-**Workplace systems are capabilities, not infrastructure.** Directory, documents, files, spreadsheets, calendar and mail live under `app/capabilities/`, exposed through each capability's `api.py`.
+**Workplace systems are capabilities, not infrastructure, and a capability is named for its purpose, not for a vendor product.** A workplace capability exists only where rule 2 puts one: an operation several features need, across suites. Its port is named for what the organization does with it (the people directory, an incident's documents), as ports are named for their purpose ([Cockburn, Hexagonal Architecture](https://alistaircockburn.com/Talk%202025-11%20Hexagonal.pdf)) and as Dispatch types its plugins by incident purpose (`document`, `storage`, `conference`, `participant`: [Dispatch plugin bases](https://github.com/Netflix/dispatch/tree/master/src/dispatch/plugins/bases)). A vendor product API (Drive, Sheets, Calendar) is not a capability by itself: a feature that needs one owns a purpose-named port, and its adapter calls the vendor integration (`integrations/<vendor>/`, one gateway per vendor that owns the client, credentials, tenant entry, retries and error classification). The insurance a neutral port buys is worth its complexity only in proportion to the likelihood of a second vendor ([Hohpe, Don't get locked up into avoiding lock-in](https://martinfowler.com/articles/oss-lockin.html)): the people directory has one (Microsoft Entra beside Google, [people-and-accounts.md](people-and-accounts.md)); files and spreadsheets have none planned, and spreadsheets become projections (rule 5). Which vendor serves an operation is data (rule 3), never a `provider` setting.
 
 **Rules for workplace systems.**
 
@@ -60,12 +60,13 @@ Current state:
 
 - import-linter ([plugin-architecture.md](plugin-architecture.md)): features and capabilities never import `infrastructure/`.
 - Review: every `app/infrastructure/` package implements a hosting contract; none serves a workplace concern.
+- Review: every workplace capability names at least two feature consumers in its README and is named for its purpose; no settings slice selects a vendor with a `provider` key.
 - Review: stored models for workplace references include system and tenant fields.
 - Review: no code reads a projection spreadsheet or document as input to a business decision.
 
 ## Migration
 
-Tickets: TASK-145 (incident records owned by the app, decomposed in [incident-management.md](incident-management.md); replaces TASK-38) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119, TASK-120 and TASK-121 (`directory`, `drive` and `spreadsheets` to `app/capabilities/`).
+Tickets: TASK-145 (incident records owned by the app, decomposed in [incident-management.md](incident-management.md); replaces TASK-38) and TASK-39 (talent-role records, with the role surface rebuild); TASK-119 (`directory` to `app/capabilities/directory/`); TASK-120 and TASK-121 (`drive` and `spreadsheets`), re-scoped by TASK-169 from a move into `capabilities/` to purpose-named ports owned by their consumers over `integrations/google_workspace/`; TASK-138 (calendar) held by TASK-169 until a second consumer or a second suite needs it; TASK-111.13 deletes the `provider` settings of the three packages.
 
 Tolerated until then:
 - the three workplace providers in `infrastructure/directory/`, `infrastructure/drive/` and `infrastructure/spreadsheets/`;
@@ -82,3 +83,4 @@ Tolerated until then:
 - 2026-10-15: `WorkplaceSystem` lives in `app/contracts/workplace/` (TASK-145.5.3).
 - 2026-10-20: a tenant entry is the expected tenant, verified against each inbound request's claim (a mismatch is refused) and by a stamping batch job's identity call; Slack's tenant is the Enterprise org when configured, else the workspace; references carry the tenant because vendor ids are scoped by their issuer, not to support several tenants (TASK-157).
 - 2026-10-22: per-tenant credentials live in configuration or, for a vendor that issues them per installation through OAuth, in an installation store; single-workspace Slack keeps its tokens on the slice (TASK-111.7 planning).
+- 2026-10-26: a workplace capability is named for its purpose and exists only for an operation several features need across suites; a vendor product API (Drive, Sheets, Calendar) is reached through a consumer-owned port over the vendor integration; vendor choice is never a `provider` setting (TASK-111.10 review; TASK-169 confirms the Google split, TASK-111.13 deletes the settings).

@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T19:22:00Z'
+updated_date: '2026-10-26T19:09:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -33,4 +33,5 @@ The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>
 - [ ] #1 Each of the five slices reads its non-secret values from the files and its credentials from <SLICE>__<FIELD> names
 - [ ] #2 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #3 integrations/opsgenie/ no longer has create_alert (no caller since the Notify key-revocation change): the function, its export and its tests are deleted
+- [ ] #4 Every reader of these slices builds them at use, not at import (found 2026-10-26 in TASK-111.10.1: integrations/trello/client.py:7, opsgenie/client.py:10, sentinel/client.py:15, notify/client.py:15 read at import, and a slice on the files fails closed before the app factory installs them); a fresh-interpreter import test proves the provider caches stay empty, as tests/unit/server/test_server_app_import_google_settings_lazy.py does
 <!-- AC:END -->

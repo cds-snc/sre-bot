@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-02 16:59
-updated_date: '2026-10-23T17:12:00Z'
+updated_date: '2026-10-26T19:32:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -17,6 +17,7 @@ dependencies:
   - TASK-110
   - TASK-114
   - TASK-36.1.2
+  - TASK-169
 references:
   - decisions/workplace-systems.md
   - decisions/incident-management.md
@@ -52,3 +53,15 @@ Sequencing: a workplace capability move like TASK-119 to TASK-121, after TASK-11
 - [ ] #4 README states the classification and names the incident consumer; the capability has an entry point and an enablement key; if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages; no new import-linter ignore entry
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-26T19:32:00Z
+
+---
+
+2026-10-26 (human approved): held by TASK-169. A calendar capability has one consumer today (postmortem scheduling) and no second suite planned; decisions/workplace-systems.md requires an operation several features need across suites. TASK-169 confirms hold or re-scope.
+
+---
+<!-- COMMENTS:END -->

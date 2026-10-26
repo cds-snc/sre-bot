@@ -4,7 +4,7 @@ title: 'Contract 2: remove the SSM blob IAM read and the old GCP key parameter'
 status: To Do
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-26T16:59:00Z'
+updated_date: '2026-10-26T18:52:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -36,6 +36,7 @@ Second half of TASK-111.15, after the TASK-111.15.1 deploy is verified. Removes 
 - [ ] #3 The PR's tf plan shows only the IAM and parameter removals; nothing replaced
 - [ ] #4 TASK-54's AC #3 is checked; TASK-54 is left for the human to set Done
 - [ ] #5 bin/env-checks.zsh and app/bin/audit_env_names.py drop their migration part (SSM blob and /sre-bot parameter reads, doc-14 destinations, the baseline retired names, HINTS); the env-file, Codespaces and GitHub Actions audit stays, and its tests pass
+- [ ] #6 The dead TF_VAR_google_oauth_pickle_string lines are deleted from tf_plan.yml and tf_apply.yml (no terraform variable reads them; a leftover of the pre-service-account OAuth admin user, found 2026-10-26), and the Actions secret GOOGLE_PICKLE_STRING is deleted (human, after merge)
 <!-- AC:END -->
 
 ## Definition of Done

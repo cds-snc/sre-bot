@@ -16,10 +16,6 @@ from integrations.google_workspace.settings import get_google_resources_config
 from integrations.slack import channels as slack_channels
 from modules.incident import incident_conversation
 
-google_resources = get_google_resources_config()
-
-CALENDAR_ID = google_resources.sre_calendar_id
-
 logger = get_logger()
 
 
@@ -340,7 +336,7 @@ def save_retro_event(
         first_available_end.isoformat(),
         user_emails,
         "Retro " + incident_name,
-        calendar_id=CALENDAR_ID,
+        calendar_id=get_google_resources_config().sre_calendar_id,
         incident_document=incident_document,
         **event_config,
     )

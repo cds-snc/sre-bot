@@ -31,8 +31,6 @@ from modules.incident import (
     schedule_retro,
 )
 
-google_resources = get_google_resources_config()
-SRE_INCIDENT_FOLDER = google_resources.incident_folder_id
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
 VALID_STATUS = [
     "In Progress",
@@ -351,7 +349,7 @@ Use `/sre incident help` to see a list of commands."""
             if not name:
                 respond("Please provide a product name using `create <product_name>`")
                 return
-            folder = incident_drive.create_folder(name, SRE_INCIDENT_FOLDER)
+            folder = incident_drive.create_folder(name, get_google_resources_config().incident_folder_id)
             folder_name = None
             if folder:
                 folder_name = folder.get("name")

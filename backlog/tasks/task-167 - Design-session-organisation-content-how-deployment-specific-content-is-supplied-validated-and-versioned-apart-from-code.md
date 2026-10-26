@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
+updated_date: '2026-10-26T18:52:00Z'
 labels:
   - architecture
   - configuration
@@ -40,4 +41,5 @@ Seed research (2026-10-26, to deepen in the session): Backstage separates plugin
 - [ ] #1 A decision record (new decisions/organisation-content.md or amendments) states the three categories (deployment configuration, code extensions, organisation content) and, for organisation content, format and schema, location, loading and validation, ownership, versioning and the adopter's starting set, with cited sources
 - [ ] #2 Every current and planned organisation-specific content type is inventoried and assigned the pattern (webhook sources and templates, access catalogue, playbooks, incident templates, notification templates)
 - [ ] #3 Follow-up scope changes are written into the affected tasks: the webhooks reassessment, TASK-165's playbooks subtask, TASK-166's catalogue loading, TASK-158
+- [ ] #4 Google document, folder, sheet and calendar ids are ruled on first (they gate TASK-111.10.3): deployment configuration under the non-public value rule (decisions/configuration.md, 2026-10-26: never in the public files, supplied like a secret, one key per id) or organisation content with its own source; the ruling names each id's owning slice or content type so the incident, talent and AWS carriers (145.6, 145.7, 145.10, 145.12, 39, 88) and TASK-158 follow it
 <!-- AC:END -->

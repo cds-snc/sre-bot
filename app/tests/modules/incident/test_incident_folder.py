@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
@@ -14,7 +15,9 @@ def logger_mock():
         yield mock
 
 
-@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch.object(
+    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
+)
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders(incident_drive_mock):
     incident_drive_mock.list_child_folders.return_value = [{"id": "foo", "name": "bar"}]
@@ -22,7 +25,9 @@ def test_list_incident_folders(incident_drive_mock):
     incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
 
 
-@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch.object(
+    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
+)
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders_sorted(incident_drive_mock):
     incident_drive_mock.list_child_folders.return_value = [
@@ -36,7 +41,9 @@ def test_list_incident_folders_sorted(incident_drive_mock):
     incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
 
 
-@patch("modules.incident.incident_folder.SRE_INCIDENT_FOLDER", "SRE_INCIDENT_FOLDER")
+@patch.object(
+    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
+)
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders_truncates_to_the_display_limit(incident_drive_mock):
     """Drive listings are unbounded now, so the Slack option limit is enforced here."""
@@ -302,7 +309,7 @@ class FakeSpreadsheetProvider:
         return self.read_cells_result
 
 
-@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
 @patch("modules.incident.incident_folder.datetime")
 def test_add_new_incident_to_list_success(datetime_mock):
     provider = FakeSpreadsheetProvider()
@@ -326,7 +333,7 @@ def test_add_new_incident_to_list_success(datetime_mock):
     assert provider.append_values_calls == [("INCIDENT_LIST", "Sheet1!A:A", values)]
 
 
-@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
 def test_add_new_incident_to_list_raises_on_failure():
     provider = FakeSpreadsheetProvider()
     provider.append_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "write failed")
@@ -367,7 +374,7 @@ def test_update_spreadsheet_incident_status_read_failure_raises():
             incident_folder.update_spreadsheet_incident_status("foo", "Closed")
 
 
-@patch("modules.incident.incident_folder.INCIDENT_LIST", "INCIDENT_LIST")
+@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
 def test_update_spreadsheet_incident_status_channel_found():
     provider = FakeSpreadsheetProvider()
     provider.read_values_result = OperationResult.success(data=[["foo", "bar", "baz", "qux"]])

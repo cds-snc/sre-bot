@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-10-26T19:32:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -16,6 +16,7 @@ dependencies:
   - TASK-106
   - TASK-110
   - TASK-114
+  - TASK-169
 references:
   - decisions/workplace-systems.md
   - decisions/plugin-architecture.md
@@ -51,3 +52,15 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 - [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DriveProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 - [ ] #7 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages (app/pyproject.toml:209)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-26T19:32:00Z
+
+---
+
+2026-10-26 (human approved): scope under review by TASK-169. decisions/workplace-systems.md now says a vendor product API is not a capability by itself; this task is expected to be re-scoped from a move into app/capabilities/ to purpose-named ports owned by its consumers over integrations/google_workspace/. Do not plan it before TASK-169 lands.
+
+---
+<!-- COMMENTS:END -->

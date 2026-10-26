@@ -10,12 +10,14 @@ resource "aws_ssm_parameter" "gcp_sre_service_account_key" {
   }
 }
 
-# Secrets the app reads under their <SLICE>__<FIELD> names (doc-14 rename map).
+# Secrets and non-public values (decisions/configuration.md) the app reads under
+# their <SLICE>__<FIELD> names (doc-14 rename map).
 # Values are set outside terraform with put-parameter --overwrite; value_wo is
 # write-only, so terraform never reads a value into state. Never bump
 # value_wo_version: that writes the placeholder over the real value.
 locals {
   sre_bot_secret_names = toset([
+    "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL",
     "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY",
     "NOTIFY__SRE_CLIENT_SECRET",
     "NOTIFY__SRE_USER_NAME",
