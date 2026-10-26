@@ -189,16 +189,6 @@ def handle_sync_user_command(
     )
 
     if not result.is_success or result.data is None:
-        if result.error_code == "FEATURE_DISABLED":
-            log.warning("access_sync_disabled_rejected")
-            return CommandResponse(
-                message=t(
-                    "access_sync.disabled",
-                    locale,
-                    "\u26d4 Access Sync is not enabled. Contact your administrator.",
-                ),
-                ephemeral=True,
-            )
         return CommandResponse(
             message=t(
                 "access_sync.user.result.error",
@@ -282,16 +272,6 @@ def handle_sync_platform_command(
     )
 
     if not result.is_success or result.data is None:
-        if result.error_code == "FEATURE_DISABLED":
-            log.warning("access_sync_disabled_rejected")
-            return CommandResponse(
-                message=t(
-                    "access_sync.disabled",
-                    locale,
-                    "\u26d4 Access Sync is not enabled. Contact your administrator.",
-                ),
-                ephemeral=True,
-            )
         return CommandResponse(
             message=t(
                 "access_sync.platform.result.error",

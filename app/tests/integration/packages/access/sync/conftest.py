@@ -75,7 +75,6 @@ from packages.access.sync.policies import (
 # ---------------------------------------------------------------------------
 
 _ACCESS_SYNC_ENV_KEYS = [
-    "ACCESS_SYNC_ENABLED",
     "ACCESS_SYNC_RECONCILIATION_ENABLED",
     "ACCESS_SYNC_JOB_TTL_SECONDS",
     "ACCESS_CONFIG_SOURCE",

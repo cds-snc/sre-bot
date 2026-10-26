@@ -1,17 +1,15 @@
 """Unit tests for packages.access.catalog.interactions.http.
 
 Tests call route handlers directly (no HTTP client needed) by injecting
-stub service and settings objects via the FastAPI dependency-injection
+stub service objects via the FastAPI dependency-injection
 protocol used in test_routes patterns across this codebase.
 """
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
 
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.catalog.domain import (
     EntitlementEntry,
@@ -23,7 +21,6 @@ from packages.access.catalog.interactions.http import (
     list_platforms,
     router,
 )
-from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
 
 
 def _get_route(path: str, method: str) -> APIRoute:
@@ -36,11 +33,6 @@ def _get_route(path: str, method: str) -> APIRoute:
 # ---------------------------------------------------------------------------
 # Stub helpers
 # ---------------------------------------------------------------------------
-
-
-class _FakeSettings:
-    def __init__(self, enabled: bool = True) -> None:
-        self.enabled = enabled
 
 
 class _FakeCatalogService:
@@ -96,27 +88,6 @@ def _make_entry(
 
 
 # ---------------------------------------------------------------------------
-# list_platforms — disabled gate
-# ---------------------------------------------------------------------------
-
-
-def test_list_platforms_should_return_503_when_feature_disabled():
-    # Arrange
-    service = _FakeCatalogService()
-    settings = _FakeSettings(enabled=False)
-
-    # Act / Assert
-    with pytest.raises(HTTPException) as exc_info:
-        list_platforms(
-            service=service,
-            settings=settings,
-            current_user=_make_user(),
-        )
-
-    assert exc_info.value.status_code == 503
-
-
-# ---------------------------------------------------------------------------
 # list_platforms — success
 # ---------------------------------------------------------------------------
 
@@ -129,7 +100,6 @@ def test_list_platforms_should_return_platform_list_on_success():
     # Act
     response = list_platforms(
         service=service,
-        settings=_FakeSettings(),
         current_user=_make_user(),
     )
 
@@ -153,7 +123,6 @@ def test_list_platforms_should_return_500_when_service_fails():
     with pytest.raises(HTTPException) as exc_info:
         list_platforms(
             service=service,
-            settings=_FakeSettings(),
             current_user=_make_user(),
         )
 
@@ -173,56 +142,10 @@ def test_list_platforms_should_return_404_when_service_returns_not_found():
     with pytest.raises(HTTPException) as exc_info:
         list_platforms(
             service=service,
-            settings=_FakeSettings(),
             current_user=_make_user(),
         )
 
     assert exc_info.value.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# list_entitlements — disabled gate
-# ---------------------------------------------------------------------------
-
-
-def test_list_entitlements_should_return_503_when_feature_disabled():
-    # Arrange
-    service = _FakeCatalogService()
-
-    # Act / Assert
-    with pytest.raises(HTTPException) as exc_info:
-        list_entitlements(
-            platform="aws",
-            service=service,
-            settings=_FakeSettings(enabled=False),
-            current_user=_make_user(),
-        )
-
-    assert exc_info.value.status_code == 503
-
-
-@pytest.mark.unit
-def test_list_platforms_returns_503_without_service_dependency_assembly():
-    app = FastAPI()
-    app.include_router(router)
-
-    service_provider_called = False
-
-    def _service_provider() -> _FakeCatalogService:
-        nonlocal service_provider_called
-        service_provider_called = True
-        raise AssertionError("catalog service dependency should not be assembled")
-
-    app.dependency_overrides[get_catalog_settings] = lambda: _FakeSettings(enabled=False)
-    app.dependency_overrides[get_catalog_service] = _service_provider
-    app.dependency_overrides[get_current_user] = _make_user
-
-    client = TestClient(app)
-    response = client.get("/access/catalog")
-
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Access Catalog is not enabled"
-    assert service_provider_called is False
 
 
 # ---------------------------------------------------------------------------
@@ -239,7 +162,6 @@ def test_list_entitlements_should_return_entitlement_list_on_success():
     response = list_entitlements(
         platform="aws",
         service=service,
-        settings=_FakeSettings(),
         current_user=_make_user(),
     )
 
@@ -257,7 +179,6 @@ def test_list_entitlements_should_normalize_platform_in_response():
     response = list_entitlements(
         platform=" AWS ",
         service=service,
-        settings=_FakeSettings(),
         current_user=_make_user(),
     )
 
@@ -285,7 +206,6 @@ def test_list_entitlements_should_return_404_when_platform_not_found():
         list_entitlements(
             platform="nonexistent",
             service=service,
-            settings=_FakeSettings(),
             current_user=_make_user(),
         )
 
@@ -306,7 +226,6 @@ def test_list_entitlements_should_return_500_when_service_fails():
         list_entitlements(
             platform="aws",
             service=service,
-            settings=_FakeSettings(),
             current_user=_make_user(),
         )
 
@@ -327,7 +246,6 @@ def test_list_entitlements_should_propagate_membership_status():
     response = list_entitlements(
         platform="aws",
         service=service,
-        settings=_FakeSettings(),
         current_user=_make_user(),
     )
 
@@ -344,7 +262,6 @@ def test_list_entitlements_should_propagate_requestable_flag():
     response = list_entitlements(
         platform="aws",
         service=service,
-        settings=_FakeSettings(),
         current_user=_make_user(),
     )
 

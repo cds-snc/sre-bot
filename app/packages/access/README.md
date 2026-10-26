@@ -17,30 +17,22 @@ The `access` package contains all business logic for managing user access to ext
 
 ## Feature settings
 
-All access feature settings are unified under a single `AccessSettings` object (defined in `packages/access/common/settings.py`, loaded once via `get_access_settings()`).
+Each access plugin has its own settings class in `packages/access/common/settings.py`, built by that plugin's provider, so a disabled plugin never validates its settings. Whether a plugin runs is its key under `[plugins.platform_access]` in `app/config/*.toml` (off everywhere by default); locally, switch one on from `app/.env`, for example `PLUGINS__PLATFORM_ACCESS='{"access.sync": true}'` (keys merge one by one).
 
 | Env var | Default | Description |
 |---|---|---|
 | `ACCESS_CONFIG_SOURCE` | `bundle` | Runtime config source: `bundle`, `file_json`, `inline_json`, `env` |
 | `ACCESS_CONFIG_REF` | `default` | Path or key for the config source |
 | `ACCESS_CONFIG_REFRESH_SECONDS` | `300` | How often to re-read a dynamic config source |
-| `ACCESS_SYNC_ENABLED` | `false` | Enable the sync feature |
 | `ACCESS_SYNC_RECONCILIATION_ENABLED` | `false` | Enable scheduled batch reconciliation |
 | `ACCESS_SYNC_RECONCILIATION_SCHEDULE` | `03:00` | Daily reconciliation time (UTC, HH:MM) |
 | `ACCESS_SYNC_JOB_TTL_SECONDS` | `86400` | Retention for completed/failed sync records |
 | `ACCESS_SYNC_LOCK_STALE_SECONDS` | `14400` | Lock age before a running job is treated as stale |
-| `ACCESS_REQUESTS_ENABLED` | `false` | Enable the access requests feature |
-| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | none (required if enabled) | Fallback approver group (e.g. `sg-org-admins`) |
+| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | none (required when `access.request` is enabled) | Fallback approver group (e.g. `sg-org-admins`) |
 | `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `1` | Approvals needed before a request is approved |
 | `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `72` | Hours before an open request expires |
-| `ACCESS_CATALOG_ENABLED` | `false` | Enable the catalog browse feature |
 
-Sub-feature settings may also be set via a single JSON env var:
-
-```bash
-ACCESS_SYNC='{"enabled": true, "job_ttl_seconds": 3600}'
-ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
-```
+The catalog has no settings of its own.
 
 ---
 

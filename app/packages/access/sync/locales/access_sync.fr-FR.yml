@@ -49,4 +49,3 @@ access_sync:
   status.result.failed: "❌ Le travail `{job_id}` a *échoué* pour la plateforme *{platform}*.\nErreur\u00a0: {error}"
   status.result.unknown: "❓ Le travail `{job_id}` a un statut inconnu\u00a0: *{status}*"
 
-  disabled: "⛔ La synchronisation des accès n'est pas activée. Contactez votre administrateur."

@@ -19,7 +19,7 @@ from bin import check_settings_key_ownership as checker
 from infrastructure.logging.settings import LoggingSettings
 from infrastructure.security.settings import SecuritySettings
 from integrations.slack.settings import SlackSettings
-from packages.access.common.settings import AccessSettings
+from packages.access.common.settings import AccessConfigSettings, AccessRequestsSettings, AccessSyncSettings
 from server.configuration import IdentitySettings, ServerSettings
 from server.slack.settings import SlackTransportSettings
 
@@ -551,7 +551,9 @@ def test_source_derivation_matches_pydantic_for_real_settings_classes() -> None:
         SlackTransportSettings,
         IdentitySettings,
         ServerSettings,
-        AccessSettings,
+        AccessConfigSettings,
+        AccessSyncSettings,
+        AccessRequestsSettings,
         SecuritySettings,
         LoggingSettings,
     ):
@@ -562,11 +564,16 @@ def test_source_derivation_matches_pydantic_for_real_settings_classes() -> None:
         assert all(any(extra.startswith(name) for name in expected) for extra in derived - expected), cls.__qualname__
 
 
-def test_access_settings_nested_names_are_derived() -> None:
-    """AccessSettings' documented variables come from nested models, not flat fields."""
-    derived = _keys(APP_ROOT, "packages.access.common.settings:AccessSettings")
+def test_access_settings_names_are_derived_from_each_plugin_prefix() -> None:
+    """Each access plugin's class owns its own ACCESS_<SUB>_ names, and none reads an enabled switch."""
+    derived = {
+        key
+        for name in ("AccessConfigSettings", "AccessSyncSettings", "AccessRequestsSettings")
+        for key in _keys(APP_ROOT, f"packages.access.common.settings:{name}")
+    }
 
-    assert {"access_sync_enabled", "access_requests_enabled", "access_catalog_enabled", "access_config_source"} <= derived
+    assert {"access_config_source", "access_sync_job_ttl_seconds", "access_requests_fallback_approver_slug"} <= derived
+    assert not {"access_sync_enabled", "access_requests_enabled", "access_catalog_enabled"} & derived
 
 
 def test_real_tree_is_clean() -> None:

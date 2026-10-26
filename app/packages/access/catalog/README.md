@@ -63,15 +63,9 @@ Platforms without a registered parser fall back to `FallbackCatalogSlugParser`, 
 
 ---
 
-## Feature flag
+## Enabling
 
-```
-ACCESS_CATALOG_ENABLED=true
-```
-
-The feature is disabled by default (`ACCESS_CATALOG_ENABLED=false`). All routes return `503` when disabled.
-
-The flag maps to `settings.catalog.enabled` in `AccessSettings` (defined in `packages/access/common/settings.py`).
+The plugin runs when its `[plugins.platform_access]` key `access.catalog` is true (off by default; see `packages/access/README.md`). A disabled plugin is never imported, so its routes do not exist. The catalog has no settings of its own.
 
 ---
 
@@ -83,5 +77,5 @@ The flag maps to `settings.catalog.enabled` in `AccessSettings` (defined in `pac
 | `schemas.py` | Pydantic HTTP response models |
 | `service.py` | Orchestration — `list_platforms()` and `list_entitlements()` |
 | `parsers.py` | `CatalogSlugParser` Protocol and `AwsCatalogSlugParser` implementation |
-| `providers.py` | `get_catalog_settings()` — thin slice provider returning `AccessCatalogSettings` |
+| `providers.py` | `get_catalog_service()` — singleton catalog service wired from the runtime config |
 | `transport/routes.py` | FastAPI route handlers |

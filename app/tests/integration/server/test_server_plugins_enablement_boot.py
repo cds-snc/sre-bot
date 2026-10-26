@@ -81,6 +81,17 @@ def test_disabled_access_plugins_register_no_route_and_no_openapi_path() -> None
     assert not any(path.endswith(access) for path in app.openapi()["paths"] for access in access_paths)
 
 
+def test_legacy_access_switches_do_not_register_a_plugin_whose_key_is_false(monkeypatch: pytest.MonkeyPatch) -> None:
+    for name in ("ACCESS_SYNC_ENABLED", "ACCESS_REQUESTS_ENABLED", "ACCESS_CATALOG_ENABLED"):
+        monkeypatch.setenv(name, "true")
+    pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
+    pm.add_hookspecs(FeatureLifecycleSpecs)
+
+    load_plugins(pm, get_plugins_settings().disabled(), MagicMock())
+
+    assert ACCESS_PLUGINS.isdisjoint(name for name, plugin in pm.list_name_plugin() if plugin is not None)
+
+
 def test_the_protected_plugins_contract_lists_exactly_the_entry_point_modules() -> None:
     pyproject = _pyproject()
     entry_point_modules = set(pyproject["project"]["entry-points"][PLUGIN_NAMESPACE].values())

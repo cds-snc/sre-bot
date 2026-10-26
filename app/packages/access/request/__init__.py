@@ -51,18 +51,10 @@ def startup_warmup(logger) -> None:
     settings = get_access_request_settings()
     logger.info(
         "access_requests_settings_loaded",
-        enabled=settings.enabled,
         fallback_approver_slug=settings.fallback_approver_slug,
         min_approver_count=settings.min_approver_count,
         request_ttl_hours=settings.request_ttl_hours,
     )
-    if not settings.enabled:
-        logger.warning(
-            "access_requests_disabled",
-            hint="Set ACCESS_REQUESTS_ENABLED=true to enable the feature.",
-        )
-        return
-
     # Fail fast on misconfigured runtime config or provider wiring.
     get_access_runtime_config()
     _register_sync_event_handlers()

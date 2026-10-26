@@ -128,9 +128,9 @@ markers = [
 ]
 env = [
     # Feature warmups must not depend on the developer's .env: tests that need a
-    # feature enable it explicitly. ACCESS_SYNC_ENABLED=true would make lifespan
-    # build the AWS Identity Center adapter (and assume its role) at startup.
-    "ACCESS_SYNC_ENABLED=false",
+    # plugin enable it explicitly. access.sync switched on from app/.env would make
+    # lifespan build the AWS Identity Center adapter (and assume its role) at startup.
+    'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
     # The test run is an unconfigured Slack (ci.toml has no [slack.tenant]): the blanks

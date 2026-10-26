@@ -7,10 +7,7 @@ interaction support is deferred to the next iteration.
 
 from contracts.plugins.namespace import hookimpl
 from packages.access.catalog.interactions.http import router as access_catalog_router
-from packages.access.catalog.providers import (
-    get_catalog_service,
-    get_catalog_settings,
-)
+from packages.access.catalog.providers import get_catalog_service
 from packages.access.common.providers import get_access_runtime_config
 
 
@@ -22,20 +19,7 @@ def register_routes(app) -> None:
 
 @hookimpl
 def startup_warmup(logger) -> None:
-    """Log effective Access Catalog settings and warm singletons at startup."""
-    settings = get_catalog_settings()
-    logger.info(
-        "access_catalog_settings_loaded",
-        enabled=settings.enabled,
-    )
-
-    if not settings.enabled:
-        logger.warning(
-            "access_catalog_disabled",
-            hint="Set ACCESS_CATALOG_ENABLED=true to enable the feature.",
-        )
-        return
-
+    """Warm the runtime config and catalog service at startup."""
     # Validate runtime config and provider assembly before serving traffic.
     get_access_runtime_config()
     get_catalog_service()

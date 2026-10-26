@@ -36,11 +36,6 @@ from packages.access.request.schemas import (
 # ---------------------------------------------------------------------------
 
 
-class _Settings:
-    def __init__(self, enabled: bool = True) -> None:
-        self.enabled = enabled
-
-
 def _make_user(email: str = "actor@example.com") -> User:
     return User(
         user_id=email,
@@ -122,31 +117,11 @@ def test_submit_request_returns_202_on_success():
     response = submit_request(
         body=body,
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(),
     )
 
     assert response.request_id == "req-001"
     assert response.status == "pending_approval"
-
-
-@pytest.mark.integration
-def test_submit_request_raises_503_when_disabled():
-    service = _FakeService(OperationResult.success(data=_make_request()))
-    body = SubmitAccessRequestBody(
-        platform="aws",
-        group_slug="sg-aws-admins",
-        justification="Need access.",
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        submit_request(
-            body=body,
-            service=service,
-            settings=_Settings(enabled=False),
-            current_user=_make_user(),
-        )
-    assert exc_info.value.status_code == 503
 
 
 @pytest.mark.integration
@@ -168,7 +143,6 @@ def test_submit_request_raises_400_on_permanent_error():
         submit_request(
             body=body,
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
     assert exc_info.value.status_code == 400
@@ -189,7 +163,6 @@ def test_approve_request_returns_response_on_success():
         request_id="req-001",
         body=body,
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(email="approver@example.com"),
     )
 
@@ -213,7 +186,6 @@ def test_approve_request_raises_404_on_not_found():
             request_id="missing",
             body=body,
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
     assert exc_info.value.status_code == 404
@@ -234,7 +206,6 @@ def test_reject_request_returns_response_on_success():
         request_id="req-001",
         body=body,
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(email="approver@example.com"),
     )
 
@@ -257,7 +228,6 @@ def test_reject_request_raises_400_on_invalid_state():
             request_id="req-001",
             body=body,
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
     assert exc_info.value.status_code == 400
@@ -278,7 +248,6 @@ def test_cancel_request_returns_response_on_success():
         request_id="req-001",
         body=body,
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(),
     )
 
@@ -299,7 +268,6 @@ def test_get_request_status_returns_full_response():
     response = get_request_status(
         request_id="req-001",
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(),
     )
 
@@ -322,7 +290,6 @@ def test_get_request_status_raises_404_on_missing():
         get_request_status(
             request_id="unknown",
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(),
         )
     assert exc_info.value.status_code == 404
@@ -343,7 +310,6 @@ def test_retry_request_returns_approved_response_on_success():
         request_id="req-001",
         body=body,
         service=service,
-        settings=_Settings(enabled=True),
         current_user=_make_user(email="approver@example.com"),
     )
 
@@ -367,7 +333,6 @@ def test_retry_request_raises_400_on_invalid_state():
             request_id="req-001",
             body=body,
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(email="approver@example.com"),
         )
     assert exc_info.value.status_code == 400
@@ -389,23 +354,6 @@ def test_retry_request_raises_503_on_idp_failure():
             request_id="req-001",
             body=body,
             service=service,
-            settings=_Settings(enabled=True),
             current_user=_make_user(email="approver@example.com"),
-        )
-    assert exc_info.value.status_code == 503
-
-
-@pytest.mark.integration
-def test_retry_request_raises_503_when_disabled():
-    service = _FakeService(OperationResult.success(data=_make_request()))
-    body = RetryRequestBody()
-
-    with pytest.raises(HTTPException) as exc_info:
-        retry_request(
-            request_id="req-001",
-            body=body,
-            service=service,
-            settings=_Settings(enabled=False),
-            current_user=_make_user(),
         )
     assert exc_info.value.status_code == 503

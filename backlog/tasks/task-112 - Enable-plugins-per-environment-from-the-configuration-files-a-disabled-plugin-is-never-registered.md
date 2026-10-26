@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-23T19:42:00Z'
+updated_date: '2026-10-26T15:06:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -61,6 +61,14 @@ created: 2026-10-23T19:22:00Z
 ---
 
 2026-10-23: size gate tripped (~450-550 prod LOC, ~30 files, three subsystems); split into TASK-112.1 (Slack transport keys, contract, host rules; parent ACs #6, #7, SLACK_* part of #3), TASK-112.2 (plugin keys by area, set_blocked; ACs #1, #2, #5) and TASK-112.3 (ACCESS_*_ENABLED, [scheduler] enabled, guard test; AC #3). This task is the coordinator: each AC is checked as the subtask that verifies it lands. Decisions: plugin keys are [plugins.<area>] tables mapping entry-point name to bool; user_rotations under incident response; the scheduler's run switch is [scheduler] enabled (from TASK-111.13); the transport slice moves to server/slack/ with a SlackTransportInfo contract for the legacy command prefix; the Notify ENVIRONMENT check rides in TASK-111.12. Follow-up gap, not created: running the access plugins locally needs an AWS profile with cross-account permissions and is undocumented.
+
+---
+
+created: 2026-10-26T15:06:00Z
+
+---
+
+2026-10-26 (human): TASK-112.3 split again: 112.3 deletes ACCESS_*_ENABLED with per-plugin access settings; TASK-112.4 takes [scheduler] enabled, the transport-independent scheduler start and the CI guard (parent AC #3 is checked when 112.4 verifies it).
 
 ---
 <!-- COMMENTS:END -->

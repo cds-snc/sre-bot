@@ -22,16 +22,12 @@ def test_catalog_startup_warmup_validates_runtime_config(monkeypatch):
         runtime_config_called = True
         return object()
 
-    class _Settings:
-        enabled = True
-
     def _warm_provider() -> object:
         nonlocal provider_warm_called
         provider_warm_called = True
         return object()
 
     monkeypatch.setattr(catalog_pkg, "get_access_runtime_config", _runtime_config, raising=False)
-    monkeypatch.setattr(catalog_pkg, "get_catalog_settings", lambda: _Settings())
     monkeypatch.setattr(catalog_pkg, "get_catalog_service", _warm_provider)
 
     catalog_pkg.startup_warmup(
@@ -51,15 +47,11 @@ def test_catalog_startup_warmup_validates_runtime_config(monkeypatch):
 
 
 @pytest.mark.unit
-def test_catalog_startup_warmup_raises_when_enabled_runtime_config_is_invalid(
+def test_catalog_startup_warmup_raises_when_runtime_config_is_invalid(
     monkeypatch,
 ):
     catalog_pkg = _reload_catalog_package()
 
-    class _Settings:
-        enabled = True
-
-    monkeypatch.setattr(catalog_pkg, "get_catalog_settings", lambda: _Settings())
     monkeypatch.setattr(
         catalog_pkg,
         "get_access_runtime_config",

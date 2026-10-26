@@ -1,34 +1,25 @@
-"""Unified access feature settings — one load, tree-shaped access.
+"""Access feature settings — one settings class per access plugin.
 
-The entire access feature is configured through a single ``AccessSettings``
-root object.  Sub-features (sync, requests, catalog) each have their own
-slice, accessed as attributes:
+Each class reads only its own ``ACCESS_<SUB>_`` environment names and is built
+by the provider of the plugin that needs it, so a disabled plugin never
+validates its settings (decisions/configuration.md):
 
-    settings = get_access_settings()
-    settings.sync.enabled          # ACCESS_SYNC_ENABLED
-    settings.requests.enabled      # ACCESS_REQUESTS_ENABLED
-    settings.catalog.enabled       # ACCESS_CATALOG_ENABLED
-    settings.config.source         # ACCESS_CONFIG_SOURCE
+    AccessConfigSettings    ACCESS_CONFIG_*    common/providers.py (every access plugin)
+    AccessSyncSettings      ACCESS_SYNC_*      sync/providers.py
+    AccessRequestsSettings  ACCESS_REQUESTS_*  request/providers.py
 
-Adding a new sub-feature requires only:
-1. A new ``BaseModel`` subclass in this file.
-2. A new field on ``AccessSettings``.
-3. Env vars following the ``ACCESS_{SUBFEATURE}_{FIELD}`` convention.
-No new ``BaseSettings`` subclass is needed.
-
-``AccessRuntimeConfig`` is a separate concept — it is a structured document
-loaded at runtime from an external source (bundle, DynamoDB, etc.) and is
-not part of this env-var settings consolidation.
+Whether a plugin runs is its ``[plugins.platform_access]`` key, not a setting
+here. ``AccessRuntimeConfig`` is a separate concept: a structured document
+loaded at runtime from the source these settings name.
 """
 
-from functools import lru_cache
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class AccessConfigSettings(BaseModel):
+class AccessConfigSettings(BaseSettings):
     """Bootstrap: how to locate the AccessRuntimeConfig document.
 
     Env vars:
@@ -36,6 +27,8 @@ class AccessConfigSettings(BaseModel):
         ACCESS_CONFIG_REF     — reference key passed to the loader (table row PK, S3 key, etc.)
         ACCESS_CONFIG_REFRESH_SECONDS — reserved for future cache invalidation
     """
+
+    model_config = SettingsConfigDict(env_prefix="ACCESS_CONFIG_", case_sensitive=False, extra="ignore", env_file=".env")
 
     source: Literal["bundle", "inline_json", "file_json", "env"] = "bundle"
     ref: str = "default"
@@ -50,11 +43,10 @@ class AccessConfigSettings(BaseModel):
         return value
 
 
-class AccessSyncSettings(BaseModel):
-    """Operational settings for the Access Sync sub-feature.
+class AccessSyncSettings(BaseSettings):
+    """Operational settings for the access.sync plugin.
 
     Env vars:
-        ACCESS_SYNC_ENABLED                  — master on/off switch
         ACCESS_SYNC_RECONCILIATION_ENABLED   — enable scheduled full-platform sync
         ACCESS_SYNC_RECONCILIATION_SCHEDULE  — daily sync run time HH:MM (UTC)
         ACCESS_SYNC_JOB_TTL_SECONDS          — retention for completed/failed job records
@@ -64,7 +56,8 @@ class AccessSyncSettings(BaseModel):
                                                (shared with the idempotency store)
     """
 
-    enabled: bool = False
+    model_config = SettingsConfigDict(env_prefix="ACCESS_SYNC_", case_sensitive=False, extra="ignore", env_file=".env")
+
     reconciliation_enabled: bool = False
     reconciliation_schedule: str = "03:00"
     job_ttl_seconds: int = 86400
@@ -73,19 +66,19 @@ class AccessSyncSettings(BaseModel):
     job_status_table_name: str = "sre_bot_idempotency"
 
 
-class AccessRequestsSettings(BaseModel):
-    """Operational settings for the Access Requests sub-feature.
+class AccessRequestsSettings(BaseSettings):
+    """Operational settings for the access.request plugin.
 
     Env vars:
-        ACCESS_REQUESTS_ENABLED                 — master on/off switch
         ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG  — org-level approver fallback group slug;
-                                                  required whenever enabled, no default
+                                                  required, no default
         ACCESS_REQUESTS_MIN_APPROVER_COUNT      — minimum affirmative decisions to approve
         ACCESS_REQUESTS_REQUEST_TTL_HOURS       — hours before a pending request expires
         ACCESS_REQUESTS_TABLE_NAME              — record table holding requests, decisions and audit entries
     """
 
-    enabled: bool = False
+    model_config = SettingsConfigDict(env_prefix="ACCESS_REQUESTS_", case_sensitive=False, extra="ignore", env_file=".env")
+
     fallback_approver_slug: str = ""
     min_approver_count: int = 1
     request_ttl_hours: int = 72
@@ -93,61 +86,7 @@ class AccessRequestsSettings(BaseModel):
 
     @model_validator(mode="after")
     def _validate_fallback_approver_slug(self) -> AccessRequestsSettings:
-        # Settings are constructed on every boot, so the requirement only applies when enabled.
-        if not self.enabled:
-            return self
+        # Built only by the access.request provider, so the requirement holds exactly when that plugin is enabled.
         if not self.fallback_approver_slug.strip():
-            raise ValueError("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG must be set when ACCESS_REQUESTS_ENABLED is true")
+            raise ValueError("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG must be set when the access.request plugin is enabled")
         return self
-
-
-class AccessCatalogSettings(BaseModel):
-    """Operational settings for the Access Catalog sub-feature.
-
-    Env vars:
-        ACCESS_CATALOG_ENABLED — master on/off switch
-    """
-
-    enabled: bool = False
-
-
-class AccessSettings(BaseSettings):
-    """Unified access feature settings — one load for the entire feature.
-
-    Uses ``env_prefix="ACCESS_"``, ``env_nested_delimiter="_"``, and
-    ``env_nested_max_split=1`` so that existing env var names are preserved
-    with no SSM parameter renames:
-
-        ACCESS_SYNC_ENABLED              → settings.sync.enabled
-        ACCESS_SYNC_JOB_TTL_SECONDS      → settings.sync.job_ttl_seconds
-        ACCESS_REQUESTS_ENABLED          → settings.requests.enabled
-        ACCESS_CATALOG_ENABLED           → settings.catalog.enabled
-        ACCESS_CONFIG_SOURCE             → settings.config.source
-
-    ``case_sensitive=False`` is required: pydantic-settings uses field names
-    (lowercase) to build the env key prefix when matching nested models, so
-    case-insensitive lookup is needed to match uppercase OS env vars.
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="ACCESS_",
-        env_nested_delimiter="_",
-        env_nested_max_split=1,
-        case_sensitive=False,
-        extra="ignore",
-        env_file=".env",
-    )
-
-    config: AccessConfigSettings = Field(default_factory=AccessConfigSettings)
-    sync: AccessSyncSettings = Field(default_factory=AccessSyncSettings)
-    requests: AccessRequestsSettings = Field(default_factory=AccessRequestsSettings)
-    catalog: AccessCatalogSettings = Field(default_factory=AccessCatalogSettings)
-
-
-@lru_cache(maxsize=1)
-def get_access_settings() -> AccessSettings:
-    """Return the singleton AccessSettings instance.
-
-    One env read for the entire access feature.  Cached for the process lifetime.
-    """
-    return AccessSettings()

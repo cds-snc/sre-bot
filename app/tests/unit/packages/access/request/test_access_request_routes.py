@@ -9,20 +9,14 @@ from datetime import UTC, datetime
 import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
 
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
 from packages.access.request.interactions.http import (
     approve_request,
     router,
     submit_request,
-)
-from packages.access.request.providers import (
-    get_access_request_service,
-    get_access_request_settings,
 )
 from packages.access.request.schemas import ApproveRequestBody, SubmitAccessRequestBody
 
@@ -32,11 +26,6 @@ def _get_route(path: str, method: str) -> APIRoute:
         if isinstance(route, APIRoute) and route.path == path and method in route.methods:
             return route
     raise AssertionError(f"Route {method} {path} not found")
-
-
-class _FakeSettings:
-    def __init__(self, enabled: bool = True) -> None:
-        self.enabled = enabled
 
 
 class _FakeAccessRequestService:
@@ -135,7 +124,6 @@ def test_submit_request_maps_permanent_error_to_400() -> None:
                 justification="Need access",
             ),
             service=service,
-            settings=_FakeSettings(enabled=True),
             current_user=_make_user("caller@example.com"),
         )
 
@@ -159,7 +147,6 @@ def test_submit_request_returns_null_message_when_service_success_has_none() -> 
             justification="Need access",
         ),
         service=_FakeAccessRequestService(),
-        settings=_FakeSettings(enabled=True),
         current_user=_make_user("caller@example.com"),
     )
 
@@ -175,47 +162,12 @@ def test_approve_request_includes_decisions_in_response() -> None:
         request_id="req-1",
         body=ApproveRequestBody(comment="Looks good"),
         service=service,
-        settings=_FakeSettings(enabled=True),
         current_user=_make_user("approver@example.com"),
     )
 
     assert response.request_id == "req-1"
     assert len(response.decisions) == 1
     assert response.decisions[0].decision == "approved"
-
-
-@pytest.mark.unit
-def test_submit_request_returns_503_without_service_dependency_assembly() -> None:
-    app = FastAPI()
-    app.include_router(router)
-
-    service_provider_called = False
-
-    def _service_provider() -> _FakeAccessRequestService:
-        nonlocal service_provider_called
-        service_provider_called = True
-        raise AssertionError("service dependency should not be assembled")
-
-    app.dependency_overrides[get_access_request_settings] = lambda: _FakeSettings(enabled=False)
-    app.dependency_overrides[get_access_request_service] = _service_provider
-    app.dependency_overrides[get_current_user] = lambda: _make_user("caller@example.com")
-
-    client = TestClient(app)
-    response = client.post(
-        "/access/requests",
-        json={
-            "platform": "aws",
-            "group_slug": "sg-aws-admins",
-            "entitlement_type": "group",
-            "actor_type": "self",
-            "request_type": "grant",
-            "justification": "Need access",
-        },
-    )
-
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Access Requests feature is disabled."
-    assert service_provider_called is False
 
 
 @pytest.mark.unit
