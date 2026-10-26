@@ -3,10 +3,10 @@ id: TASK-112.2
 title: >-
   Plugin enablement keys by product area; a disabled plugin is never imported or
   registered
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T16:11:00Z'
+updated_date: '2026-10-26T17:13:00Z'
 labels:
   - plugin-architecture
   - plugins

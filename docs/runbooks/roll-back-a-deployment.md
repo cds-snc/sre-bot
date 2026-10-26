@@ -29,7 +29,7 @@ Region `ca-central-1`, cluster `sre-bot-cluster`, service `sre-bot-service`, tas
 
 ### Find the image tags
 
-Each run's summary lists the deployed tag (`<git sha>-<YYYY-MM-DD>`) and digest. To list the newest tags in ECR:
+Each run's summary lists the deployed tag (`<git sha>-<YYYY-MM-DD>`) and digest. Before a merge, `zsh bin/deploy-checks.zsh pre` prints the running image's tag, which is the rollback target for that merge (output in `tmp/deploy-checks/`, never committed). To list the newest tags in ECR:
 
 ```bash
 aws ecr describe-images --region ca-central-1 --repository-name sre-bot \
@@ -69,7 +69,7 @@ The next workflow deploy renders from the latest revision again, so fix the terr
 
 ## Verify
 
-Run after every deploy or rollback.
+Run after every deploy or rollback. `zsh bin/deploy-checks.zsh post [CHECK ...]` runs steps 2 and 3 (and checks the workflow run, Slack and `/version`) read-only, plus the change-specific checks named in the task's notes; step 4 stays manual.
 
 1. The workflow posted its Slack success message, and the run summary shows the expected tag and digest.
 2. One PRIMARY deployment, COMPLETED, running the expected revision:

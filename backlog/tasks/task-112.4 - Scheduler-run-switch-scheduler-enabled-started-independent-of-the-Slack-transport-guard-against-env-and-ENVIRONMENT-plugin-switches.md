@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T15:04:00Z'
-updated_date: '2026-10-26T15:06:00Z'
+updated_date: '2026-10-26T16:39:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -83,3 +83,9 @@ BLAST RADIUS AND ROLLBACK: production behaviour unchanged except ordering: jobs 
 
 DEPLOY CHECK (new phase post-scheduler, human extends /workspace/tmp/deploy-checks.zsh): post-plugins checks plus scheduled_tasks_started count >= tasks since the deploy; no scheduled_tasks_skipped; no scheduled_job_skipped for notify_stale_incident_channels; running_scheduler_heartbeat on every task within 6 minutes; feature_background_job_scheduled listed; no configuration_invalid; blob_where for DEFAULT_TIER2_LEASE_TTL_SECONDS and SCHEDULER.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-26: the deploy checks are versioned in bin/deploy-checks.zsh (TASK-112.3); this task's post-deploy check is a named task check 'scheduler' (zsh bin/deploy-checks.zsh post scheduler), not a post-scheduler phase, and it deletes the 'plugins' check if 112.2 and 112.3 are Done by then.
+<!-- SECTION:NOTES:END -->

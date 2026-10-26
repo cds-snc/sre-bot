@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T16:27:00Z'
+updated_date: '2026-10-26T17:11:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -75,21 +75,21 @@ DEPLOY CHECK: phase post-plugins again (access absent from /sre help; /incident 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Implemented 2026-10-26 on task-112.3-access-switches (from main 5be2b74f, after 112.2 merged).
+Implemented 2026-10-26 on task-112.3-access-switches (from main 5be2b74f after 112.2 merged as #1788).
 
-What changed: AccessSyncSettings.enabled, AccessRequestsSettings.enabled and AccessCatalogSettings are gone with every 'if not settings.enabled' guard, the 503 'not enabled' route results, the ingress FEATURE_DISABLED path, the Slack 'not enabled' branches, the access_sync.disabled locale key and the access_*_disabled warmup warnings; warmups run unconditionally and register_background_jobs registers iff reconciliation_enabled. The AccessSettings root and get_access_settings are deleted; common/settings.py holds AccessConfigSettings (ACCESS_CONFIG_), AccessSyncSettings (ACCESS_SYNC_) and AccessRequestsSettings (ACCESS_REQUESTS_), each a BaseSettings on the same env names, built by get_access_config_settings (common/providers.py), get_access_sync_settings (sync/providers.py) and get_access_request_settings (request/providers.py). The requests class requires ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG unconditionally. ADR: configuration.md Changes entry.
+Access switches: ACCESS_SYNC_ENABLED, ACCESS_REQUESTS_ENABLED and ACCESS_CATALOG_ENABLED are gone with every enabled guard, the 503 'not enabled' results, the ingress FEATURE_DISABLED path, the Slack 'not enabled' replies, the access_sync.disabled locale key and the disabled-warmup warnings. The AccessSettings root is split into AccessConfigSettings (ACCESS_CONFIG_), AccessSyncSettings (ACCESS_SYNC_) and AccessRequestsSettings (ACCESS_REQUESTS_), same env names, each built by its plugin's provider; the requests class requires ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG unconditionally. AccessCatalogSettings deleted (empty, dead); the single-JSON ACCESS_SYNC / ACCESS_REQUESTS form retired; the sync POST route documents 500 for an enqueue failure. The pytest-env guard moved to PLUGINS__PLATFORM_ACCESS all false. ADR: configuration.md Changes entry.
 
-Deviations from the plan: (1) no AccessCatalogSettings: with enabled gone it was empty, so it and get_catalog_settings are deleted as dead code. (2) The pytest-env guard is kept, moved to PLUGINS__PLATFORM_ACCESS with all three keys false, because the slices read app/.env and a developer's access.sync opt-in would otherwise build the AWS adapter in lifespan during tests. (3) The single-JSON ACCESS_SYNC / ACCESS_REQUESTS form is retired with the nested root (production sets no ACCESS_* key, doc-14). (4) The sync POST route's documented error is now 500 (enqueue failure); request and catalog keep 503 for TRANSIENT_ERROR, reworded.
+Dead code and docs riding along: six pytest-env names nothing reads (SRE_DRIVE_ID, SRE_INCIDENT_FOLDER, INCIDENT_TEMPLATE, INCIDENT_LIST, PICKLE_STRING, INCIDENT_HANDBOOK_URL; values come from GOOGLE_RESOURCES); doc-14's NOTIFY_OPS_CHANNEL_ID and NOTIFY_ONCALL_GROUP_ID rows corrected to [notify_api_key_leak]; the human removed the ACCESS_*_ENABLED lines from app/.env.example.
 
-Tests: new test_access_settings_per_plugin_load.py (replaces common/test_settings.py) and request/test_access_request_settings_fallback_slug.py; disabled-gate route tests deleted; boot test asserts ACCESS_*_ENABLED=true leaves a plugin with a false key unregistered; key-ownership test pins per-plugin prefixes and no enabled names.
+Helper scripts versioned (human decision: helpers, not app code; outputs in gitignored tmp/): bin/deploy-checks.zsh pre | post [CHECK ...] (one post phase plus named task checks, deleted once their task is Done; plugins remains for 112.2 and 112.3) and bin/env-checks.zsh (make env-checks) with app/bin/audit_env_names.py, one action per env name (none, delete, rename, check) across app/.env*, Codespaces, Actions, Dependabot and SSM, judged against the settings classes, workflow references, developer setup references, the names retired since TASK-111.1 and doc-14. Its migration part is deleted in TASK-111.15.2 (AC added). Runbook roll-back-a-deployment.md points to both deploy-checks phases.
 
-Gates (from app/): ruff check . All checks passed; mypy 47 errors in 18 files, all pre-existing and none in touched files; pytest tests --ignore=tests/smoke 5723 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK.
+Production checks 2026-10-26: merge gate met (pre 16:08Z: rollback tag 5be2b74f4e925781d831bf1d9a3942a7b3d596c6-2026-10-26; post-plugins 16:06Z shows no ACCESS_*_ENABLED in either blob). Env audit 16:20Z: blobs need no hand edit (retired lines inert until the blobs are deleted after 111.15.2); all eleven /sre-bot/* secrets set; repo Codespaces cleanup done by the human (GEO_DB_BUCKET restored as sre-bot-bucket: make dev-setup reads it).
 
-Human before merge: delete ACCESS_SYNC_ENABLED, ACCESS_REQUESTS_ENABLED, ACCESS_CATALOG_ENABLED from app/.env.example (and personal .env / Codespaces secrets); local opt-in is PLUGINS__PLATFORM_ACCESS='{"access.sync": true}', and access.request also needs ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG. Deploy check: post-plugins plus blob_where for the three names.
+Follow-up for the next task touching .devcontainer: docker-compose.yml expands MAXMIND_KEY into a LICENSE_KEY build arg the Dockerfile never declares (dead).
 
-Merge gate 2026-10-26 (human ran zsh /workspace/tmp/deploy-checks.zsh pre, output pre-20261026T160802Z.txt): rollback image_tag 5be2b74f4e925781d831bf1d9a3942a7b3d596c6-2026-10-26 (task definition 46); all three Slack tokens match their SecureStrings; no signing secret. The post-plugins run on 112.2's deploy already shows none of ACCESS_SYNC_ENABLED, ACCESS_REQUESTS_ENABLED, ACCESS_CATALOG_ENABLED in either blob, so production never set them (doc-14 confirmed).
+Gates (from app/, final tree): ruff check . passed; mypy 47 errors in 18 files = baseline, none in touched files (427 checked); pytest tests --ignore=tests/smoke 5751 passed; make check-import-contracts 13 kept; make check-settings-key-ownership OK.
 
-Env audit 2026-10-26 (human ran zsh /workspace/tmp/env-checks.zsh, output 20261026T162040Z.txt): production blobs hold no retired name that is still needed (every one is migrated, inert or pending its 111.x subtask); all eleven /sre-bot/* secrets are set. Dead code removed with this task: six pytest-env names nothing reads (SRE_DRIVE_ID, SRE_INCIDENT_FOLDER, INCIDENT_TEMPLATE, INCIDENT_LIST, PICKLE_STRING, INCIDENT_HANDBOOK_URL; their values come from GOOGLE_RESOURCES). doc-14 corrected: NOTIFY_OPS_CHANNEL_ID and NOTIFY_ONCALL_GROUP_ID went to [notify_api_key_leak] channel_id and oncall_group_id in 111.7, not [server]. Gates after: ruff OK, key ownership OK, pytest 5723 passed.
+Human: after deploy run zsh bin/deploy-checks.zsh post plugins; set Done.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
