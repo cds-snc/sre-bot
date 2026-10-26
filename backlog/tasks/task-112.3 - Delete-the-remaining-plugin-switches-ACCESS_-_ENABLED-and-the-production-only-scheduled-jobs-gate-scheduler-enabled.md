@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T16:02:00Z'
+updated_date: '2026-10-26T16:27:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -86,6 +86,10 @@ Tests: new test_access_settings_per_plugin_load.py (replaces common/test_setting
 Gates (from app/): ruff check . All checks passed; mypy 47 errors in 18 files, all pre-existing and none in touched files; pytest tests --ignore=tests/smoke 5723 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK.
 
 Human before merge: delete ACCESS_SYNC_ENABLED, ACCESS_REQUESTS_ENABLED, ACCESS_CATALOG_ENABLED from app/.env.example (and personal .env / Codespaces secrets); local opt-in is PLUGINS__PLATFORM_ACCESS='{"access.sync": true}', and access.request also needs ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG. Deploy check: post-plugins plus blob_where for the three names.
+
+Merge gate 2026-10-26 (human ran zsh /workspace/tmp/deploy-checks.zsh pre, output pre-20261026T160802Z.txt): rollback image_tag 5be2b74f4e925781d831bf1d9a3942a7b3d596c6-2026-10-26 (task definition 46); all three Slack tokens match their SecureStrings; no signing secret. The post-plugins run on 112.2's deploy already shows none of ACCESS_SYNC_ENABLED, ACCESS_REQUESTS_ENABLED, ACCESS_CATALOG_ENABLED in either blob, so production never set them (doc-14 confirmed).
+
+Env audit 2026-10-26 (human ran zsh /workspace/tmp/env-checks.zsh, output 20261026T162040Z.txt): production blobs hold no retired name that is still needed (every one is migrated, inert or pending its 111.x subtask); all eleven /sre-bot/* secrets are set. Dead code removed with this task: six pytest-env names nothing reads (SRE_DRIVE_ID, SRE_INCIDENT_FOLDER, INCIDENT_TEMPLATE, INCIDENT_LIST, PICKLE_STRING, INCIDENT_HANDBOOK_URL; their values come from GOOGLE_RESOURCES). doc-14 corrected: NOTIFY_OPS_CHANNEL_ID and NOTIFY_ONCALL_GROUP_ID went to [notify_api_key_leak] channel_id and oncall_group_id in 111.7, not [server]. Gates after: ruff OK, key ownership OK, pytest 5723 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

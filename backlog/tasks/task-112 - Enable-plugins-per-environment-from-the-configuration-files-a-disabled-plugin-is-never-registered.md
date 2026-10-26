@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-26T15:06:00Z'
+updated_date: '2026-10-26T16:11:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -38,11 +38,11 @@ Vendor tenant entries (decisions/configuration.md, workplace-systems.md): a vend
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every entry point has an enablement key in the base configuration file (boot test fails on a missing key)
-- [ ] #2 A plugin disabled in the environment file is never registered: no routes, no OpenAPI entries, no hookimpl calls, no settings reads (boot test)
+- [x] #1 Every entry point has an enablement key in the base configuration file (boot test fails on a missing key)
+- [x] #2 A plugin disabled in the environment file is never registered: no routes, no OpenAPI entries, no hookimpl calls, no settings reads (boot test)
 - [ ] #3 grep finds no environment-variable feature switch or ENVIRONMENT check deciding whether a plugin runs
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
+- [x] #5 Enablement keys in the base configuration are grouped by product area as decisions/product-scope.md names them (incident response, cloud operations, platform access, workplace utilities)
 - [x] #6 The SLACK_ENABLED exception is removed from bin/check_settings_key_ownership.py's vendor-enabled rule, and the check passes with an empty allowlist
 - [x] #7 The Slack transport's enabled and socket_mode keys are in [slack_transport] (decisions/configuration.md, transport-slack.md); SLACK_ENABLED and SLACK_SOCKET_MODE are no longer read, and switching the transport on without the Slack tenant entry or the app token Socket Mode needs fails boot naming the key
 <!-- AC:END -->
