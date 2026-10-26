@@ -139,7 +139,7 @@ def build_user_group_sync_target(*, approved_domains: frozenset[str] = frozenset
     """Build the target on the admin user token; ``usergroups.*`` writes reject the bot token."""
     if not get_slack_settings().user_token:
         raise ValueError(
-            "SLACK_USER_TOKEN is required to sync on-call rotations into Slack user groups "
+            "SLACK__USER_TOKEN is required to sync on-call rotations into Slack user groups "
             "(usergroups.* writes cannot use the shared inbound bot token)."
         )
     return SlackUserGroupTarget(get_slack_web_client(actor="user"), approved_domains=approved_domains)

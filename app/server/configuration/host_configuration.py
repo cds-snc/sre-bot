@@ -30,12 +30,12 @@ from server.slack.settings import SlackTransportSettings, get_slack_transport_se
 
 
 class SlackKey(StrEnum):
-    """The Slack slice keys the transport rules name; TASK-111.9 renames them when the slice moves onto [slack]."""
+    """The Slack slice keys the transport rules name."""
 
-    TEAM_ID = "SLACK_TEAM_ID"
-    BOT = "SLACK_BOT_TOKEN"
-    APP = "SLACK_APP_TOKEN"
-    SIGNING = "SLACK_SIGNING_SECRET"
+    TEAM_ID = "[slack.tenant] team_id"
+    BOT = "SLACK__BOT_TOKEN"
+    APP = "SLACK__APP_TOKEN"
+    SIGNING = "SLACK__SIGNING_SECRET"
 
 
 @dataclass(frozen=True)

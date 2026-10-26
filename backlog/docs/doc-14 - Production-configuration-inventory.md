@@ -20,7 +20,7 @@ Destinations:
 ## Facts recorded for TASK-111 AC6
 
 - Production sets `AWS_ORG_ACCOUNT_ROLE_ARN` and `ISSUER_CONFIG`.
-- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP`, `SLACK_SIGNING_SECRET` or any `ACCESS_*` key; those run on their code defaults.
+- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP`, `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults.
 - Production `CORS_ALLOWED_ORIGINS` is the terraform variable default, an empty list.
 
 ## sre-bot-config
@@ -63,9 +63,9 @@ Destinations:
 | SENTINEL_LOG_TYPE | SentinelSettings | file [sentinel] log_type | 111.12 |
 | SENTINEL_SHARED_KEY | SentinelSettings | secret SENTINEL__SHARED_KEY | 111.4, 111.12 |
 | SESSION_SECRET_KEY | ServerSettings (unused field) | delete | 111.7 |
-| SLACK_APP_TOKEN | SlackSettings | secret SLACK__APP_TOKEN | 111.4, 111.9 |
-| SLACK_BOT_TOKEN | SlackSettings | secret SLACK__BOT_TOKEN | 111.4, 111.9 |
-| SLACK_ENABLED | SlackSettings (interim transport switch) | file [slack] enabled until TASK-112 replaces it | 111.9 |
+| SLACK_APP_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__APP_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
+| SLACK_BOT_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__BOT_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
+| SLACK_ENABLED | no longer read (TASK-112.1, 2026-10-23) | production.toml [slack_transport] enabled = true; the blob line stays inert until 111.15 removes the blob | 112.1 |
 | SLACK_SECURITY_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
 | SLACK_TOKEN | none | delete | 111.15 |
 | SRE_BOT_EMAIL | GoogleWorkspaceSettings | file [google_workspace] sre_bot_email | 111.10 |
@@ -81,8 +81,8 @@ Destinations:
 | NOTIFY_ONCALL_GROUP_ID | ServerSettings | file [server] notify_oncall_group_id | 111.7 |
 | OPENAI_API_KEY | OpenAISettings | secret OPENAI__API_KEY | 111.4, 111.11 |
 | SLACK_NOTIFY_MGMT_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
-| SLACK_TEAM_ID | SlackSettings (tenant) | file [slack.tenant] team_id | 111.9 |
-| SLACK_USER_TOKEN | SlackSettings | secret SLACK__USER_TOKEN | 111.4, 111.9 |
+| SLACK_TEAM_ID | no longer read (TASK-111.9, 2026-10-23) | production.toml [slack.tenant] team_id = "T2G2S06PM"; the blob line stays inert until 111.15 removes the blob | 111.9 |
+| SLACK_USER_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__USER_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
 | SRE_TEST_CHANNEL_ID | ServerSettings | file [server] sre_test_channel_id | 111.7 |
 
 ## Task definition

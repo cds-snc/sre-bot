@@ -1,6 +1,10 @@
 # Overrides of base.toml for ENVIRONMENT=production, key by key.
 # Never put a secret here: secrets come from the environment as <SLICE>__<FIELD>.
 
+[slack.tenant]
+# The workspace the production Slack app is installed in.
+team_id = "T2G2S06PM"
+
 [slack_transport]
 enabled = true
 

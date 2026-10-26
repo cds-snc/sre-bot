@@ -67,12 +67,12 @@ class TestSettingsOverrides:
     """Catalogues and the default retry hint are read from settings at call time."""
 
     def test_catalogue_override_reclassifies_a_code(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("SLACK_NOT_FOUND_ERRORS", '["invalid_users"]')
+        monkeypatch.setenv("SLACK__NOT_FOUND_ERRORS", '["invalid_users"]')
 
         assert classify_slack_error(_slack_error("invalid_users")) == (OperationStatus.NOT_FOUND, "invalid_users", None)
 
     def test_default_retry_hint_override(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("SLACK_TRANSIENT_RETRY_AFTER_SECONDS", "90")
+        monkeypatch.setenv("SLACK__TRANSIENT_RETRY_AFTER_SECONDS", "90")
 
         assert classify_slack_error(_slack_error("internal_error")) == (OperationStatus.TRANSIENT_ERROR, "internal_error", 90)
 
