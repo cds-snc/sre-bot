@@ -78,7 +78,7 @@ Tolerated until closed:
 - network I/O before `yield` that aborts boot on failure: the opt-in directory warmup, and `access/sync`'s AssumeRole during client construction;
 - a feature whose settings fail validation aborts boot instead of being skipped;
 - in-process event subscriptions registered in `startup_warmup` by `access/request` and `access/sync`;
-- scheduled tasks gated on `ENVIRONMENT == "production"` (until `[scheduler] enabled`, TASK-112.3) and started from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
+- scheduled tasks gated on `ENVIRONMENT == "production"` and started only once the Slack app has initialised, with the Bolt app handed to the legacy stale-channel job (until `[scheduler] enabled` and the transport-independent start, TASK-112.4), from `jobs/scheduled_tasks.py`, with leases from the coordination contract;
 - legacy `modules/` handlers registered by hand after feature registration;
 
 **Changes:**
@@ -91,3 +91,4 @@ Tolerated until closed:
 - 2026-10-22: the configuration phase runs in the app factory (`uvicorn --factory`) before the middleware is built; the lifespan receives the loaded configuration (TASK-111.7).
 - 2026-10-23: logging is configured first in the configuration phase, right after the identity and `[logging]` slices (TASK-111.17).
 - 2026-10-23: the transport's switch is `[slack_transport] enabled`, and its cross-slice rules run in the configuration phase; the `SLACK_ENABLED` tolerated item is closed (TASK-112.1).
+- 2026-10-26: the scheduler starting inside the Slack branch is listed as tolerated; phase 6 starts it independent of the transports (TASK-112.4).

@@ -51,7 +51,7 @@ Runtime config is a JSON document with this shape:
 
 ### Config sources (set via env vars)
 
-Env var `ACCESS_CONFIG_SOURCE` controls which loader is used. It is read from `settings.config.source` in `AccessSettings` (defined in `packages/access/common/settings.py`).
+Env var `ACCESS_CONFIG_SOURCE` controls which loader is used. It is read by `AccessConfigSettings` (defined in `packages/access/common/settings.py`).
 
 | `ACCESS_CONFIG_SOURCE` | `ACCESS_CONFIG_REF` | When to use |
 |---|---|---|
@@ -84,11 +84,10 @@ ACCESS_CONFIG_REF=/workspace/app/packages/access/access.local.json
 
 ### Operational settings
 
-All sync operational settings are in `AccessSyncSettings` (a slice of `AccessSettings` in `packages/access/common/settings.py`):
+The plugin runs when its `[plugins.platform_access]` key `access.sync` is true (off by default; see `packages/access/README.md`). Its operational settings are in `AccessSyncSettings` (`packages/access/common/settings.py`):
 
 | Env var | Default | Description |
 |---|---|---|
-| `ACCESS_SYNC_ENABLED` | `false` | Master on/off switch |
 | `ACCESS_SYNC_RECONCILIATION_ENABLED` | `false` | Enable scheduled batch sync |
 | `ACCESS_SYNC_RECONCILIATION_SCHEDULE` | `03:00` | Daily run time (UTC, HH:MM) |
 | `ACCESS_SYNC_JOB_TTL_SECONDS` | `86400` | Retention for completed/failed job records |
@@ -97,7 +96,6 @@ All sync operational settings are in `AccessSyncSettings` (a slice of `AccessSet
 ### Scheduled reconciliation
 
 ```
-ACCESS_SYNC_ENABLED=true
 ACCESS_SYNC_RECONCILIATION_ENABLED=true
 ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
 ```
@@ -176,4 +174,4 @@ ACCESS_SYNC_RECONCILIATION_SCHEDULE=03:00   # UTC, HH:MM
 | `store.py` | `SyncRunRepository` — persists audit records |
 | `transport/` | HTTP routes and Slack command handlers |
 
-**Settings** live in `packages/access/common/settings.py` as `AccessSyncSettings` (slice of `AccessSettings`).
+**Settings** live in `packages/access/common/settings.py` as `AccessSyncSettings`.

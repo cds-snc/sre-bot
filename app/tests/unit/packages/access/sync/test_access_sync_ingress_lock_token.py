@@ -20,7 +20,6 @@ pytestmark = pytest.mark.unit
 
 @dataclass(frozen=True)
 class _Settings:
-    enabled: bool = True
     job_ttl_seconds: int = 14400
 
 

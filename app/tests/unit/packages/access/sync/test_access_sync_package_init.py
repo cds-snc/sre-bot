@@ -37,7 +37,6 @@ def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeyp
         return object()
 
     class _Settings:
-        enabled = True
         reconciliation_enabled = False
         reconciliation_schedule = "03:00"
 
@@ -73,7 +72,6 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
     sync_pkg = _reload_sync_package()
 
     class _Settings:
-        enabled = True
         reconciliation_enabled = False
         reconciliation_schedule = "03:00"
 
@@ -124,11 +122,10 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
 
 
 @pytest.mark.unit
-def test_sync_startup_warmup_raises_when_enabled_runtime_config_is_invalid(monkeypatch):
+def test_sync_startup_warmup_raises_when_runtime_config_is_invalid(monkeypatch):
     sync_pkg = _reload_sync_package()
 
     class _Settings:
-        enabled = True
         reconciliation_enabled = False
         reconciliation_schedule = "03:00"
 
@@ -161,7 +158,6 @@ def test_sync_register_background_job_registers_reconciliation_when_enabled(
     sync_pkg = _reload_sync_package()
 
     class _Settings:
-        enabled = True
         reconciliation_enabled = True
         reconciliation_schedule = "03:30"
 
@@ -182,22 +178,12 @@ def test_sync_register_background_job_registers_reconciliation_when_enabled(
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(
-    ("enabled", "reconciliation_enabled"),
-    [(False, True), (True, False), (False, False)],
-)
-def test_sync_register_background_job_skips_registration_when_disabled(
-    monkeypatch,
-    enabled: bool,
-    reconciliation_enabled: bool,
-) -> None:
+def test_sync_register_background_job_skips_registration_when_reconciliation_disabled(monkeypatch) -> None:
     sync_pkg = _reload_sync_package()
 
     class _Settings:
+        reconciliation_enabled = False
         reconciliation_schedule = "03:30"
-
-    _Settings.enabled = enabled
-    _Settings.reconciliation_enabled = reconciliation_enabled
 
     registrations: list[dict[str, object]] = []
 

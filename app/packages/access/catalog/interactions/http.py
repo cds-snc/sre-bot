@@ -18,7 +18,7 @@ from contracts.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
 from infrastructure.security.models import User
 from packages.access.catalog.domain import EntitlementEntry, PlatformSummary
-from packages.access.catalog.providers import get_catalog_service, get_catalog_settings
+from packages.access.catalog.providers import get_catalog_service
 from packages.access.catalog.schemas import (
     EntitlementEntryResponse,
     EntitlementListResponse,
@@ -29,12 +29,6 @@ from packages.access.catalog.schemas import (
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access/catalog", tags=["Access Catalog"])
-
-
-class _CatalogRouteSettings(Protocol):
-    """Structural contract for settings consumed by route handlers."""
-
-    enabled: bool
 
 
 class _EntitlementCatalog(Protocol):
@@ -65,12 +59,12 @@ def _map_status(status: OperationStatus) -> int:
 def _resolve_catalog_service(
     service: _EntitlementCatalog | None,
 ) -> _EntitlementCatalog:
-    """Resolve catalog service lazily after feature-gate checks."""
+    """Resolve the catalog service lazily, unless a caller injected one."""
     return service if service is not None else get_catalog_service()
 
 
 def _noop_catalog_service() -> _EntitlementCatalog | None:
-    """No-op dependency used to defer heavy service assembly until after gating."""
+    """No-op dependency that defers heavy service assembly to the handler."""
     return None
 
 
@@ -81,11 +75,10 @@ def _noop_catalog_service() -> _EntitlementCatalog | None:
     description="Return all platforms enrolled in the access management system.",
     status_code=200,
     responses={
-        503: {"description": "Access Catalog feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def list_platforms(
-    settings: Annotated[_CatalogRouteSettings, Depends(get_catalog_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
     service: Annotated[_EntitlementCatalog | None, Depends(_noop_catalog_service)] = None,
 ) -> PlatformListResponse:
@@ -96,8 +89,6 @@ def list_platforms(
     )
     log.info("catalog_list_platforms_request")
 
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Catalog is not enabled")
     service_dep = _resolve_catalog_service(service)
 
     result = service_dep.list_platforms()
@@ -122,12 +113,11 @@ def list_platforms(
     status_code=200,
     responses={
         404: {"description": "Platform not found."},
-        503: {"description": "Access Catalog feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def list_entitlements(
     platform: str,
-    settings: Annotated[_CatalogRouteSettings, Depends(get_catalog_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-catalog"])],
     service: Annotated[_EntitlementCatalog | None, Depends(_noop_catalog_service)] = None,
 ) -> EntitlementListResponse:
@@ -139,8 +129,6 @@ def list_entitlements(
     )
     log.info("catalog_list_entitlements_request")
 
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Catalog is not enabled")
     service_dep = _resolve_catalog_service(service)
 
     result = service_dep.list_entitlements(

@@ -109,4 +109,4 @@ class AccessRuntimeConfig:
 
 # This file contains only runtime domain models loaded from an external config
 # document (JSON bundle, DynamoDB, etc.) — not from env vars.
-# Feature settings live in packages.access.common.settings.AccessSettings.
+# Feature settings live in packages.access.common.settings, one class per access plugin.

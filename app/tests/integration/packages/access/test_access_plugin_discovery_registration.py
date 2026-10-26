@@ -10,9 +10,6 @@ from server.plugins.manager import get_plugin_manager, load_plugins
 from tests.factories.incident import incident_scopes
 
 _ACCESS_ENV_KEYS = (
-    "ACCESS_SYNC_ENABLED",
-    "ACCESS_REQUESTS_ENABLED",
-    "ACCESS_CATALOG_ENABLED",
     "ACCESS_CONFIG_SOURCE",
     "ACCESS_CONFIG_REF",
     "ACCESS_CONFIG_ENV_DIR_PREFIX",

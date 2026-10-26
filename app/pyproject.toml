@@ -128,9 +128,9 @@ markers = [
 ]
 env = [
     # Feature warmups must not depend on the developer's .env: tests that need a
-    # feature enable it explicitly. ACCESS_SYNC_ENABLED=true would make lifespan
-    # build the AWS Identity Center adapter (and assume its role) at startup.
-    "ACCESS_SYNC_ENABLED=false",
+    # plugin enable it explicitly. access.sync switched on from app/.env would make
+    # lifespan build the AWS Identity Center adapter (and assume its role) at startup.
+    'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
     # The test run is an unconfigured Slack (ci.toml has no [slack.tenant]): the blanks
@@ -139,11 +139,6 @@ env = [
     "SLACK__USER_TOKEN=",
     "SLACK__APP_TOKEN=",
     "SLACK__SIGNING_SECRET=",
-    "SRE_DRIVE_ID=SRE_DRIVE_ID",
-    "SRE_INCIDENT_FOLDER=SRE_INCIDENT_FOLDER",
-    "INCIDENT_TEMPLATE=INCIDENT_TEMPLATE",
-    "INCIDENT_LIST=INCIDENT_LIST",
-    "PICKLE_STRING=PICKLE_STRING",
     "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
     "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
     "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
@@ -151,7 +146,6 @@ env = [
     "NOTIFY_SRE_CLIENT_SECRET=NOTIFY_SRE_CLIENT_SECRET",
     "SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
     "SLACK_NOTIFY_MGMT_USER_GROUP_ID=SLACK_NOTIFY_MGMT_USER_GROUP_ID",
-    "INCIDENT_HANDBOOK_URL=INCIDENT_HANDBOOK_URL",
     "AWS_ORG_ACCOUNT_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
     "AWS_LOGGING_ACCOUNT_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
     "AWS_AUDIT_ACCOUNT_ROLE_ARN=AWS_AUDIT_ACCOUNT_ROLE_ARN",

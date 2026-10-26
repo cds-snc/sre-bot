@@ -49,4 +49,3 @@ access_sync:
   status.result.failed: "❌ Sync job `{job_id}` *failed* for platform *{platform}*.\nError: {error}"
   status.result.unknown: "❓ Sync job `{job_id}` has unknown status: *{status}*"
 
-  disabled: "⛔ Access Sync is not enabled. Contact your administrator."

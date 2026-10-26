@@ -3,10 +3,10 @@ id: TASK-112.2
 title: >-
   Plugin enablement keys by product area; a disabled plugin is never imported or
   registered
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T14:24:00Z'
+updated_date: '2026-10-26T17:13:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -123,4 +123,6 @@ Tests: test_server_plugins_enablement_check.py, test_server_plugins_settings_loa
 Gates (from app/): ruff check All checks passed; ruff format 1039 files already formatted; mypy Found 47 errors in 18 files = baseline, none in touched files; pytest tests --ignore=tests/smoke 5733 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK.
 
 After deploy: zsh /workspace/tmp/deploy-checks.zsh post-plugins (new phase: post-slack-files plus feature_plugins_loaded with six plugins and access disabled). Manual: /sre help no longer lists access; /incident works.
+
+Post-deploy 2026-10-26 (human ran zsh /workspace/tmp/deploy-checks.zsh post-plugins, output post-plugins-20261026T160614Z.txt): deploy run 40352769677 on 5be2b74f, build/sbom/deploy success; rollout COMPLETED 2/2 on task definition 46; boot_errors, config_phase_json, slack_up, transport_switch, slack_files and plugins PASS (feature_plugins_loaded with the six plugins and access disabled on both tasks, 0 enablement errors, 0 access log lines); /version = 5be2b74f, /health 200. Manual: /sre help lists no access; /incident works. Post-deploy items closed; ready for Done (human).
 <!-- SECTION:NOTES:END -->

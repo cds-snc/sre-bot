@@ -6,46 +6,17 @@ Shared contracts for the access domain. Contains only types, constants, and help
 
 ## Contents
 
-### `settings.py` — `AccessSettings`
+### `settings.py` — one settings class per access plugin
 
-The single unified settings object for the entire access feature. Loaded once from the environment; all sub-features read their slice from it.
+Each class reads only its own `ACCESS_<SUB>_` names and is built by the provider of the plugin that needs it, so a disabled plugin never validates its settings. Whether a plugin runs is its `[plugins.platform_access]` key, not a setting here.
 
-```python
-from packages.access.common.settings import get_access_settings
-
-settings = get_access_settings()
-settings.config.source  # ACCESS_CONFIG_SOURCE
-settings.sync.enabled  # ACCESS_SYNC_ENABLED
-settings.requests.enabled  # ACCESS_REQUESTS_ENABLED
-settings.catalog.enabled  # ACCESS_CATALOG_ENABLED
-```
-
-**Env var → Python attribute mapping:**
-
-| Env var | Python attribute | Default |
+| Class | Env prefix | Built by |
 |---|---|---|
-| `ACCESS_CONFIG_SOURCE` | `settings.config.source` | `bundle` |
-| `ACCESS_CONFIG_REF` | `settings.config.ref` | `default` |
-| `ACCESS_CONFIG_REFRESH_SECONDS` | `settings.config.refresh_seconds` | `300` |
-| `ACCESS_SYNC_ENABLED` | `settings.sync.enabled` | `false` |
-| `ACCESS_SYNC_RECONCILIATION_ENABLED` | `settings.sync.reconciliation_enabled` | `false` |
-| `ACCESS_SYNC_RECONCILIATION_SCHEDULE` | `settings.sync.reconciliation_schedule` | `03:00` |
-| `ACCESS_SYNC_JOB_TTL_SECONDS` | `settings.sync.job_ttl_seconds` | `86400` |
-| `ACCESS_SYNC_LOCK_STALE_SECONDS` | `settings.sync.lock_stale_seconds` | `14400` |
-| `ACCESS_REQUESTS_ENABLED` | `settings.requests.enabled` | `false` |
-| `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG` | `settings.requests.fallback_approver_slug` | none (required if enabled) |
-| `ACCESS_REQUESTS_MIN_APPROVER_COUNT` | `settings.requests.min_approver_count` | `1` |
-| `ACCESS_REQUESTS_REQUEST_TTL_HOURS` | `settings.requests.request_ttl_hours` | `72` |
-| `ACCESS_CATALOG_ENABLED` | `settings.catalog.enabled` | `false` |
+| `AccessConfigSettings` | `ACCESS_CONFIG_` | `get_access_config_settings()` in `common/providers.py` (every access plugin) |
+| `AccessSyncSettings` | `ACCESS_SYNC_` | `get_access_sync_settings()` in `sync/providers.py` |
+| `AccessRequestsSettings` | `ACCESS_REQUESTS_` | `get_access_request_settings()` in `request/providers.py` |
 
-Each sub-feature slice may also be set via a **single JSON env var** instead of individual flat vars:
-
-```bash
-ACCESS_SYNC='{"enabled": true, "job_ttl_seconds": 3600}'
-ACCESS_REQUESTS='{"enabled": true, "min_approver_count": 2}'
-```
-
-Adding a new sub-feature: add a `BaseModel` subclass and a field to `AccessSettings` in `settings.py`. No new `BaseSettings` subclass or provider needed.
+`AccessRequestsSettings` requires `ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG`; it is built only when `access.request` is enabled. A new access plugin with settings adds its own class with its own prefix.
 
 ### `config/settings.py` — `AccessRuntimeConfig`
 
@@ -93,7 +64,7 @@ naming.authn_group_slug("aws")  # "sg-aws-authn"
 
 | Provider | Returns | Description |
 |---|---|---|
-| `get_access_settings()` | `AccessSettings` | Singleton — unified feature settings (cached) |
+| `get_access_config_settings()` | `AccessConfigSettings` | Singleton — runtime config source and ref (cached) |
 | `get_access_runtime_config()` | `AccessRuntimeConfig` | Singleton — runtime config document (cached) |
 
 ---

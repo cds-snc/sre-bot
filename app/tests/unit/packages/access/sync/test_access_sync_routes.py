@@ -3,23 +3,17 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import Response
 from fastapi.routing import APIRoute
-from fastapi.testclient import TestClient
 
 from contracts.coordination import LeaseStore, ReadFailurePolicy
 from contracts.operations import OperationResult, OperationStatus
 from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
-from infrastructure.security import get_current_user
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.interactions.http import router, sync_endpoint
 from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.access.sync.job_runner import run_user_sync_job
-from packages.access.sync.providers import (
-    get_access_sync_coordinator,
-    get_access_sync_settings,
-)
 from packages.access.sync.schemas import UserSyncJobAcceptedResponse, UserSyncRequest
 
 
@@ -57,8 +51,7 @@ class _FakeCoordinator:
 class _Settings:
     """Minimal settings stub satisfying the _AccessSyncRouteSettings protocol."""
 
-    def __init__(self, enabled: bool) -> None:
-        self.enabled = enabled
+    def __init__(self) -> None:
         self.job_ttl_seconds = 86400
         self.lock_stale_seconds = 14400
 
@@ -125,7 +118,7 @@ def test_sync_endpoint_user_sync_enqueues_job_and_returns_202():
             _make_request(),
             response=response,
             coordinator=_FakeCoordinator(OperationResult.success()),
-            settings=_Settings(enabled=True),
+            settings=_Settings(),
             current_user=_make_user(),
         )
 
@@ -177,7 +170,7 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
             _make_request(),
             response=response,
             coordinator=_FakeCoordinator(OperationResult.success()),
-            settings=_Settings(enabled=True),
+            settings=_Settings(),
             current_user=_make_user(),
         )
 
@@ -188,64 +181,9 @@ def test_sync_endpoint_user_sync_returns_existing_job_when_lock_held():
 
 
 @pytest.mark.unit
-def test_sync_endpoint_returns_503_when_disabled():
-    """Sync endpoint should return 503 when the feature flag is disabled."""
-
-    with (
-        patch(
-            "packages.access.sync.interactions.http.get_access_sync_job_status_store",
-            return_value=MagicMock(),
-        ),
-        pytest.raises(HTTPException) as exc_info,
-    ):
-        sync_endpoint(
-            _make_request(),
-            response=Response(),
-            coordinator=_FakeCoordinator(OperationResult.success()),
-            settings=_Settings(enabled=False),
-            current_user=_make_user(),
-        )
-
-    assert exc_info.value.status_code == 503
-
-
-@pytest.mark.unit
-def test_sync_endpoint_returns_503_without_coordinator_dependency_assembly():
-    app = FastAPI()
-    app.include_router(router)
-
-    coordinator_provider_called = False
-
-    def _coordinator_provider() -> _FakeCoordinator:
-        nonlocal coordinator_provider_called
-        coordinator_provider_called = True
-        raise AssertionError("coordinator dependency should not be assembled")
-
-    app.dependency_overrides[get_access_sync_settings] = lambda: _Settings(enabled=False)
-    app.dependency_overrides[get_access_sync_coordinator] = _coordinator_provider
-    app.dependency_overrides[get_current_user] = _make_user
-
-    client = TestClient(app)
-    response = client.post(
-        "/access/sync-runs",
-        json={
-            "sync_type": "user",
-            "user_email": "user@example.com",
-            "platform": "aws",
-            "dry_run": False,
-            "request_id": "req-1",
-        },
-    )
-
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Access Sync is not enabled"
-    assert coordinator_provider_called is False
-
-
-@pytest.mark.unit
 def test_access_sync_routes_expose_explicit_openapi_metadata() -> None:
     cases = [
-        ("/access/sync-runs", "POST", 202, {503}),
+        ("/access/sync-runs", "POST", 202, {500}),
         ("/access/sync-runs/{job_id}", "GET", 200, {404}),
     ]
 
@@ -377,7 +315,7 @@ def test_sync_endpoint_passes_lock_store_to_ingress_enqueue():
             _make_request(),
             response=Response(),
             coordinator=_FakeCoordinator(OperationResult.success()),
-            settings=_Settings(enabled=True),
+            settings=_Settings(),
             current_user=_make_user(),
         )
 

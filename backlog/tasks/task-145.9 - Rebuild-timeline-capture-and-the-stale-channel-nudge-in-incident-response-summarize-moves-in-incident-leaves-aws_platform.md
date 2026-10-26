@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-10-26T15:06:00Z'
 labels:
   - incident
   - features
@@ -89,3 +89,15 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 
 2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 incident legacy upgrade job (which also fills the open index) has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; TASK-145.13 removes the job (updated 2026-10-15). Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-26T15:06:00Z
+
+---
+
+2026-10-26: TASK-112.4 first moves notify_stale_incident_channels off the Bolt app: it takes the integrations/slack Web API client per run and is scheduled only when [slack.tenant] is configured. The rebuilt nudge keeps both properties (decisions/reliability.md).
+
+---
+<!-- COMMENTS:END -->

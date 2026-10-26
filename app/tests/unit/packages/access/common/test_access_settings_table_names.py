@@ -13,8 +13,7 @@ import pytest
 
 from contracts.records import RecordQuery
 from infrastructure.records.in_memory import InMemoryRecordStore
-from packages.access.common import settings as access_settings
-from packages.access.common.settings import AccessSettings
+from packages.access.common.settings import AccessRequestsSettings, AccessSyncSettings
 from packages.access.request import providers as request_providers
 from packages.access.request.domain import ApprovalDecision
 from packages.access.request.store import access_requests_table
@@ -26,24 +25,23 @@ from packages.access.sync.store import sync_runs_table
 pytestmark = pytest.mark.unit
 
 
-def test_table_names_default_to_provisioned_tables() -> None:
-    settings = AccessSettings(_env_file=None)
+def test_table_names_default_to_provisioned_tables(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG", "sg-org-admins")
 
-    assert settings.requests.table_name == "sre_bot_access_requests"
-    assert settings.sync.table_name == "sre_bot_access"
-    assert settings.sync.job_status_table_name == "sre_bot_idempotency"
+    assert AccessRequestsSettings().table_name == "sre_bot_access_requests"
+    assert AccessSyncSettings().table_name == "sre_bot_access"
+    assert AccessSyncSettings().job_status_table_name == "sre_bot_idempotency"
 
 
 def test_table_names_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ACCESS_REQUESTS_TABLE_NAME", "requests_elsewhere")
     monkeypatch.setenv("ACCESS_SYNC_TABLE_NAME", "sync_elsewhere")
     monkeypatch.setenv("ACCESS_SYNC_JOB_STATUS_TABLE_NAME", "jobs_elsewhere")
+    monkeypatch.setenv("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG", "sg-org-admins")
 
-    settings = AccessSettings(_env_file=None)
-
-    assert settings.requests.table_name == "requests_elsewhere"
-    assert settings.sync.table_name == "sync_elsewhere"
-    assert settings.sync.job_status_table_name == "jobs_elsewhere"
+    assert AccessRequestsSettings().table_name == "requests_elsewhere"
+    assert AccessSyncSettings().table_name == "sync_elsewhere"
+    assert AccessSyncSettings().job_status_table_name == "jobs_elsewhere"
 
 
 @pytest.fixture
@@ -52,10 +50,12 @@ def store(monkeypatch: pytest.MonkeyPatch) -> Iterator[InMemoryRecordStore]:
     monkeypatch.setenv("ACCESS_REQUESTS_TABLE_NAME", "requests_elsewhere")
     monkeypatch.setenv("ACCESS_SYNC_TABLE_NAME", "sync_elsewhere")
     monkeypatch.setenv("ACCESS_SYNC_JOB_STATUS_TABLE_NAME", "jobs_elsewhere")
+    monkeypatch.setenv("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG", "sg-org-admins")
     monkeypatch.setattr(request_providers, "get_record_store", lambda: fake)
     monkeypatch.setattr(sync_providers, "get_record_store", lambda: fake)
     caches = (
-        access_settings.get_access_settings,
+        request_providers.get_access_request_settings,
+        sync_providers.get_access_sync_settings,
         request_providers.get_access_request_repository,
         sync_providers.get_sync_run_repository,
         sync_providers.get_access_sync_job_status_store,

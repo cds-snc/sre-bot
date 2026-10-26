@@ -1,12 +1,12 @@
 ---
 id: TASK-111.13
 title: >-
-  Move the hosting slices onto the files: retry, audit, coordination, scheduler,
-  directory, drive, spreadsheets
+  Move the hosting slices onto the files: retry, audit, coordination, directory,
+  drive, spreadsheets
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T19:22:00Z'
+updated_date: '2026-10-26T15:05:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -36,3 +36,15 @@ The hosting slices (RetrySettings, AuditSettings, ConditionalWriteSettings, Dire
 - [ ] #2 RetrySettings lives in infrastructure/resilience/retry/ and InfrastructureSettings is deleted
 - [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-26T15:05:00Z
+
+---
+
+2026-10-26: SchedulerSettings is TASK-112.4's (split from 112.3); title updated.
+
+---
+<!-- COMMENTS:END -->

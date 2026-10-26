@@ -16,14 +16,15 @@ from infrastructure.events import (
 from infrastructure.records import get_record_store
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
-from packages.access.common.settings import AccessRequestsSettings, get_access_settings
+from packages.access.common.settings import AccessRequestsSettings
 from packages.access.request.service import AccessRequestService
 from packages.access.request.store import AccessRequestRepository
 
 
+@lru_cache(maxsize=1)
 def get_access_request_settings() -> AccessRequestsSettings:
-    """Return the requests settings slice from the unified access settings."""
-    return get_access_settings().requests
+    """Return the singleton access.request settings; fails without a fallback approver slug."""
+    return AccessRequestsSettings()
 
 
 @lru_cache(maxsize=1)

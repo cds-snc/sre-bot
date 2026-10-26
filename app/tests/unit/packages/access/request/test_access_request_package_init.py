@@ -44,7 +44,6 @@ def test_request_startup_warmup_registers_handlers_and_warms_runtime_config(
         return object()
 
     class _Settings:
-        enabled = True
         fallback_approver_slug = "sg-org-admins"
         min_approver_count = 1
         request_ttl_hours = 72
@@ -82,7 +81,6 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
     request_pkg = _reload_request_package()
 
     class _Settings:
-        enabled = True
         fallback_approver_slug = "sg-org-admins"
         min_approver_count = 1
         request_ttl_hours = 72

@@ -53,7 +53,7 @@ Destinations:
 | ISSUER_CONFIG | SecuritySettings | file [security] issuer_config (structured table) | 111.8 |
 | MAXMIND_KEY | none (MaxMindSettings reads only the database path) | delete | 111.15 |
 | NOTIFY_API_URL | NotifySettings | file [notify] api_url | 111.12 |
-| NOTIFY_OPS_CHANNEL_ID | ServerSettings | file [server] notify_ops_channel_id | 111.7 |
+| NOTIFY_OPS_CHANNEL_ID | NotifyApiKeyLeakSettings (moved from ServerSettings in 111.7) | file [notify_api_key_leak] channel_id | 111.7 |
 | NOTIFY_SRE_CLIENT_SECRET | NotifySettings | secret NOTIFY__SRE_CLIENT_SECRET | 111.4, 111.12 |
 | NOTIFY_SRE_USER_NAME | NotifySettings (credential id) | secret NOTIFY__SRE_USER_NAME | 111.4, 111.12 |
 | NOTIFY_TEST_KEY | none (one test reads it with a default) | delete | 111.15 |
@@ -78,7 +78,7 @@ Destinations:
 
 | Key | Owning slice | Destination | Subtask |
 | --- | --- | --- | --- |
-| NOTIFY_ONCALL_GROUP_ID | ServerSettings | file [server] notify_oncall_group_id | 111.7 |
+| NOTIFY_ONCALL_GROUP_ID | NotifyApiKeyLeakSettings (moved from ServerSettings in 111.7) | file [notify_api_key_leak] oncall_group_id | 111.7 |
 | OPENAI_API_KEY | OpenAISettings | secret OPENAI__API_KEY | 111.4, 111.11 |
 | SLACK_NOTIFY_MGMT_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
 | SLACK_TEAM_ID | no longer read (TASK-111.9, 2026-10-23) | production.toml [slack.tenant] team_id = "T2G2S06PM"; the blob line stays inert until 111.15 removes the blob | 111.9 |

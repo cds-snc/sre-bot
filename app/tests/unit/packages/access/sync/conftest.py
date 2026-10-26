@@ -28,17 +28,15 @@ from packages.access.sync.policies import AdapterCapabilities
 def make_sync_settings():
     """Factory fixture for ``AccessSyncSettings``.
 
-    ``AccessSyncSettings`` is a plain ``BaseModel`` — no env file reading.
-    Pass field overrides directly as keyword arguments.
-
-    To test env-var loading, instantiate ``AccessSettings(_env_file=None)``
-    directly in the test after calling ``monkeypatch.setenv``.
+    Pass field overrides directly as keyword arguments; the access-root
+    conftest strips ``ACCESS_*`` variables and the ``.env`` file, so the
+    remaining fields take their defaults.
 
     Usage::
 
         def test_defaults(make_sync_settings):
             settings = make_sync_settings()
-            assert settings.enabled is False
+            assert settings.reconciliation_enabled is False
 
         def test_ttl_override(make_sync_settings):
             settings = make_sync_settings(job_ttl_seconds=3600)

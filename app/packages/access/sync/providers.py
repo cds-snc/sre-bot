@@ -7,7 +7,7 @@ from infrastructure.events import get_event_dispatcher
 from infrastructure.records import get_record_store
 from packages.access.common.group_policy import ManagedGroupPolicy
 from packages.access.common.providers import get_access_runtime_config
-from packages.access.common.settings import AccessSyncSettings, get_access_settings
+from packages.access.common.settings import AccessSyncSettings
 from packages.access.sync.adapters import AccessSyncAdapter
 from packages.access.sync.adapters.aws_identity_center import build_aws_identity_center_adapter
 from packages.access.sync.adapters.fake_platform import FakePlatformAdapter
@@ -17,9 +17,10 @@ from packages.access.sync.job_status_store import JobStatusStore
 from packages.access.sync.store import SyncRunRepository
 
 
+@functools.lru_cache(maxsize=1)
 def get_access_sync_settings() -> AccessSyncSettings:
-    """Return the sync settings slice from the unified access settings."""
-    return get_access_settings().sync
+    """Return the singleton access.sync settings."""
+    return AccessSyncSettings()
 
 
 @functools.lru_cache(maxsize=1)

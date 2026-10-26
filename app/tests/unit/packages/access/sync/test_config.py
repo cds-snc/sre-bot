@@ -13,7 +13,7 @@ from packages.access.common.config import (
     get_access_config_loader,
     normalize_target_key,
 )
-from packages.access.common.settings import AccessSettings
+from packages.access.common.settings import AccessSyncSettings
 
 # ---------------------------------------------------------------------------
 # AccessSyncSettings defaults
@@ -25,7 +25,6 @@ def test_access_sync_settings_defaults(make_sync_settings):
     """AccessSyncSettings must provide sane defaults without env vars."""
     # Access-root conftest autouse fixture already strips ACCESS_* vars.
     settings = make_sync_settings()
-    assert settings.enabled is False
     assert settings.reconciliation_enabled is False
     assert settings.reconciliation_schedule == "03:00"
     assert settings.job_ttl_seconds == 86400
@@ -34,12 +33,10 @@ def test_access_sync_settings_defaults(make_sync_settings):
 
 @pytest.mark.unit
 def test_access_sync_settings_env_overrides(monkeypatch):
-    """AccessSettings must read ACCESS_SYNC_* env vars into the sync slice."""
-    monkeypatch.setenv("ACCESS_SYNC_ENABLED", "true")
+    """AccessSyncSettings must read ACCESS_SYNC_* env vars."""
     monkeypatch.setenv("ACCESS_SYNC_JOB_TTL_SECONDS", "3600")
 
-    settings = AccessSettings(_env_file=None).sync
-    assert settings.enabled is True
+    settings = AccessSyncSettings()
     assert settings.job_ttl_seconds == 3600
 
 

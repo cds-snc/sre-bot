@@ -21,10 +21,7 @@ from contracts.operations import OperationResult, OperationStatus
 from infrastructure.security import get_current_user
 from infrastructure.security.models import User
 from packages.access.request.domain import AccessRequest, ApprovalDecision
-from packages.access.request.providers import (
-    get_access_request_service,
-    get_access_request_settings,
-)
+from packages.access.request.providers import get_access_request_service
 from packages.access.request.schemas import (
     AccessRequestStatusResponse,
     ApprovalDecisionResponse,
@@ -38,12 +35,6 @@ from packages.access.request.schemas import (
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/access/requests", tags=["Access Requests"])
-
-
-class _AccessRequestRouteSettings(Protocol):
-    """Structural contract for settings consumed by route handlers."""
-
-    enabled: bool
 
 
 class _AccessRequestWorkflow(Protocol):
@@ -153,12 +144,12 @@ def _build_request_response(
 def _resolve_service(
     service: _AccessRequestWorkflow | None,
 ) -> _AccessRequestWorkflow:
-    """Resolve the request service lazily after feature-gate checks."""
+    """Resolve the request service lazily, unless a caller injected one."""
     return service if service is not None else get_access_request_service()
 
 
 def _noop_request_service() -> _AccessRequestWorkflow | None:
-    """No-op dependency used to defer heavy service assembly until after gating."""
+    """No-op dependency that defers heavy service assembly to the handler."""
     return None
 
 
@@ -176,18 +167,15 @@ def _noop_request_service() -> _AccessRequestWorkflow | None:
     responses={
         400: {"description": "Invalid request payload or policy violation."},
         403: {"description": "Caller is not authorized."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def submit_request(
     body: SubmitAccessRequestBody,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> SubmitAccessRequestResponse:
     """Submit a new access request."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     user_email = body.user_email or current_user.email
@@ -240,19 +228,16 @@ def submit_request(
         403: {"description": "Caller is not authorized to approve requests."},
         404: {"description": "Access request not found."},
         409: {"description": "Request state does not allow approval."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def approve_request(
     request_id: str,
     body: ApproveRequestBody,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit an approval decision for a pending access request."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -290,19 +275,16 @@ def approve_request(
         403: {"description": "Caller is not authorized to reject requests."},
         404: {"description": "Access request not found."},
         409: {"description": "Request state does not allow rejection."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def reject_request(
     request_id: str,
     body: RejectRequestBody,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Submit a rejection decision for a pending access request."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -340,19 +322,16 @@ def reject_request(
         403: {"description": "Caller is not authorized to cancel this request."},
         404: {"description": "Access request not found."},
         409: {"description": "Request state does not allow cancellation."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def cancel_request(
     request_id: str,
     body: CancelRequestBody,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Cancel a pending access request (requester only)."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -395,19 +374,16 @@ def cancel_request(
         403: {"description": "Caller is not authorized to retry this request."},
         404: {"description": "Access request not found."},
         409: {"description": "Request state does not allow retry."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def retry_request(
     request_id: str,
     body: RetryRequestBody,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Retry IDP provisioning for a failed access request."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(
@@ -443,18 +419,15 @@ def retry_request(
     status_code=200,
     responses={
         404: {"description": "Access request not found."},
-        503: {"description": "Access Requests feature is disabled."},
+        503: {"description": "A dependency is temporarily unavailable."},
     },
 )
 def get_request_status(
     request_id: str,
-    settings: Annotated[_AccessRequestRouteSettings, Depends(get_access_request_settings)],
     current_user: Annotated[User, Security(get_current_user, scopes=["sre-bot:access-requests"])],
     service: Annotated[_AccessRequestWorkflow | None, Depends(_noop_request_service)] = None,
 ) -> AccessRequestStatusResponse:
     """Fetch request status, resolved approvers, and decision history."""
-    if not settings.enabled:
-        raise HTTPException(status_code=503, detail="Access Requests feature is disabled.")
     service_dep = _resolve_service(service)
 
     log = logger.bind(

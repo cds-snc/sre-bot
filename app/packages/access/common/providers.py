@@ -4,10 +4,9 @@
 shared access runtime config.  It is consumed by all access sub-packages
 (sync, catalog, request) — they import from here, never from each other.
 
-``get_access_settings`` (imported from ``packages.access.common.settings``) is
-the provider for the unified feature settings that control all access
-sub-features.  Bootstrap config (which loader source/ref) lives there under
-``settings.config``.
+``get_access_config_settings`` provides the bootstrap settings that select the
+loader source and ref. Each plugin's own settings are provided by that
+plugin's ``providers.py``.
 """
 
 from functools import lru_cache
@@ -17,7 +16,13 @@ from packages.access.common.config import (
     AccessRuntimeConfig,
     get_access_config_loader,
 )
-from packages.access.common.settings import get_access_settings
+from packages.access.common.settings import AccessConfigSettings
+
+
+@lru_cache(maxsize=1)
+def get_access_config_settings() -> AccessConfigSettings:
+    """Return the singleton bootstrap settings for the runtime config loader."""
+    return AccessConfigSettings()
 
 
 @lru_cache(maxsize=1)
@@ -33,9 +38,9 @@ def get_access_runtime_config() -> AccessRuntimeConfig:
         RuntimeError: If the config cannot be loaded (misconfigured source or
             invalid document).
     """
-    settings = get_access_settings()
-    loader = get_access_config_loader(source=settings.config.source)
-    result: OperationResult[AccessRuntimeConfig] = loader.load(ref=settings.config.ref)
+    settings = get_access_config_settings()
+    loader = get_access_config_loader(source=settings.source)
+    result: OperationResult[AccessRuntimeConfig] = loader.load(ref=settings.ref)
     config: AccessRuntimeConfig | None = result.data
     if not result.is_success or config is None:
         raise RuntimeError(f"access_config_load_failed: {result.message}")
