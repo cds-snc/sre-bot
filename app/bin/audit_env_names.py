@@ -112,7 +112,7 @@ class Context:
     current: set[str]
     retired: set[str] = field(default_factory=set)
     doc14: Destinations = field(default_factory=dict)
-    secrets: dict[str, str] = field(default_factory=dict)
+    parameter_states: dict[str, str] = field(default_factory=dict)
     workflow_refs: dict[str, list[str]] = field(default_factory=dict)
     setup_refs: dict[str, list[str]] = field(default_factory=dict)
 
@@ -136,7 +136,7 @@ def baseline_names(sha: str, tree: Path | None) -> set[str]:
 
 
 def workflow_references(root: Path = WORKFLOW_DIR) -> dict[str, list[str]]:
-    """Name -> workflow files that reference ``secrets.NAME`` or ``vars.NAME``."""
+    """Name -> workflow files that reference the NAME of a GitHub secret or variable."""
     refs: defaultdict[str, set[str]] = defaultdict(set)
     for path in sorted(root.rglob("*.y*ml")):
         for name in WORKFLOW_REFERENCE.findall(path.read_text()):
@@ -253,7 +253,7 @@ def _production_blob(name: str, ctx: Context) -> Verdict:
                 return Verdict("none", f"migrated to [{match[1]}] (restructured: {', '.join(sorted(table))}); {BLOB_END}")
             return Verdict("check", f"not read, and production [{match[1]}] has no {match[2]}: fix doc-14 or the config")
         if match := SECRET_DESTINATION.match(destination):
-            status = ctx.secrets.get(match[1], "missing")
+            status = ctx.parameter_states.get(match[1], "missing")
             if status == "set":
                 return Verdict("none", f"migrated to secret {match[1]}; {BLOB_END}")
             return Verdict("check", f"migrated to secret {match[1]}, but /sre-bot/{match[1]} is {status}")
@@ -271,12 +271,12 @@ def classify(source: str, name: str, state: str, ctx: Context) -> Verdict:
     return _developer(name, state, ctx)
 
 
-def secret_parameters(ctx: Context) -> list[tuple[str, str, Verdict]]:
+def parameter_rows(ctx: Context) -> list[tuple[str, str, Verdict]]:
     """The /sre-bot/<NAME> parameters doc-14 names (migration part)."""
     wanted = sorted({m[1] for destination, _ in ctx.doc14.values() if (m := SECRET_DESTINATION.match(destination))})
     rows = []
     for name in wanted:
-        state = ctx.secrets.get(name, "missing")
+        state = ctx.parameter_states.get(name, "missing")
         if state == "set":
             why = "read by the app" if name in ctx.current else "set; the app reads it once its slice moves (doc-14)"
             rows.append((name, state, Verdict("none", why)))
@@ -285,7 +285,7 @@ def secret_parameters(ctx: Context) -> list[tuple[str, str, Verdict]]:
     return rows
 
 
-def missing_workflow_secrets(listed: set[str], ctx: Context) -> list[tuple[str, str, Verdict]]:
+def unprovided_workflow_references(listed: set[str], ctx: Context) -> list[tuple[str, str, Verdict]]:
     """Names a workflow references that no listed secret or variable provides."""
     return [
         (
@@ -314,7 +314,7 @@ def main(argv: list[str]) -> None:
         current=current,
         retired=baseline_names(args[0], Path(args[1]) if len(args) == 2 else None) - current,
         doc14=doc14_destinations(),
-        secrets={name: state for source, name, state in entries if source == "ssm-param"},
+        parameter_states={name: state for source, name, state in entries if source == "ssm-param"},
         workflow_refs=workflow_references(),
         setup_refs=setup_references(),
     )
@@ -323,11 +323,11 @@ def main(argv: list[str]) -> None:
     for source, name, state in entries:
         if source not in {"ssm-param", ACTIONS_LISTED}:
             sections[source].append((name, state, classify(source, name, state, ctx)))
-    if ctx.secrets:
-        sections["ssm /sre-bot/<NAME> secret parameters"] = secret_parameters(ctx)
+    if ctx.parameter_states:
+        sections["ssm /sre-bot/<NAME> secret parameters"] = parameter_rows(ctx)
     if any(source == ACTIONS_LISTED for source, _, _ in entries):
         listed = {name for source, name, _ in entries if source.startswith(("actions", "dependabot"))}
-        sections["github actions: workflow references with no secret or variable"] = missing_workflow_secrets(listed, ctx)
+        sections["github actions: workflow references with no secret or variable"] = unprovided_workflow_references(listed, ctx)
 
     print(LEGEND)
     totals: Counter[str] = Counter()

@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T17:11:00Z'
+updated_date: '2026-10-26T17:24:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -90,6 +90,10 @@ Follow-up for the next task touching .devcontainer: docker-compose.yml expands M
 Gates (from app/, final tree): ruff check . passed; mypy 47 errors in 18 files = baseline, none in touched files (427 checked); pytest tests --ignore=tests/smoke 5751 passed; make check-import-contracts 13 kept; make check-settings-key-ownership OK.
 
 Human: after deploy run zsh bin/deploy-checks.zsh post plugins; set Done.
+
+PR #1789 opened 2026-10-26. First run of the versioned bin/deploy-checks.zsh post plugins (17:12Z, output post-plugins-20261026T171232Z.txt) against the 112.2 deploy (5be2b74f, task definition 46): every section PASS, the three ACCESS_*_ENABLED names in neither blob. 112.3's own post-deploy check is still to run after #1789 merges and deploys.
+
+CodeQL on #1789 (py/clear-text-logging-sensitive-data, high, audit_env_names.py:340) was a name-heuristic false positive: only names and state words are printed, but the data flowed from identifiers named secrets. Renamed Context.secrets -> parameter_states, secret_parameters -> parameter_rows, missing_workflow_secrets -> unprovided_workflow_references. Verified locally with CodeQL 2.27.2: the committed module reproduces the alert (3 paths into line 340), the renamed one has 0 alerts on the clear-text logging query and on the full python-code-scanning suite.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

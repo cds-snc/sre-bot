@@ -11,10 +11,10 @@ import pytest
 from bin.audit_env_names import (
     Context,
     classify,
-    missing_workflow_secrets,
+    parameter_rows,
     replacement,
-    secret_parameters,
     setup_references,
+    unprovided_workflow_references,
 )
 
 pytestmark = pytest.mark.unit
@@ -30,7 +30,7 @@ CTX = Context(
         "ENVIRONMENT": ("platform (task definition already sets it)", "111.15"),
         "GHOST": ("file [nowhere] key", "111.99"),
     },
-    secrets={"SLACK__BOT_TOKEN": "set"},
+    parameter_states={"SLACK__BOT_TOKEN": "set"},
     workflow_refs={"GEO_DB_BUCKET": ["refresh_geodb.yml"], "LOG_ANALYTICS_WORKSPACE_ID": ["ci_code.yml"]},
     setup_refs={"GEO_DB_BUCKET": [".devcontainer/maxmind-create.sh"]},
 )
@@ -91,7 +91,7 @@ def test_actions_names_are_judged_by_workflow_references(source: str, name: str,
 
 
 def test_a_workflow_reference_with_no_listed_secret_is_a_check() -> None:
-    rows = missing_workflow_secrets({"GEO_DB_BUCKET"}, CTX)
+    rows = unprovided_workflow_references({"GEO_DB_BUCKET"}, CTX)
 
     assert [(name, verdict.action) for name, _, verdict in rows] == [("LOG_ANALYTICS_WORKSPACE_ID", "check")]
 
@@ -114,10 +114,10 @@ def test_production_blob_lines_are_never_hand_edited(name: str, action: str) -> 
 
 
 def test_a_migrated_secret_whose_parameter_is_not_set_is_a_check() -> None:
-    ctx = Context(current=CTX.current, doc14=CTX.doc14, secrets={"SLACK__BOT_TOKEN": "placeholder"})
+    ctx = Context(current=CTX.current, doc14=CTX.doc14, parameter_states={"SLACK__BOT_TOKEN": "placeholder"})
 
     assert _action("ssm-blob sre-bot-config", "SLACK_BOT_TOKEN", ctx=ctx) == "check"
-    assert [verdict.action for _, _, verdict in secret_parameters(ctx)] == ["check"]
+    assert [verdict.action for _, _, verdict in parameter_rows(ctx)] == ["check"]
 
 
 def test_replacement_prefers_the_shortest_table_prefixed_name() -> None:
