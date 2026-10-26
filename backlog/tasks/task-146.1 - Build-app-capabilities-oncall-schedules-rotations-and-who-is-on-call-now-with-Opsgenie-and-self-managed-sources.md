@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-23T17:05:00Z'
+updated_date: '2026-10-26T13:45:00Z'
 labels:
   - oncall
   - capabilities
@@ -42,4 +42,5 @@ THIS SLICE
 - [ ] #4 packages/user_rotations no longer exists and no vocabulary from incident or oncall_sync appears in the capability
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 With no Opsgenie settings the capability registers and the self-managed source answers (boot test, decisions/oncall.md)
+- [ ] #7 Deleting user_rotations also removes its [plugins.incident_response] key, its module from the protected-plugins import contract, and the oncall_sync -> user_rotations ignore entries (repointed to the capability's api)
 <!-- AC:END -->

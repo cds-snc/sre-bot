@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
+updated_date: '2026-10-26T14:03:00Z'
 labels:
   - access
 milestone: m-7
-dependencies: []
+dependencies:
+  - TASK-167
 type: feature
 ordinal: 438000
 ---
@@ -38,4 +40,5 @@ This coordinator is broken out into subtasks as the ADRs are amended (people and
 - [ ] #1 The ADR amendments for IdP writes, platform-entitlement targets, the in-feature approval effect, preferred language and accessibility are recorded
 - [ ] #2 Subtasks cover the shared prerequisites (security permissions, approvals, people, directory, notifications), the move and strip to app/features/access, the reconcile core with grants, the catalogue, request, the Slack surface and the AWS Identity Center adapter, each a single PR
 - [ ] #3 An approved AWS request grants access within seconds and is removed at expiry by reconcile, including after the bot was down
+- [ ] #4 A developer can run the access plugins locally: the AWS profile and cross-account permissions they need are documented, and the plugins are switched on through PLUGINS__PLATFORM_ACCESS in app/.env
 <!-- AC:END -->

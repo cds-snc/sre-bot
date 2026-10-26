@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-23T19:22:00Z'
+updated_date: '2026-10-26T13:45:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -47,6 +47,7 @@ Operator tooling lives in app/bin/ (decisions/migration.md). Follow the existing
 - [ ] #2 The CI shape check fails on a top-level name outside the feature-packages.md table in any package under app/features/ or app/capabilities/, on a non-empty umbrella __init__.py, on an umbrella core/ with entrypoints/, hookimpls or an entry point, and on an umbrella common/ holding adapters/, a store or a provider module
 - [ ] #3 Capability packages are checked for README classification and at least one named feature consumer (plugin-architecture.md Checks)
 - [ ] #4 The check is a script under app/bin/ with a make target and a blocking CI step
+- [ ] #5 The generator asks for the plugin's product area (one of decisions/product-scope.md's four) and writes the enablement key into that area's [plugins.<area>] table in base.toml, and adds the entry-point module to the import-linter protected-plugins contract
 <!-- AC:END -->
 
 ## Comments

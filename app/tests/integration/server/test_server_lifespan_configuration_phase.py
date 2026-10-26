@@ -24,6 +24,7 @@ from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_a
 from server.configuration import CONFIG_DIR as REAL_CONFIG_DIR
 from server.configuration import get_server_settings, load_host_configuration
 from server.lifespan import build_lifespan
+from server.plugins.settings import PluginsSettings, get_plugins_settings
 from server.slack.settings import get_slack_transport_settings
 from tests.factories.lifespan import lifespan
 
@@ -35,12 +36,14 @@ def _config_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Pat
     """Point the loader at tmp_path and build the logging slice fresh for each test."""
     monkeypatch.setattr("server.configuration.loader.CONFIG_DIR", tmp_path)
     (tmp_path / "base.toml").write_text((REAL_CONFIG_DIR / "base.toml").read_text(encoding="utf-8"), encoding="utf-8")
-    for getter in (get_server_settings, get_notify_api_key_leak_settings, get_slack_transport_settings):
+    for getter in (get_server_settings, get_notify_api_key_leak_settings, get_slack_transport_settings, get_plugins_settings):
         getter.cache_clear()
     monkeypatch.setitem(LoggingSettings.model_config, "env_file", None)
+    monkeypatch.setitem(PluginsSettings.model_config, "env_file", None)
     get_logging_settings.cache_clear()
     yield tmp_path
     get_logging_settings.cache_clear()
+    get_plugins_settings.cache_clear()
 
 
 def _stub_later_phases(stack: ExitStack) -> AsyncMock:
@@ -125,3 +128,25 @@ async def test_lifespan_registers_host_info_in_the_service_registry(_config_dir:
         async with build_lifespan(configuration)(app):
             container = svcs.Container(app.state.svcs_registry)
             assert container.get(HostInfo) is configuration.host_info
+
+
+async def test_an_installed_entry_point_without_an_enablement_key_fails_boot_naming_it(_config_dir: Path) -> None:
+    base = _config_dir / "base.toml"
+    base.write_text(base.read_text(encoding="utf-8").replace("rant = true\n", ""), encoding="utf-8")
+    (_config_dir / "ci.toml").write_text("", encoding="utf-8")
+
+    await _boot_fails_naming("'rant' has no enablement key")
+
+
+async def test_the_lifespan_loads_plugins_with_the_disabled_names_from_the_files(_config_dir: Path) -> None:
+    (_config_dir / "ci.toml").write_text("", encoding="utf-8")
+    configuration = load_host_configuration()
+
+    with ExitStack() as stack:
+        _stub_later_phases(stack)
+        load_plugins = stack.enter_context(patch("server.lifespan.load_plugins"))
+        async with build_lifespan(configuration)(FastAPI()):
+            pass
+
+    assert configuration.disabled_plugins == frozenset({"access.catalog", "access.request", "access.sync"})
+    assert load_plugins.call_args.args[1] == configuration.disabled_plugins

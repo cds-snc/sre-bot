@@ -85,3 +85,20 @@ def test_nested_table_keys_are_checked(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match=r"\[slack\.tenant\] Team_Id"):
         load_configuration_files("ci", tmp_path)
+
+
+def test_a_quoted_dotted_key_of_lower_snake_case_segments_loads(tmp_path: Path) -> None:
+    """Plugin enablement keys are entry-point names, such as "incident.comms"; each segment is lower snake_case."""
+    _write(tmp_path, '[plugins.incident_response]\n"incident.comms" = true\noncall_sync = true\n', "")
+
+    load_configuration_files("ci", tmp_path)
+
+
+@pytest.mark.parametrize(
+    "key", ['"Incident.comms"', '"incident.Comms"', '"incident..comms"', '"incident.comms."', '"incident.1comms"']
+)
+def test_a_dotted_key_with_a_segment_that_is_not_lower_snake_case_fails_naming_it(tmp_path: Path, key: str) -> None:
+    _write(tmp_path, f"[plugins.incident_response]\n{key} = true\n", "")
+
+    with pytest.raises(ConfigurationError, match=r"\[plugins\.incident_response\]"):
+        load_configuration_files("ci", tmp_path)

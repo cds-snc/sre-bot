@@ -338,7 +338,7 @@ modules = [
 ]
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
-    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/feature-packages.md; TASK-123 removes the oncall_sync -> user_rotations coupling).
+    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/feature-packages.md; TASK-146.1 removes the oncall_sync -> user_rotations coupling).
     # Shrink-only: remove an entry when its import is fixed; never add one.
     "packages.oncall_sync -> packages.user_rotations.settings",
     "packages.oncall_sync.ports -> packages.user_rotations.service",
@@ -416,3 +416,33 @@ type = "forbidden"
 # host implements ServiceScopeOpener over svcs in server/services.py.
 source_modules = ["contracts"]
 forbidden_modules = ["svcs"]
+
+[[tool.importlinter.contracts]]
+id = "protected-plugins"
+name = "(m) A plugin's modules are imported only from inside the plugin"
+# A disabled plugin is blocked before loading and never imported (decisions/plugins.md),
+# which holds only if no host, legacy or sibling code imports it. One module per
+# entry point in [project.entry-points.sre_bot]; a boot test keeps the two lists equal.
+type = "protected"
+protected_modules = [
+    "packages.access.catalog",
+    "packages.access.request",
+    "packages.access.sync",
+    "packages.geolocate",
+    "features.incident.comms",
+    "features.incident.scribe",
+    "packages.oncall_sync",
+    "packages.rant",
+    "packages.user_rotations",
+]
+allowed_importers = []
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Existing violations, seeded 2026-10-26 by TASK-112.2. Shrink-only: remove an entry when its import is fixed; never add one.
+    # TASK-146.1 deletes user_rotations.
+    "packages.oncall_sync -> packages.user_rotations.settings",
+    "packages.oncall_sync.ports -> packages.user_rotations.service",
+    "packages.oncall_sync.providers -> packages.user_rotations.providers",
+    # TASK-124.6 moves or retires the legacy GET /geolocate/{ip} route.
+    "api.v1.routes.geolocate -> packages.geolocate.schemas",
+]

@@ -76,7 +76,8 @@ Code defects abort in every layer: they ship with the image, the old tasks keep 
 - No `import pluggy` outside `contracts/` and the host's plugin manager in `server/`.
 - Boot test: a plugin's `register_credential_checks` check returning `UNAUTHORIZED` logs `credential_check_failed` and the plugin still serves; a plugin without the hook opens no connection at boot.
 - Boot test: a poisoned package or a raising hookimpl aborts boot in every layer; a feature with an invalid settings slice is absent from every registry and from the OpenAPI schema, `plugin_boot_failed` is logged at CRITICAL, and the other plugins serve; a capability with an invalid settings slice aborts boot.
-- Boot test: every expected plugin is registered; every entry point has an enablement key in the base configuration file; a disabled plugin is never registered.
+- Boot test: every expected plugin is registered; every entry point has exactly one enablement key in the base configuration file; a disabled plugin is never imported or registered.
+- import-linter `protected`: an entry point's module is imported only from inside itself, so the host, the legacy tree and sibling plugins never import a plugin that may be disabled ([plugin-architecture.md](plugin-architecture.md)); the boot test checks the protected list against the entry points.
 - CI check: every package under `features/` and `capabilities/` that ships hookimpls has a matching entry-point line.
 - The marker namespace and the entry-point group are the same constant, sourced from project metadata.
 - grep: no new `register_event_handlers` hookimpl or `register_handler` call.
@@ -100,3 +101,4 @@ Tolerated until closed:
 - 2026-10-15: a platform transport has an enablement key in the configuration files; an invalid vendor slice aborts boot (TASK-153).
 - 2026-10-23: enablement keys sit in one `[plugins.<area>]` table per product area; the host blocks disabled names with `pm.set_blocked` before loading the entry points, so a disabled plugin is never imported (TASK-112.2).
 - 2026-10-23: `[slack_transport] enabled` replaced `SLACK_ENABLED`; that tolerated item is closed (TASK-112.1).
+- 2026-10-26: blocking keeps a disabled plugin unimported only if nothing else imports it, so an import-linter `protected` contract over the entry-point modules enforces it (TASK-112.2; pytest's `-p no:<name>` blocks the same way before loading).

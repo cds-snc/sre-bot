@@ -11,7 +11,7 @@ def test_plugin_discovery_finds_geolocate() -> None:
     pm = get_plugin_manager()
 
     # Load plugins from entry points (same as in lifespan)
-    load_plugins(pm, MagicMock())
+    load_plugins(pm, (), MagicMock())
 
     plugins = pm.get_plugins()
     assert len(plugins) > 0, "No plugins discovered"
@@ -29,7 +29,7 @@ def test_i18n_hook_registers_geolocate_resources() -> None:
     """Test that register_i18n_resources hook is called and geolocate registers."""
     pm = get_plugin_manager()
 
-    load_plugins(pm, MagicMock())
+    load_plugins(pm, (), MagicMock())
 
     # Call the hook
     registry = I18nResourceRegistry()

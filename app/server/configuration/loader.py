@@ -17,6 +17,9 @@ from contracts.configuration import ConfigurationError
 CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
 
 _LOWER_SNAKE_CASE = re.compile(r"[a-z][a-z0-9_]*")
+# A key may also be dotted lower snake_case segments: a plugin enablement key is the
+# plugin's entry-point name, such as "incident.comms" (decisions/configuration.md).
+_KEY = re.compile(r"[a-z][a-z0-9_]*(?:\.[a-z][a-z0-9_]*)*")
 
 
 @dataclass(frozen=True)
@@ -56,5 +59,7 @@ def _check_keys(path: Path, table: tuple[str, ...], body: Mapping[str, Any]) -> 
     for key, value in body.items():
         if isinstance(value, Mapping):
             _check_keys(path, (*table, key), value)
-        elif not _LOWER_SNAKE_CASE.fullmatch(key):
-            raise ConfigurationError(f"{path}: [{name}] {key}: keys must be lower snake_case")
+        elif not _KEY.fullmatch(key):
+            raise ConfigurationError(
+                f"{path}: [{name}] {key}: keys must be lower snake_case, dot-separated for an entry-point name"
+            )

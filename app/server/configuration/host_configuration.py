@@ -26,6 +26,8 @@ from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_a
 from server.configuration.identity import IdentitySettings, get_identity_settings
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
 from server.configuration.server_settings import ServerSettings, get_server_settings
+from server.plugins.manager import installed_plugin_names
+from server.plugins.settings import check_plugin_enablement, get_plugins_settings
 from server.slack.settings import SlackTransportSettings, get_slack_transport_settings
 
 
@@ -51,6 +53,7 @@ class HostConfiguration:
     sre_ops: SreOpsSettings
     logging: LoggingSettings
     slack_transport: SlackTransportSettings
+    disabled_plugins: frozenset[str]
 
 
 def build_host_info(identity: IdentitySettings, server: ServerSettings) -> HostInfo:
@@ -145,6 +148,8 @@ def _validate_slices(
     validate_slack_transport(slack_transport, get_slack_settings())
     get_google_workspace_settings()
     get_notify_api_key_leak_settings()
+    plugins = get_plugins_settings()
+    check_plugin_enablement(plugins, installed_plugin_names())
     host = build_host_info(identity, server)
     refuse_dev_bypass_in_production(host, security)
     install_host_info(host)
@@ -159,4 +164,5 @@ def _validate_slices(
         sre_ops=sre_ops,
         logging=logging_settings,
         slack_transport=slack_transport,
+        disabled_plugins=plugins.disabled(),
     )

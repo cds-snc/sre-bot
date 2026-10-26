@@ -56,3 +56,29 @@ command_prefix = ""
 [notify_api_key_leak]
 channel_id = ""
 oncall_group_id = ""
+
+# Plugin enablement (decisions/plugins.md): one table per product area
+# (decisions/product-scope.md), one key per entry point, named as in
+# pyproject.toml. Boot fails when an installed entry point has no key, a key
+# names no entry point, or a name sits under two areas. A disabled plugin is
+# never imported. An environment file overrides a key; a developer can switch
+# one on from app/.env, for example PLUGINS__PLATFORM_ACCESS='{"access.sync": true}'.
+
+[plugins.incident_response]
+"incident.comms" = true
+"incident.scribe" = true
+oncall_sync = true
+user_rotations = true
+
+[plugins.cloud_operations]
+# No plugin yet: the AWS surfaces are still legacy modules (TASK-88).
+
+[plugins.platform_access]
+# Off everywhere, as production runs them today (TASK-112.3 deletes their ACCESS_*_ENABLED switches).
+"access.catalog" = false
+"access.request" = false
+"access.sync" = false
+
+[plugins.workplace_utilities]
+geolocate = true
+rant = true
