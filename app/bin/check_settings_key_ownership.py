@@ -17,6 +17,16 @@ decisions/configuration.md "Checks" asks for these, all enforced here:
   - environ-read:   no ``os.environ`` / ``os.getenv`` read outside a settings
                     class (``bin/`` developer scripts and tests excepted).
 
+decisions/plugins.md and reliability.md "Checks" add, for ``server/lifespan.py``
+and the ``server/plugins/``, ``packages/``, ``features/`` and ``jobs/`` trees:
+  - plugin-switch:    no flat settings class (not a ``ConfigurationSlice``)
+                      declares an ``enabled`` field, or a ``<NAME>_ENABLED``
+                      field without an ``env_prefix``: a plugin or the scheduler
+                      runs on a configuration-file key;
+  - environment-gate: no comparison against the environment name
+                      (``environment``, ``ENVIRONMENT``, ``os.environ["ENVIRONMENT"]``);
+                      ``server/configuration/`` and legacy ``modules/`` are outside these trees.
+
 The naming rules apply to slices on the configuration files only; a slice
 still on flat environment names keeps them until TASK-111 moves it.
 
@@ -60,6 +70,11 @@ SCANNED_EXCLUSIONS = EXCLUDED_DIR_NAMES | {"tests"}
 
 # Developer scripts read their own environment; they are not app code.
 ENVIRON_EXEMPT_ROOTS = frozenset({"bin"})
+
+# Where a plugin or the scheduler is decided to run: judged by plugin-switch and environment-gate.
+RUN_SWITCH_FILES = frozenset({"server/lifespan.py"})
+RUN_SWITCH_ROOTS = ("server/plugins/", "packages/", "features/", "jobs/")
+ENVIRONMENT_NAME = "environment"
 
 # Names the platform sets for the app; they keep their bare names.
 PLATFORM_NAMES = frozenset({"ENVIRONMENT", "GIT_SHA", "FORWARDED_ALLOW_IPS"})
@@ -516,6 +531,70 @@ def _environ_reads(tree: _Tree) -> list[Violation]:
     return violations
 
 
+def _decides_runs(path: str) -> bool:
+    """Return True for a module where a plugin or the scheduler is decided to run."""
+    return path in RUN_SWITCH_FILES or path.startswith(RUN_SWITCH_ROOTS)
+
+
+def _plugin_switches(tree: _Tree) -> list[Violation]:
+    """Return each flat ``enabled`` switch a settings class in a run-deciding tree declares."""
+    violations = []
+    for cls in tree.settings_classes():
+        if not _decides_runs(cls.module.path) or tree.derives_from(cls, CONFIGURATION_SLICE_ROOT):
+            continue
+        try:
+            prefixed = bool(_config(tree, cls).get("env_prefix"))
+        except _Unreadable:
+            continue  # reported as unreadable-alias
+        for name, _ in _declared_fields(cls):
+            folded = name.lower()
+            if folded == "enabled" or (not prefixed and folded.endswith("_enabled")):
+                message = (
+                    f"{cls.owner} declares {name}: a plugin or the scheduler runs on a configuration-file key"
+                    " ([plugins.<area>] or [scheduler] enabled), never a flat environment switch"
+                )
+                violations.append(Violation(rule="plugin-switch", location=cls.owner, message=message))
+    return violations
+
+
+def _names_environment(node: ast.expr) -> bool:
+    """Return True for an expression that reads the environment name."""
+    if isinstance(node, ast.Name):
+        return node.id.lower() == ENVIRONMENT_NAME
+    if isinstance(node, ast.Attribute):
+        return node.attr.lower() == ENVIRONMENT_NAME
+    if isinstance(node, ast.Subscript):
+        key = node.slice
+        return isinstance(key, ast.Constant) and isinstance(key.value, str) and key.value.lower() == ENVIRONMENT_NAME
+    if isinstance(node, ast.Call):
+        return any(
+            isinstance(arg, ast.Constant) and isinstance(arg.value, str) and arg.value.lower() == ENVIRONMENT_NAME
+            for arg in node.args
+        )
+    return False
+
+
+def _environment_gates(tree: _Tree) -> list[Violation]:
+    """Return each comparison against the environment name in a run-deciding module."""
+    violations = []
+    for module in sorted(tree.modules.values(), key=lambda item: item.path):
+        if not _decides_runs(module.path):
+            continue
+        lines = {
+            node.lineno
+            for node in ast.walk(module.tree)
+            if isinstance(node, ast.Compare) and any(_names_environment(side) for side in (node.left, *node.comparators))
+        }
+        for line in sorted(lines):
+            location = f"{module.path}:{line}"
+            message = (
+                f"{location} compares the environment name; whether a plugin or the scheduler runs is a"
+                " configuration-file key, set per environment in that environment's file"
+            )
+            violations.append(Violation(rule="environment-gate", location=location, message=message))
+    return violations
+
+
 def _collision_violation(collision: Collision) -> Violation:
     owners = ", ".join(collision.owners)
     if collision.source_kind == TABLE_SOURCE:
@@ -592,6 +671,8 @@ def find_violations(root: Path) -> list[Violation]:
         *_naming_violations(tree, claims),
         *find_vendor_switches(claims),
         *_environ_reads(tree),
+        *_plugin_switches(tree),
+        *_environment_gates(tree),
     ]
 
 
@@ -605,14 +686,15 @@ def main() -> int:
         print(
             "\nEach environment variable and each configuration-file table has exactly one\n"
             "owning settings slice, a slice on the files reads only its own <TABLE>__ names,\n"
-            "a vendor client is enabled by its tenant entry, and only settings classes read\n"
-            "the environment. Move the key or table to its one owner, or read it through that slice."
+            "a vendor client is enabled by its tenant entry, a plugin or the scheduler runs on a\n"
+            "configuration-file key, and only settings classes read the environment. Move the key\n"
+            "or table to its one owner, or read it through that slice."
         )
         return 1
 
     print(
         "OK: every settings key and configuration table has one owner, slices on the files read only their own names,"
-        " no vendor switch exists, and only settings classes read the environment."
+        " no vendor, plugin or environment run switch exists, and only settings classes read the environment."
     )
     return 0
 

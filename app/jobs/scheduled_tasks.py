@@ -12,6 +12,8 @@ from contracts.services import ServiceScopeOpener
 from features.incident.drive.adapters import google_drive as incident_drive
 from infrastructure.coordination import get_lease_store, run_if_leased
 from integrations import maxmind, opsgenie
+from integrations.slack.client import get_slack_web_client
+from integrations.slack.settings import get_slack_settings
 from jobs.settings import get_scheduler_settings
 from modules.aws import identity_center, spending
 from modules.incident.notify_stale_incident_channels import (
@@ -94,11 +96,10 @@ def _tier2(name: str, job: Callable[..., None]) -> Callable[..., None]:
     return wrapped
 
 
-def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None], service_scopes: ServiceScopeOpener):
+def init(register_plugin_jobs: Callable[[BackgroundJobRegistry], None], service_scopes: ServiceScopeOpener) -> None:
     """Initialize the scheduled tasks.
 
     Args:
-        bot: Slack Bolt app whose client the legacy jobs use.
         register_plugin_jobs: Called once with the scheduler registry so feature
             plugins register their recurring jobs.
         service_scopes: Opener the registry exposes so jobs open a service scope per run.
@@ -110,11 +111,14 @@ def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None], ser
 
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
     schedule.every(2).hours.do(safe_run(_tier2("scheduler:provision_aws_identity_center", provision_aws_identity_center)))
-    # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
-    schedule.every().day.at("16:00").do(
-        safe_run(_tier2("scheduler:notify_stale_incident_channels", notify_stale_incident_channels)),
-        client=bot.client,
-    )
+    # A vendor's tenant entry enables its client (decisions/configuration.md).
+    if get_slack_settings().tenant is not None:
+        # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
+        schedule.every().day.at("16:00").do(
+            safe_run(_tier2("scheduler:notify_stale_incident_channels", notify_stale_incident_channels_job)),
+        )
+    else:
+        logger.info("scheduled_job_skipped", job_name="notify_stale_incident_channels", reason="slack_not_configured")
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
     schedule.every().day.at("00:00").do(
         safe_run(_tier2("scheduler:spending_generate_spending_data", spending.execute_spending_data_update_job)),
@@ -122,6 +126,11 @@ def init(bot, register_plugin_jobs: Callable[[BackgroundJobRegistry], None], ser
 
     registry = _ScheduleBackgroundJobRegistry(service_scopes)
     register_plugin_jobs(registry)
+
+
+def notify_stale_incident_channels_job() -> None:
+    """Run the legacy stale-channel notice on the outbound Slack Web API client, built per run."""
+    notify_stale_incident_channels(client=get_slack_web_client())
 
 
 def scheduler_heartbeat():

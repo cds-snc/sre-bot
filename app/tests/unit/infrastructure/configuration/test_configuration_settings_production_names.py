@@ -50,7 +50,6 @@ from integrations.opsgenie.settings import OpsGenieSettings
 from integrations.sentinel.settings import SentinelSettings
 from integrations.slack.settings import SlackSettings
 from integrations.trello.settings import TrelloSettings
-from jobs.settings import SchedulerSettings
 from server.configuration import IdentitySettings
 
 PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
@@ -63,7 +62,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         "567",
         567,
     ),
-    (SchedulerSettings, "DEFAULT_TIER2_LEASE_TTL_SECONDS", "default_tier2_lease_ttl_seconds", "777", 777),
     (RetrySettings, "RETRY_ENABLED", "enabled", "false", False),
     (RetrySettings, "RETRY_BACKEND", "backend", "dynamodb", "dynamodb"),
     (RetrySettings, "RETRY_DYNAMODB_TABLE_NAME", "dynamodb_table_name", "sentinel-retry", "sentinel-retry"),

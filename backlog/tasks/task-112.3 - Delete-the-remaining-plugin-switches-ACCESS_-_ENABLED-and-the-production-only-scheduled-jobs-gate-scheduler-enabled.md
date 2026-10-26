@@ -3,10 +3,10 @@ id: TASK-112.3
 title: >-
   Delete the access plugin switches ACCESS_*_ENABLED; each access plugin
   validates only its own settings
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-23T19:21:00Z'
-updated_date: '2026-10-26T17:24:00Z'
+updated_date: '2026-10-26T17:34:00Z'
 labels:
   - plugin-architecture
   - plugins

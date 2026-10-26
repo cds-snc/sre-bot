@@ -9,7 +9,7 @@ scope: Settings ownership, configuration files, plugin enablement, environment i
 
 ## Context
 
-Almost every setting is read from environment variables today, through about three dozen `BaseSettings` classes. The configuration files exist (`app/config/base.toml`, `local.toml`, `ci.toml`, `production.toml`), loaded by `server/configuration/` and read through the `ConfigurationSlice` base in `contracts/configuration.py`; the host slices (`[logging]`, `[server]`, `[slack_transport]`), `[security]` and `[slack]` read them so far.
+Almost every setting is read from environment variables today, through about three dozen `BaseSettings` classes. The configuration files exist (`app/config/base.toml`, `local.toml`, `ci.toml`, `production.toml`), loaded by `server/configuration/` and read through the `ConfigurationSlice` base in `contracts/configuration.py`; the host slices (`[logging]`, `[server]`, `[slack_transport]`, `[scheduler]`), `[security]` and `[slack]` read them so far.
 
 Current code:
 - AWS settings live only in `integrations/aws/settings.py`. Slack settings live only in `integrations/slack/settings.py`, which reads `[slack]` and `[slack.tenant]` and its tokens as `SLACK__<FIELD>`. OpenAI, Trello, MaxMind, Notify, OpsGenie and Sentinel live only in `integrations/<vendor>/settings.py`, and Google in `integrations/google_workspace/settings.py`. `GOOGLE_RESOURCES`, the Google document and folder ids of several features, is read by `GoogleResourcesConfig` in the same module.
@@ -128,3 +128,4 @@ Tolerated until closed:
 - 2026-10-26: a developer enables a plugin locally through a `PLUGINS__<AREA>` variable in `app/.env`, merged key by key (TASK-112.2).
 - 2026-10-26: the loader accepts quoted keys of dot-joined lower snake_case segments, so plugin enablement keys are entry-point names (TASK-112.2).
 - 2026-10-26: the `ACCESS_*_ENABLED` switches are retired for the `[plugins.platform_access]` keys; the access settings split into one class per plugin (`ACCESS_CONFIG_`, `ACCESS_SYNC_`, `ACCESS_REQUESTS_`, same environment names), each built by its plugin's provider, so the fallback-approver slug is required unconditionally on the requests class; the catalog has no settings; the single-JSON `ACCESS_SYNC` / `ACCESS_REQUESTS` form is retired (TASK-112.3).
+- 2026-10-26: `SchedulerSettings` reads `[scheduler]` (`enabled`, `default_tier2_lease_ttl_seconds`); `DEFAULT_TIER2_LEASE_TTL_SECONDS` is retired; the test run pins `SCHEDULER__ENABLED=false`, as it pins the access plugins off, so a developer's `app/.env` never starts the jobs under pytest (TASK-112.4).

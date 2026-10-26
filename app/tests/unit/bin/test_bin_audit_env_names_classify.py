@@ -77,6 +77,16 @@ def test_a_retired_switch_points_to_its_configuration_key() -> None:
     assert "[slack_transport] enabled" in classify("file app/.env", "SLACK_ENABLED", "set", CTX).reason
 
 
+def test_the_retired_flat_lease_ttl_is_deleted_for_its_scheduler_key_not_renamed() -> None:
+    """Without the hint the guess would be a SCHEDULER__ rename; the value is a configuration key."""
+    ctx = Context(current={"SCHEDULER__DEFAULT_TIER2_LEASE_TTL_SECONDS"}, retired={"DEFAULT_TIER2_LEASE_TTL_SECONDS"})
+
+    verdict = classify("file app/.env", "DEFAULT_TIER2_LEASE_TTL_SECONDS", "set", ctx)
+
+    assert verdict.action == "delete"
+    assert "[scheduler] default_tier2_lease_ttl_seconds" in verdict.reason
+
+
 @pytest.mark.parametrize(
     ("source", "name", "action"),
     [

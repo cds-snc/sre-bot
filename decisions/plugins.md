@@ -79,7 +79,7 @@ Code defects abort in every layer: they ship with the image, the old tasks keep 
 - Boot test: every expected plugin is registered; every entry point has exactly one enablement key in the base configuration file; a disabled plugin is never imported or registered.
 - import-linter `protected`: an entry point's module is imported only from inside itself, so the host, the legacy tree and sibling plugins never import a plugin that may be disabled ([plugin-architecture.md](plugin-architecture.md)); the boot test checks the protected list against the entry points.
 - CI check: every package under `features/` and `capabilities/` that ships hookimpls has a matching entry-point line.
-- CI check (`bin/check_settings_key_ownership.py`): no settings class outside the configuration files declares an `enabled` switch, and no `ENVIRONMENT` comparison in `server/lifespan.py`, `server/plugins/`, packages, features or `jobs/` decides whether a plugin or the scheduler runs (TASK-112.4).
+- CI check (`bin/check_settings_key_ownership.py`): no settings class outside the configuration files declares an `enabled` field (or, without an `env_prefix`, a `<NAME>_enabled` field), and no `ENVIRONMENT` comparison in `server/lifespan.py`, `server/plugins/`, packages, features or `jobs/` decides whether a plugin or the scheduler runs (TASK-112.4).
 - The marker namespace and the entry-point group are the same constant, sourced from project metadata.
 - grep: no new `register_event_handlers` hookimpl or `register_handler` call.
 
