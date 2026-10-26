@@ -65,8 +65,7 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
 
     directory_settings = SimpleNamespace(provider="google")
     workspace_settings = SimpleNamespace(
-        sre_bot_email="sre-bot@example.com",
-        tenant=SimpleNamespace(customer_id="C03abc123"),
+        tenant=SimpleNamespace(customer_id="C03abc123", delegated_user_email="sre-bot@example.com"),
     )
 
     captured: dict[str, object] = {}
@@ -119,9 +118,7 @@ def test_get_directory_provider_without_a_google_tenant_entry_passes_no_customer
         return MagicMock(spec=DirectoryProvider)
 
     monkeypatch.setattr(directory_factory, "get_directory_settings", lambda: SimpleNamespace(provider="google"))
-    monkeypatch.setattr(
-        directory_factory, "get_google_workspace_settings", lambda: SimpleNamespace(sre_bot_email="", tenant=None)
-    )
+    monkeypatch.setattr(directory_factory, "get_google_workspace_settings", lambda: SimpleNamespace(tenant=None))
     monkeypatch.setattr(directory_factory, "build_google_directory_provider", fake_builder)
 
     directory_factory.get_directory_provider()

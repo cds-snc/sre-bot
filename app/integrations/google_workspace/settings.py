@@ -1,11 +1,19 @@
-"""Vendor settings for the Google Workspace API client.
+"""Google Workspace vendor settings slice: the [google_workspace] table of the configuration files.
 
 Exposes ``GoogleWorkspaceSettings``, its tenant entry ``GoogleWorkspaceTenant``, and the
-cached ``get_google_workspace_settings()`` provider. Each field reads the environment variable of the same name.
+cached ``get_google_workspace_settings()`` provider.
+
+Non-secret values (retries, per-attempt timeout) come from [google_workspace]. The
+tenant entry is read only from the environment as GOOGLE_WORKSPACE__TENANT__<FIELD>:
+the customer id and the delegated user are non-public values and the service-account
+key a secret (decisions/configuration.md), so no configuration file names the tenant.
+A customer id needs the key, and the key or the delegated user set without a customer
+id fails, so Google is never half configured. Which principal and scopes each caller
+uses is TASK-169's.
 
 Also holds ``GoogleResourcesConfig`` (GOOGLE_RESOURCES) and ``get_google_resources_config()``:
-the Google document and folder ids of several features, tolerated here until TASK-111
-splits them into the owning feature slices.
+the Google document and folder ids of several features, tolerated here until TASK-111.10.3
+gives each id its own key.
 """
 
 import json
@@ -16,104 +24,91 @@ import structlog
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from contracts.configuration import ConfigurationSlice
+
 logger = structlog.get_logger().bind(component="config.google")
+
+# The tenant entry's fields, read from the environment as GOOGLE_WORKSPACE__TENANT__<FIELD>; empty counts as unset.
+_TENANT_FIELDS = ("customer_id", "service_account_key", "delegated_user_email")
+_TENANT_VARIABLE = "GOOGLE_WORKSPACE__TENANT__{}"
 
 
 class GoogleWorkspaceTenant(BaseModel):
     """The Google Workspace tenant this instance works with, and the credential that reaches it."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    customer_id: str = Field(description="Real Google Workspace customer id, never the my_customer alias.")
+    customer_id: str = Field(
+        repr=False, description="Real Google Workspace customer id, never the my_customer alias; a non-public value."
+    )
     service_account_key: str = Field(repr=False, description="Service-account key JSON for this tenant.")
-
-
-class GoogleWorkspaceSettings(BaseSettings):
-    """Google Workspace configuration settings.
-
-    Environment Variables:
-        GOOGLE_DELEGATED_ADMIN_EMAIL: Admin email for domain-wide delegation
-        SRE_BOT_EMAIL: SRE Bot service account email
-        GOOGLE_WORKSPACE_CUSTOMER_ID: Real Google Workspace customer id (no default)
-        GCP_SRE_SERVICE_ACCOUNT_KEY_FILE: Service-account key JSON
-        GOOGLE_API_NUM_RETRIES: Number of automatic retries for transient Google API failures
-        GOOGLE_API_TIMEOUT_SECONDS: Per-attempt HTTP timeout in seconds for Google API calls (defaults to 10.0)
-
-    The two keys are the source of the interim Google tenant entry
-    (``GoogleWorkspaceTenant``, read through ``tenant``) until TASK-111 makes the
-    entry a nested field (decisions/configuration.md); readers use the entry,
-    never the flat fields. The entry is present when either key is set, and a
-    present entry needs both: the key, and the real customer id, non-blank and
-    not the my_customer API alias. Each failure names its variable. The id is
-    opaque (Google documents no format), so no pattern is checked and no network
-    call is made. With neither key set, Google is not configured.
-
-    Example:
-        ```python
-        from integrations.google_workspace.settings import get_google_workspace_settings
-
-        settings = get_google_workspace_settings()
-
-        admin_email = settings.google_delegated_admin_email
-        tenant = settings.tenant
-        ```
-    """
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
+    delegated_user_email: str | None = Field(
+        default=None,
+        repr=False,
+        description="Workspace user the service account impersonates when a caller names none; a non-public value.",
     )
 
-    google_delegated_admin_email: str = Field(default="")
-    sre_bot_email: str = Field(default="")
-    google_workspace_customer_id: str | None = Field(default=None)
-    gcp_sre_service_account_key_file: str = Field(default="")
-    google_api_num_retries: int = Field(
+    @field_validator("customer_id")
+    @classmethod
+    def _real_customer_id(cls, value: str) -> str:
+        # The id is opaque (Google documents no format), so only blankness and the alias are checked.
+        value = value.strip()
+        if not value or value == "my_customer":
+            raise ValueError("customer_id must be the real Google Workspace customer id, not blank or my_customer")
+        return value
+
+
+class GoogleWorkspaceSettings(ConfigurationSlice):
+    """Vendor credential, tenant and tuning settings for Google Workspace.
+
+    Keys of [google_workspace]:
+        api_num_retries, api_timeout_seconds.
+
+    Environment only (the tenant entry; no tenant without a customer id):
+        GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID, GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY,
+        GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL. An empty value counts as unset.
+    """
+
+    model_config = SettingsConfigDict(toml_table_header=("google_workspace",), env_prefix="GOOGLE_WORKSPACE__")
+
+    tenant: GoogleWorkspaceTenant | None = Field(
+        default=None, description="The Google Workspace tenant this instance works with."
+    )
+    api_num_retries: int = Field(
         default=3,
         description="Number of automatic retries googleapiclient applies to transient (429/5xx) API call failures, configured once at service construction.",
     )
-    google_api_timeout_seconds: float = Field(
+    api_timeout_seconds: float = Field(
         default=10.0,
         gt=0,
-        description="Per-attempt HTTP timeout in seconds for every Google Workspace API client, configured once at service construction. Defaults to 10.0; must be positive.",
+        description="Per-attempt HTTP timeout in seconds for every Google Workspace API client, configured once at service construction; must be positive.",
     )
 
-    @property
-    def tenant(self) -> GoogleWorkspaceTenant | None:
-        """Return the Google tenant entry, or None when Google is not configured."""
-        if self.google_workspace_customer_id is None or not self.gcp_sre_service_account_key_file:
-            return None
-        return GoogleWorkspaceTenant(
-            customer_id=self.google_workspace_customer_id.strip(),
-            service_account_key=self.gcp_sre_service_account_key_file,
-        )
-
-    @field_validator("google_workspace_customer_id", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _empty_customer_id_is_absent(cls, value: object) -> object:
-        return None if value == "" else value
-
-    @model_validator(mode="after")
-    def _validate_tenant_entry(self) -> GoogleWorkspaceSettings:
-        if self.google_workspace_customer_id is None and not self.gcp_sre_service_account_key_file:
-            return self
-        if not self.gcp_sre_service_account_key_file:
-            raise ValueError("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is required when GOOGLE_WORKSPACE_CUSTOMER_ID is set")
-        customer_id = (self.google_workspace_customer_id or "").strip()
-        if not customer_id or customer_id == "my_customer":
-            raise ValueError(
-                "GOOGLE_WORKSPACE_CUSTOMER_ID must be the real Google Workspace customer id, not blank or the "
-                "my_customer alias, when GCP_SRE_SERVICE_ACCOUNT_KEY_FILE is set"
-            )
-        return self
+    def _tenant_and_its_values_go_together(cls, data: Any) -> Any:
+        # Before validation: pydantic's own errors would not name the variable, and an empty key
+        # would build a half tenant.
+        if not isinstance(data, dict) or not isinstance(data.get("tenant"), dict):
+            return data
+        tenant = {key: value for key, value in data["tenant"].items() if not (key in _TENANT_FIELDS and value == "")}
+        customer_id = _TENANT_VARIABLE.format("CUSTOMER_ID")
+        if "customer_id" not in tenant:
+            for field in _TENANT_FIELDS[1:]:
+                if field in tenant:
+                    raise ValueError(f"{_TENANT_VARIABLE.format(field.upper())} is set but {customer_id} is not")
+            # Anything else in the entry is left for validation to reject as an unknown key.
+            return {**data, "tenant": tenant or None}
+        if "service_account_key" not in tenant:
+            raise ValueError(f"{_TENANT_VARIABLE.format('SERVICE_ACCOUNT_KEY')} is required when {customer_id} is set")
+        return {**data, "tenant": tenant}
 
 
 class GoogleResourcesConfig(BaseSettings):
     """Consolidated Google Drive/Document resources configuration.
 
-    Feature data, not vendor settings: it waits here until TASK-111 splits it into
-    the owning feature slices (decisions/configuration.md).
+    Feature data, not vendor settings: it waits here until TASK-111.10.3 gives each
+    id its own key (decisions/configuration.md).
 
     Stores all Google resource IDs (folders, documents, sheets) in a
     single compact JSON structure to reduce AWS Parameter Store footprint.

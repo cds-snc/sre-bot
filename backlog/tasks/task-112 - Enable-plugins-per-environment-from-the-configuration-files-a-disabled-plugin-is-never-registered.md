@@ -3,10 +3,10 @@ id: TASK-112
 title: >-
   Enable plugins per environment from the configuration files; a disabled plugin
   is never registered
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-26T17:48:00Z'
+updated_date: '2026-10-26T21:43:00Z'
 labels:
   - plugin-architecture
   - plugins

@@ -5,25 +5,30 @@
 # Developer helper for the configuration migration and plugin work, not part of the app.
 #
 # Usage (from any directory; needs AWS read credentials and gh auth):
-#   zsh bin/deploy-checks.zsh pre               # before a merge: rollback image tag, task definition, 24h baseline
-#   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, Slack up, HTTP,
-#                                               # plus each named task check
+#   zsh bin/deploy-checks.zsh pre [CHECK ...]   # before a merge: rollback image tag, task definition, 24h baseline,
+#                                               # plus the pre part of each named task check that has one
+#   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, runtime errors,
+#                                               # Slack up, HTTP, plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   scheduler  [scheduler] enabled starts the jobs on every task, the stale-channel job included,
-#              and the retired DEFAULT_TIER2_LEASE_TTL_SECONDS name (TASK-112.4)
+#   google  pre: the three GOOGLE_WORKSPACE__TENANT__ parameters compared by hash with the values they
+#           replace (MATCH or DIFFER, never printed);
+#           post: Google configured on every task, no credential or delegation error (TASK-111.10.2)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(scheduler)
+TASK_CHECKS=(google)
+PRE_CHECKS=(google)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
 checks=("$@")
 for c in $checks; do (( ${TASK_CHECKS[(Ie)$c]} )) || { print -u2 "unknown check '$c'; known: $TASK_CHECKS"; exit 2 }; done
-[[ $phase == pre && ${#checks} -gt 0 ]] && { print -u2 "task checks run with post only"; exit 2 }
+if [[ $phase == pre ]]; then
+  for c in $checks; do (( ${PRE_CHECKS[(Ie)$c]} )) || { print -u2 "check '$c' has no pre part; pre parts: $PRE_CHECKS"; exit 2 }; done
+fi
 
 ROOT=$(git -C ${0:A:h} rev-parse --show-toplevel)
 REGION=ca-central-1
@@ -41,11 +46,11 @@ section() { print "\n== $1 =="; }
 result() { print "RESULT $1: $2"; }
 mask() { sed -E "s/(xox[abpersu]-|xapp-)[A-Za-z0-9-]+/\1***/g; s/input_value=('[^']*'|\"[^\"]*\"|[^,} ]*)/input_value=***/g" | cut -c1-200; }
 
-# Logs Insights: li <epoch start> <query>; prints the rows as compact JSON objects.
+# Logs Insights: li <epoch start> <query> [epoch end, default now]; prints the rows as compact JSON objects.
 li() {
-  local start=$1 query=$2 qid qstate
+  local start=$1 query=$2 end=${3:-$(date -u +%s)} qid qstate
   qid=$(aws logs start-query --region $REGION --log-group-name $LOG_GROUP \
-    --start-time $start --end-time $(date -u +%s) --query-string "$query" --output text --query queryId)
+    --start-time $start --end-time $end --query-string "$query" --output text --query queryId)
   for _ in {1..30}; do
     qstate=$(aws logs get-query-results --region $REGION --query-id $qid --query status --output text)
     [[ $qstate == Complete || $qstate == Failed || $qstate == Cancelled ]] && break
@@ -55,10 +60,28 @@ li() {
   aws logs get-query-results --region $REGION --query-id $qid --output json \
     | jq -c '.results[] | map({(.field): .value}) | add | del(."@ptr")'
 }
-li_count() { local v; v=$(li $1 "$2 | stats count() as n" | jq -r '.n // empty' | head -1); print -r -- ${v:-0}; }
+li_count() { local v; v=$(li $1 "$2 | stats count() as n" ${3:-} | jq -r '.n // empty' | head -1); print -r -- ${v:-0}; }
 
 # blob_where NAME: which blob(s) hold a NAME line (names only).
 blob_where() { local b w=(); for b in $BLOBS; do aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text | tr -d '\r' | grep -qE "^[[:space:]]*$1[[:space:]]*=" && w+=$b; done; print -r -- "${w:-none}"; }
+# blob_value NAME: the value of a NAME line in the first blob holding it, quotes and spaces trimmed. Callers keep it
+# in a local variable and never print it unless it is meant for the files.
+blob_value() {
+  local b line
+  for b in $BLOBS; do
+    line=$(aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text \
+      | tr -d '\r' | grep -E "^[[:space:]]*$1[[:space:]]*=" | tail -1)
+    [[ -n $line ]] && { print -rn -- ${line#*=} | sed -E "s/^[[:space:]]+|[[:space:]]+\$//g; s/^[\"'](.*)[\"']\$/\1/"; return 0; }
+  done
+  return 1
+}
+# param_hash NAME: sha256 of a SecureString parameter's value, or 'missing'.
+param_hash() {
+  local v
+  v=$(aws ssm get-parameter --region $REGION --name $1 --with-decryption --query Parameter.Value --output text 2>/dev/null) || { print missing; return; }
+  print -rn -- $v | sha256sum | cut -c1-64
+}
+same_hash() { [[ $1 != missing && $1 == $2 ]] && print MATCH || print DIFFER; }
 primary_deployment() {
   aws ecs describe-services --region $REGION --cluster $CLUSTER --services $SERVICE --output json \
     | jq -c '.services[0].deployments[] | select(.status=="PRIMARY") | {taskDefinition, rolloutState, runningCount, desiredCount, createdAt}'
@@ -90,6 +113,26 @@ if [[ $phase == pre ]]; then
   print "slack_app_initialized: $(li_count $since 'filter event = "slack_app_initialized"')"
   print "error or critical lines: $(li_count $since 'filter level in ["error","critical"]')"
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | sort @timestamp desc | limit 3'
+
+  if (( ${checks[(Ie)google]} )); then  # TASK-111.10.2
+    section "Google tenant parameters against the values they replace (TASK-111.10.2)"
+    # line_hash NAME: sha256 of a blob line's value, or 'missing'; the value never leaves this function.
+    line_hash() { local v; v=$(blob_value $1) && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
+    customer_new=$(param_hash /sre-bot/GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID)
+    customer_old=$(line_hash GOOGLE_WORKSPACE_CUSTOMER_ID)
+    print "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID vs the GOOGLE_WORKSPACE_CUSTOMER_ID line: $(same_hash $customer_new $customer_old)"
+    key_new=$(param_hash /sre-bot/GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY)
+    key_old=$(param_hash gcp_sre_service_account_key)
+    print "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY vs gcp_sre_service_account_key: $(same_hash $key_new $key_old)"
+    delegated_new=$(param_hash /sre-bot/GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL)
+    delegated_old=$(line_hash SRE_BOT_EMAIL)
+    print "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL vs the SRE_BOT_EMAIL line: $(same_hash $delegated_new $delegated_old)"
+    for name in GOOGLE_DELEGATED_ADMIN_EMAIL GOOGLE_API_NUM_RETRIES GOOGLE_API_TIMEOUT_SECONDS; do
+      print "$name in (unread after TASK-111.10.2; blob lines go with the blobs): $(blob_where $name)"
+    done
+    [[ $(same_hash $customer_new $customer_old) == MATCH && $(same_hash $key_new $key_old) == MATCH && $(same_hash $delegated_new $delegated_old) == MATCH ]] \
+      && result google_pre PASS || result google_pre "FAIL (a DIFFER blocks the merge: put-parameter the right value first)"
+  fi
 fi
 
 if [[ $phase == post ]]; then
@@ -105,10 +148,37 @@ if [[ $phase == post ]]; then
   since=$(print -r -- $dep | jq -r '.createdAt | if type=="number" then floor else (sub("\\.[0-9]+";"") | sub("[+-][0-9:]+$";"Z") | fromdateiso8601) end')
   print "window_start=$(date -u -d @$since +%FT%TZ)"
 
-  section "Boot errors since the deploy (event names, masked samples)"
-  n=$(li_count $since 'filter level in ["error","critical"] or @message like /ValidationError|ConfigurationError|Traceback|configuration files not loaded/')
-  li $since 'filter level in ["error","critical"] or @message like /ValidationError|ConfigurationError|Traceback/ | fields @timestamp, event, level, @message | limit 10' | mask
+  # Boot ends 5 minutes after the last configured_systems_built (10 minutes after the rollout started if none).
+  booted=$(li $since 'filter event = "configured_systems_built" | stats max(toMillis(@timestamp)) as t' | jq -r '.t // empty' | head -1)
+  if [[ -n $booted ]]; then boot_end=$(( ${booted%%.*} / 1000 + 300 )); else boot_end=$(( since + 600 )); fi
+  now=$(date -u +%s); (( boot_end > now )) && boot_end=$now
+
+  section "Boot errors, rollout to $(date -u -d @$boot_end +%FT%TZ) (event names, masked samples)"
+  n=$(li_count $since 'filter level in ["error","critical"] or @message like /ValidationError|ConfigurationError|Traceback|configuration files not loaded/' $boot_end)
+  li $since 'filter level in ["error","critical"] or @message like /ValidationError|ConfigurationError|Traceback|configuration files not loaded/ | fields @timestamp, event, level, @message | limit 10' $boot_end | mask
   [[ $n == 0 ]] && result boot_errors PASS || result boot_errors "FAIL ($n lines)"
+
+  section "Runtime errors after boot (a Socket Mode reconnect followed by a new session on the same task is WARN)"
+  other=$(li_count $boot_end 'filter (level in ["error","critical"] or @message like /Traceback/) and @message not like /on_error invoked/')
+  li $boot_end 'filter (level in ["error","critical"] or @message like /Traceback/) and @message not like /on_error invoked/ | fields @timestamp, @logStream, event, level, @message | limit 10' | mask
+  # Per task (one log stream each): the last Socket Mode on_error and the last session established.
+  errors=$(li $boot_end 'filter @message like /on_error invoked/ | stats max(toMillis(@timestamp)) as t, count() as n by @logStream')
+  sessions=$(li $boot_end 'filter @message like /session has been established/ | stats max(toMillis(@timestamp)) as t by @logStream')
+  reconnected=0 lost=0
+  for row in ${(f)errors}; do
+    stream=$(print -r -- $row | jq -r '."@logStream"')
+    error_at=$(print -r -- $row | jq -r '.t | tonumber | floor')
+    session_at=$(print -r -- $sessions | jq -r --arg s $stream 'select(."@logStream" == $s) | .t | tonumber | floor' | head -1)
+    if [[ -n $session_at ]] && (( session_at > error_at )); then
+      (( reconnected++ )); print "reconnected: $stream ($(print -r -- $row | jq -r .n) on_error, last at $(date -u -d @$(( error_at / 1000 )) +%FT%TZ))"
+    else
+      (( lost++ )); print "no session after the last on_error: $stream"
+    fi
+  done
+  print "other runtime error lines: $other; Socket Mode reconnects: $reconnected; tasks without a session after on_error: $lost"
+  if (( other > 0 || lost > 0 )); then result runtime_errors "FAIL (other=$other lost=$lost)"
+  elif (( reconnected > 0 )); then result runtime_errors "WARN (Socket Mode reconnected on $reconnected task(s))"
+  else result runtime_errors PASS; fi
 
   section "Non-JSON lines since the deploy (uvicorn lines expected until TASK-28.2)"
   print "count=$(li_count $since 'filter @message not like /^\s*\{/')"
@@ -123,26 +193,17 @@ if [[ $phase == post ]]; then
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
 
-  if (( ${checks[(Ie)scheduler]} )); then  # TASK-112.4
-    section "Scheduler from [scheduler] enabled, independent of the Slack transport (TASK-112.4)"
-    started=$(li_count $since 'filter event = "scheduled_tasks_started"')
-    skipped=$(li_count $since 'filter event = "scheduled_tasks_skipped"')
-    stale=$(li_count $since 'filter event = "scheduled_job_skipped" and job_name = "notify_stale_incident_channels"')
-    print "scheduled_tasks_started: $started (tasks=$tasks); scheduled_tasks_skipped: $skipped (expected 0)"
-    print "scheduled_job_skipped for notify_stale_incident_channels: $stale (expected 0, production has [slack.tenant])"
-    li $since 'filter event = "feature_background_job_scheduled" | stats count() as n by job_name, cadence'
-    age=$(( $(date -u +%s) - since ))
-    beating=$(li $since 'filter event = "running_scheduler_heartbeat" | stats count_distinct(@logStream) as n' | jq -r '.n // 0' | head -1)
-    print "tasks with a running_scheduler_heartbeat: ${beating:-0} (heartbeat every 5 minutes; window ${age}s)"
-    if [[ $started -ge $tasks && $skipped == 0 && $stale == 0 ]]; then
-      if [[ ${beating:-0} -ge $tasks ]]; then result scheduler PASS
-      elif (( age < 360 )); then result scheduler "CHECK (rerun after 6 minutes for the heartbeat)"
-      else result scheduler "FAIL (no heartbeat on every task: ${beating:-0}/$tasks)"; fi
-    else
-      result scheduler "FAIL (started=$started tasks=$tasks skipped=$skipped stale_skipped=$stale)"
-    fi
-    print "DEFAULT_TIER2_LEASE_TTL_SECONDS in (unread since TASK-112.4): $(blob_where DEFAULT_TIER2_LEASE_TTL_SECONDS)"
-    print "SCHEDULER__* in (expected none; production.toml sets [scheduler]): $(blob_where 'SCHEDULER__[A-Z0-9_]+')"
+  if (( ${checks[(Ie)google]} )); then  # TASK-111.10.2
+    section "Google Workspace from the files and GOOGLE_WORKSPACE__TENANT__* (TASK-111.10.2)"
+    with_google=$(li $since 'filter event = "configured_systems_built" and @message like /google/ | stats count_distinct(@logStream) as n' | jq -r '.n // 0' | head -1)
+    print "tasks whose configured_systems_built lists google: ${with_google:-0} (tasks=$tasks)"
+    bad=$(li_count $since 'filter event in ["google_workspace_not_configured","invalid_credentials_json"] or @message like /RefreshError|invalid_grant|unauthorized_client/')
+    li $since 'filter event in ["google_workspace_not_configured","invalid_credentials_json"] or @message like /RefreshError|invalid_grant|unauthorized_client/ | fields @timestamp, event, @message | limit 10' | mask
+    print "credential or delegation error lines: $bad (expected 0)"
+    for name in GOOGLE_WORKSPACE_CUSTOMER_ID SRE_BOT_EMAIL GOOGLE_DELEGATED_ADMIN_EMAIL; do
+      print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
+    done
+    [[ ${with_google:-0} -ge $tasks && $bad == 0 ]] && result google PASS || result google "FAIL (google on ${with_google:-0}/$tasks tasks, $bad error lines)"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

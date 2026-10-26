@@ -9,10 +9,10 @@ production-values test. The Slack slice
 reads the [slack] table too: its secrets are pinned under their SLACK__<FIELD>
 names (production sets SLACK__BOT_TOKEN, SLACK__USER_TOKEN and SLACK__APP_TOKEN
 as task-definition secrets) beside a tenant entry, and the retired SLACK_<FIELD>
-names are pinned as unread. The Google Workspace slice follows the same rule:
-production sets GOOGLE_DELEGATED_ADMIN_EMAIL, GOOGLE_RESOURCES, GOOGLE_WORKSPACE_CUSTOMER_ID,
-SRE_BOT_EMAIL and GCP_SRE_SERVICE_ACCOUNT_KEY_FILE; the remaining names of those
-slices stay part of the interface. The AWS, OpenAI, Notify, Trello, OpsGenie,
+names are pinned as unread. The Google Workspace slice follows the same rule: its
+key and delegated user are pinned under GOOGLE_WORKSPACE__TENANT__<FIELD> (production
+sets both as task-definition secrets) beside a tenant entry, and the retired flat names
+are pinned as unread; production still sets GOOGLE_RESOURCES. The AWS, OpenAI, Notify, Trello, OpsGenie,
 MaxMind and Sentinel slices likewise: production sets the AWS_*_ACCOUNT_ROLE_ARN
 names (only AWS_ORG_ACCOUNT_ROLE_ARN with a value), the AWS_SSO_* names,
 OPENAI_API_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
@@ -75,16 +75,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (DirectorySettings, "DIRECTORY_REQUIRE_STARTUP_WARMUP", "require_startup_warmup", "true", True),
     (DirectorySettings, "DIRECTORY_CACHE_TTL_SECONDS", "cache_ttl_seconds", "61", 61),
     (DirectorySettings, "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "startup_warmup_timeout_seconds", "3", 3),
-    (
-        GoogleWorkspaceSettings,
-        "GOOGLE_DELEGATED_ADMIN_EMAIL",
-        "google_delegated_admin_email",
-        "admin@sentinel.example",
-        "admin@sentinel.example",
-    ),
-    (GoogleWorkspaceSettings, "SRE_BOT_EMAIL", "sre_bot_email", "bot@sentinel.example", "bot@sentinel.example"),
-    (GoogleWorkspaceSettings, "GOOGLE_API_NUM_RETRIES", "google_api_num_retries", "7", 7),
-    (GoogleWorkspaceSettings, "GOOGLE_API_TIMEOUT_SECONDS", "google_api_timeout_seconds", "12.5", 12.5),
     (
         GoogleResourcesConfig,
         "GOOGLE_RESOURCES",
@@ -296,36 +286,71 @@ def test_configuration_settings_slack_retired_name_is_unread(monkeypatch: pytest
     assert settings.model_dump() == baseline
 
 
-def test_configuration_settings_google_customer_id_and_key_build_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The customer id and the service-account key are read together; the validator rejects either alone."""
-    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C0sentinel")
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", '{"type":"service_account"}')
+GOOGLE_NAMES: list[tuple[str, str, str, Any]] = [
+    ("GOOGLE_WORKSPACE__API_NUM_RETRIES", "api_num_retries", "7", 7),
+    ("GOOGLE_WORKSPACE__API_TIMEOUT_SECONDS", "api_timeout_seconds", "12.5", 12.5),
+]
+
+GOOGLE_RETIRED_NAMES = [
+    "GOOGLE_DELEGATED_ADMIN_EMAIL",
+    "SRE_BOT_EMAIL",
+    "GOOGLE_WORKSPACE_CUSTOMER_ID",
+    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
+    "GOOGLE_API_NUM_RETRIES",
+    "GOOGLE_API_TIMEOUT_SECONDS",
+]
+
+
+@pytest.mark.parametrize(("env_name", "attribute", "raw", "expected"), GOOGLE_NAMES, ids=[row[0] for row in GOOGLE_NAMES])
+def test_configuration_settings_google_name_reaches_field(
+    monkeypatch: pytest.MonkeyPatch, env_name: str, attribute: str, raw: str, expected: Any
+) -> None:
+    """The GOOGLE_WORKSPACE__<FIELD> name sets the field; a fallback to the default would differ from the sentinel."""
+    monkeypatch.setenv(env_name, raw)
 
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert settings.google_workspace_customer_id == "C0sentinel"
-    assert settings.gcp_sre_service_account_key_file == '{"type":"service_account"}'
-    assert settings.tenant is not None
+    assert getattr(settings, attribute) == expected
+
+
+def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The key and the delegated user reach the tenant entry under their GOOGLE_WORKSPACE__TENANT__ names."""
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C0sentinel")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", '{"type":"service_account"}')
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "bot@sentinel.example")
+
+    tenant = GoogleWorkspaceSettings(_env_file=None).tenant  # type: ignore[call-arg]
+
+    assert tenant is not None
+    assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (
+        "C0sentinel",
+        '{"type":"service_account"}',
+        "bot@sentinel.example",
+    )
+
+
+@pytest.mark.parametrize("env_name", GOOGLE_RETIRED_NAMES)
+def test_configuration_settings_google_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
+    """The old flat Google names are read by no field: the slice builds exactly as without them."""
+    baseline = GoogleWorkspaceSettings(_env_file=None).model_dump()  # type: ignore[call-arg]
+    monkeypatch.setenv(env_name, "7")
+
+    settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.model_dump() == baseline
 
 
 def test_configuration_settings_slack_and_google_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """The lower-case spelling of a Slack name and of a Google name is read too."""
     monkeypatch.setenv("slack__tenant__team_id", "TSENTINEL1")
     monkeypatch.setenv("slack__bot_token", "xoxb-lower")
-    monkeypatch.setenv("sre_bot_email", "lower@sentinel.example")
+    monkeypatch.setenv("google_workspace__api_num_retries", "9")
 
     slack = SlackSettings(_env_file=None)  # type: ignore[call-arg]
     google = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert slack.bot_token == "xoxb-lower"
-    assert google.sre_bot_email == "lower@sentinel.example"
-
-
-def test_configuration_settings_google_upper_case_keyword_accepted() -> None:
-    """Constructor keywords in the environment spelling still set the lower-case Google field."""
-    settings = GoogleWorkspaceSettings(_env_file=None, SRE_BOT_EMAIL="kw@sentinel.example")  # type: ignore[call-arg]
-
-    assert settings.sre_bot_email == "kw@sentinel.example"
+    assert google.api_num_retries == 9
 
 
 def test_configuration_settings_openai_api_key_reaches_field(monkeypatch: pytest.MonkeyPatch) -> None:

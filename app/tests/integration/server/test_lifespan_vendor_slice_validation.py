@@ -36,8 +36,9 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
         monkeypatch.setenv(f"SLACK__{field.upper()}", "")
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "")
-    monkeypatch.delenv("GOOGLE_WORKSPACE_CUSTOMER_ID", raising=False)
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "")
+    for field in ("service_account_key", "delegated_user_email"):
+        monkeypatch.setenv(f"GOOGLE_WORKSPACE__TENANT__{field.upper()}", "")
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
@@ -102,16 +103,26 @@ async def test_slack_secret_without_the_tenant_fails_boot_naming_the_key(monkeyp
 
 
 async def test_google_key_with_the_my_customer_alias_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", '{"type": "service_account"}')
-    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "my_customer")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", '{"private_key": "secret-key-boot-0001"}')
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "my_customer")
 
-    await _boot_fails_naming("GOOGLE_WORKSPACE_CUSTOMER_ID")
+    rendered = await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID")
+
+    assert "secret-key-boot-0001" not in rendered
 
 
-async def test_google_customer_id_without_the_key_fails_boot_naming_the_key_file(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GOOGLE_WORKSPACE_CUSTOMER_ID", "C03abc123")
+async def test_google_tenant_without_the_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
 
-    await _boot_fails_naming("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE")
+    await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY")
+
+
+async def test_google_delegated_user_without_the_tenant_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "delegated-boot-0001@example.com")
+
+    rendered = await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL")
+
+    assert "delegated-boot-0001@example.com" not in rendered
 
 
 async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -132,5 +143,5 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
 
     assert reached_yield is True
     assert get_slack_settings().tenant is None
-    assert get_google_workspace_settings().gcp_sre_service_account_key_file == ""
+    assert get_google_workspace_settings().tenant is None
     assert connects == []
