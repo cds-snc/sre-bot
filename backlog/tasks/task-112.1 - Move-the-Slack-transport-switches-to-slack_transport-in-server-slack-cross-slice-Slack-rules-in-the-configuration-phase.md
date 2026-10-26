@@ -3,10 +3,10 @@ id: TASK-112.1
 title: >-
   Move the Slack transport switches to [slack_transport] in server/slack/;
   cross-slice Slack rules in the configuration phase
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-23T19:20:00Z'
-updated_date: '2026-10-23T22:26:00Z'
+updated_date: '2026-10-26T14:49:00Z'
 labels:
   - plugin-architecture
   - configuration
