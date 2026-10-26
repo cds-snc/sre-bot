@@ -3,10 +3,10 @@ id: TASK-112.4
 title: >-
   Scheduler run switch [scheduler] enabled, started independent of the Slack
   transport; guard against env and ENVIRONMENT plugin switches
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T15:04:00Z'
-updated_date: '2026-10-26T17:48:00Z'
+updated_date: '2026-10-26T17:59:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -90,4 +90,6 @@ DEPLOY CHECK (new phase post-scheduler, human extends /workspace/tmp/deploy-chec
 2026-10-26: the deploy checks are versioned in bin/deploy-checks.zsh (TASK-112.3); this task's post-deploy check is a named task check 'scheduler' (zsh bin/deploy-checks.zsh post scheduler), not a post-scheduler phase, and it deletes the 'plugins' check if 112.2 and 112.3 are Done by then.
 
 2026-10-26 implementation (plan approved by the human 2026-10-26; working tree on main c3de2f3c, branch task-112.4-scheduler to be created by the human). SchedulerSettings is the [scheduler] ConfigurationSlice (enabled false in base, true in production.toml; default_tier2_lease_ttl_seconds 1800); DEFAULT_TIER2_LEASE_TTL_SECONDS retired (pin row deleted; audit HINTS entry so env-checks says delete, not a SCHEDULER__ rename). HostConfiguration carries the slice; lifespan starts the scheduler after the Slack block with no ENVIRONMENT comparison, no Bolt app and no _is_test_environment() guard (the Slack start guard stays). init(register_plugin_jobs, service_scopes); the stale-channel job runs notify_stale_incident_channels_job, which builds the integrations/slack Web API client per run, scheduled only with [slack.tenant], else scheduled_job_skipped reason=slack_not_configured. Two rules in bin/check_settings_key_ownership.py: plugin-switch (a non-slice settings class under server/lifespan.py, server/plugins/, packages/, features/, jobs/ declaring an enabled field, or a <NAME>_enabled field without env_prefix; ACCESS_SYNC_RECONCILIATION_ENABLED, a prefixed in-plugin job toggle, passes: TASK-166's) and environment-gate (any comparison against environment/ENVIRONMENT there). Implementation decision: pytest-env pins SCHEDULER__ENABLED=false, as 112.3 pins the access plugins off, so a developer's app/.env never starts the real jobs thread in tests (configuration.md Changes). ADRs: lifecycle.md current state and tolerated item closed, plugins.md Checks wording matches the rule, reliability.md and configuration.md Changes. Deploy check: named task check 'scheduler' in bin/deploy-checks.zsh; the 'plugins' check is deleted (112.2 and 112.3 Done). Gates: ruff clean; mypy 47 errors = baseline, none in touched files; pytest tests --ignore=tests/smoke 5778 passed (was 5751); make check-import-contracts 13 kept; make check-settings-key-ownership OK. Human: make env-checks before merge (no SCHEDULER__* or DEFAULT_TIER2_LEASE_TTL_SECONDS in app/.env.example, app/.env, Codespaces, blobs); pre at merge; after deploy zsh bin/deploy-checks.zsh post scheduler (rerun after 6 minutes for the heartbeat). Parent TASK-112 ACs 3 and 4 checked.
+
+2026-10-26 pre-merge: PR #1790 open. Env-checks 17:52Z (tmp/env-checks/20261026T175215Z.txt): total none=115, no delete, rename or check rows; DEFAULT_TIER2_LEASE_TTL_SECONDS and SCHEDULER__* are in no env file or Codespaces secret, and doc-14 lists neither in the blobs (the audit classifies an unread blob line as none, so doc-14 is the evidence for the blobs; post scheduler's blob_where confirms after the deploy). Actions secrets section not yet run. Remaining: pre at merge, then post scheduler after the deploy.
 <!-- SECTION:NOTES:END -->
