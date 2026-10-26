@@ -1,18 +1,24 @@
+from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, call, patch
 
 from modules import role
 
-ROLE_CONSTANTS = {
-    "SCORING_GUIDE_TEMPLATE": "scoring_guide_template",
-    "CORE_VALUES_INTERVIEW_NOTES_TEMPLATE": "core_values_template",
-    "TECHNICAL_INTERVIEW_NOTES_TEMPLATE": "technical_interview_template",
-    "INTAKE_FORM_TEMPLATE": "intake_form_template",
-    "PHONE_SCREEN_TEMPLATE": "phone_screen_template",
-    "RECRUITMENT_FEEDBACK_TEMPLATE": "recruitment_feedback_template",
-    "PANELIST_GUIDEBOOK_TEMPLATE": "panelist_guidebook_template",
-    "INTERNAL_TALENT_FOLDER": "mock_internal_talent_folder",
-    "TEMPLATES_FOLDER": "mock_templates_folder",
-}
+
+def role_resources(**overrides: str) -> SimpleNamespace:
+    """The talent ids the role handler reads from the Google resources settings when a role is submitted."""
+    ids = {
+        "scoring_guide_template_id": "scoring_guide_template",
+        "core_values_interview_notes_id": "core_values_template",
+        "technical_interview_notes_id": "technical_interview_template",
+        "intake_form_template_id": "intake_form_template",
+        "phone_screen_template_id": "phone_screen_template",
+        "recruitment_feedback_template_id": "recruitment_feedback_template",
+        "panelist_guidebook_template_id": "panelist_guidebook_template",
+        "internal_talent_folder_id": "mock_internal_talent_folder",
+        "templates_folder_id": "mock_templates_folder",
+    }
+    return SimpleNamespace(**(ids | overrides))
+
 
 help_text_fr = "\n `/role help` - For help in English\n---\n\n `/role aide`\n       - afficher les informations d'utilisation et le texte d'aide \n `/role nouveau`\n       - créer un nouveau rôle"
 help_text_en = "\n `/role aide` - Pour de l'aide en français\n---\n\n `/role help`\n       - show usage information and help text\n `/role new`\n       - create a new role\n"
@@ -305,7 +311,7 @@ def test_update_modal_locale_to_FR():
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "fr-FR"
 
 
-@patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
+@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")
 def test_create_new_folder(mock_create_role_folder, mock_copy_template_to_role_folder):
@@ -319,7 +325,7 @@ def test_create_new_folder(mock_create_role_folder, mock_copy_template_to_role_f
     mock_create_role_folder.assert_called_once_with("foo", "internal_talent_folder")
 
 
-@patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
+@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")
@@ -337,7 +343,7 @@ def test_create_new_folder_failed(mock_create_role_folder, mock_copy_template_to
     mock_copy_template_to_role_folder.assert_not_called()
 
 
-@patch.multiple(role, **ROLE_CONSTANTS)  # type: ignore
+@patch.object(role, "get_google_resources_config", new=role_resources)
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.create_role_folder")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
@@ -406,7 +412,7 @@ def test_copy_files_to_internal_talent_folder(mock_copy_template_to_role_folder,
     assert bound_logger.info.call_count == 10
 
 
-@patch.object(role, "INTERNAL_TALENT_FOLDER", "internal_talent_folder")
+@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")

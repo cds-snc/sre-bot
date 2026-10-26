@@ -21,7 +21,6 @@ if TYPE_CHECKING:
     from googleapiclient._apis.drive.v3 import DriveResource, File  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
-INCIDENT_TEMPLATE = get_google_resources_config().incident_template_id
 
 
 def _drive_service() -> DriveResource:
@@ -135,7 +134,7 @@ def get_metadata(file_id: str, fields: str | None = None) -> dict[str, Any]:
 def incident_drive_healthcheck() -> bool:
     healthy = False
     try:
-        metadata = get_metadata(INCIDENT_TEMPLATE)
+        metadata = get_metadata(get_google_resources_config().incident_template_id)
         if metadata is not None:
             healthy = "id" in metadata
         logger.info(

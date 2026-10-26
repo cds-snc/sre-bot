@@ -12,7 +12,6 @@ from infrastructure.drive.factory import get_drive_provider
 from integrations.google_workspace.settings import get_google_workspace_settings
 
 logger = structlog.get_logger()
-BOT_EMAIL = get_google_workspace_settings().sre_bot_email
 
 
 def _log_failure(event: str, result: OperationResult[Any]) -> None:
@@ -25,7 +24,9 @@ def _log_failure(event: str, result: OperationResult[Any]) -> None:
 
 
 def create_role_folder(name: str, parent_folder_id: str) -> dict[str, Any] | None:
-    result = get_drive_provider().create_folder(name, parent_folder_id, delegated_user_email=BOT_EMAIL)
+    result = get_drive_provider().create_folder(
+        name, parent_folder_id, delegated_user_email=get_google_workspace_settings().sre_bot_email
+    )
     if not result.is_success:
         _log_failure("talent_drive_create_folder_failed", result)
         return None
@@ -45,7 +46,7 @@ def copy_template_to_role_folder(
         name,
         templates_folder_id,
         destination_folder_id,
-        delegated_user_email=BOT_EMAIL,
+        delegated_user_email=get_google_workspace_settings().sre_bot_email,
     )
     if not result.is_success:
         _log_failure("talent_drive_copy_template_failed", result)

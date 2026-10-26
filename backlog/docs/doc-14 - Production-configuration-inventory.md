@@ -14,6 +14,7 @@ This is the rename map: TASK-111.4 creates one SSM SecureString parameter per ro
 Destinations:
 - `file [table] key`: a value in `app/config/production.toml` (or `base.toml` when it equals the default everywhere).
 - `secret NAME`: an SSM SecureString parameter injected under `NAME` through task-definition `secrets:`.
+- `secret NAME (non-public value)`: not a credential, but kept out of the public repository (decisions/configuration.md, non-public values); supplied exactly like a secret.
 - `platform`: a platform-provided name, left as a task-definition environment variable.
 - `delete`: no reader in code; removed with the SSM parameters, never migrated.
 
@@ -44,9 +45,9 @@ Destinations:
 | FRONTEND_URL | none | delete | 111.15 |
 | GOOGLE_CLIENT_ID | ServerSettings (unused field) | delete | 111.7 |
 | GOOGLE_CLIENT_SECRET | ServerSettings (unused field) | delete | 111.7 |
-| GOOGLE_DELEGATED_ADMIN_EMAIL | GoogleWorkspaceSettings | file [google_workspace] delegated_admin_email | 111.10 |
-| GOOGLE_RESOURCES | GoogleResourcesConfig (interim) | file [google_resources] (structured table; owners split it, TASK-158 deletes it) | 111.10 |
-| GOOGLE_WORKSPACE_CUSTOMER_ID | GoogleWorkspaceSettings (tenant) | file [google_workspace.tenant] customer_id | 111.10 |
+| GOOGLE_DELEGATED_ADMIN_EMAIL | GoogleWorkspaceSettings (unused field) | delete | 111.10.2 |
+| GOOGLE_RESOURCES | GoogleResourcesConfig (interim) | one key per id, never one JSON; Drive item ids are non-public values (never in the files), supplied as TASK-167 rules for document ids | 111.10.3 |
+| GOOGLE_WORKSPACE_CUSTOMER_ID | GoogleWorkspaceSettings (tenant) | file [google_workspace.tenant] customer_id | 111.10.2 |
 | GROUP_DOMAIN | GroupsFeatureSettings (dead slice) | delete | 111.14 |
 | GROUP_PROVIDERS | GroupsFeatureSettings (dead slice) | delete | 111.14 |
 | INCIDENT_CHANNEL | IncidentFeatureSettings (infrastructure/configuration/features/incident.py) | file, the slice's table | 111.14 |
@@ -68,7 +69,7 @@ Destinations:
 | SLACK_ENABLED | no longer read (TASK-112.1, 2026-10-23) | production.toml [slack_transport] enabled = true; the blob line stays inert until 111.15 removes the blob | 112.1 |
 | SLACK_SECURITY_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
 | SLACK_TOKEN | none | delete | 111.15 |
-| SRE_BOT_EMAIL | GoogleWorkspaceSettings | file [google_workspace] sre_bot_email | 111.10 |
+| SRE_BOT_EMAIL | GoogleWorkspaceSettings (tenant: the domain-wide delegation subject) | secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public value: the address of a domain-privileged account; parameter added in 111.10.1, read from 111.10.2) | 111.10.1, 111.10.2 |
 | SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
 | TRELLO_APP_KEY | TrelloSettings | secret TRELLO__APP_KEY | 111.4, 111.12 |
 | TRELLO_ATIP_BOARD | TrelloSettings | file [trello] atip_board | 111.12 |
@@ -94,8 +95,10 @@ Destinations:
 | CORS_ALLOWED_ORIGINS | environment (terraform variable, empty) | SecuritySettings | file [security] cors_allowed_origins | 111.8, removed in 111.15 |
 | FORWARDED_ALLOW_IPS | environment (VPC public subnet CIDRs) | none (uvicorn) | platform | - |
 | SLACK__COMMAND_PREFIX | environment (empty string) | SlackTransportSettings | file [slack_transport] command_prefix (the transport's table; TASK-112 adds its enablement key beside it) | 111.7, removed in 111.15 |
-| GCP_SRE_SERVICE_ACCOUNT_KEY_FILE | secrets: (SSM parameter, value from a terraform variable) | GoogleWorkspaceSettings (tenant) | secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (new parameter whose value is set outside terraform) | 111.4, 111.10 |
+| GCP_SRE_SERVICE_ACCOUNT_KEY_FILE | secrets: (SSM parameter, value from a terraform variable) | GoogleWorkspaceSettings (tenant) | secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (new parameter whose value is set outside terraform) | 111.4, 111.10.2 |
 
 ## Secrets TASK-111.4 creates
 
 `SLACK__BOT_TOKEN`, `SLACK__APP_TOKEN`, `SLACK__USER_TOKEN`, `GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY`, `OPENAI__API_KEY`, `NOTIFY__SRE_USER_NAME`, `NOTIFY__SRE_CLIENT_SECRET`, `OPSGENIE__INTEGRATIONS_KEY`, `TRELLO__APP_KEY`, `TRELLO__TOKEN`, `SENTINEL__SHARED_KEY`: eleven parameters, each named `/sre-bot/<NAME>` and injected as `<NAME>`. Terraform creates them with a placeholder; each real value is set outside terraform from its source key above (`GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY` takes the value of the `gcp_sre_service_account_key` parameter). `SECURITY__DEV_BYPASS_TOKEN` and `SLACK__SIGNING_SECRET` are not set in production and get no parameter.
+
+TASK-111.10.1 adds a twelfth parameter the same way, `GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL`, a non-public value (decided 2026-10-26); its value is the `SRE_BOT_EMAIL` blob line, set by the human with put-parameter after the apply.

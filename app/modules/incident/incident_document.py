@@ -15,8 +15,6 @@ from features.incident.documents.adapters.google_docs import (
 from features.incident.drive.adapters import google_drive as incident_drive
 from integrations.google_workspace.settings import get_google_resources_config
 
-google_resources = get_google_resources_config()
-INCIDENT_TEMPLATE = google_resources.incident_template_id
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
 TIMELINE_UPDATE_ATTEMPTS = 3
@@ -34,7 +32,7 @@ def create_incident_document(title, folder):
         str: The ID of the new document.
     """
     document_id = ""
-    response = incident_drive.create_document_from_template(title, folder, INCIDENT_TEMPLATE)
+    response = incident_drive.create_document_from_template(title, folder, get_google_resources_config().incident_template_id)
     if response:
         document_id = str(response.get("id") or "")
 
