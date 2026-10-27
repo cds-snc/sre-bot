@@ -170,8 +170,8 @@ if [[ $phase == pre ]]; then
       [[ $where == none ]] || aws_ok=no
     done
     td_aws=$(aws ecs describe-task-definition --region $REGION --task-definition $td --output json \
-      | jq -r '[.taskDefinition.containerDefinitions[0] | (.environment[]?.name), (.secrets[]?.name) | select(startswith("AWS_"))] | join(" ")')
-    print "task definition names starting AWS_ (expected none: ECS injects the region; if post shows NoRegionError, add AWS_DEFAULT_REGION to the task definition first): ${td_aws:-none}"
+      | jq -r '[.taskDefinition.containerDefinitions[0] | (.environment[]?.name), (.secrets[]?.name) | select(startswith("AWS_") and (startswith("AWS__") | not))] | join(" ")')
+    print "task definition SDK names AWS_* (the slice names AWS__* excluded; expected none: ECS injects the region; if post shows NoRegionError, add AWS_DEFAULT_REGION to the task definition first): ${td_aws:-none}"
     [[ $aws_ok == yes ]] && result aws_pre PASS || result aws_pre "FAIL (a DIFFER or MISSING parameter, a format NO or a tuning line blocks the merge: put-parameter the right value first)"
   fi
 fi

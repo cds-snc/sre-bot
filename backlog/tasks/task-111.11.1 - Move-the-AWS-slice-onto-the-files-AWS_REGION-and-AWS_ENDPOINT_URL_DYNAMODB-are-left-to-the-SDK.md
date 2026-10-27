@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-26T22:21:00Z'
-updated_date: '2026-10-27T13:36:00Z'
+updated_date: '2026-10-27T14:15:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -30,12 +30,12 @@ AWSSettings (integrations/aws/settings.py) becomes the [aws] ConfigurationSlice 
 <!-- AC:BEGIN -->
 - [x] #1 [aws] holds only the client tuning (retry, timeouts, error-code lists; base.toml defaults, per-environment overrides) and declares no AWS_* SDK name (AWS_REGION, AWS_ENDPOINT_URL_DYNAMODB) as a field; an unknown key in [aws] fails boot naming the key
 - [x] #2 get_aws_client resolves the region and the dynamodb-local endpoint through the SDK alone (AWS_DEFAULT_REGION or the shared config file, AWS_ENDPOINT_URL_DYNAMODB); the dynamodb-only endpoint and the ca-central-1 default are gone from code
-- [ ] #3 No configuration file names a value of the AWS tenant entry or [access_permission_sets]; the five production values (AWS__TENANT__INSTANCE_ID, AWS__TENANT__INSTANCE_ARN, AWS__TENANT__ORG_ROLE_ARN, ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS, ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS) are SSM parameters that pre aws shows as MATCH against the blob lines they replace, with both instance formats OK; no file holds a credential
+- [x] #3 No configuration file names a value of the AWS tenant entry or [access_permission_sets]; the five production values (AWS__TENANT__INSTANCE_ID, AWS__TENANT__INSTANCE_ARN, AWS__TENANT__ORG_ROLE_ARN, ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS, ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS) are SSM parameters that pre aws shows as MATCH against the blob lines they replace, with both instance formats OK; no file holds a credential
 - [x] #4 The old names (AWS_SSO_SYSTEM_ADMIN_PERMISSIONS, AWS_SSO_VIEW_ONLY_PERMISSIONS, AWS_AUDIT_ACCOUNT_ROLE_ARN, AWS_ORG_ACCOUNT_ROLE_ARN, AWS_LOGGING_ACCOUNT_ROLE_ARN, AWS_SSO_INSTANCE_ID, AWS_SSO_INSTANCE_ARN, AWS_RETRY_MAX_ATTEMPTS, AWS_RETRY_MODE, AWS_CONNECT_TIMEOUT_SECONDS, AWS_READ_TIMEOUT_SECONDS, AWS_TRANSIENT_RETRY_AFTER_SECONDS, AWS_NOT_FOUND_CODES, AWS_UNAUTHORIZED_CODES, AWS_TRANSIENT_CODES) are no longer read from the environment or .env
 - [x] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass; make check-import-contracts and make check-settings-key-ownership pass
 - [x] #6 The AWS organisation is the optional AWS tenant entry (AWS__TENANT__<FIELD>, environment only; instance_id and instance_arn required and checked against the documented AWS patterns; audit/org/logging role ARNs each optional, empty counting as unset); a malformed entry fails boot naming the key; ci.toml names no tenant and an absent tenant keeps today's behaviour (the bot's own credentials, empty instance values); [aws] holds only the client tuning
 - [x] #7 The two SSO permission-set values are read by an access-owned slice in packages/access/common/settings.py ([access_permission_sets]), moved mechanically (no policy redesign); build_sso_admin_adapter takes them as parameters and integrations/aws no longer declares them
-- [ ] #8 The tenant's role ARNs, instance id and ARN, and the two permission-set ARNs are non-public values supplied from the environment (SSM parameters in production, Codespaces secrets in development); production behaviour is identical (same ARNs, same instance); .devcontainer/docker-compose.yml sets AWS_DEFAULT_REGION
+- [x] #8 The tenant's role ARNs, instance id and ARN, and the two permission-set ARNs are non-public values supplied from the environment (SSM parameters in production, Codespaces secrets in development); production behaviour is identical (same ARNs, same instance); .devcontainer/docker-compose.yml sets AWS_DEFAULT_REGION
 <!-- AC:END -->
 
 ## Definition of Done
@@ -156,6 +156,8 @@ Human steps: after the terraform expand PR applies, put-parameter /sre-bot/AWS__
 2026-10-27 AC #3, #6 and #8 reworded for the environment-only tenant entry (human approval); #1, #2, #4 to #7 re-checked on the reworked tree (gates re-run 2026-10-26: 5860 passed, mypy 47 = baseline, contracts 13 kept, key ownership OK); #3 and #8 wait on pre aws after the ssm-aws-tenant-parameters expand PR applies and the five values are put.
 
 2026-10-27 pre aws run 13:28Z: all five MATCH, both formats OK, but it showed AWS_AUDIT_ACCOUNT_ROLE_ARN and AWS_LOGGING_ACCOUNT_ROLE_ARN set in sre-bot-config, and the check passed anyway. The plan had assumed production sets only the org role (a misreading of doc-14's AC6 facts); shipping on that assumption would drop the audit and logging roles in production, against AC #8. Fixed: pre aws compares all seven parameters, the two roles included, and fails on a MISSING one; doc-14 rows and the audit HINTS corrected. The parameters come from a second terraform-only PR (ssm.tf +2) before this one merges, which also carries an env-checks coverage rule (a development-only doc-14 value whose blob line is set is a check) and limits the .env.example check to names the app reads. ECS sets AWS_DEFAULT_REGION on Fargate tasks (AWS docs), so the region needs no task-definition change. Gates on the working tree: ruff clean, mypy 47 = baseline, contracts 13 kept, key ownership OK, pytest 5875 passed.
+
+2026-10-27 merge-gate evidence: #1796 merged 14:10Z (ssm.tf +2), both values put; pre aws 14:13Z: seven MATCH (instance id, instance ARN, org, audit and logging roles, both permission sets), both formats OK, no retired tuning line, aws_pre PASS; rollback tag 5b0a7cb1e6044bb7b382275157d7abcea5498260-2026-10-27 (sre-bot-task:56). AC #3 and #8 checked (docker-compose sets AWS_DEFAULT_REGION; ECS sets it on Fargate). pre aws's task-definition line now excludes the AWS__* slice names it wrongly listed. Remaining: pre at merge, deploy, post aws and a DynamoDB-backed read (DoD), then the cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
