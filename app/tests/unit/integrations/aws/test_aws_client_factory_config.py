@@ -156,6 +156,8 @@ class TestServiceSelection:
             "securityhub",
             "lambda",
             "sts",
+            "devops-agent",
+            "ssm",
         ],
     )
     def test_builds_a_client_for_the_requested_service(self, service_name: str) -> None:

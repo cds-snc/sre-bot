@@ -11,6 +11,7 @@ assumed before the client was handed back.
 
 from __future__ import annotations
 
+import socket
 from datetime import UTC, datetime
 from typing import Any
 
@@ -168,6 +169,31 @@ class TestFactoryWiring:
         assert client.meta.service_model.service_name == "identitystore"
         assert assume_role_calls == []
         assert len(recorded_sessions) == 1
+
+    @pytest.mark.parametrize("service_name", ["devops-agent", "ssm", "dynamodb"])
+    def test_investigation_services_are_built_on_the_assumed_session_without_connecting(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        recorded_sessions: list[boto3.session.Session],
+        assume_role_calls: list[tuple[Any, str, str]],
+        service_name: str,
+    ) -> None:
+        """The investigation feature's clients assume the ops-account role and open no connection when built.
+
+        ``socket.connect`` is replaced by a recorder, so any outbound connection made while
+        building the client would be seen; the STS exchange itself is faked.
+        """
+        connections: list[Any] = []
+        monkeypatch.setattr(socket.socket, "connect", lambda self, address: connections.append(address))
+
+        client = aws_client.get_aws_client(service_name, role_arn=_ROLE_ARN)  # type: ignore[call-overload]
+
+        assert client.meta.service_model.service_name == service_name
+        assert [call[1] for call in assume_role_calls] == [_ROLE_ARN]
+        assumed = recorded_sessions[-1].get_credentials()
+        assert assumed is not None
+        assert assumed.access_key == "ASIAASSUMEDKEY000001"
+        assert connections == []
 
     def test_private_credential_injection_is_gone_from_the_module(self) -> None:
         """The refreshable-credential hook that reached into botocore internals is no longer imported."""

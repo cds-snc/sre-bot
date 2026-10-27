@@ -12,8 +12,8 @@ are internal tenant identifiers only Identity Center administrators see (the id 
 default access-portal subdomain), so they are non-public values (decisions/configuration.md)
 and no configuration file names the entry. It is present when AWS__TENANT__INSTANCE_ID is
 set and then needs AWS__TENANT__INSTANCE_ARN, each checked against the format AWS
-documents; the audit, org and logging role ARNs are individually optional, and an empty
-value counts as unset. An absent tenant keeps the bot's own credentials and empty instance
+documents; the audit, org and logging role ARNs and the DevOps Agent investigation role ARN
+are individually optional, and an empty value counts as unset. An absent tenant keeps the bot's own credentials and empty instance
 values. The region and the dynamodb-local endpoint are the SDK's: boto3 resolves them from
 AWS_DEFAULT_REGION or the shared config file and AWS_ENDPOINT_URL_DYNAMODB, so no field
 declares them. The two SSO permission sets are access policy and live in
@@ -29,7 +29,14 @@ from pydantic_settings import SettingsConfigDict
 from contracts.configuration import ConfigurationSlice
 
 # The tenant entry's fields, read from the environment as AWS__TENANT__<FIELD>; empty counts as unset.
-_TENANT_FIELDS = ("instance_id", "instance_arn", "audit_role_arn", "org_role_arn", "logging_role_arn")
+_TENANT_FIELDS = (
+    "instance_id",
+    "instance_arn",
+    "audit_role_arn",
+    "org_role_arn",
+    "logging_role_arn",
+    "devops_agent_role_arn",
+)
 _TENANT_VARIABLE = "AWS__TENANT__{}"
 
 RetryMode = Literal["legacy", "standard", "adaptive"]
@@ -60,6 +67,13 @@ class AwsTenant(BaseModel):
     logging_role_arn: str = Field(
         default="", description="Role assumed in the logging account; empty uses the bot's own credentials."
     )
+    devops_agent_role_arn: str = Field(
+        default="",
+        description=(
+            "Role assumed in the ops account to start and read AWS DevOps Agent investigations, its "
+            "investigations table and its Agent Space lookups; empty leaves the investigation feature unconfigured."
+        ),
+    )
 
 
 class AWSSettings(ConfigurationSlice):
@@ -71,7 +85,8 @@ class AWSSettings(ConfigurationSlice):
 
     Environment only (the tenant entry; no tenant without an instance id):
         AWS__TENANT__INSTANCE_ID, AWS__TENANT__INSTANCE_ARN, AWS__TENANT__AUDIT_ROLE_ARN,
-        AWS__TENANT__ORG_ROLE_ARN, AWS__TENANT__LOGGING_ROLE_ARN. An empty value counts as unset.
+        AWS__TENANT__ORG_ROLE_ARN, AWS__TENANT__LOGGING_ROLE_ARN, AWS__TENANT__DEVOPS_AGENT_ROLE_ARN.
+        An empty value counts as unset.
     """
 
     model_config = SettingsConfigDict(toml_table_header=("aws",), env_prefix="AWS__")
@@ -159,6 +174,15 @@ class AWSSettings(ConfigurationSlice):
     def sso_instance_arn(self) -> str:
         """Identity Center instance ARN of the managed organisation, or empty without a tenant."""
         return self.tenant.instance_arn if self.tenant else ""
+
+    @property
+    def devops_agent_role_arn(self) -> str:
+        """Role assumed in the ops account for AWS DevOps Agent investigations, or empty when unset.
+
+        It is not in ``service_role_map``: the role also reaches DynamoDB and SSM in the ops
+        account, so it is chosen by the investigation feature, never by service name.
+        """
+        return self.tenant.devops_agent_role_arn if self.tenant else ""
 
     @property
     def service_role_map(self) -> dict[str, str]:

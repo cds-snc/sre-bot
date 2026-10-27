@@ -201,7 +201,7 @@ dev = [
     "requests-mock==1.12.1",
     "setuptools==84.2.1",
     "moto[dynamodb]>=5.2.4",
-    "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin,sts]>=1.43.116",
+    "types-boto3[ce,config,devops-agent,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,ssm,sso-admin,sts]>=1.43.116",
     "google-api-python-client-stubs>=1.40.0",
     "import-linter>=2.15",
 ]
