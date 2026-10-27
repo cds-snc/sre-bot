@@ -4,6 +4,7 @@ import structlog
 
 from contracts.operations import OperationStatus
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from packages.access.common.settings import get_access_permission_sets_settings
 from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
 from packages.aws_platform.adapters.organizations import build_organizations_adapter
 from packages.aws_platform.adapters.sso_admin import build_sso_admin_adapter
@@ -60,7 +61,11 @@ def execute():
             "message": f"Failed to list AWS Organization accounts: {accounts_result.message}",
         }
 
-    sso_admin_adapter = build_sso_admin_adapter()
+    permission_sets = get_access_permission_sets_settings()
+    sso_admin_adapter = build_sso_admin_adapter(
+        system_admin_permissions=permission_sets.system_admin_permissions,
+        view_only_permissions=permission_sets.view_only_permissions,
+    )
     assignments_result = sso_admin_adapter.list_account_assignments_for_principal(
         principal_id=aws_ops_group_id, principal_type="GROUP"
     )

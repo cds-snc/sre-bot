@@ -12,7 +12,8 @@ from infrastructure.coordination.in_memory import InMemoryConditionalWriteStore
 from infrastructure.coordination.settings import ConditionalWriteSettings
 from integrations.aws import client as aws_client
 from integrations.aws.client import get_aws_client
-from integrations.aws.settings import get_aws_settings
+
+_REGION = "ca-central-1"
 
 STORE_TEST_TABLE_NAME = "test-sre-bot-idempotency-store"
 
@@ -31,7 +32,7 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
-    monkeypatch.setenv("AWS_DEFAULT_REGION", get_aws_settings().aws_region)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", _REGION)
     monkeypatch.delenv("AWS_ENDPOINT_URL_DYNAMODB", raising=False)
     aws_client.get_aws_settings.cache_clear()
 

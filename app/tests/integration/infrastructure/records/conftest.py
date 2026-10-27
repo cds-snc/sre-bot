@@ -16,7 +16,8 @@ from contracts.records import KeySchema, RecordIndex, RecordStore, RecordTable
 from infrastructure.records.in_memory import InMemoryRecordStore
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws import client as aws_client
-from integrations.aws.settings import get_aws_settings
+
+_REGION = "ca-central-1"
 
 RECORDS_TEST_TABLE = RecordTable(
     name="test-sre-bot-record-store",
@@ -36,7 +37,7 @@ def _set_moto_aws_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setenv("AWS_SECURITY_TOKEN", "testing")
     monkeypatch.setenv("AWS_SESSION_TOKEN", "testing")
-    monkeypatch.setenv("AWS_DEFAULT_REGION", get_aws_settings().aws_region)
+    monkeypatch.setenv("AWS_DEFAULT_REGION", _REGION)
     monkeypatch.delenv("AWS_ENDPOINT_URL_DYNAMODB", raising=False)
     aws_client.get_aws_settings.cache_clear()
 
@@ -76,7 +77,7 @@ def record_store(monkeypatch: pytest.MonkeyPatch) -> Iterator[DynamoDBRecordStor
     _set_moto_aws_credentials(monkeypatch)
 
     with moto.mock_aws():
-        client = boto3.client("dynamodb", region_name=get_aws_settings().aws_region)
+        client = boto3.client("dynamodb", region_name=_REGION)
         _create_records_table(client)
         yield DynamoDBRecordStore(dynamodb=client)
 

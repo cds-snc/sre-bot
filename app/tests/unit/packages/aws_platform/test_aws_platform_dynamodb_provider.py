@@ -2,8 +2,7 @@
 
 The provider is monkeypatched to record get_aws_client calls and verify routing:
 two calls to get_aws_client('dynamodb', ...), the second with retries=False.
-Environment variables AWS_AUDIT_ACCOUNT_ROLE_ARN, AWS_ORG_ACCOUNT_ROLE_ARN, and
-AWS_LOGGING_ACCOUNT_ROLE_ARN are set to verify that dynamodb has no service_role_map
+The tenant's audit, org and logging role ARNs are set to verify that dynamodb has no service_role_map
 entry and always receives role_arn=None. get_aws_settings cache is cleared before
 and after each test.
 """
@@ -17,6 +16,7 @@ import pytest
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.dynamodb import build_dynamodb_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -80,10 +80,10 @@ class TestBuildDynamoDBAdapter:
         assert get_aws_client_calls[1]["retries"] is False
 
     def test_role_arn_always_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Role ARN is None even when AWS_AUDIT_ACCOUNT_ROLE_ARN, AWS_ORG_ACCOUNT_ROLE_ARN, AWS_LOGGING_ACCOUNT_ROLE_ARN are set."""
-        monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/audit-role")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
-        monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/logging-role")
+        """Role ARN is None even when the audit, org and logging role ARNs are set."""
+        set_aws_tenant(monkeypatch, audit_role_arn="arn:aws:iam::123456789012:role/audit-role")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, logging_role_arn="arn:aws:iam::123456789012:role/logging-role")
         get_aws_client_calls: list[dict[str, Any]] = []
 
         def record_get_aws_client(

@@ -134,6 +134,8 @@ env = [
     "SCHEDULER__ENABLED=false",
     # Every test run behaves as the CI environment, locally and in GitHub Actions.
     "ENVIRONMENT=ci",
+    # The SDK resolves the region (botocore reads AWS_DEFAULT_REGION, not AWS_REGION); the code names none.
+    "AWS_DEFAULT_REGION=ca-central-1",
     # The test run is an unconfigured Slack and Google (ci.toml has no [slack.tenant]; the
     # Google tenant is environment only): the blanks override a developer's app/.env and the
     # Codespaces secrets every process inherits.
@@ -144,6 +146,14 @@ env = [
     "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID=",
     "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY=",
     "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL=",
+    # Likewise AWS: the tenant entry and the permission sets are environment only (blank = unset).
+    "AWS__TENANT__INSTANCE_ID=",
+    "AWS__TENANT__INSTANCE_ARN=",
+    "AWS__TENANT__AUDIT_ROLE_ARN=",
+    "AWS__TENANT__ORG_ROLE_ARN=",
+    "AWS__TENANT__LOGGING_ROLE_ARN=",
+    "ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS=",
+    "ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS=",
     "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
     "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
     "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
@@ -151,9 +161,6 @@ env = [
     "NOTIFY_SRE_CLIENT_SECRET=NOTIFY_SRE_CLIENT_SECRET",
     "SLACK_SECURITY_USER_GROUP_ID=SLACK_SECURITY_USER_GROUP_ID",
     "SLACK_NOTIFY_MGMT_USER_GROUP_ID=SLACK_NOTIFY_MGMT_USER_GROUP_ID",
-    "AWS_ORG_ACCOUNT_ROLE_ARN=AWS_ORG_ACCOUNT_ROLE_ARN",
-    "AWS_LOGGING_ACCOUNT_ROLE_ARN=AWS_LOGGING_ACCOUNT_ROLE_ARN",
-    "AWS_AUDIT_ACCOUNT_ROLE_ARN=AWS_AUDIT_ACCOUNT_ROLE_ARN",
     "ATIP_ANNOUNCE_CHANNEL=ATIP_ANNOUNCE_CHANNEL",
     "TRELLO_APP_KEY=TRELLO_APP_KEY",
     "TRELLO_TOKEN=TRELLO_TOKEN",

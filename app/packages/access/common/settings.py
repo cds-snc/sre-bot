@@ -8,15 +8,22 @@ validates its settings (decisions/configuration.md):
     AccessSyncSettings      ACCESS_SYNC_*      sync/providers.py
     AccessRequestsSettings  ACCESS_REQUESTS_*  request/providers.py
 
+and one slice on the configuration files, read at use (a disabled plugin never builds it):
+
+    AccessPermissionSetsSettings  [access_permission_sets]  get_access_permission_sets_settings()
+
 Whether a plugin runs is its ``[plugins.platform_access]`` key, not a setting
 here. ``AccessRuntimeConfig`` is a separate concept: a structured document
 loaded at runtime from the source these settings name.
 """
 
+from functools import lru_cache
 from typing import Literal
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from contracts.configuration import ConfigurationSlice
 
 
 class AccessConfigSettings(BaseSettings):
@@ -90,3 +97,26 @@ class AccessRequestsSettings(BaseSettings):
         if not self.fallback_approver_slug.strip():
             raise ValueError("ACCESS_REQUESTS_FALLBACK_APPROVER_SLUG must be set when the access.request plugin is enabled")
         return self
+
+
+class AccessPermissionSetsSettings(ConfigurationSlice):
+    """The AWS SSO permission sets the "write" and "read" access aliases resolve to.
+
+    Keys of [access_permission_sets]:
+        system_admin_permissions — permission set ARN the "write" alias resolves to
+        view_only_permissions    — permission set ARN the "read" alias resolves to
+
+    Both are public values, empty until an environment file names them; the permission-set
+    policy itself is redesigned in the access feature.
+    """
+
+    model_config = SettingsConfigDict(toml_table_header=("access_permission_sets",), env_prefix="ACCESS_PERMISSION_SETS__")
+
+    system_admin_permissions: str = ""
+    view_only_permissions: str = ""
+
+
+@lru_cache(maxsize=1)
+def get_access_permission_sets_settings() -> AccessPermissionSetsSettings:
+    """Return the process-wide `AccessPermissionSetsSettings` singleton."""
+    return AccessPermissionSetsSettings()

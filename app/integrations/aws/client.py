@@ -4,8 +4,9 @@ Provides the typed boto3 client factory and the shared error classification
 per decisions/outbound-clients.md: clients raise typed SDK exceptions; adapters
 classify them. Every client carries SDK-native standard retries and explicit
 per-attempt timeouts fixed once at construction, AssumeRole goes through the
-public STS API, and the only endpoint override is the dynamodb-local one.
-Clients are built per call and never cached, so assumed credentials never
+public STS API. The region and the dynamodb-local endpoint are the SDK's to
+resolve (AWS_DEFAULT_REGION or the shared config file, AWS_ENDPOINT_URL_DYNAMODB),
+so the factory names neither. Clients are built per call and never cached, so assumed credentials never
 need refreshing.
 """
 
@@ -136,23 +137,18 @@ def get_aws_client(
     session_name: str = _DEFAULT_SESSION_NAME,
     retries: bool = True,
 ) -> Any:
-    """Build a boto3 client with the standard retry, timeout and endpoint policy.
+    """Build a boto3 client with the standard retry and timeout policy.
 
     ``role_arn`` assumes that role eagerly through STS before the client is
     built. ``retries=False`` makes exactly one attempt, for writes that are not
-    safe to replay. The dynamodb-local endpoint is applied to dynamodb only,
-    and only when configured. Failures raise SDK exceptions; adapters classify
-    them with ``classify_aws_error``.
+    safe to replay. The region and any endpoint override come from the SDK's own
+    resolution; with no region configured anywhere, botocore raises
+    ``NoRegionError``. Failures raise SDK exceptions; adapters classify them with
+    ``classify_aws_error``.
     """
     settings = get_aws_settings()
     session = _session_for(settings, role_arn, session_name)
-    endpoint_url = settings.dynamodb_endpoint_url if service_name == "dynamodb" else None
-    return session.client(
-        service_name,
-        region_name=settings.aws_region,
-        config=_build_config(settings, retries=retries),
-        endpoint_url=endpoint_url,
-    )
+    return session.client(service_name, config=_build_config(settings, retries=retries))
 
 
 def _build_config(settings: AWSSettings, *, retries: bool) -> Config:
@@ -167,7 +163,7 @@ def _build_config(settings: AWSSettings, *, retries: bool) -> Config:
 
 def _session_for(settings: AWSSettings, role_arn: str | None, session_name: str) -> boto3.Session:
     """Ambient-credential session, or one holding credentials assumed for ``role_arn``."""
-    ambient = boto3.Session(region_name=settings.aws_region)
+    ambient = boto3.Session()
     if not role_arn:
         return ambient
 
@@ -177,7 +173,6 @@ def _session_for(settings: AWSSettings, role_arn: str | None, session_name: str)
         aws_access_key_id=credentials["AccessKeyId"],
         aws_secret_access_key=credentials["SecretAccessKey"],
         aws_session_token=credentials["SessionToken"],
-        region_name=settings.aws_region,
     )
 
 

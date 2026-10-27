@@ -3,19 +3,21 @@
 Each expected botocore exception family is mapped onto the closed
 ``OperationStatus`` set using the code catalogues and the transient retry hint
 from ``integrations.aws.settings``; anything unexpected propagates unchanged.
-Catalogue and retry-hint overrides are applied through real environment
-variables plus a provider cache clear so the tests prove settings are read at
-classification time rather than bound at import.
+Catalogue and retry-hint overrides are installed as configuration files so
+the tests prove settings are read at classification time rather than bound at
+import.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import pytest
 from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
 
 from contracts.operations.status import OperationStatus
 from integrations.aws import client as aws_client
-from integrations.aws.settings import get_aws_settings
+from tests.unit.integrations.aws.conftest import install_aws_files
 
 pytestmark = pytest.mark.unit
 
@@ -88,21 +90,18 @@ class TestMappedFamilies:
 class TestSettingsDriven:
     """Catalogues and the retry hint come from the AWS settings module."""
 
-    def test_retry_hint_follows_the_configured_transient_retry_after(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AWS_TRANSIENT_RETRY_AFTER_SECONDS", "15")
-        get_aws_settings.cache_clear()
+    def test_retry_hint_follows_the_configured_transient_retry_after(self, tmp_path: Path) -> None:
+        install_aws_files(tmp_path, "[aws]\ntransient_retry_after_seconds = 15\n")
 
         assert aws_client.classify_aws_error(_client_error("Throttling")) == (OperationStatus.TRANSIENT_ERROR, "Throttling", 15)
 
-    def test_not_found_catalogue_override_maps_a_custom_code(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AWS_NOT_FOUND_CODES", '["CustomMissing"]')
-        get_aws_settings.cache_clear()
+    def test_not_found_catalogue_override_maps_a_custom_code(self, tmp_path: Path) -> None:
+        install_aws_files(tmp_path, "[aws]\nnot_found_codes = ['CustomMissing']\n")
 
         assert aws_client.classify_aws_error(_client_error("CustomMissing")) == (OperationStatus.NOT_FOUND, "CustomMissing", None)
 
-    def test_transient_catalogue_override_removes_default_codes(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setenv("AWS_TRANSIENT_CODES", '["OnlyThisOne"]')
-        get_aws_settings.cache_clear()
+    def test_transient_catalogue_override_removes_default_codes(self, tmp_path: Path) -> None:
+        install_aws_files(tmp_path, "[aws]\ntransient_codes = ['OnlyThisOne']\n")
 
         with pytest.raises(ClientError):
             aws_client.classify_aws_error(_client_error("Throttling"))

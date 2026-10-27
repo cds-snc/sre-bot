@@ -72,6 +72,21 @@ HINTS = {
     "GOOGLE_WORKSPACE_CUSTOMER_ID": "secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID",
     "GOOGLE_API_NUM_RETRIES": "[google_workspace] api_num_retries",
     "GOOGLE_API_TIMEOUT_SECONDS": "[google_workspace] api_timeout_seconds",
+    "AWS_AUDIT_ACCOUNT_ROLE_ARN": "secret AWS__TENANT__AUDIT_ROLE_ARN (development only; production leaves the audit role unset)",
+    "AWS_ORG_ACCOUNT_ROLE_ARN": "secret AWS__TENANT__ORG_ROLE_ARN",
+    "AWS_LOGGING_ACCOUNT_ROLE_ARN": "secret AWS__TENANT__LOGGING_ROLE_ARN (development only; production leaves the logging role unset)",
+    "AWS_SSO_INSTANCE_ID": "secret AWS__TENANT__INSTANCE_ID",
+    "AWS_SSO_INSTANCE_ARN": "secret AWS__TENANT__INSTANCE_ARN",
+    "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS": "secret ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS",
+    "AWS_SSO_VIEW_ONLY_PERMISSIONS": "secret ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS",
+    "AWS_RETRY_MAX_ATTEMPTS": "[aws] retry_max_attempts",
+    "AWS_RETRY_MODE": "[aws] retry_mode",
+    "AWS_CONNECT_TIMEOUT_SECONDS": "[aws] connect_timeout_seconds",
+    "AWS_READ_TIMEOUT_SECONDS": "[aws] read_timeout_seconds",
+    "AWS_TRANSIENT_RETRY_AFTER_SECONDS": "[aws] transient_retry_after_seconds",
+    "AWS_NOT_FOUND_CODES": "[aws] not_found_codes",
+    "AWS_UNAUTHORIZED_CODES": "[aws] unauthorized_codes",
+    "AWS_TRANSIENT_CODES": "[aws] transient_codes",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one

@@ -20,6 +20,7 @@ from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
+from integrations.aws.settings import get_aws_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from jobs.settings import SchedulerSettings, get_scheduler_settings
@@ -149,6 +150,7 @@ def _validate_slices(
     slack_transport = get_slack_transport_settings()
     validate_slack_transport(slack_transport, get_slack_settings())
     scheduler = get_scheduler_settings()
+    get_aws_settings()
     get_google_workspace_settings()
     get_notify_api_key_leak_settings()
     plugins = get_plugins_settings()

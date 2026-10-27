@@ -31,15 +31,15 @@ Destinations:
 | ACCESS_TOKEN_EXPIRE_MINUTES | ServerSettings (unused field) | delete | 111.7 |
 | APP_TOKEN | none | delete | 111.15 |
 | ATIP_ANNOUNCE_CHANNEL | AtipSettings (dead slice) | delete | 111.14 |
-| AWS_AUDIT_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] audit_role_arn | 111.11 |
-| AWS_LOGGING_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] logging_role_arn | 111.11 |
-| AWS_ORG_ACCOUNT_ROLE_ARN | AWSSettings | file [aws] org_role_arn | 111.11 |
+| AWS_AUDIT_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__AUDIT_ROLE_ARN (non-public value; development only: production sets no audit role, so it has no parameter); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
+| AWS_LOGGING_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__LOGGING_ROLE_ARN (non-public value; development only: production sets no logging role, so it has no parameter); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
+| AWS_ORG_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__ORG_ROLE_ARN (non-public value); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
 | AWS_SRE_ACCOUNT_ROLE_ARN | none | delete | 111.15 |
-| AWS_SSO_INSTANCE_ARN | AWSSettings | file [aws] instance_arn | 111.11 |
-| AWS_SSO_INSTANCE_ID | AWSSettings | file [aws] instance_id | 111.11 |
+| AWS_SSO_INSTANCE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__INSTANCE_ARN (non-public value: an internal tenant identifier only Identity Center administrators see); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
+| AWS_SSO_INSTANCE_ID | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__INSTANCE_ID (non-public value: the identity store id is also the default access-portal subdomain); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
 | AWS_SSO_ROLE_ARN | none | delete | 111.15 |
-| AWS_SSO_SYSTEM_ADMIN_PERMISSIONS | AWSSettings | file [aws] system_admin_permissions | 111.11 |
-| AWS_SSO_VIEW_ONLY_PERMISSIONS | AWSSettings | file [aws] view_only_permissions | 111.11 |
+| AWS_SSO_SYSTEM_ADMIN_PERMISSIONS | no longer read (TASK-111.11.1, 2026-10-26) | secret ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS (non-public value: the ARN embeds the instance id); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
+| AWS_SSO_VIEW_ONLY_PERMISSIONS | no longer read (TASK-111.11.1, 2026-10-26) | secret ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS (non-public value: the ARN embeds the instance id); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
 | COMMAND_PROVIDERS | none | delete | 111.15 |
 | ENVIRONMENT | AppSettings (identity) | platform (task definition already sets it) | 111.15 |
 | FRONTEND_URL | none | delete | 111.15 |
@@ -60,7 +60,7 @@ Destinations:
 | NOTIFY_TEST_KEY | none (one test reads it with a default) | delete | 111.15 |
 | OPSGENIE_INTEGRATIONS_KEY | OpsGenieSettings | secret OPSGENIE__INTEGRATIONS_KEY | 111.4, 111.12 |
 | OPSGENIE_KEY | none | delete | 111.15 |
-| SENTINEL_CUSTOMER_ID | SentinelSettings | file [sentinel] customer_id | 111.12 |
+| SENTINEL_CUSTOMER_ID | SentinelSettings | secret SENTINEL__CUSTOMER_ID (non-public value: the Log Analytics workspace id, a tenant identifier only Azure administrators see, paired with the shared key); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line | 111.12 |
 | SENTINEL_LOG_TYPE | SentinelSettings | file [sentinel] log_type | 111.12 |
 | SENTINEL_SHARED_KEY | SentinelSettings | secret SENTINEL__SHARED_KEY | 111.4, 111.12 |
 | SESSION_SECRET_KEY | ServerSettings (unused field) | delete | 111.7 |
@@ -72,7 +72,7 @@ Destinations:
 | SRE_BOT_EMAIL | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public value: the address of a domain-privileged account; parameter added in 111.10.1, read by GoogleWorkspaceSettings from 111.10.2); the blob line stays inert until 111.15 removes the blob | 111.10.1, 111.10.2 |
 | SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
 | TRELLO_APP_KEY | TrelloSettings | secret TRELLO__APP_KEY | 111.4, 111.12 |
-| TRELLO_ATIP_BOARD | TrelloSettings | file [trello] atip_board | 111.12 |
+| TRELLO_ATIP_BOARD | TrelloSettings | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line | 111.12 |
 | TRELLO_TOKEN | TrelloSettings | secret TRELLO__TOKEN | 111.4, 111.12 |
 
 ## sre-bot-config-infrastructure

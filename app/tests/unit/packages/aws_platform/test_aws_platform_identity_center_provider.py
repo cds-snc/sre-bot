@@ -2,7 +2,7 @@
 
 The provider is monkeypatched to record get_aws_client calls and verify routing:
 two calls to get_aws_client('identitystore', ...), the second with retries=False.
-Environment variables AWS_SSO_INSTANCE_ID and AWS_ORG_ACCOUNT_ROLE_ARN are set
+The tenant entry (instance_id, org_role_arn) is set
 and get_aws_settings cache is cleared before and after. The adapter receives
 two Stubbers: create_user and create_group_membership use the no-retry client,
 get_user_id uses the standard-retry client. Both clients assert no pending
@@ -19,6 +19,7 @@ from botocore.stub import Stubber
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.identity_center import build_identity_center_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -45,8 +46,8 @@ class TestBuildIdentityCenterAdapter:
 
     def test_two_get_aws_client_calls_standard_and_no_retry(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """build_identity_center_adapter calls get_aws_client twice: standard and no-retry."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         get_aws_client_calls: list[dict[str, Any]] = []
 
@@ -86,8 +87,8 @@ class TestBuildIdentityCenterAdapter:
 
     def test_role_arn_from_service_role_map(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Role ARN is read from service_role_map['identitystore']."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         get_aws_client_calls: list[dict[str, Any]] = []
 
@@ -112,9 +113,9 @@ class TestBuildIdentityCenterAdapter:
         assert get_aws_client_calls[1]["role_arn"] == "arn:aws:iam::123456789012:role/org-role"
 
     def test_role_arn_none_when_setting_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Role ARN is None when AWS_ORG_ACCOUNT_ROLE_ARN is empty."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "")
+        """Role ARN is None when org_role_arn is empty."""
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="")
 
         get_aws_client_calls: list[dict[str, Any]] = []
 
@@ -139,14 +140,14 @@ class TestBuildIdentityCenterAdapter:
         assert get_aws_client_calls[1]["role_arn"] is None
 
     def test_identity_store_id_from_aws_sso_instance_id(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """IdentityStoreId sent on the wire comes from AWS_SSO_INSTANCE_ID.
+        """IdentityStoreId sent on the wire comes from the tenant's instance_id.
 
         Stub strategy: the built adapter issues one GetUserId whose expected
         params pin the IdentityStoreId, so the assertion is on the request the
         SDK would send rather than on adapter internals.
         """
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-9876543210")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-9876543210")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         client = _identitystore_client()
 
@@ -190,8 +191,8 @@ class TestBuildIdentityCenterAdapter:
 
     def test_create_user_uses_no_retry_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CreateUser is sent through the no-retry client."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         std_client = _identitystore_client()
         no_retry_client = _identitystore_client()
@@ -239,8 +240,8 @@ class TestBuildIdentityCenterAdapter:
 
     def test_get_user_id_uses_standard_retry_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """GetUserId is sent through the standard-retry client."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         std_client = _identitystore_client()
         no_retry_client = _identitystore_client()
@@ -289,8 +290,8 @@ class TestBuildIdentityCenterAdapter:
 
     def test_create_group_membership_uses_no_retry_client(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """CreateGroupMembership is sent through the no-retry client."""
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ID", "d-1234567890")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_id="d-1234567890")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
 
         std_client = _identitystore_client()
         no_retry_client = _identitystore_client()

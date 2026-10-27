@@ -92,7 +92,7 @@ class AwsIdentityCenterAdapter:
         identitystore: Typed boto3 IdentityStore client (injected — never
             constructed here). Use ``build_aws_identity_center_adapter()`` to
             wire the production instance.
-        identity_store_id: AWS SSO Identity Store ID (``AWS_SSO_INSTANCE_ID``),
+        identity_store_id: AWS SSO Identity Store ID (``AWS__TENANT__INSTANCE_ID``),
             passed as ``IdentityStoreId`` on every call.
     """
 
@@ -1224,4 +1224,4 @@ def build_aws_identity_center_adapter() -> AwsIdentityCenterAdapter:
     settings = get_aws_settings()
     role_arn = settings.service_role_map.get("identitystore") or None
     client = get_aws_client("identitystore", role_arn=role_arn)
-    return AwsIdentityCenterAdapter(client, settings.instance_id)
+    return AwsIdentityCenterAdapter(client, settings.identity_store_id)
