@@ -17,14 +17,17 @@
 #           they replace (MATCH, DIFFER or MISSING, never printed), the instance id and ARN checked against the
 #           documented formats, any tuning line, the AWS_ names in the task definition;
 #           post: no region, endpoint, credential or role error, DynamoDB-backed events present (TASK-111.11.1)
+#   openai  pre: OPENAI__API_KEY compared by hash with the OPENAI_API_KEY blob line (MATCH, DIFFER or MISSING, never
+#           printed), any OPENAI_* tuning line;
+#           post: no configuration or text-generation-unconfigured line, no 401/403 from the endpoint (TASK-111.11.2)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(google aws)
-PRE_CHECKS=(google aws)  # task checks with a pre part
+TASK_CHECKS=(google aws openai)
+PRE_CHECKS=(google aws openai)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -174,6 +177,25 @@ if [[ $phase == pre ]]; then
     print "task definition SDK names AWS_* (the slice names AWS__* excluded; expected none: ECS injects the region; if post shows NoRegionError, add AWS_DEFAULT_REGION to the task definition first): ${td_aws:-none}"
     [[ $aws_ok == yes ]] && result aws_pre PASS || result aws_pre "FAIL (a DIFFER or MISSING parameter, a format NO or a tuning line blocks the merge: put-parameter the right value first)"
   fi
+
+  if (( ${checks[(Ie)openai]} )); then  # TASK-111.11.2
+    section "OpenAI key parameter against the blob line it replaces (TASK-111.11.2; value never printed)"
+    line_hash() { local v; v=$(blob_value $1) && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
+    key_new=$(param_hash /sre-bot/OPENAI__API_KEY)
+    key_old=$(line_hash OPENAI_API_KEY)
+    if [[ $key_new == missing ]]; then key_line="MISSING (no such parameter)"
+    elif [[ $key_old == missing ]]; then key_line="MISSING (no such blob line)"
+    else key_line=$(same_hash $key_new $key_old); fi
+    print "OPENAI__API_KEY vs the OPENAI_API_KEY line: $key_line"
+    openai_ok=yes
+    [[ $key_line == MATCH ]] || openai_ok=no
+    for name in OPENAI_MODEL OPENAI_BASE_URL OPENAI_MAX_OUTPUT_TOKENS OPENAI_TEMPERATURE OPENAI_TIMEOUT_SECONDS; do
+      where=$(blob_where $name)
+      print "$name in (expected none; a present line needs its [openai] or [openai.tenant] key in production.toml first): $where"
+      [[ $where == none ]] || openai_ok=no
+    done
+    [[ $openai_ok == yes ]] && result openai_pre PASS || result openai_pre "FAIL (a DIFFER or MISSING key or a tuning line blocks the merge: put-parameter the right value first)"
+  fi
 fi
 
 if [[ $phase == post ]]; then
@@ -261,6 +283,20 @@ if [[ $phase == post ]]; then
       print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
     done
     [[ $bad == 0 && $invalid == 0 && $dynamo -gt 0 ]] && result aws PASS || result aws "FAIL ($bad error lines, $invalid configuration_invalid, $dynamo DynamoDB-backed events)"
+  fi
+
+  if (( ${checks[(Ie)openai]} )); then  # TASK-111.11.2
+    section "OpenAI from [openai.tenant] and OPENAI__API_KEY (TASK-111.11.2)"
+    invalid=$(li_count $since 'filter event = "configuration_invalid" and @message like /openai/')
+    print "configuration_invalid lines naming openai: $invalid (expected 0)"
+    unconfigured=$(li_count $since 'filter event = "incident_status_update_text_generation_unconfigured"')
+    print "text generation unconfigured lines: $unconfigured (expected 0)"
+    denied=$(li_count $since 'filter event = "openai_summarize_failed" and @message like /401|403/')
+    li $since 'filter event = "openai_summarize_failed" | fields @timestamp, event, @message | limit 5' | mask
+    print "openai_summarize_failed lines with 401 or 403: $denied (expected 0)"
+    print "openai_summarize_usage lines (informational; rises after the manual check): $(li_count $since 'filter event = "openai_summarize_usage"')"
+    print "OPENAI_API_KEY in (unread, inert until the blobs go in TASK-111.15): $(blob_where OPENAI_API_KEY)"
+    [[ $invalid == 0 && $unconfigured == 0 && $denied == 0 ]] && result openai PASS || result openai "FAIL ($invalid configuration_invalid, $unconfigured unconfigured, $denied 401/403 lines)"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

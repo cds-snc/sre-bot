@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-10-27T18:11:00Z'
 labels:
   - incident
   - features
@@ -62,7 +62,7 @@ RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 - [ ] #6 The legacy readers (app/models/incidents.py Incident and its callers) keep working on new items until TASK-145.8, by the option chosen at planning (dual-write with extra="ignore", or the same release as TASK-145.8), and the source_alert shape is recorded in the plan
 - [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from format_stored_time in core/adapters/incident_items.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, the declare path is not registered and one startup event names the key, while every other incident command still works (tested)
+- [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, boot fails with one CRITICAL plugin_boot_failed event naming the key (declare is the feature's core path, so an enabled incident feature requires it: decisions/plugins.md, TASK-172) (tested)
 - [ ] #10 The incident handbook id moves from the interim [google_resources] table into the incident response slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
 <!-- AC:END -->
 

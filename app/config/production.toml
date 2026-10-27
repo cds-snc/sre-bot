@@ -19,6 +19,11 @@ sre_test_channel_id = "C033L7RGCT0"
 channel_id = "CNWA63606"
 oncall_group_id = "S0BNW0G8CFK"
 
+[openai.tenant]
+# The model gateway production drafts with; its key is the task-definition secret OPENAI__API_KEY.
+base_url = "https://ai.cdssandbox.xyz"
+model = "gpt-5.6-luna"
+
 [[security.issuers]]
 issuer = "https://backstage.cdssandbox.xyz/api/auth"
 jwks_uri = "https://backstage.cdssandbox.xyz/api/auth/.well-known/jwks.json"

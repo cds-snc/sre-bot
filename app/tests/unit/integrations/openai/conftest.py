@@ -1,43 +1,55 @@
 """Isolation fixtures for OpenAI integration unit tests.
 
-Clears cached settings and OPENAI_* environment variables between tests so
-that each test observes a clean configuration surface.
+``_openai_env_isolation`` (autouse) removes every OPENAI_* and OPENAI__* variable, disables the
+.env file and clears the cached provider, so a test observes only the files it installs and the
+variables it sets. ``install_openai_files`` writes a base and a local file into tmp_path and
+installs them.
 """
-
-from __future__ import annotations
 
 import os
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
-from integrations.openai.settings import OpenAISettings, get_openai_settings
+from contracts.configuration import install_configuration_files
+from integrations.openai.settings import OpenAISettings, OpenAITenant, get_openai_settings
+from server.configuration.loader import TomlConfigurationFiles
 
-
-def _clear_openai_caches() -> None:
-    """Reset the cached settings singleton."""
-    get_openai_settings.cache_clear()
-
-
-def _clear_openai_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove every OPENAI_* variable so tests cannot read host values."""
-    for key in tuple(os.environ):
-        if key.startswith("OPENAI_"):
-            monkeypatch.delenv(key, raising=False)
+RETIRED_NAMES = (
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "OPENAI_MAX_OUTPUT_TOKENS",
+    "OPENAI_TEMPERATURE",
+    "OPENAI_TIMEOUT_SECONDS",
+    "OPENAI_BASE_URL",
+)
+BASE_URL = "https://models.example.test"
+MODEL = "test-model"
 
 
 @pytest.fixture(autouse=True)
 def _openai_env_isolation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Apply env + cache isolation for every OpenAI unit test."""
     monkeypatch.setitem(OpenAISettings.model_config, "env_file", None)
-    _clear_openai_env(monkeypatch)
-    _clear_openai_caches()
+    for key in tuple(os.environ):
+        if key.startswith("OPENAI_"):
+            monkeypatch.delenv(key, raising=False)
+    get_openai_settings.cache_clear()
     yield
-    _clear_openai_caches()
+    get_openai_settings.cache_clear()
+
+
+def install_openai_files(tmp_path: Path, base: str = "[openai]\n", environment: str = "") -> None:
+    (tmp_path / "base.toml").write_text(base, encoding="utf-8")
+    (tmp_path / "local.toml").write_text(environment, encoding="utf-8")
+    install_configuration_files(
+        TomlConfigurationFiles(environment="local", paths=(tmp_path / "base.toml", tmp_path / "local.toml"))
+    )
 
 
 @pytest.fixture
-def openai_settings(monkeypatch: pytest.MonkeyPatch) -> OpenAISettings:
-    """A valid ``OpenAISettings`` instance with a dummy API key."""
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-key")
-    return OpenAISettings()
+def openai_settings(tmp_path: Path) -> OpenAISettings:
+    """A configured ``OpenAISettings``: a tenant entry and a dummy API key."""
+    install_openai_files(tmp_path)
+    return OpenAISettings(tenant=OpenAITenant(base_url=BASE_URL, model=MODEL), api_key="sk-test-key")

@@ -119,6 +119,14 @@ transient_codes = [
 system_admin_permissions = ""
 view_only_permissions = ""
 
+[openai]
+# The completion budget, temperature (negative omits it) and request timeout. The model endpoint is
+# the [openai.tenant] entry (base_url, model), named in the deployment's environment file; with no
+# entry OpenAI is not configured. The key is a secret from OPENAI__API_KEY.
+max_output_tokens = 3000
+temperature = -1.0
+timeout_seconds = 180.0
+
 [scheduler]
 # Each deployment that runs the scheduled jobs switches them on in its own file;
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.

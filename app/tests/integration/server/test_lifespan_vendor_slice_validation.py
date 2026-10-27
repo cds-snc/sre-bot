@@ -23,6 +23,7 @@ from structlog.testing import capture_logs
 from contracts.configuration import ConfigurationError
 from integrations.aws.settings import AWSSettings, get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
+from integrations.openai.settings import OpenAISettings, get_openai_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from server.configuration import host_configuration
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
@@ -38,6 +39,8 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     monkeypatch.setitem(SlackSettings.model_config, "env_file", None)
     monkeypatch.setitem(GoogleWorkspaceSettings.model_config, "env_file", None)
     monkeypatch.setitem(AWSSettings.model_config, "env_file", None)
+    monkeypatch.setitem(OpenAISettings.model_config, "env_file", None)
+    monkeypatch.setenv("OPENAI__API_KEY", "")
     monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
     monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
@@ -49,11 +52,13 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
+    get_openai_settings.cache_clear()
     yield
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
+    get_openai_settings.cache_clear()
 
 
 def _stub_later_phases(stack: ExitStack) -> AsyncMock:
@@ -181,4 +186,36 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
     assert get_slack_settings().tenant is None
     assert get_google_workspace_settings().tenant is None
     assert get_aws_settings().tenant is None
+    assert get_openai_settings().tenant is None
     assert connects == []
+
+
+def _with_ci_file_lines(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lines: str) -> None:
+    shutil.copytree(CONFIG_DIR, tmp_path / "config")
+    with (tmp_path / "config" / "ci.toml").open("a", encoding="utf-8") as ci_file:
+        ci_file.write(lines)
+    monkeypatch.setattr(
+        host_configuration,
+        "load_configuration_files",
+        lambda environment, directory=None: load_configuration_files(environment, tmp_path / "config"),
+    )
+
+
+async def test_openai_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _with_ci_file_lines(monkeypatch, tmp_path, "\n[openai]\ntimeout_second = 30\n")
+
+    await _boot_fails_naming("timeout_second")
+
+
+async def test_openai_tenant_without_the_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    _with_ci_file_lines(monkeypatch, tmp_path, '\n[openai.tenant]\nbase_url = "https://models.example.test"\nmodel = "m"\n')
+
+    await _boot_fails_naming("OPENAI__API_KEY")
+
+
+async def test_openai_key_without_the_tenant_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI__API_KEY", "sk-boot-0001")
+
+    rendered = await _boot_fails_naming("OPENAI__API_KEY")
+
+    assert "sk-boot-0001" not in rendered

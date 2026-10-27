@@ -8,13 +8,12 @@ returns ``OperationResult``. Unmapped exceptions propagate -- they are bugs,
 not outcomes.
 """
 
-from __future__ import annotations
-
 from functools import lru_cache
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
 
+from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from integrations.openai.client import build_openai_client, classify_openai_error
 from integrations.openai.settings import OpenAISettings, get_openai_settings
@@ -68,6 +67,9 @@ class OpenAISummarizer:
                 (e.g. structured multi-section drafts) raise it; ``None`` uses
                 the configured ``max_output_tokens``.
         """
+        if self._settings.tenant is None:
+            # OpenAI is not configured: answer without building a client or reaching any endpoint.
+            return OperationResult.permanent_error(message="OpenAI is not configured", error_code=ErrorCode.CONFIG_NOT_CONFIGURED)
         payload: dict[str, Any] = {
             "model": self._settings.model,
             "max_completion_tokens": max_output_tokens or self._settings.max_output_tokens,
