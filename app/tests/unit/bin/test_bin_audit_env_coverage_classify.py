@@ -149,3 +149,29 @@ def test_a_parameter_not_created_yet_also_says_whether_its_source_line_exists() 
     _, reason = _rows({"SLACK__BOT_TOKEN", "TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"]
     assert "tf_apply pending" in reason
     assert "no TRELLO_ATIP_BOARD line" in reason
+
+
+def test_a_development_only_name_production_sets_is_a_check() -> None:
+    """doc-14 calling a value development only while a production blob line sets it would drop it in production."""
+    entries = [
+        ("ssm-param", "SLACK__BOT_TOKEN", "set"),
+        ("ssm-blob sre-bot-config", "AWS_AUDIT_ACCOUNT_ROLE_ARN", "set"),
+        (CODESPACES, "AWS__TENANT__AUDIT_ROLE_ARN", "present"),
+    ]
+
+    action, reason = _rows({"SLACK__BOT_TOKEN"}, entries)["AWS__TENANT__AUDIT_ROLE_ARN"]
+    assert action == "check"
+    assert "production sets AWS_AUDIT_ACCOUNT_ROLE_ARN" in reason
+
+
+def test_the_env_example_is_judged_only_for_names_the_app_reads() -> None:
+    """A parameter staged ahead of its slice needs no example line yet; one the app reads does."""
+    entries = [("ssm-param", "TRELLO__TOKEN", "set"), ("ssm-param", "SLACK__BOT_TOKEN", "set"), (EXAMPLE, "OTHER", "set")]
+
+    rows = {
+        name: verdict
+        for name, _, verdict in coverage_rows(DOC14, {"TRELLO__TOKEN", "SLACK__BOT_TOKEN"}, entries, read={"SLACK__BOT_TOKEN"})
+    }
+
+    assert "app/.env.example" not in rows["TRELLO__TOKEN"].reason
+    assert "app/.env.example" in rows["SLACK__BOT_TOKEN"].reason
