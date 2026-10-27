@@ -38,6 +38,8 @@ locals {
     "SLACK__USER_TOKEN",
     "TRELLO__APP_KEY",
     "TRELLO__ATIP_BOARD",
+    "TRELLO__TENANT__APP_KEY",
+    "TRELLO__TENANT__TOKEN",
     "TRELLO__TOKEN",
   ])
 }

@@ -71,9 +71,11 @@ Destinations:
 | SLACK_TOKEN | none | delete | 111.15 |
 | SRE_BOT_EMAIL | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public value: the address of a domain-privileged account; parameter added in 111.10.1, read by GoogleWorkspaceSettings from 111.10.2); the blob line stays inert until 111.15 removes the blob | 111.10.1, 111.10.2 |
 | SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
-| TRELLO_APP_KEY | TrelloSettings | secret TRELLO__APP_KEY | 111.4, 111.12 |
+| TRELLO_APP_KEY | TrelloSettings | secret TRELLO__TENANT__APP_KEY (the credentials are Trello's tenant entry: the SDK fixes the host, so nothing else identifies the tenant, decisions/configuration.md 2026-10-27); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line | 111.12 |
 | TRELLO_ATIP_BOARD | TrelloSettings | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line | 111.12 |
-| TRELLO_TOKEN | TrelloSettings | secret TRELLO__TOKEN | 111.4, 111.12 |
+| TRELLO_TOKEN | TrelloSettings | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line | 111.12 |
+| TRELLO__APP_KEY | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__APP_KEY) | secret TRELLO__APP_KEY until the task definition drops it | 111.15.1 |
+| TRELLO__TOKEN | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__TOKEN) | secret TRELLO__TOKEN until the task definition drops it | 111.15.1 |
 
 ## sre-bot-config-infrastructure
 
