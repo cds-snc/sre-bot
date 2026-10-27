@@ -17,6 +17,11 @@ resource "aws_ssm_parameter" "gcp_sre_service_account_key" {
 # value_wo_version: that writes the placeholder over the real value.
 locals {
   sre_bot_secret_names = toset([
+    "ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS",
+    "ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS",
+    "AWS__TENANT__INSTANCE_ARN",
+    "AWS__TENANT__INSTANCE_ID",
+    "AWS__TENANT__ORG_ROLE_ARN",
     "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID",
     "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL",
     "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY",
@@ -24,11 +29,13 @@ locals {
     "NOTIFY__SRE_USER_NAME",
     "OPENAI__API_KEY",
     "OPSGENIE__INTEGRATIONS_KEY",
+    "SENTINEL__CUSTOMER_ID",
     "SENTINEL__SHARED_KEY",
     "SLACK__APP_TOKEN",
     "SLACK__BOT_TOKEN",
     "SLACK__USER_TOKEN",
     "TRELLO__APP_KEY",
+    "TRELLO__ATIP_BOARD",
     "TRELLO__TOKEN",
   ])
 }
