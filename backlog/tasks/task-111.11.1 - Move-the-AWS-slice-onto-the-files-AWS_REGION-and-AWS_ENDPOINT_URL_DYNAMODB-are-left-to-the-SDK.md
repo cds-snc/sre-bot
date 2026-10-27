@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-26T22:21:00Z'
-updated_date: '2026-10-27T00:01:00Z'
+updated_date: '2026-10-27T13:36:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -154,6 +154,8 @@ Gates (app/): ruff check: All checks passed!; mypy: Found 47 errors in 18 files 
 Human steps: after the terraform expand PR applies, put-parameter /sre-bot/AWS__TENANT__INSTANCE_ID from the AWS_SSO_INSTANCE_ID blob line, INSTANCE_ARN from AWS_SSO_INSTANCE_ARN, ORG_ROLE_ARN from AWS_ORG_ACCOUNT_ROLE_ARN, ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS from AWS_SSO_SYSTEM_ADMIN_PERMISSIONS, ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS from AWS_SSO_VIEW_ONLY_PERMISSIONS; run zsh bin/deploy-checks.zsh pre aws (all MATCH, formats OK); Codespaces secrets under the new names (AWS__TENANT__INSTANCE_ID, INSTANCE_ARN, AUDIT_ROLE_ARN, ORG_ROLE_ARN, LOGGING_ROLE_ARN, ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS, VIEW_ONLY_PERMISSIONS; audit and logging are development only); edit app/.env.example; rebuild the devcontainer; then post aws.
 
 2026-10-27 AC #3, #6 and #8 reworded for the environment-only tenant entry (human approval); #1, #2, #4 to #7 re-checked on the reworked tree (gates re-run 2026-10-26: 5860 passed, mypy 47 = baseline, contracts 13 kept, key ownership OK); #3 and #8 wait on pre aws after the ssm-aws-tenant-parameters expand PR applies and the five values are put.
+
+2026-10-27 pre aws run 13:28Z: all five MATCH, both formats OK, but it showed AWS_AUDIT_ACCOUNT_ROLE_ARN and AWS_LOGGING_ACCOUNT_ROLE_ARN set in sre-bot-config, and the check passed anyway. The plan had assumed production sets only the org role (a misreading of doc-14's AC6 facts); shipping on that assumption would drop the audit and logging roles in production, against AC #8. Fixed: pre aws compares all seven parameters, the two roles included, and fails on a MISSING one; doc-14 rows and the audit HINTS corrected. The parameters come from a second terraform-only PR (ssm.tf +2) before this one merges, which also carries an env-checks coverage rule (a development-only doc-14 value whose blob line is set is a check) and limits the .env.example check to names the app reads. ECS sets AWS_DEFAULT_REGION on Fargate tasks (AWS docs), so the region needs no task-definition change. Gates on the working tree: ruff clean, mypy 47 = baseline, contracts 13 kept, key ownership OK, pytest 5875 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

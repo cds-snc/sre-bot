@@ -101,7 +101,7 @@ def test_aws_settings_tenant_fills_the_role_map(tmp_path: Path, monkeypatch: pyt
 
 
 def test_aws_settings_org_role_only_maps_the_org_services(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """With only the org role named, as in production, only the org-role services get an entry."""
+    """With only the org role named, only the org-role services get an entry."""
     install_aws_files(tmp_path)
     set_aws_tenant(monkeypatch, instance_id=INSTANCE_ID, instance_arn=INSTANCE_ARN, org_role_arn=ORG)
 

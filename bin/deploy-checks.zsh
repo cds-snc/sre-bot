@@ -151,6 +151,7 @@ if [[ $phase == pre ]]; then
     }
     aws_ok=yes
     for pair in AWS__TENANT__INSTANCE_ID:AWS_SSO_INSTANCE_ID AWS__TENANT__INSTANCE_ARN:AWS_SSO_INSTANCE_ARN AWS__TENANT__ORG_ROLE_ARN:AWS_ORG_ACCOUNT_ROLE_ARN \
+        AWS__TENANT__AUDIT_ROLE_ARN:AWS_AUDIT_ACCOUNT_ROLE_ARN AWS__TENANT__LOGGING_ROLE_ARN:AWS_LOGGING_ACCOUNT_ROLE_ARN \
         ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS:AWS_SSO_SYSTEM_ADMIN_PERMISSIONS ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS:AWS_SSO_VIEW_ONLY_PERMISSIONS; do
       line=$(compare ${pair%%:*} ${pair##*:}); print -r -- $line
       [[ $line == *MATCH ]] || aws_ok=no
@@ -163,9 +164,6 @@ if [[ $phase == pre ]]; then
     instance_arn=$(blob_value AWS_SSO_INSTANCE_ARN) || instance_arn=
     if [[ $instance_id =~ $id_pattern ]]; then print "AWS_SSO_INSTANCE_ID format: OK"; else print "AWS_SSO_INSTANCE_ID format: NO"; aws_ok=no; fi
     if [[ $instance_arn =~ $arn_pattern ]]; then print "AWS_SSO_INSTANCE_ARN format: OK"; else print "AWS_SSO_INSTANCE_ARN format: NO"; aws_ok=no; fi
-    for name in AWS_AUDIT_ACCOUNT_ROLE_ARN AWS_LOGGING_ACCOUNT_ROLE_ARN; do
-      print "$name set in (expected none: development only, a Codespaces secret under AWS__TENANT__*): $(blob_where $name)"
-    done
     for name in AWS_RETRY_MAX_ATTEMPTS AWS_RETRY_MODE AWS_CONNECT_TIMEOUT_SECONDS AWS_READ_TIMEOUT_SECONDS AWS_TRANSIENT_RETRY_AFTER_SECONDS AWS_NOT_FOUND_CODES AWS_UNAUTHORIZED_CODES AWS_TRANSIENT_CODES; do
       where=$(blob_where $name)
       print "$name in (expected none; a present line needs an [aws] key in production.toml first): $where"
