@@ -670,3 +670,37 @@ def test_should_return_failed_when_list_account_assignments_fails(
         error="Not authorized to list assignments",
     )
     sso_admin_adapter.create_account_assignment.assert_not_called()
+
+
+@pytest.mark.unit
+@patch("modules.aws.ops_group_assignment.get_access_permission_sets_settings")
+@patch("modules.aws.ops_group_assignment.get_aws_feature_settings")
+@patch("modules.aws.ops_group_assignment.build_identity_center_adapter")
+@patch("modules.aws.ops_group_assignment.build_organizations_adapter")
+@patch("modules.aws.ops_group_assignment.build_sso_admin_adapter")
+def test_should_build_the_sso_admin_adapter_with_the_access_permission_sets(
+    mock_build_sso_admin_adapter,
+    mock_build_organizations_adapter,
+    mock_build_adapter,
+    mock_get_aws_feature_settings,
+    mock_get_access_permission_sets_settings,
+):
+    """The SSO Admin adapter is built with the permission sets the access slice names.
+
+    Stub strategy: the access permission-set provider returns two sentinel values and
+    the adapter factory is patched. Asserts the factory receives exactly those values
+    as keyword parameters, so the AWS platform package never reads access policy itself.
+    """
+    # Arrange
+    mock_get_aws_feature_settings.return_value = _feature_settings()
+    mock_build_adapter.return_value.get_group_id.return_value = _group_found()
+    mock_get_access_permission_sets_settings.return_value = MagicMock(
+        system_admin_permissions="arn:admin", view_only_permissions="arn:view"
+    )
+    _arrange_accounts(mock_build_organizations_adapter, mock_build_sso_admin_adapter, accounts=[])
+
+    # Act
+    ops_group_assignment.execute()
+
+    # Assert
+    mock_build_sso_admin_adapter.assert_called_once_with(system_admin_permissions="arn:admin", view_only_permissions="arn:view")

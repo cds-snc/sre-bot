@@ -28,6 +28,7 @@ services:
       AWS_SECRET_ACCESS_KEY: 'AWSSECRETACCESSKEY'
       SHELL: /bin/zsh
       ENVIRONMENT: 'local'
+      AWS_DEFAULT_REGION: 'ca-central-1'
       AWS_ENDPOINT_URL_DYNAMODB: 'http://dynamodb-local:8000'
 
 volumes:

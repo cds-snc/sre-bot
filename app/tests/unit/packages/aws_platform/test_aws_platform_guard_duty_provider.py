@@ -2,7 +2,7 @@
 
 get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 guardduty client with dummy static credentials. The logging
-role comes from AWS_LOGGING_ACCOUNT_ROLE_ARN and the settings cache is cleared
+role comes from the tenant's logging_role_arn and the settings cache is cleared
 around each test, so the assertions pin the service name and the role ARN the
 factory reads from service_role_map.
 """
@@ -16,6 +16,7 @@ import pytest
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.guard_duty import GuardDutyAdapter, build_guard_duty_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -54,7 +55,7 @@ class TestBuildGuardDutyAdapter:
 
     def test_single_guard_duty_client_with_logging_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """One get_aws_client('guardduty') call carries service_role_map['guardduty']."""
-        monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/logging-role")
+        set_aws_tenant(monkeypatch, logging_role_arn="arn:aws:iam::123456789012:role/logging-role")
         calls: list[dict[str, Any]] = []
 
         adapter = self._build_recording(calls)
@@ -65,8 +66,8 @@ class TestBuildGuardDutyAdapter:
         assert calls[0]["role_arn"] == "arn:aws:iam::123456789012:role/logging-role"
 
     def test_role_arn_none_when_setting_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An empty AWS_LOGGING_ACCOUNT_ROLE_ARN is passed as role_arn=None, not an empty string."""
-        monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "")
+        """An empty logging_role_arn is passed as role_arn=None, not an empty string."""
+        set_aws_tenant(monkeypatch, logging_role_arn="")
         calls: list[dict[str, Any]] = []
 
         self._build_recording(calls)

@@ -9,9 +9,11 @@ connection. An invalid vendor slice must stop startup with a ConfigurationError 
 key, before the lifespan yields and before core services are built.
 """
 
+import shutil
 import socket
 from collections.abc import Iterator
 from contextlib import ExitStack
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,8 +21,11 @@ from fastapi import FastAPI
 from structlog.testing import capture_logs
 
 from contracts.configuration import ConfigurationError
+from integrations.aws.settings import AWSSettings, get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
+from server.configuration import host_configuration
+from server.configuration.loader import CONFIG_DIR, load_configuration_files
 from server.slack.settings import get_slack_transport_settings
 from tests.factories.lifespan import lifespan
 
@@ -32,6 +37,7 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     """Build the vendor slices from the environment only, fresh for each test."""
     monkeypatch.setitem(SlackSettings.model_config, "env_file", None)
     monkeypatch.setitem(GoogleWorkspaceSettings.model_config, "env_file", None)
+    monkeypatch.setitem(AWSSettings.model_config, "env_file", None)
     monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
     monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
@@ -42,10 +48,12 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
+    get_aws_settings.cache_clear()
     yield
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
+    get_aws_settings.cache_clear()
 
 
 def _stub_later_phases(stack: ExitStack) -> AsyncMock:
@@ -125,6 +133,34 @@ async def test_google_delegated_user_without_the_tenant_fails_boot_naming_the_ke
     assert "delegated-boot-0001@example.com" not in rendered
 
 
+async def test_aws_tenant_off_the_instance_id_format_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ID", "not-an-identity-store-id")
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ARN", "arn:aws:sso:::instance/ssoins-1234567890abcdef")
+
+    await _boot_fails_naming("instance_id")
+
+
+async def test_aws_tenant_unknown_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ID", "d-1234567890")
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ARN", "arn:aws:sso:::instance/ssoins-1234567890abcdef")
+    monkeypatch.setenv("AWS__TENANT__ORG_ROLE", "arn:aws:iam::123456789012:role/org-role")
+
+    await _boot_fails_naming("org_role")
+
+
+async def test_aws_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    shutil.copytree(CONFIG_DIR, tmp_path / "config")
+    with (tmp_path / "config" / "ci.toml").open("a", encoding="utf-8") as ci_file:
+        ci_file.write("\n[aws]\nretry_max_attemps = 3\n")
+    monkeypatch.setattr(
+        host_configuration,
+        "load_configuration_files",
+        lambda environment, directory=None: load_configuration_files(environment, tmp_path / "config"),
+    )
+
+    await _boot_fails_naming("retry_max_attemps")
+
+
 async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: pytest.MonkeyPatch) -> None:
     connects: list[object] = []
     real_connect = socket.socket.connect
@@ -144,4 +180,5 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
     assert reached_yield is True
     assert get_slack_settings().tenant is None
     assert get_google_workspace_settings().tenant is None
+    assert get_aws_settings().tenant is None
     assert connects == []

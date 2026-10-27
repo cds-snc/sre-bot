@@ -12,13 +12,16 @@ as task-definition secrets) beside a tenant entry, and the retired SLACK_<FIELD>
 names are pinned as unread. The Google Workspace slice follows the same rule: its
 key and delegated user are pinned under GOOGLE_WORKSPACE__TENANT__<FIELD> (production
 sets both as task-definition secrets) beside a tenant entry, and the retired flat names
-are pinned as unread; production still sets GOOGLE_RESOURCES. The AWS, OpenAI, Notify, Trello, OpsGenie,
-MaxMind and Sentinel slices likewise: production sets the AWS_*_ACCOUNT_ROLE_ARN
-names (only AWS_ORG_ACCOUNT_ROLE_ARN with a value), the AWS_SSO_* names,
+are pinned as unread; production still sets GOOGLE_RESOURCES. The AWS slice reads the [aws] table and its tenant entry from AWS__TENANT__<FIELD>
+(production sets INSTANCE_ID, INSTANCE_ARN and ORG_ROLE_ARN as task-definition secrets),
+and the access slice the [access_permission_sets] table with its two values from
+ACCESS_PERMISSION_SETS__<FIELD>: non-public values, so no file names them; the fifteen
+retired AWS_* names are pinned as unread; the region and the dynamodb-local endpoint are the SDK's
+(AWS_DEFAULT_REGION, AWS_ENDPOINT_URL_DYNAMODB), declared by no field. The OpenAI,
+Notify, Trello, OpsGenie, MaxMind and Sentinel slices likewise: production sets
 OPENAI_API_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
 the TRELLO_* names, OPSGENIE_INTEGRATIONS_KEY and the SENTINEL_* names, some of
-them written 'NAME =value' in the .env file; AWS_REGION is injected by the
-platform, and the remaining names stay part of the interface. The identity,
+them written 'NAME =value' in the .env file; the remaining names stay part of the interface. The identity,
 server, dev and Slack transport slices too: production sets ENVIRONMENT,
 BACKEND_URL and SLACK__COMMAND_PREFIX (task definition), GIT_SHA (image),
 NOTIFY_OPS_CHANNEL_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY
@@ -50,6 +53,7 @@ from integrations.opsgenie.settings import OpsGenieSettings
 from integrations.sentinel.settings import SentinelSettings
 from integrations.slack.settings import SlackSettings
 from integrations.trello.settings import TrelloSettings
+from packages.access.common.settings import AccessPermissionSetsSettings
 from server.configuration import IdentitySettings
 
 PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
@@ -82,53 +86,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         '{"inc":{"d":"sentinel-drive"}}',
         {"inc": {"d": "sentinel-drive"}},
     ),
-    (
-        AWSSettings,
-        "AWS_AUDIT_ACCOUNT_ROLE_ARN",
-        "audit_role_arn",
-        "arn:aws:iam::111111111111:role/sentinel-audit",
-        "arn:aws:iam::111111111111:role/sentinel-audit",
-    ),
-    (
-        AWSSettings,
-        "AWS_LOGGING_ACCOUNT_ROLE_ARN",
-        "logging_role_arn",
-        "arn:aws:iam::111111111111:role/sentinel-logging",
-        "arn:aws:iam::111111111111:role/sentinel-logging",
-    ),
-    (
-        AWSSettings,
-        "AWS_ORG_ACCOUNT_ROLE_ARN",
-        "org_role_arn",
-        "arn:aws:iam::111111111111:role/sentinel-org",
-        "arn:aws:iam::111111111111:role/sentinel-org",
-    ),
-    (
-        AWSSettings,
-        "AWS_SSO_INSTANCE_ARN",
-        "instance_arn",
-        "arn:aws:sso:::instance/ssoins-sentinel",
-        "arn:aws:sso:::instance/ssoins-sentinel",
-    ),
-    (AWSSettings, "AWS_SSO_INSTANCE_ID", "instance_id", "d-sentinel", "d-sentinel"),
-    (AWSSettings, "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", "system_admin_permissions", "SentinelAdmin", "SentinelAdmin"),
-    (AWSSettings, "AWS_SSO_VIEW_ONLY_PERMISSIONS", "view_only_permissions", "SentinelView", "SentinelView"),
-    (AWSSettings, "AWS_REGION", "aws_region", "sentinel-region-1", "sentinel-region-1"),
-    (
-        AWSSettings,
-        "AWS_ENDPOINT_URL_DYNAMODB",
-        "dynamodb_endpoint_url",
-        "http://sentinel-dynamodb:8000",
-        "http://sentinel-dynamodb:8000",
-    ),
-    (AWSSettings, "AWS_RETRY_MAX_ATTEMPTS", "retry_max_attempts", "5", 5),
-    (AWSSettings, "AWS_RETRY_MODE", "retry_mode", "adaptive", "adaptive"),
-    (AWSSettings, "AWS_CONNECT_TIMEOUT_SECONDS", "connect_timeout_seconds", "4", 4),
-    (AWSSettings, "AWS_READ_TIMEOUT_SECONDS", "read_timeout_seconds", "7", 7),
-    (AWSSettings, "AWS_TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", "15", 15),
-    (AWSSettings, "AWS_NOT_FOUND_CODES", "not_found_codes", '["SentinelMissing"]', ["SentinelMissing"]),
-    (AWSSettings, "AWS_UNAUTHORIZED_CODES", "unauthorized_codes", '["SentinelDenied"]', ["SentinelDenied"]),
-    (AWSSettings, "AWS_TRANSIENT_CODES", "transient_codes", '["SentinelBusy"]', ["SentinelBusy"]),
     (NotifySettings, "NOTIFY_SRE_USER_NAME", "notify_sre_user_name", "sentinel-user", "sentinel-user"),
     (NotifySettings, "NOTIFY_SRE_CLIENT_SECRET", "notify_sre_client_secret", "sentinel-secret", "sentinel-secret"),
     (
@@ -384,62 +341,114 @@ def test_configuration_settings_openai_name_reaches_field(
     assert getattr(settings, attribute) == expected
 
 
-def test_configuration_settings_aws_org_role_only_maps_services(monkeypatch: pytest.MonkeyPatch) -> None:
-    """With only the org role set, as in production, the org-role services get it and the audit and logging roles stay empty."""
-    org_role = "arn:aws:iam::111111111111:role/sentinel-org"
-    monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", org_role)
-    monkeypatch.delenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", raising=False)
-    monkeypatch.delenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", raising=False)
+AWS_RETIRED_NAMES = [
+    "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS",
+    "AWS_SSO_VIEW_ONLY_PERMISSIONS",
+    "AWS_AUDIT_ACCOUNT_ROLE_ARN",
+    "AWS_ORG_ACCOUNT_ROLE_ARN",
+    "AWS_LOGGING_ACCOUNT_ROLE_ARN",
+    "AWS_SSO_INSTANCE_ID",
+    "AWS_SSO_INSTANCE_ARN",
+    "AWS_RETRY_MAX_ATTEMPTS",
+    "AWS_RETRY_MODE",
+    "AWS_CONNECT_TIMEOUT_SECONDS",
+    "AWS_READ_TIMEOUT_SECONDS",
+    "AWS_TRANSIENT_RETRY_AFTER_SECONDS",
+    "AWS_NOT_FOUND_CODES",
+    "AWS_UNAUTHORIZED_CODES",
+    "AWS_TRANSIENT_CODES",
+]
 
-    role_map = AWSSettings(_env_file=None).service_role_map  # type: ignore[call-arg]
-
-    for service in ("organizations", "identitystore", "sso-admin", "ce"):
-        assert role_map[service] == org_role
-    assert role_map["audit"] == ""
-    assert role_map["logging"] == ""
-
-
-def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The lower-case spelling of a Notify name and of an AWS alias is read too."""
-    monkeypatch.setenv("notify_api_url", "https://lower.sentinel.example")
-    monkeypatch.setenv("aws_retry_mode", "adaptive")
-
-    notify = NotifySettings(_env_file=None)  # type: ignore[call-arg]
-    aws = AWSSettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert notify.notify_api_url == "https://lower.sentinel.example"
-    assert aws.retry_mode == "adaptive"
+AWS_NAMES: list[tuple[str, str, Any]] = [
+    ("AWS__RETRY_MAX_ATTEMPTS", "retry_max_attempts", 5),
+    ("AWS__RETRY_MODE", "retry_mode", "adaptive"),
+    ("AWS__CONNECT_TIMEOUT_SECONDS", "connect_timeout_seconds", 4),
+    ("AWS__READ_TIMEOUT_SECONDS", "read_timeout_seconds", 7),
+    ("AWS__TRANSIENT_RETRY_AFTER_SECONDS", "transient_retry_after_seconds", 15),
+]
 
 
-def test_configuration_settings_aws_bare_field_name_not_read(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The bare field name RETRY_MODE is not an environment name; only the AWS_RETRY_MODE alias is."""
-    monkeypatch.setenv("RETRY_MODE", "legacy")
-    monkeypatch.delenv("AWS_RETRY_MODE", raising=False)
+@pytest.mark.parametrize(("env_name", "attribute", "expected"), AWS_NAMES, ids=[row[0] for row in AWS_NAMES])
+def test_configuration_settings_aws_table_name_reaches_field(
+    monkeypatch: pytest.MonkeyPatch, env_name: str, attribute: str, expected: Any
+) -> None:
+    """The AWS__<FIELD> name sets the field; a fallback to the default would differ from the sentinel."""
+    monkeypatch.setenv(env_name, str(expected))
 
     settings = AWSSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert settings.retry_mode == "standard"
+    assert getattr(settings, attribute) == expected
 
 
-def test_configuration_settings_aws_upper_case_keyword_accepted() -> None:
-    """A constructor keyword in the environment spelling still sets the lower-case AWS field."""
-    settings = AWSSettings(_env_file=None, AWS_REGION="kw-region")  # type: ignore[call-arg]
+@pytest.mark.parametrize("env_name", AWS_RETIRED_NAMES)
+def test_configuration_settings_aws_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
+    """The fifteen old AWS_* names are read by no field: the slices build exactly as without them."""
+    baseline = (AWSSettings(_env_file=None).model_dump(), AccessPermissionSetsSettings(_env_file=None).model_dump())  # type: ignore[call-arg]
+    monkeypatch.setenv(
+        env_name, "7" if env_name.endswith(("SECONDS", "ATTEMPTS")) else "arn:aws:sso:::instance/ssoins-1234567890abcdef"
+    )
 
-    assert settings.aws_region == "kw-region"
+    settings = (AWSSettings(_env_file=None).model_dump(), AccessPermissionSetsSettings(_env_file=None).model_dump())  # type: ignore[call-arg]
+
+    assert settings == baseline
+
+
+def test_configuration_settings_aws_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The five AWS__TENANT__ names reach the tenant entry; a fallback would leave it absent."""
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ID", "d-1234567890")
+    monkeypatch.setenv("AWS__TENANT__INSTANCE_ARN", "arn:aws:sso:::instance/ssoins-1234567890abcdef")
+    monkeypatch.setenv("AWS__TENANT__AUDIT_ROLE_ARN", "arn:aws:iam::111111111111:role/sentinel-audit")
+    monkeypatch.setenv("AWS__TENANT__ORG_ROLE_ARN", "arn:aws:iam::111111111111:role/sentinel-org")
+    monkeypatch.setenv("AWS__TENANT__LOGGING_ROLE_ARN", "arn:aws:iam::111111111111:role/sentinel-logging")
+
+    tenant = AWSSettings(_env_file=None).tenant  # type: ignore[call-arg]
+
+    assert tenant is not None
+    assert (tenant.instance_id, tenant.instance_arn) == ("d-1234567890", "arn:aws:sso:::instance/ssoins-1234567890abcdef")
+    assert (tenant.audit_role_arn, tenant.org_role_arn, tenant.logging_role_arn) == (
+        "arn:aws:iam::111111111111:role/sentinel-audit",
+        "arn:aws:iam::111111111111:role/sentinel-org",
+        "arn:aws:iam::111111111111:role/sentinel-logging",
+    )
+
+
+def test_configuration_settings_access_permission_sets_name_reaches_field(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The ACCESS_PERMISSION_SETS__<FIELD> names set the two permission-set values."""
+    monkeypatch.setenv("ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS", "SentinelAdmin")
+    monkeypatch.setenv("ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS", "SentinelView")
+
+    settings = AccessPermissionSetsSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert (settings.system_admin_permissions, settings.view_only_permissions) == ("SentinelAdmin", "SentinelView")
+
+
+def test_configuration_settings_no_slice_declares_an_sdk_aws_name() -> None:
+    """The region and the endpoint are the SDK's: no AWS slice field is, or aliases, an AWS_* SDK name."""
+    sdk_names = {"aws_region", "aws_default_region", "aws_endpoint_url_dynamodb", "dynamodb_endpoint_url", "region_name"}
+    for slice_class in (AWSSettings, AccessPermissionSetsSettings):
+        for name, field in slice_class.model_fields.items():
+            assert name not in sdk_names
+            assert not str(field.alias or "").upper().startswith("AWS_")
+
+
+def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lower-case spelling of a Notify name is read too."""
+    monkeypatch.setenv("notify_api_url", "https://lower.sentinel.example")
+
+    notify = NotifySettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert notify.notify_api_url == "https://lower.sentinel.example"
 
 
 def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Lines written 'NAME =value', as some production .env lines are, reach a no-alias and an aliased field."""
+    """Lines written 'NAME =value', as some production .env lines are, reach a field."""
     monkeypatch.delenv("SENTINEL_SHARED_KEY", raising=False)
-    monkeypatch.delenv("AWS_SSO_INSTANCE_ID", raising=False)
     env_file = tmp_path / ".env"
-    env_file.write_text("SENTINEL_SHARED_KEY =spaced-shared-key\nAWS_SSO_INSTANCE_ID =d-spaced\n")
+    env_file.write_text("SENTINEL_SHARED_KEY =spaced-shared-key\n")
 
     sentinel = SentinelSettings(_env_file=env_file)  # type: ignore[call-arg]
-    aws = AWSSettings(_env_file=env_file)  # type: ignore[call-arg]
 
     assert sentinel.sentinel_shared_key == "spaced-shared-key"
-    assert aws.instance_id == "d-spaced"
 
 
 def test_configuration_settings_identity_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:

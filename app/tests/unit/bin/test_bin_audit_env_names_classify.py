@@ -107,6 +107,39 @@ def test_a_retired_google_name_is_deleted_naming_its_destination(name: str, dest
     assert destination in verdict.reason
 
 
+@pytest.mark.parametrize(
+    ("name", "destination"),
+    [
+        ("AWS_AUDIT_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__AUDIT_ROLE_ARN"),
+        ("AWS_ORG_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__ORG_ROLE_ARN"),
+        ("AWS_LOGGING_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__LOGGING_ROLE_ARN"),
+        ("AWS_SSO_INSTANCE_ID", "secret AWS__TENANT__INSTANCE_ID"),
+        ("AWS_SSO_INSTANCE_ARN", "secret AWS__TENANT__INSTANCE_ARN"),
+        ("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", "secret ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS"),
+        ("AWS_SSO_VIEW_ONLY_PERMISSIONS", "secret ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS"),
+        ("AWS_RETRY_MAX_ATTEMPTS", "[aws] retry_max_attempts"),
+        ("AWS_RETRY_MODE", "[aws] retry_mode"),
+        ("AWS_CONNECT_TIMEOUT_SECONDS", "[aws] connect_timeout_seconds"),
+        ("AWS_READ_TIMEOUT_SECONDS", "[aws] read_timeout_seconds"),
+        ("AWS_TRANSIENT_RETRY_AFTER_SECONDS", "[aws] transient_retry_after_seconds"),
+        ("AWS_NOT_FOUND_CODES", "[aws] not_found_codes"),
+        ("AWS_UNAUTHORIZED_CODES", "[aws] unauthorized_codes"),
+        ("AWS_TRANSIENT_CODES", "[aws] transient_codes"),
+    ],
+)
+def test_a_retired_aws_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert destination in verdict.reason
+
+
+@pytest.mark.parametrize("name", ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL_DYNAMODB", "AWS_ACCESS_KEY_ID"])
+def test_an_aws_sdk_name_is_kept(name: str) -> None:
+    """The SDK reads these names itself, so no AWS hint may turn them into a delete."""
+    assert classify("codespaces repo cds-snc/sre-bot", name, "present", CTX).action == "none"
+
+
 def test_the_retired_flat_lease_ttl_is_deleted_for_its_scheduler_key_not_renamed() -> None:
     """Without the hint the guess would be a SCHEDULER__ rename; the value is a configuration key."""
     ctx = Context(current={"SCHEDULER__DEFAULT_TIER2_LEASE_TTL_SECONDS"}, retired={"DEFAULT_TIER2_LEASE_TTL_SECONDS"})

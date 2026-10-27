@@ -60,6 +60,65 @@ command_prefix = ""
 api_num_retries = 3
 api_timeout_seconds = 10.0
 
+[aws]
+# The AWS clients' retry policy, per-attempt timeouts and error-code catalogues; hosting
+# reaches DynamoDB through the same clients. The region and the dynamodb-local endpoint are the
+# SDK's: AWS_DEFAULT_REGION (or the shared config file) and AWS_ENDPOINT_URL_DYNAMODB.
+# The tenant entry is never in a file: the Identity Center identity store id and instance ARN
+# (internal tenant identifiers, non-public values) and the optional audit, org and logging role
+# ARNs come from the environment as AWS__TENANT__<FIELD>: INSTANCE_ID, INSTANCE_ARN,
+# AUDIT_ROLE_ARN, ORG_ROLE_ARN, LOGGING_ROLE_ARN.
+retry_max_attempts = 3
+retry_mode = "standard"
+connect_timeout_seconds = 10
+read_timeout_seconds = 10
+transient_retry_after_seconds = 60
+not_found_codes = [
+    "ResourceNotFoundException",
+    "NoSuchEntity",
+    "NoSuchBucket",
+    "NoSuchKey",
+    "NotFoundException",
+    "AccountNotFoundException",
+    "TargetNotFoundException",
+    "NoSuchConfigurationAggregatorException",
+]
+unauthorized_codes = [
+    "AccessDenied",
+    "AccessDeniedException",
+    "UnauthorizedOperation",
+    "InvalidClientTokenId",
+    "SignatureDoesNotMatch",
+    "ExpiredToken",
+    "ExpiredTokenException",
+    "TokenRefreshRequired",
+    "InvalidAccessException",
+]
+transient_codes = [
+    "Throttling",
+    "ThrottlingException",
+    "RequestLimitExceeded",
+    "ProvisionedThroughputExceededException",
+    "TooManyRequestsException",
+    "RequestTimeout",
+    "RequestTimeoutException",
+    "ServiceUnavailable",
+    "ServiceUnavailableException",
+    "InternalFailure",
+    "InternalServerError",
+    "InternalServerErrorException",
+    "InternalException",
+    "ServiceException",
+    "LimitExceededException",
+]
+
+[access_permission_sets]
+# The AWS SSO permission set ARNs the access "write" and "read" aliases resolve to. They embed the
+# Identity Center instance id (a non-public value), so a deployment supplies them from the environment
+# as ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS and ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS.
+system_admin_permissions = ""
+view_only_permissions = ""
+
 [scheduler]
 # Each deployment that runs the scheduled jobs switches them on in its own file;
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.

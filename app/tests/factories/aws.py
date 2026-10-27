@@ -1,3 +1,6 @@
+import os
+
+
 def make_aws_users(n=3, prefix="", domain="test.com", store_id="d-123412341234"):
     users = []
     for i in range(n):
@@ -84,3 +87,38 @@ def make_aws_groups_w_users(
             user_details["Emails"] = [{**email, "Type": email["Type"].upper()} for email in user_details.get("Emails", [])]
             group["GroupMemberships"].append({**membership, "UserDetails": user_details})
     return groups
+
+
+DEFAULT_INSTANCE_ID = "d-1234567890"
+DEFAULT_INSTANCE_ARN = "arn:aws:sso:::instance/ssoins-1234567890abcdef"
+
+
+def set_aws_tenant(
+    monkeypatch,
+    *,
+    instance_id=None,
+    instance_arn=None,
+    audit_role_arn=None,
+    org_role_arn=None,
+    logging_role_arn=None,
+):
+    """Name an AWS tenant through the AWS__TENANT__<FIELD> variables.
+
+    The Identity Center pair is required by the entry, so a test that names only a role
+    gets a valid default pair; each argument given overrides its variable, and a role
+    left out stays unset.
+    """
+    values = {
+        "INSTANCE_ID": instance_id,
+        "INSTANCE_ARN": instance_arn,
+        "AUDIT_ROLE_ARN": audit_role_arn,
+        "ORG_ROLE_ARN": org_role_arn,
+        "LOGGING_ROLE_ARN": logging_role_arn,
+    }
+    defaults = {"INSTANCE_ID": DEFAULT_INSTANCE_ID, "INSTANCE_ARN": DEFAULT_INSTANCE_ARN}
+    for field, value in values.items():
+        name = f"AWS__TENANT__{field}"
+        if value is not None:
+            monkeypatch.setenv(name, value)
+        elif field in defaults and not os.environ.get(name):
+            monkeypatch.setenv(name, defaults[field])

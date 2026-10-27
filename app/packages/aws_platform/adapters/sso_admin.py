@@ -164,13 +164,16 @@ class SsoAdminAdapter:
         )
 
 
-def build_sso_admin_adapter() -> SsoAdminAdapter:
-    """Build the adapter with the sso-admin role from ``service_role_map`` and the SSO instance settings."""
+def build_sso_admin_adapter(*, system_admin_permissions: str, view_only_permissions: str) -> SsoAdminAdapter:
+    """Build the adapter with the sso-admin role from ``service_role_map`` and the SSO instance ARN.
+
+    The permission set ARNs are access policy, so the caller passes them in; this package never reads them.
+    """
     settings = get_aws_settings()
     role_arn = settings.service_role_map.get("sso-admin") or None
     return SsoAdminAdapter(
         get_aws_client("sso-admin", role_arn=role_arn),
-        instance_arn=settings.instance_arn,
-        system_admin_permissions=settings.system_admin_permissions,
-        view_only_permissions=settings.view_only_permissions,
+        instance_arn=settings.sso_instance_arn,
+        system_admin_permissions=system_admin_permissions,
+        view_only_permissions=view_only_permissions,
     )

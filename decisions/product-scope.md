@@ -15,7 +15,7 @@ The bot was named for site reliability engineering and the root README described
 
 **One codebase, one deployable, four named product areas.** The bot is the organisation's internal operations platform; incident response is its first-class area. Isolation between areas comes from the plugin architecture, not from repositories: import-linter keeps features independent ([plugin-architecture.md](plugin-architecture.md)), and per-environment enablement ([plugins.md](plugins.md)) switches an area off with a configuration change and no code change (the files ship in the image, so it still deploys).
 
-**Built as a framework another organisation can adopt.** The bot runs for one organisation today, but nothing specific to that organisation belongs in its code: deployment values live in the configuration files ([configuration.md](configuration.md)), behaviour comes from plugins ([plugins.md](plugins.md)), and organisation content (webhook sender mappings and message templates, playbooks, the access catalogue, incident templates) is supplied as data in a way TASK-167's design session decides.
+**Built as a framework another organisation can adopt.** The bot runs for one organisation today, but nothing specific to that organisation belongs in its code: deployment values live in the configuration files ([configuration.md](configuration.md)), behaviour comes from plugins ([plugins.md](plugins.md)), and organisation content (webhook sender mappings and message templates, playbooks, the access catalogue, incident templates) is supplied as data in a way TASK-167's design session decides. The end state is two repositories: this one holds only the app code, and each organisation configures and deploys its instance from a deployment repository of its own, holding its environment configuration files, its organisation content (team playbooks included) and its deployment code. This organisation's values sit in this repository until then (`app/config/production.toml`, `terraform/`); the split is not scheduled and does not gate the app refactor, but new designs (TASK-167's content locations among them) do not assume the content lives in this repository.
 
 | Area | Packages |
 | --- | --- |
@@ -33,6 +33,7 @@ The bot was named for site reliability engineering and the root README described
 - A new package is assigned an area in this record before it merges, so the question "does this belong here" has a written answer.
 - When per-environment enablement lands, keys are grouped by area, so a deployment holding only the first two areas is a configuration diff.
 - The root README describes the bot as the operations platform with these areas, not as an SRE tool.
+- Nothing a deploying organisation supplies (environment file values, organisation content, deployment code) needs a change to the app repository once the deployment repository exists; until then, such values added here are interim and move with it.
 
 ## Checks
 
@@ -43,3 +44,4 @@ The bot was named for site reliability engineering and the root README described
 - 2026-10-09: Accepted. One app with four areas and written carve-out criteria.
 - 2026-10-23: `user_rotations` is in incident response; area enablement is a configuration change, not a change without a deploy (TASK-112).
 - 2026-10-26: the bot is built as a framework another organisation can adopt; organisation-specific content stays out of the code, its pattern decided by TASK-167 (human).
+- 2026-10-26: end state recorded: the app repository holds only app code; each organisation configures and deploys its instance from its own deployment repository (configuration files, organisation content, deployment code); not scheduled, the refactor comes first (human).

@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-26T19:09:00Z'
+updated_date: '2026-10-27T11:45:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -35,3 +35,23 @@ The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>
 - [ ] #3 integrations/opsgenie/ no longer has create_alert (no caller since the Notify key-revocation change): the function, its export and its tests are deleted
 - [ ] #4 Every reader of these slices builds them at use, not at import (found 2026-10-26 in TASK-111.10.1: integrations/trello/client.py:7, opsgenie/client.py:10, sentinel/client.py:15, notify/client.py:15 read at import, and a slice on the files fails closed before the app factory installs them); a fresh-interpreter import test proves the provider caches stay empty, as tests/unit/server/test_server_app_import_google_settings_lazy.py does
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-27T11:26:00Z
+
+---
+
+2026-10-27 (TASK-111.11.1 session, human: create every parameter ahead of its reader): SENTINEL_CUSTOMER_ID and TRELLO_ATIP_BOARD are non-public values (decisions/configuration.md 2026-10-27). They are read as SENTINEL__CUSTOMER_ID and TRELLO__ATIP_BOARD from the environment only, never production.toml, so the description's 'Trello ATIP board, Sentinel customer id ... go in production.toml' is superseded. Their /sre-bot parameters are created by the standalone ssm PR before 111.11.1, with values put from the blob lines. Finding to assess in planning: Microsoft retired the Azure Monitor HTTP Data Collector API (customer id plus shared key) on 2026-09-14 (https://azure.microsoft.com/en-us/updates/azure-monitor-data-collection-api-retirement/); the replacement is the DCR-based Logs Ingestion API with Entra token auth. Check whether production Sentinel sends still succeed (the sentinel client's log events since 2026-09-14). If they fail, the slice is rebuilt on the Logs Ingestion API or deleted rather than moved, and SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY are removed in the contract.
+
+---
+
+created: 2026-10-27T11:45:00Z
+
+---
+
+2026-10-27: the Sentinel retirement finding is TASK-171 (doc-11 row Z2). This task's Sentinel part follows its ruling: rebuild on the Logs Ingestion API, or delete.
+
+---
+<!-- COMMENTS:END -->

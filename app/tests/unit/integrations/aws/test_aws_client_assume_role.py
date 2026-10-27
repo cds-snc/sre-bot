@@ -32,6 +32,12 @@ _ASSUMED = {
 }
 
 
+@pytest.fixture(autouse=True)
+def _sdk_region(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The deployment supplies the region through AWS_DEFAULT_REGION; the factory names none."""
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "ca-central-1")
+
+
 def _sts_client() -> Any:
     return boto3.client(
         "sts",

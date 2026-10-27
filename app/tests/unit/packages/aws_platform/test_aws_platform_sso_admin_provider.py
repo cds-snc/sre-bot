@@ -4,7 +4,7 @@ get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 sso-admin client with dummy static credentials. Settings come
 from environment variables with the settings cache cleared around each test.
 Role routing is asserted on the recorded call; instance ARN and permission set
-wiring are asserted on the wire through Stubber expected params, so the check is
+parameters are asserted on the wire through Stubber expected params, so the check is
 on the request the SDK would send rather than on adapter internals.
 """
 
@@ -18,6 +18,7 @@ from botocore.stub import Stubber
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.sso_admin import SsoAdminAdapter, build_sso_admin_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -42,10 +43,8 @@ class TestBuildSsoAdminAdapter:
     @pytest.fixture(autouse=True)
     def sso_settings(self, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         """Set SSO settings and clear the settings cache before and after each test."""
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
-        monkeypatch.setenv("AWS_SSO_INSTANCE_ARN", _INSTANCE_ARN)
-        monkeypatch.setenv("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", _ADMIN_ARN)
-        monkeypatch.setenv("AWS_SSO_VIEW_ONLY_PERMISSIONS", _VIEW_ONLY_ARN)
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, instance_arn=_INSTANCE_ARN)
         get_aws_settings.cache_clear()
         yield
         get_aws_settings.cache_clear()
@@ -60,7 +59,7 @@ class TestBuildSsoAdminAdapter:
             side_effect=record_get_aws_client,
             create=True,
         ):
-            return build_sso_admin_adapter()
+            return build_sso_admin_adapter(system_admin_permissions=_ADMIN_ARN, view_only_permissions=_VIEW_ONLY_ARN)
 
     def test_single_sso_admin_client_with_org_role(self) -> None:
         """One get_aws_client('sso-admin') call carries service_role_map['sso-admin']."""
@@ -74,8 +73,8 @@ class TestBuildSsoAdminAdapter:
         assert calls[0]["role_arn"] == "arn:aws:iam::123456789012:role/org-role"
 
     def test_role_arn_none_when_setting_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An empty AWS_ORG_ACCOUNT_ROLE_ARN is passed as role_arn=None, not an empty string."""
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "")
+        """An empty org_role_arn is passed as role_arn=None, not an empty string."""
+        set_aws_tenant(monkeypatch, org_role_arn="")
         get_aws_settings.cache_clear()
         calls: list[dict[str, Any]] = []
 
@@ -83,8 +82,8 @@ class TestBuildSsoAdminAdapter:
 
         assert calls[0]["role_arn"] is None
 
-    def test_instance_arn_and_permission_sets_come_from_settings(self) -> None:
-        """InstanceArn and the 'write'/'read' PermissionSetArn sent on the wire come from settings."""
+    def test_instance_arn_comes_from_settings_and_permission_sets_from_parameters(self) -> None:
+        """InstanceArn is the tenant's; the 'write'/'read' PermissionSetArn are the parameters passed in."""
         client = _sso_admin_client()
         adapter = self._build(client, [])
 

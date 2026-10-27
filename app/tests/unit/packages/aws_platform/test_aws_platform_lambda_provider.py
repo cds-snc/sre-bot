@@ -16,6 +16,7 @@ import pytest
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.aws_lambda import LambdaAdapter, build_lambda_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -64,10 +65,10 @@ class TestBuildLambdaAdapter:
         assert calls[0]["role_arn"] is None
 
     def test_role_arn_none_even_when_all_role_env_vars_set(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """role_arn=None even when AWS_AUDIT_ACCOUNT_ROLE_ARN, AWS_ORG_ACCOUNT_ROLE_ARN, AWS_LOGGING_ACCOUNT_ROLE_ARN are set."""
-        monkeypatch.setenv("AWS_AUDIT_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/audit-role")
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
-        monkeypatch.setenv("AWS_LOGGING_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/logging-role")
+        """role_arn=None even when the audit, org and logging role ARNs are set."""
+        set_aws_tenant(monkeypatch, audit_role_arn="arn:aws:iam::123456789012:role/audit-role")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, logging_role_arn="arn:aws:iam::123456789012:role/logging-role")
         calls: list[dict[str, Any]] = []
 
         self._build_recording(calls)

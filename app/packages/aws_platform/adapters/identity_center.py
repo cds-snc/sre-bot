@@ -292,7 +292,7 @@ class IdentityCenterAdapter:
 
 
 def build_identity_center_adapter() -> IdentityCenterAdapter:
-    """Build the adapter from AWS settings: org role for identitystore, IdentityStoreId from INSTANCE_ID.
+    """Build the adapter from AWS settings: org role for identitystore, IdentityStoreId from the tenant's instance_id (AWS__TENANT__INSTANCE_ID).
 
     Two clients are built per call: a standard-retry client and a
     retries-disabled one for the non-idempotent creates.
@@ -301,4 +301,4 @@ def build_identity_center_adapter() -> IdentityCenterAdapter:
     role_arn = settings.service_role_map.get("identitystore") or None
     identitystore = get_aws_client("identitystore", role_arn=role_arn)
     identitystore_no_retry = get_aws_client("identitystore", role_arn=role_arn, retries=False)
-    return IdentityCenterAdapter(identitystore, identitystore_no_retry, settings.instance_id)
+    return IdentityCenterAdapter(identitystore, identitystore_no_retry, settings.identity_store_id)

@@ -2,7 +2,7 @@
 
 get_aws_client is patched in the adapter module to record its arguments and
 return a real boto3 cost-explorer client with dummy static credentials. The Cost
-Explorer role comes from AWS_ORG_ACCOUNT_ROLE_ARN and the settings cache is
+Explorer role comes from the AWS tenant's org_role_arn and the settings cache is
 cleared around each test, so the assertions pin the service name 'ce' and the
 role ARN the factory reads from service_role_map.
 """
@@ -16,6 +16,7 @@ import pytest
 
 from integrations.aws.settings import get_aws_settings
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter, build_cost_explorer_adapter
+from tests.factories.aws import set_aws_tenant
 
 pytestmark = pytest.mark.unit
 
@@ -54,7 +55,7 @@ class TestBuildCostExplorerAdapter:
 
     def test_single_cost_explorer_client_with_org_role(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """One get_aws_client('ce') call carries service_role_map['ce']."""
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "arn:aws:iam::123456789012:role/org-role")
+        set_aws_tenant(monkeypatch, org_role_arn="arn:aws:iam::123456789012:role/org-role")
         calls: list[dict[str, Any]] = []
 
         adapter = self._build_recording(calls)
@@ -65,8 +66,8 @@ class TestBuildCostExplorerAdapter:
         assert calls[0]["role_arn"] == "arn:aws:iam::123456789012:role/org-role"
 
     def test_role_arn_none_when_setting_empty(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """An empty AWS_ORG_ACCOUNT_ROLE_ARN is passed as role_arn=None, not an empty string."""
-        monkeypatch.setenv("AWS_ORG_ACCOUNT_ROLE_ARN", "")
+        """An empty org_role_arn is passed as role_arn=None, not an empty string."""
+        set_aws_tenant(monkeypatch, org_role_arn="")
         calls: list[dict[str, Any]] = []
 
         self._build_recording(calls)

@@ -13,14 +13,18 @@
 #   google  pre: the three GOOGLE_WORKSPACE__TENANT__ parameters compared by hash with the values they
 #           replace (MATCH or DIFFER, never printed);
 #           post: Google configured on every task, no credential or delegation error (TASK-111.10.2)
+#   aws     pre: the five AWS__TENANT__ and ACCESS_PERMISSION_SETS__ parameters compared by hash with the blob lines
+#           they replace (MATCH, DIFFER or MISSING, never printed), the instance id and ARN checked against the
+#           documented formats, any tuning line, the AWS_ names in the task definition;
+#           post: no region, endpoint, credential or role error, DynamoDB-backed events present (TASK-111.11.1)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(google)
-PRE_CHECKS=(google)  # task checks with a pre part
+TASK_CHECKS=(google aws)
+PRE_CHECKS=(google aws)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -133,6 +137,43 @@ if [[ $phase == pre ]]; then
     [[ $(same_hash $customer_new $customer_old) == MATCH && $(same_hash $key_new $key_old) == MATCH && $(same_hash $delegated_new $delegated_old) == MATCH ]] \
       && result google_pre PASS || result google_pre "FAIL (a DIFFER blocks the merge: put-parameter the right value first)"
   fi
+
+  if (( ${checks[(Ie)aws]} )); then  # TASK-111.11.1
+    section "AWS tenant and permission-set parameters against the blob lines they replace (TASK-111.11.1; values never printed)"
+    # line_hash is defined in the google check above only when it ran, so define it here too.
+    line_hash() { local v; v=$(blob_value $1) && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
+    # compare NEW_PARAMETER OLD_BLOB_LINE: MATCH, DIFFER, or MISSING (the parameter or the blob line is absent).
+    compare() {
+      local new old; new=$(param_hash /sre-bot/$1); old=$(line_hash $2)
+      if [[ $new == missing ]]; then print "$1 vs the $2 line: MISSING (no such parameter)"
+      elif [[ $old == missing ]]; then print "$1 vs the $2 line: MISSING (no such blob line)"
+      else print "$1 vs the $2 line: $(same_hash $new $old)"; fi
+    }
+    aws_ok=yes
+    for pair in AWS__TENANT__INSTANCE_ID:AWS_SSO_INSTANCE_ID AWS__TENANT__INSTANCE_ARN:AWS_SSO_INSTANCE_ARN AWS__TENANT__ORG_ROLE_ARN:AWS_ORG_ACCOUNT_ROLE_ARN \
+        AWS__TENANT__AUDIT_ROLE_ARN:AWS_AUDIT_ACCOUNT_ROLE_ARN AWS__TENANT__LOGGING_ROLE_ARN:AWS_LOGGING_ACCOUNT_ROLE_ARN \
+        ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS:AWS_SSO_SYSTEM_ADMIN_PERMISSIONS ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS:AWS_SSO_VIEW_ONLY_PERMISSIONS; do
+      line=$(compare ${pair%%:*} ${pair##*:}); print -r -- $line
+      [[ $line == *MATCH ]] || aws_ok=no
+    done
+    # Documented formats of the blob values (a NO would fail boot on the tenant entry): IdentityStoreId (d- and ten hex
+    # digits, or a UUID) and the sso-admin InstanceArn.
+    id_pattern='^(d-[0-9a-f]{10}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$'
+    arn_pattern='^arn:aws(-[a-z]{1,5}){0,3}:sso:::instance/(sso)?ins-[a-zA-Z0-9.-]{16}$'
+    instance_id=$(blob_value AWS_SSO_INSTANCE_ID) || instance_id=
+    instance_arn=$(blob_value AWS_SSO_INSTANCE_ARN) || instance_arn=
+    if [[ $instance_id =~ $id_pattern ]]; then print "AWS_SSO_INSTANCE_ID format: OK"; else print "AWS_SSO_INSTANCE_ID format: NO"; aws_ok=no; fi
+    if [[ $instance_arn =~ $arn_pattern ]]; then print "AWS_SSO_INSTANCE_ARN format: OK"; else print "AWS_SSO_INSTANCE_ARN format: NO"; aws_ok=no; fi
+    for name in AWS_RETRY_MAX_ATTEMPTS AWS_RETRY_MODE AWS_CONNECT_TIMEOUT_SECONDS AWS_READ_TIMEOUT_SECONDS AWS_TRANSIENT_RETRY_AFTER_SECONDS AWS_NOT_FOUND_CODES AWS_UNAUTHORIZED_CODES AWS_TRANSIENT_CODES; do
+      where=$(blob_where $name)
+      print "$name in (expected none; a present line needs an [aws] key in production.toml first): $where"
+      [[ $where == none ]] || aws_ok=no
+    done
+    td_aws=$(aws ecs describe-task-definition --region $REGION --task-definition $td --output json \
+      | jq -r '[.taskDefinition.containerDefinitions[0] | (.environment[]?.name), (.secrets[]?.name) | select(startswith("AWS_") and (startswith("AWS__") | not))] | join(" ")')
+    print "task definition SDK names AWS_* (the slice names AWS__* excluded; expected none: ECS injects the region; if post shows NoRegionError, add AWS_DEFAULT_REGION to the task definition first): ${td_aws:-none}"
+    [[ $aws_ok == yes ]] && result aws_pre PASS || result aws_pre "FAIL (a DIFFER or MISSING parameter, a format NO or a tuning line blocks the merge: put-parameter the right value first)"
+  fi
 fi
 
 if [[ $phase == post ]]; then
@@ -204,6 +245,22 @@ if [[ $phase == post ]]; then
       print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
     done
     [[ ${with_google:-0} -ge $tasks && $bad == 0 ]] && result google PASS || result google "FAIL (google on ${with_google:-0}/$tasks tasks, $bad error lines)"
+  fi
+
+  if (( ${checks[(Ie)aws]} )); then  # TASK-111.11.1
+    section "AWS from the files and the SDK (TASK-111.11.1)"
+    aws_filter='@message like /NoRegionError|EndpointConnectionError|InvalidClientTokenId/ or (@message like /AccessDenied/ and @message like /AssumeRole/)'
+    bad=$(li_count $since "filter $aws_filter")
+    li $since "filter $aws_filter | fields @timestamp, event, @message | limit 10" | mask
+    print "region, endpoint, credential or AssumeRole error lines: $bad (expected 0)"
+    invalid=$(li_count $since 'filter event = "configuration_invalid"')
+    print "configuration_invalid lines: $invalid (expected 0)"
+    dynamo=$(li_count $since 'filter event like /coordination|lease|record|status_update/')
+    print "DynamoDB-backed coordination or record events since the deploy: $dynamo (expected > 0)"
+    for name in AWS_SSO_INSTANCE_ID AWS_ORG_ACCOUNT_ROLE_ARN AWS_SSO_SYSTEM_ADMIN_PERMISSIONS; do
+      print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
+    done
+    [[ $bad == 0 && $invalid == 0 && $dynamo -gt 0 ]] && result aws PASS || result aws "FAIL ($bad error lines, $invalid configuration_invalid, $dynamo DynamoDB-backed events)"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

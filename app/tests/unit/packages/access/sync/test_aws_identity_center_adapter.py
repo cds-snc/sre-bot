@@ -461,7 +461,7 @@ class _FakeAwsSettings:
     """Minimal AwsSettings stand-in for factory-wiring tests."""
 
     def __init__(self, instance_id: str, identitystore_role_arn: str) -> None:
-        self.instance_id = instance_id
+        self.identity_store_id = instance_id
         self.service_role_map = {"identitystore": identitystore_role_arn}
 
 
