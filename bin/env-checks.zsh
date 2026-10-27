@@ -14,7 +14,9 @@
 #   env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --web; the script then retries with it automatically.
 # User Codespaces secrets need the codespace scope once: gh auth refresh -h github.com -s codespace
 # Output: tmp/env-checks/<UTC timestamp>.txt (gitignored, never commit it), also echoed.
-# Classifier: app/bin/audit_env_names.py.
+# Classifier: app/bin/audit_env_names.py (each present name); app/bin/audit_env_coverage.py (where each name
+# supplied through the environment is missing: terraform/ssm.tf, SSM, the blob source line, Codespaces,
+# app/.env.example).
 
 setopt no_unset pipe_fail
 unsetopt xtrace verbose
@@ -123,6 +125,7 @@ scan_lines() {
   if [[ $(cut -d' ' -f1 $OUT_DIR/.baseline-names.txt 2>/dev/null) == $sha ]]; then tree=(); else
     git -C $ROOT archive $sha app | tar -x -C $BASE_DIR && tree=($BASE_DIR/app); fi
   cd $APP && uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
+  uv run --quiet python -m bin.audit_env_coverage $show $filters < $NAMES
 } 2>&1 | tee $OUT
 
 print "\nwritten: $OUT"
