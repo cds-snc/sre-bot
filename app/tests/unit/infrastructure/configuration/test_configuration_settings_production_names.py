@@ -17,9 +17,11 @@ are pinned as unread; production still sets GOOGLE_RESOURCES. The AWS slice read
 and the access slice the [access_permission_sets] table with its two values from
 ACCESS_PERMISSION_SETS__<FIELD>: non-public values, so no file names them; the fifteen
 retired AWS_* names are pinned as unread; the region and the dynamodb-local endpoint are the SDK's
-(AWS_DEFAULT_REGION, AWS_ENDPOINT_URL_DYNAMODB), declared by no field. The OpenAI,
+(AWS_DEFAULT_REGION, AWS_ENDPOINT_URL_DYNAMODB), declared by no field. The OpenAI slice
+reads the [openai] table with its key under OPENAI__API_KEY (a task-definition secret) beside a
+tenant entry; the six retired OPENAI_* names are pinned as unread. The
 Notify, Trello, OpsGenie, MaxMind and Sentinel slices likewise: production sets
-OPENAI_API_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
+NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
 the TRELLO_* names, OPSGENIE_INTEGRATIONS_KEY and the SENTINEL_* names, some of
 them written 'NAME =value' in the .env file; the remaining names stay part of the interface. The identity,
 server, dev and Slack transport slices too: production sets ENVIRONMENT,
@@ -111,17 +113,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
     (IdentitySettings, "ENVIRONMENT", "environment", "production", "production"),
     (IdentitySettings, "GIT_SHA", "git_sha", "sentinel-sha", "sentinel-sha"),
-]
-
-_OPENAI_COMPANION_KEY = "sk-companion"
-"""OPENAI_API_KEY is required, so every OpenAI row sets it beside the name under test."""
-
-OPENAI_NAMES: list[tuple[str, str, str, Any]] = [
-    ("OPENAI_MODEL", "model", "sentinel-model", "sentinel-model"),
-    ("OPENAI_MAX_OUTPUT_TOKENS", "max_output_tokens", "1234", 1234),
-    ("OPENAI_TEMPERATURE", "temperature", "0.25", 0.25),
-    ("OPENAI_TIMEOUT_SECONDS", "timeout_seconds", "42.5", 42.5),
-    ("OPENAI_BASE_URL", "base_url", "https://ai.sentinel.example", "https://ai.sentinel.example"),
 ]
 
 
@@ -310,35 +301,56 @@ def test_configuration_settings_slack_and_google_lower_case_names_accepted(monke
     assert google.api_num_retries == 9
 
 
-def test_configuration_settings_openai_api_key_reaches_field(monkeypatch: pytest.MonkeyPatch) -> None:
-    """OPENAI_API_KEY sets the required secret field; compared through its secret value."""
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-sentinel")
+OPENAI_RETIRED_NAMES = [
+    "OPENAI_API_KEY",
+    "OPENAI_MODEL",
+    "OPENAI_MAX_OUTPUT_TOKENS",
+    "OPENAI_TEMPERATURE",
+    "OPENAI_TIMEOUT_SECONDS",
+    "OPENAI_BASE_URL",
+]
+
+OPENAI_NAMES: list[tuple[str, str, Any]] = [
+    ("OPENAI__MAX_OUTPUT_TOKENS", "max_output_tokens", 1234),
+    ("OPENAI__TEMPERATURE", "temperature", 0.25),
+    ("OPENAI__TIMEOUT_SECONDS", "timeout_seconds", 42.5),
+]
+
+
+def test_configuration_settings_openai_key_and_tenant_names_configure_openai(monkeypatch: pytest.MonkeyPatch) -> None:
+    """OPENAI__API_KEY reaches the secret field beside a tenant entry; compared through its secret value."""
+    monkeypatch.setenv("OPENAI__API_KEY", "sk-sentinel")
+    monkeypatch.setenv("OPENAI__TENANT__BASE_URL", "https://ai.sentinel.example")
+    monkeypatch.setenv("OPENAI__TENANT__MODEL", "sentinel-model")
 
     settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
 
     assert isinstance(settings.api_key, SecretStr)
     assert settings.api_key.get_secret_value() == "sk-sentinel"
+    assert (settings.base_url, settings.model) == ("https://ai.sentinel.example", "sentinel-model")
 
 
-@pytest.mark.parametrize(
-    ("env_name", "attribute", "raw", "expected"),
-    OPENAI_NAMES,
-    ids=[row[0] for row in OPENAI_NAMES],
-)
-def test_configuration_settings_openai_name_reaches_field(
-    monkeypatch: pytest.MonkeyPatch,
-    env_name: str,
-    attribute: str,
-    raw: str,
-    expected: Any,
+@pytest.mark.parametrize(("env_name", "attribute", "expected"), OPENAI_NAMES, ids=[row[0] for row in OPENAI_NAMES])
+def test_configuration_settings_openai_table_name_reaches_field(
+    monkeypatch: pytest.MonkeyPatch, env_name: str, attribute: str, expected: Any
 ) -> None:
-    """Each OpenAI name sets its field when the required key is present; a default would differ from the sentinel."""
-    monkeypatch.setenv("OPENAI_API_KEY", _OPENAI_COMPANION_KEY)
-    monkeypatch.setenv(env_name, raw)
+    """The OPENAI__<FIELD> name sets the field; a fallback to the default would differ from the sentinel."""
+    monkeypatch.setenv(env_name, str(expected))
 
     settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
 
     assert getattr(settings, attribute) == expected
+
+
+@pytest.mark.parametrize("env_name", OPENAI_RETIRED_NAMES)
+def test_configuration_settings_openai_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
+    """The six old OPENAI_* names are read by no field: the slice builds exactly as without them."""
+    baseline = OpenAISettings(_env_file=None).model_dump()  # type: ignore[call-arg]
+    monkeypatch.setenv(env_name, "https://ai.retired.example" if env_name == "OPENAI_BASE_URL" else "7")
+
+    settings = OpenAISettings(_env_file=None).model_dump()  # type: ignore[call-arg]
+
+    assert settings == baseline
 
 
 AWS_RETIRED_NAMES = [

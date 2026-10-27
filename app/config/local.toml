@@ -13,3 +13,8 @@ command_prefix = "dev-"
 [notify_api_key_leak]
 channel_id = "C033L7RGCT0"
 oncall_group_id = ""
+
+[openai.tenant]
+# The model gateway every development environment shares; its key is the repository's Codespaces secret OPENAI__API_KEY.
+base_url = "https://ai.cdssandbox.xyz"
+model = "gpt-5.6-luna"

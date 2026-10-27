@@ -396,8 +396,8 @@ rest.
 | `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
 
 Vendor settings live in `integrations.openai`. Two matter here:
-`OPENAI_MAX_OUTPUT_TOKENS` (the fallback budget, overridden per call by the
-row above) and `OPENAI_TEMPERATURE`, which is **omitted by default** — the
+`[openai] max_output_tokens` (the fallback budget, overridden per call by the
+row above) and `[openai] temperature`, which is **omitted by default** — the
 gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
 where the model supports it, for more reproducible drafts.
 
@@ -423,8 +423,8 @@ ours will not help.
 
 #### Credentials
 
-`OPENAI_API_KEY` (`integrations.openai`, which also supplies the model and
-timeout) and the Google Workspace service account, with the `documents` and
+`OPENAI__API_KEY` (`integrations.openai`, whose `[openai.tenant]` entry also
+supplies the endpoint and model, and whose `[openai]` table the timeout) and the Google Workspace service account, with the `documents` and
 `drive` scopes.
 
 #### Required Slack scopes
@@ -492,7 +492,7 @@ have safe defaults:
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
 
 OpenAI credentials/model are **not** configured here — they belong to the
-vendor client (`OPENAI_API_KEY`, `OPENAI_MODEL`, …) in
+vendor client (`OPENAI__API_KEY`, `[openai.tenant] model`, …) in
 `app/integrations/openai/settings.py`.
 
 #### Required Slack scopes

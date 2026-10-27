@@ -22,6 +22,7 @@ from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.aws.settings import get_aws_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
+from integrations.openai.settings import get_openai_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from jobs.settings import SchedulerSettings, get_scheduler_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
@@ -152,6 +153,7 @@ def _validate_slices(
     scheduler = get_scheduler_settings()
     get_aws_settings()
     get_google_workspace_settings()
+    get_openai_settings()
     get_notify_api_key_leak_settings()
     plugins = get_plugins_settings()
     check_plugin_enablement(plugins, installed_plugin_names())

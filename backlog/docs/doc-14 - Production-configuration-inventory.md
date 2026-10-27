@@ -80,7 +80,7 @@ Destinations:
 | Key | Owning slice | Destination | Subtask |
 | --- | --- | --- | --- |
 | NOTIFY_ONCALL_GROUP_ID | NotifyApiKeyLeakSettings (moved from ServerSettings in 111.7) | file [notify_api_key_leak] oncall_group_id | 111.7 |
-| OPENAI_API_KEY | OpenAISettings | secret OPENAI__API_KEY | 111.4, 111.11 |
+| OPENAI_API_KEY | no longer read (TASK-111.11.2, 2026-10-27) | secret OPENAI__API_KEY, read by OpenAISettings beside production.toml [openai.tenant] (base_url, model); the blob line stays inert until 111.15 removes the blob | 111.4, 111.11.2 |
 | SLACK_NOTIFY_MGMT_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
 | SLACK_TEAM_ID | no longer read (TASK-111.9, 2026-10-23) | production.toml [slack.tenant] team_id = "T2G2S06PM"; the blob line stays inert until 111.15 removes the blob | 111.9 |
 | SLACK_USER_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__USER_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |

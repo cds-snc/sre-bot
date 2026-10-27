@@ -134,6 +134,24 @@ def test_a_retired_aws_name_is_deleted_naming_its_destination(name: str, destina
     assert destination in verdict.reason
 
 
+@pytest.mark.parametrize(
+    ("name", "destination"),
+    [
+        ("OPENAI_API_KEY", "secret OPENAI__API_KEY"),
+        ("OPENAI_BASE_URL", "[openai.tenant] base_url"),
+        ("OPENAI_MODEL", "[openai.tenant] model"),
+        ("OPENAI_MAX_OUTPUT_TOKENS", "[openai] max_output_tokens"),
+        ("OPENAI_TEMPERATURE", "[openai] temperature"),
+        ("OPENAI_TIMEOUT_SECONDS", "[openai] timeout_seconds"),
+    ],
+)
+def test_a_retired_openai_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert destination in verdict.reason
+
+
 @pytest.mark.parametrize("name", ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL_DYNAMODB", "AWS_ACCESS_KEY_ID"])
 def test_an_aws_sdk_name_is_kept(name: str) -> None:
     """The SDK reads these names itself, so no AWS hint may turn them into a delete."""

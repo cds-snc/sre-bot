@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-10-23T17:09:00Z'
+updated_date: '2026-10-27T18:58:00Z'
 labels:
   - clients
   - phase-3
@@ -59,9 +59,11 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/openai/ contains only __init__.py, client.py and settings.py; classify_openai_error returns (OperationStatus, error_code, retry_after); every openai entry in bin/baselines/vendor_package_contract.txt is removed
-- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; features/incident/scribe/service.py and features/incident/comms/adapters/text_generation.py import only its api.py, with unchanged behaviour (including the comms unconfigured fallback) covered by their existing tests; the 'features.incident.scribe.service -> integrations.openai' import-linter ignore is removed
+- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; the port reports unavailable when the OpenAI tenant entry is absent, never an error; features/incident/scribe/service.py and features/incident/comms/adapters/text_generation.py import only its api.py, with unchanged behaviour (comms treats text generation as optional and falls back when it is unavailable; scribe requires it, TASK-172) covered by their existing tests; the 'features.incident.scribe.service -> integrations.openai' import-linter ignore is removed
 - [ ] #3 The OpenAI client's retry policy is explicit at construction (or explicitly none, with the reason recorded), alongside its timeout
 - [ ] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
 - [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, lint-imports, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 - [ ] #6 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages
+- [ ] #7 integrations/openai/settings.py holds the connection only: [openai] timeout_seconds (plus the retry policy of AC #3) and [openai.tenant] base_url, with OPENAI__API_KEY; max_output_tokens, temperature and the tenant's model are gone from the vendor slice, and production.toml and local.toml move model to the capability's table in the same PR
+- [ ] #8 capabilities/text_generation/settings.py holds the default model; each feature use case passes its own output budget from its own settings (scribe's catch-up summary gains one, 3000 as today, so production sends the same); the port carries an optional per-call temperature, omitted when unset; decisions/configuration.md drops the generation-parameters tolerance
 <!-- AC:END -->

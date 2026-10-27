@@ -61,7 +61,7 @@ Runtime orchestration (loops, schedulers, error boundaries) stays in `server/`. 
 
 **Features never import each other.** A need two features share becomes a capability. A need two subdomains of one feature share stays in that feature, in its `core/` ([feature-packages.md](feature-packages.md)).
 
-**Text generation is a capability.** Producing text from source material and instructions (a summary, or a template filled section by section) is a domain-agnostic engine with a feature-free vocabulary. Features supply the source text, the instructions or template, and any feature-specific post-processing; the model vendor sits behind the capability's adapter.
+**Text generation is a capability.** Producing text from source material and instructions (a summary, or a template filled section by section) is a domain-agnostic engine with a feature-free vocabulary. Features supply the source text, the instructions or template, and any feature-specific post-processing; the model vendor sits behind the capability's adapter. The capability reports unavailable when its vendor is not configured, never an error; each consumer decides whether that is fatal: comms' AI drafting is a designed optional use, scribe requires it ([plugins.md](plugins.md)). The capability's own slice holds the default model; features pass their output budget, and a temperature when one needs it, on each call; the vendor slice holds only the connection ([configuration.md](configuration.md)).
 
 **Plugins get core services from a registry, keyed by contract.** At startup the host registers a factory for each `contracts` Protocol in a type-keyed registry ([svcs](https://svcs.hynek.me/)). Entry points (HTTP routes, Slack and Teams handlers, jobs) take what they need from a container scoped to that call; FastAPI routes do this through the registry's FastAPI integration. Services receive their dependencies through their constructor and never look them up mid-method. Tests register fakes against the same Protocols.
 
@@ -156,3 +156,5 @@ Tolerated until then:
 - 2026-10-20: `contracts/` may import pydantic-settings for the settings-slice base; the configuration loader is host code in `server/configuration/` (TASK-111).
 - 2026-10-22: `contracts/configuration.py` holds `HostInfo`, the host facts every layer may read; the identity and server slices are host code in `server/configuration/` (TASK-111.7).
 - 2026-10-26: the host may import everything except a plugin's own modules, enforced by an import-linter `protected` contract over the entry-point modules (TASK-112.2).
+- 2026-10-27: text generation reports unavailable when its vendor is not configured; a consumer that requires it states so and aborts boot without it (TASK-172, TASK-25.10).
+- 2026-10-27: the text-generation capability's slice holds the default model; features pass their generation parameters per call; the vendor slice holds the connection only (TASK-25.10).

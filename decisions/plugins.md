@@ -52,16 +52,9 @@ Entry-point names are dotted `<package>.<subdomain>` for subdomains, so the flat
 
 **Marker discipline.** Plugins import `hookimpl` from `contracts`, never from `pluggy` directly.
 
-**Boot failure policy is fixed by layer and kind of failure.** It follows [lifecycle.md](lifecycle.md)'s rule that only deploy-coupled defects abort boot:
+**Boot failure policy is one rule for every layer.** It follows [lifecycle.md](lifecycle.md)'s rule that only deploy-coupled defects abort boot. An enabled plugin states that it must work in this environment, so in the host, a capability or a feature each of these aborts boot: an entry-point target that will not import or a hookimpl that raises during startup; a settings slice that fails validation; a vendor slice that fails validation; a vendor or capability the plugin requires that is not configured. Each ships with the image or the checked-in configuration: the old tasks keep serving during the deploy, and the circuit breaker's rollback fixes it. A credential check that fails logs ERROR and the plugin keeps serving, because credentials change without a deploy and a rollback cannot fix them. A plugin is switched off with its enablement key, never skipped at boot. This is Backstage's default, where any plugin boot failure aborts the backend ([building backends](https://backstage.io/docs/backend-system/building-backends/index/)); there is no per-plugin override, so an enabled plugin is never silently absent. Every abort logs one CRITICAL `plugin_boot_failed` event naming the plugin, phase and error type, and the configuration key when one is at fault ([observability.md](observability.md)).
 
-| Failure | Host, capability | Feature |
-| --- | --- | --- |
-| Entry-point target will not import, or a hookimpl raises during startup | abort | abort |
-| Settings slice fails validation | abort | skip the plugin |
-| Vendor slice fails validation | abort | abort |
-| Credential check fails | log ERROR, keep serving | log ERROR, keep serving |
-
-Code defects abort in every layer: they ship with the image, the old tasks keep serving during the deploy, and rollback fixes them. A skipped feature registers nothing (the host drops what it registered before the registries freeze), and the host logs one CRITICAL `plugin_boot_failed` event naming the plugin, phase and error type ([observability.md](observability.md)). Capabilities and host services abort instead of being skipped because features depend on them. There is no per-plugin override. Backstage offers one (`onPluginBootFailure`, [building backends](https://backstage.io/docs/backend-system/building-backends/index/)); we keep a single policy instead, so a feature cannot opt into taking the whole app down.
+**A plugin states what it requires by resolving it.** While it registers, a plugin resolves each vendor or capability it requires (vendors through the configured-systems read, [workplace-systems.md](workplace-systems.md) rule 3) and raises the `contracts` required-dependency error, naming the configuration key, when one is absent. Spring fails startup the same way when a required constructor dependency is missing, and only an explicitly optional one may be absent ([Spring Boot auto-configuration](https://docs.spring.io/spring-boot/reference/features/developing-auto-configuration.html)). A plugin runs without a dependency only where its ADR designs that state (comms' AI drafting over text generation, [incident-management.md](incident-management.md)): the dependency is then optional, and its absence is reported as unavailable, never as an error. Whether a vendor is required is never its own slice's decision ([configuration.md](configuration.md)).
 
 ## Consequences
 
@@ -85,10 +78,11 @@ Code defects abort in every layer: they ship with the image, the old tasks keep 
 
 ## Migration
 
-Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading), TASK-112 (enablement from configuration), TASK-126 (feature isolation and credential checks). The package moves are listed in [plugin-architecture.md](plugin-architecture.md). `modules/` keeps its hand-written registration until each surface is rebuilt ([migration.md](migration.md)).
+Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading), TASK-112 (enablement from configuration), TASK-126 (credential checks), TASK-172 (required dependencies abort boot). The package moves are listed in [plugin-architecture.md](plugin-architecture.md). `modules/` keeps its hand-written registration until each surface is rebuilt ([migration.md](migration.md)).
 
 Tolerated until closed:
-- a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's settings or credentials;
+- a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's credentials (TASK-126);
+- no plugin states what it requires yet, so a plugin enabled without its vendor boots and fails at use (TASK-172);
 - the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
 - plugins under `packages/` rather than `features/`.
 
@@ -104,3 +98,4 @@ Tolerated until closed:
 - 2026-10-23: `[slack_transport] enabled` replaced `SLACK_ENABLED`; that tolerated item is closed (TASK-112.1).
 - 2026-10-26: blocking keeps a disabled plugin unimported only if nothing else imports it, so an import-linter `protected` contract over the entry-point modules enforces it (TASK-112.2; pytest's `-p no:<name>` blocks the same way before loading).
 - 2026-10-26: the CI check for environment-variable and `ENVIRONMENT` plugin switches joins the Checks (TASK-112.4); the access switches `ACCESS_*_ENABLED` go in TASK-112.3.
+- 2026-10-27: one boot failure policy for every layer: an enabled plugin whose settings fail validation, or whose required vendor or capability is not configured, aborts boot (Backstage's default); a plugin states a requirement by resolving it at registration; a dependency is optional only where the plugin's ADR designs that state; no skip, no per-plugin override (TASK-172).

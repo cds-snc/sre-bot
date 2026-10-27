@@ -87,6 +87,12 @@ HINTS = {
     "AWS_NOT_FOUND_CODES": "[aws] not_found_codes",
     "AWS_UNAUTHORIZED_CODES": "[aws] unauthorized_codes",
     "AWS_TRANSIENT_CODES": "[aws] transient_codes",
+    "OPENAI_API_KEY": "secret OPENAI__API_KEY",
+    "OPENAI_BASE_URL": "[openai.tenant] base_url",
+    "OPENAI_MODEL": "[openai.tenant] model",
+    "OPENAI_MAX_OUTPUT_TOKENS": "[openai] max_output_tokens",
+    "OPENAI_TEMPERATURE": "[openai] temperature",
+    "OPENAI_TIMEOUT_SECONDS": "[openai] timeout_seconds",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
