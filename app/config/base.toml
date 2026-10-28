@@ -177,6 +177,27 @@ default_tier2_lease_ttl_seconds = 1800
 channel_id = ""
 oncall_group_id = ""
 
+[atip]
+# The channel a new ATIP request is announced in; empty means none.
+announce_channel_id = ""
+
+[incident]
+# Where the legacy declare path announces an incident and which user groups it invites.
+# Slack ids are deployment configuration, never a secret; empty means none. Local shares
+# the production workspace, so no production id is a default here.
+incident_channel = ""
+slack_security_user_group_id = ""
+slack_notify_mgmt_user_group_id = ""
+
+[sre_ops]
+# The channel the startup message and ops notifications go to; empty means none.
+sre_ops_channel_id = ""
+
+[cloud_operations]
+# Google group addresses whose members may run the legacy /aws admin commands; empty
+# denies every caller. A developer sets CLOUD_OPERATIONS__AWS_ADMIN_GROUPS='["..."]' in app/.env.
+aws_admin_groups = []
+
 # Plugin enablement (decisions/plugins.md): one table per product area
 # (decisions/product-scope.md), one key per entry point, named as in
 # pyproject.toml. Boot fails when an installed entry point has no key, a key

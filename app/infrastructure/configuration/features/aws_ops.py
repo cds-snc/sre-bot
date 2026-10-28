@@ -1,32 +1,29 @@
-"""AWS operations feature settings."""
+"""AWS operations feature settings: the [cloud_operations] table of the configuration files."""
 
 from functools import lru_cache
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
-from infrastructure.configuration.base import FeatureSettings
+from contracts.configuration import ConfigurationSlice
 
 
-class AWSFeatureSettings(FeatureSettings):
-    """AWS operations feature configuration.
+class AWSFeatureSettings(ConfigurationSlice):
+    """Who may run the legacy /aws admin commands.
 
-    Environment Variables:
-        AWS_ADMIN_GROUPS: List of admin group emails for AWS operations
-        AWS_OPS_GROUP_NAME: Operations group name
+    A group's address is an identifier, not a secret: membership is the control. TASK-88
+    deletes the setting when the rebuilt AWS surfaces declare their permissions.
 
-    Example:
-        ```python
-        from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
-
-        settings = get_aws_feature_settings()
-
-        admin_groups = settings.AWS_ADMIN_GROUPS
-        ops_group = settings.AWS_OPS_GROUP_NAME
-        ```
+    Keys of [cloud_operations]:
+        aws_admin_groups: Google group addresses whose members may run /aws admin commands;
+            empty denies every caller.
     """
 
-    AWS_ADMIN_GROUPS: list[str] = Field(default=["sre-ifs@cds-snc.ca"], alias="AWS_ADMIN_GROUPS")
-    AWS_OPS_GROUP_NAME: str = Field(default="", alias="AWS_OPS_GROUP_NAME")
+    model_config = SettingsConfigDict(toml_table_header=("cloud_operations",), env_prefix="CLOUD_OPERATIONS__")
+
+    AWS_ADMIN_GROUPS: list[str] = Field(
+        default_factory=list, description="Google group addresses whose members may run /aws admin commands"
+    )
 
 
 @lru_cache(maxsize=1)

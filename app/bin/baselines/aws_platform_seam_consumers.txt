@@ -12,7 +12,6 @@ jobs/scheduled_tasks.py
 modules/aws/aws_account_health.py
 modules/aws/identity_center.py
 modules/aws/lambdas.py
-modules/aws/ops_group_assignment.py
 modules/aws/spending.py
 modules/incident/db_operations.py
 modules/provisioning/groups.py

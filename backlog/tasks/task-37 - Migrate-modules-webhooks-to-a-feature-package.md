@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-26T14:03:00Z'
+updated_date: '2026-10-28T17:14:00Z'
 labels:
   - migration
   - webhooks
@@ -61,3 +61,9 @@ External contract: the webhook URLs and behaviour are held by the TASK-36.2 rout
 - [ ] #1 Smoke suite green post-cutover; other-team-facing surface verified unchanged
 - [ ] #2 PR series references decisions/migration.md recipe
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 (found in TASK-111.14): modules/slack/webhooks_create.py:37-38 and webhooks_list.py:231 write the webhook URL host https://sre-bot.cdssandbox.xyz in code; the rebuild builds it from HostInfo.public_base_url ([server] public_base_url).
+<!-- SECTION:NOTES:END -->

@@ -451,6 +451,22 @@ def test_channel_slug(channel_name, expected):
     assert incident_folder.channel_slug(channel_name) == expected
 
 
+@pytest.mark.parametrize(
+    ("link", "expected"),
+    [
+        ("https://gcdigital.slack.com/archives/C0123456789", "C0123456789"),
+        ("https://other.slack.com/archives/C0123456789", "C0123456789"),
+        ("https://slack.com/app_redirect?channel=C0123456789&team=T0TEAM", "C0123456789"),
+        ("https://slack.com/app_redirect?channel=C0123456789", "C0123456789"),
+        ("https://example.com/archives/C0123456789", None),
+        ("https://slack.com/app_redirect?team=T0TEAM", None),
+    ],
+)
+def test_channel_id_from_link_reads_both_link_forms(link, expected):
+    """Rows written before the deep link keep the workspace archive URL; both forms give the channel id."""
+    assert incident_folder.channel_id_from_link(link) == expected
+
+
 def _incident_row_data():
     return [
         [SheetCell("header")],

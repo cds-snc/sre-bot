@@ -4,3 +4,6 @@
 [notify_api_key_leak]
 channel_id = "C033L7RGCT0"
 oncall_group_id = ""
+
+[atip]
+announce_channel_id = "C033L7RGCT0"

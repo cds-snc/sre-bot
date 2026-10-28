@@ -7,6 +7,7 @@ import datetime
 import re
 import time
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 from slack_bolt import Ack
 from slack_sdk.errors import SlackApiError
@@ -366,6 +367,21 @@ def return_channel_name(input_str: str):
     return input_str
 
 
+_ARCHIVE_PATH = re.compile(r"^/archives/(\w+)")
+
+
+def channel_id_from_link(link: str) -> str | None:
+    """Read the channel id from a sheet row's channel link: a workspace archive URL or Slack's deep link."""
+    parts = urlsplit(link)
+    host = parts.hostname or ""
+    if host != "slack.com" and not host.endswith(".slack.com"):
+        return None
+    if parts.path == "/app_redirect":
+        return next(iter(parse_qs(parts.query).get("channel", [])), None)
+    match = _ARCHIVE_PATH.match(parts.path)
+    return match.group(1) if match else None
+
+
 def get_incidents_from_sheet(days=0) -> list:
     """Get incidents from the incident list spreadsheet."""
     date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
@@ -386,9 +402,7 @@ def get_incidents_from_sheet(days=0) -> list:
         channel_cell = row[4]
         channel_id = None
         if channel_cell.link:
-            match = re.search(r"https://gcdigital\.slack\.com/archives/(\w+)", channel_cell.link)
-            if match:
-                channel_id = match.group(1)
+            channel_id = channel_id_from_link(channel_cell.link)
         channel_name = channel_cell.formatted_value
         channel_name = "TBC" if not channel_name else channel_name[1:]
         incident_details: dict[str, Any] = {

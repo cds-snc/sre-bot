@@ -16,6 +16,8 @@ from contracts.configuration import (
 )
 from contracts.slack.transport import SlackTransportInfo, install_slack_transport_info
 from infrastructure.audit.settings import get_audit_settings
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from infrastructure.configuration.features.incident import get_incident_settings
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
 from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
@@ -31,6 +33,7 @@ from integrations.opsgenie.settings import get_opsgenie_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from integrations.trello.settings import get_trello_settings
 from jobs.settings import SchedulerSettings, get_scheduler_settings
+from modules.atip.settings import get_atip_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from server.configuration.identity import IdentitySettings, get_identity_settings
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
@@ -167,6 +170,9 @@ def _validate_slices(
     get_opsgenie_settings()
     get_maxmind_settings()
     get_notify_api_key_leak_settings()
+    get_incident_settings()
+    get_atip_settings()
+    get_aws_feature_settings()
     plugins = get_plugins_settings()
     check_plugin_enablement(plugins, installed_plugin_names())
     host = build_host_info(identity, server)

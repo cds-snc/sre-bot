@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-10-28T17:26:00Z'
 labels:
   - incident
   - features
@@ -87,4 +87,6 @@ Sheet consumers see the same rows. Revert restores the sheet reads and the impor
 2026-10-15: the legacy backfill moved to the TASK-145.5.7 upgrade job (human); this task removes the sheet import, the last legacy writer, and reruns that job after deploy.
 
 2026-10-20 (TASK-27.5 planning): AC3 rewritten. The whole-table read rule (decisions/cloud-portability.md contract 4) makes listings an index read (list_open) and removes the sheet duplicate-row check; only the rebuild uses read_all.
+
+2026-10-28 (TASK-111.14): new incident list rows hold the channel as Slack's deep link (slack.com/app_redirect?channel=<id>&team=<team_id>), older rows hold gcdigital.slack.com/archives/<id>; modules/incident/incident_folder.channel_id_from_link reads both until the sheet import is removed here.
 <!-- SECTION:NOTES:END -->

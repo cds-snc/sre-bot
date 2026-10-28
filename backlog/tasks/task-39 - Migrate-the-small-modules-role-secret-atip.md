@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-27T20:32:00Z'
+updated_date: '2026-10-28T17:14:00Z'
 labels:
   - migration
   - phase-5
@@ -67,6 +67,14 @@ Targets:
 - [ ] #1 Each module landed as its own reviewable PR series
 - [ ] #2 PR series references decisions/migration.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28 (TASK-111.14): the ATIP announce channel was hard-coded (C033L7RGCT0) in modules/atip/atip.py; it now reads [atip] announce_channel_id from modules/atip/settings.py. The rebuild moves that slice to features/atip with the module and adds the Trello board id to the same table.
+
+2026-10-28 (found in TASK-111.14): modules/secret/secret.py:58,64 write the encrypted-message service host (https://encrypted-message.cdssandbox.xyz) in code; the secret rebuild reads it from its slice's table (deployment configuration, production.toml).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

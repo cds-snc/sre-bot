@@ -21,7 +21,7 @@ Destinations:
 ## Facts recorded for TASK-111 AC6
 
 - Production sets `AWS_ORG_ACCOUNT_ROLE_ARN` and `ISSUER_CONFIG`.
-- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP` (now `[directory] require_startup_warmup`, default false), `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults. Nor does it set `IDEMPOTENCY_TTL_SECONDS`, `IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS` or `AUDIT_TABLE_NAME` (now `[coordination] record_ttl_seconds` and `in_progress_ttl_seconds`, and `[audit] table_name`, TASK-111.13.3): the table names and TTLs come from `base.toml`, equal to the former defaults.
+- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP` (now `[directory] require_startup_warmup`, default false), `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults. Nor does it set `IDEMPOTENCY_TTL_SECONDS`, `IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS` or `AUDIT_TABLE_NAME` (now `[coordination] record_ttl_seconds` and `in_progress_ttl_seconds`, and `[audit] table_name`, TASK-111.13.3): the table names and TTLs come from `base.toml`, equal to the former defaults. Nor does it set `AWS_ADMIN_GROUPS` or `AWS_OPS_GROUP_NAME` (pre features confirms): production ran on the code default `["sre-ifs@cds-snc.ca"]`, now `[cloud_operations] aws_admin_groups` in `production.toml`, and the ops group assignment the empty group name disabled is deleted (TASK-111.14); the groups slice's other names (`RECONCILIATION_*`, `CIRCUIT_BREAKER_*`, `REQUIRE_JUSTIFICATION`, `MIN_JUSTIFICATION_LENGTH`) were never set and are deleted with it.
 - Production `CORS_ALLOWED_ORIGINS` is the terraform variable default, an empty list.
 
 ## sre-bot-config
@@ -30,7 +30,7 @@ Destinations:
 | --- | --- | --- | --- |
 | ACCESS_TOKEN_EXPIRE_MINUTES | ServerSettings (unused field) | delete | 111.7 |
 | APP_TOKEN | none | delete | 111.15 |
-| ATIP_ANNOUNCE_CHANNEL | AtipSettings (dead slice) | delete | 111.14 |
+| ATIP_ANNOUNCE_CHANNEL | no longer read (TASK-111.14, 2026-10-28; the legacy AtipSettings was never wired: modules/atip/atip.py posted to C033L7RGCT0 written in code) | production.toml [atip] announce_channel_id (public Slack id; pre features compares it with this blob line; local and ci keep the test channel); the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | AWS_AUDIT_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__AUDIT_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded wrongly as unset in production); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
 | AWS_LOGGING_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__LOGGING_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded wrongly as unset in production); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
 | AWS_ORG_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__ORG_ROLE_ARN (non-public value); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
@@ -48,9 +48,9 @@ Destinations:
 | GOOGLE_DELEGATED_ADMIN_EMAIL | no longer read (TASK-111.10.2, 2026-10-26); the field is deleted | delete; the blob line stays inert until 111.15 removes the blob | 111.10.2 |
 | GOOGLE_RESOURCES | GoogleResourcesConfig (interim) | one key per id, never one JSON; Drive item ids are non-public values (never in the files), supplied as TASK-167 rules for document ids | 111.10.3 |
 | GOOGLE_WORKSPACE_CUSTOMER_ID | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID (non-public value: Google shows it only to domain-settings admins; parameter added by a terraform-only PR before 111.10.2, decided 2026-10-26); the blob line stays inert until 111.15 removes the blob | 111.10.2 |
-| GROUP_DOMAIN | GroupsFeatureSettings (dead slice) | delete | 111.14 |
-| GROUP_PROVIDERS | GroupsFeatureSettings (dead slice) | delete | 111.14 |
-| INCIDENT_CHANNEL | IncidentFeatureSettings (infrastructure/configuration/features/incident.py) | file, the slice's table | 111.14 |
+| GROUP_DOMAIN | no longer read (TASK-111.14, 2026-10-28; GroupsFeatureSettings deleted) | delete; the blob line stays inert until 111.15 removes the blobs | 111.14 |
+| GROUP_PROVIDERS | no longer read (TASK-111.14, 2026-10-28; GroupsFeatureSettings deleted) | delete; the blob line stays inert until 111.15 removes the blobs | 111.14 |
+| INCIDENT_CHANNEL | no longer read (TASK-111.14, 2026-10-28) | production.toml [incident] incident_channel (public Slack id; pre features compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | ISSUER_CONFIG | SecuritySettings | file [security] issuer_config (structured table) | 111.8 |
 | MAXMIND_KEY | none (MaxMindSettings reads only the database path) | delete | 111.15 |
 | NOTIFY_API_URL | no longer read (TASK-111.12, 2026-10-28) | production.toml [notify.tenant] api_url (public; pre vendors compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.12 |
@@ -67,10 +67,10 @@ Destinations:
 | SLACK_APP_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__APP_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
 | SLACK_BOT_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__BOT_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
 | SLACK_ENABLED | no longer read (TASK-112.1, 2026-10-23) | production.toml [slack_transport] enabled = true; the blob line stays inert until 111.15 removes the blob | 112.1 |
-| SLACK_SECURITY_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
+| SLACK_SECURITY_USER_GROUP_ID | no longer read (TASK-111.14, 2026-10-28) | production.toml [incident] slack_security_user_group_id (public Slack id; pre features compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | SLACK_TOKEN | none | delete | 111.15 |
 | SRE_BOT_EMAIL | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public value: the address of a domain-privileged account; parameter added in 111.10.1, read by GoogleWorkspaceSettings from 111.10.2); the blob line stays inert until 111.15 removes the blob | 111.10.1, 111.10.2 |
-| SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
+| SRE_OPS_CHANNEL_ID | no longer read (TASK-111.14, 2026-10-28) | production.toml [sre_ops] sre_ops_channel_id (public Slack id; pre features compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | TRELLO_APP_KEY | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__APP_KEY (the credentials are Trello's tenant entry: the SDK fixes the host, so nothing else identifies the tenant, decisions/configuration.md 2026-10-27); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO_ATIP_BOARD | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO_TOKEN | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
@@ -83,7 +83,7 @@ Destinations:
 | --- | --- | --- | --- |
 | NOTIFY_ONCALL_GROUP_ID | NotifyApiKeyLeakSettings (moved from ServerSettings in 111.7) | file [notify_api_key_leak] oncall_group_id | 111.7 |
 | OPENAI_API_KEY | no longer read (TASK-111.11.2, 2026-10-27) | secret OPENAI__API_KEY, read by OpenAISettings beside production.toml [openai.tenant] (base_url, model); the blob line stays inert until 111.15 removes the blob | 111.4, 111.11.2 |
-| SLACK_NOTIFY_MGMT_USER_GROUP_ID | IncidentFeatureSettings | file, the slice's table | 111.14 |
+| SLACK_NOTIFY_MGMT_USER_GROUP_ID | no longer read (TASK-111.14, 2026-10-28) | production.toml [incident] slack_notify_mgmt_user_group_id (public Slack id; pre features compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | SLACK_TEAM_ID | no longer read (TASK-111.9, 2026-10-23) | production.toml [slack.tenant] team_id = "T2G2S06PM"; the blob line stays inert until 111.15 removes the blob | 111.9 |
 | SLACK_USER_TOKEN | no longer read (TASK-111.9, 2026-10-23) | secret SLACK__USER_TOKEN, read by SlackSettings; the blob line stays inert until 111.15 removes the blob | 111.4, 111.9 |
 | SRE_TEST_CHANNEL_ID | ServerSettings | file [server] sre_test_channel_id | 111.7 |

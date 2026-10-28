@@ -1,10 +1,21 @@
 """Tests for recreate_missing_resources functionality."""
 
+from collections.abc import Iterator
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from modules.incident import core, incident_folder
+
+
+@pytest.fixture(autouse=True)
+def _slack_tenant() -> Iterator[None]:
+    """The channel link names the configured workspace."""
+    with patch(
+        "modules.incident.core.get_slack_settings", return_value=SimpleNamespace(tenant=SimpleNamespace(team_id="T0TEAM"))
+    ):
+        yield
 
 
 @pytest.fixture
@@ -89,7 +100,7 @@ def test_add_incident_to_sheet_dev_channel_uses_consistent_slug():
         "Incident name",
         "2024-01-01-foo",
         "Product",
-        "https://gcdigital.slack.com/archives/C123",
+        "https://slack.com/app_redirect?channel=C123&team=T0TEAM",
     )
 
 

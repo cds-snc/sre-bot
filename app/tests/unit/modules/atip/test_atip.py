@@ -534,3 +534,37 @@ def test_should_pass_ati_id_to_modal_view():
 
     # Assert
     client.views_open.assert_called_once()
+
+
+@pytest.mark.unit
+@patch("integrations.trello.add_atip_card_to_trello")
+@patch("modules.atip.atip.get_atip_settings")
+def test_should_announce_in_the_configured_channel(mock_settings, mock_trello, make_view_submission_payload):
+    """The kickoff and the request text go to [atip] announce_channel_id, never a channel named in code."""
+    mock_settings.return_value = SimpleNamespace(announce_channel_id="C0ANNOUNCE")
+    body = make_view_submission_payload(locale="en-US")
+    say = MagicMock()
+    client = MagicMock()
+    client.conversations_create.return_value = {"channel": {"id": "C123", "name": "tmp-atip-number"}}
+
+    atip.atip_view_handler(MagicMock(), body, say, client)
+
+    channels = [call.kwargs["channel"] for call in say.call_args_list]
+    assert channels == ["C0ANNOUNCE", "C0ANNOUNCE", "C123"]
+
+
+@pytest.mark.unit
+@patch("integrations.trello.add_atip_card_to_trello")
+@patch("modules.atip.atip.get_atip_settings")
+def test_should_post_only_in_the_new_channel_when_no_announce_channel(mock_settings, mock_trello, make_view_submission_payload):
+    """An empty announce channel skips both announcements; the request still reaches its own channel."""
+    mock_settings.return_value = SimpleNamespace(announce_channel_id="")
+    body = make_view_submission_payload(locale="en-US")
+    say = MagicMock()
+    client = MagicMock()
+    client.conversations_create.return_value = {"channel": {"id": "C123", "name": "tmp-atip-number"}}
+
+    atip.atip_view_handler(MagicMock(), body, say, client)
+
+    assert [call.kwargs["channel"] for call in say.call_args_list] == ["C123"]
+    assert mock_trello.call_count == 1

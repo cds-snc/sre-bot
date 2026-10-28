@@ -1,29 +1,26 @@
-"""SRE operations feature settings."""
+"""SRE operations feature settings: the [sre_ops] table of the configuration files."""
 
 from functools import lru_cache
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
-from infrastructure.configuration.base import FeatureSettings
+from contracts.configuration import ConfigurationSlice
 
 
-class SreOpsSettings(FeatureSettings):
-    """SRE operations feature configuration.
+class SreOpsSettings(ConfigurationSlice):
+    """The channel the startup message and ops notifications go to.
 
-    Environment Variables:
-        SRE_OPS_CHANNEL_ID: Slack channel ID for SRE operations notifications
+    The field name stays until the slice moves with its surface (TASK-40), which also
+    standardises the key.
 
-    Example:
-        ```python
-        from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
-
-        settings = get_sre_ops_settings()
-
-        ops_channel = settings.SRE_OPS_CHANNEL_ID
-        ```
+    Keys of [sre_ops]:
+        sre_ops_channel_id: Slack channel id for SRE operations notifications; empty for none.
     """
 
-    SRE_OPS_CHANNEL_ID: str = Field(default="", alias="SRE_OPS_CHANNEL_ID")
+    model_config = SettingsConfigDict(toml_table_header=("sre_ops",), env_prefix="SRE_OPS__")
+
+    SRE_OPS_CHANNEL_ID: str = Field(default="", description="Slack channel id for SRE operations notifications")
 
 
 @lru_cache(maxsize=1)

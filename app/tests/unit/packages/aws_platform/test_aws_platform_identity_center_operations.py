@@ -410,45 +410,6 @@ class TestListUsers:
         assert result.is_success
 
 
-class TestGetGroupId:
-    """GetGroupId via AlternateIdentifier displayName lookup returns GroupId."""
-
-    def test_get_group_id_success_by_displayname(self) -> None:
-        """GetGroupId with displayName AlternateIdentifier returns GroupId."""
-        client = _identitystore_client()
-        adapter = IdentityCenterAdapter(
-            identitystore=client,
-            identitystore_no_retry=client,
-            identity_store_id="d-1234567890",
-        )
-
-        with Stubber(client) as stub:
-            stub.add_response(
-                "get_group_id",
-                {
-                    "GroupId": "group-123",
-                    "IdentityStoreId": "d-1234567890",
-                    "GroupArn": "arn:aws:identitystore:::group/1234567890-225bfb47-93c3-5a21-8e64-acab8c8d8d9e",
-                },
-                expected_params={
-                    "IdentityStoreId": "d-1234567890",
-                    "AlternateIdentifier": {
-                        "UniqueAttribute": {
-                            "AttributePath": "displayName",
-                            "AttributeValue": "Admins",
-                        }
-                    },
-                },
-            )
-
-            result = adapter.get_group_id("Admins")
-
-            stub.assert_no_pending_responses()
-
-        assert result.is_success
-        assert result.data == "group-123"
-
-
 class TestListGroups:
     """ListGroups paginates through Groups and only passes Filters when given."""
 

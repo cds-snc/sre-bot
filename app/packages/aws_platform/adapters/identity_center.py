@@ -158,18 +158,6 @@ class IdentityCenterAdapter:
 
     # -- groups -------------------------------------------------------------
 
-    def get_group_id(self, group_name: str) -> OperationResult[str]:
-        """Resolve a GroupId from its displayName (NOT_FOUND when no group matches)."""
-        return self._call(
-            "get_group_id",
-            lambda: self._identitystore.get_group_id(
-                IdentityStoreId=self._identity_store_id,
-                # AttributeValue is a boto3 "document" type (any JSON scalar); the generated stub
-                # over-narrows it to Mapping[str, Any], as packages/access notes.
-                AlternateIdentifier={"UniqueAttribute": {"AttributePath": "displayName", "AttributeValue": group_name}},  # type: ignore[typeddict-item]
-            )["GroupId"],
-        )
-
     def list_groups(self, filters: list[dict[str, str]] | None = None) -> OperationResult[list[dict[str, Any]]]:
         """List every group, optionally narrowed by Identity Store Filters."""
         kwargs: dict[str, Any] = {"Filters": filters} if filters is not None else {}

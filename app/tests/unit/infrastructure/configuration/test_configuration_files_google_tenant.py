@@ -23,6 +23,8 @@ pytestmark = pytest.mark.unit
 # snake_case error codes of [slack] hold neither. The CamelCase boto3 error-code lists of [aws] do, so
 # they are cut out before the search.
 _AWS_CODE_LISTS = re.compile(r"^(?:not_found|unauthorized|transient)_codes = \[.*?^\]$", re.DOTALL | re.MULTILINE)
+# A group address whose membership grants a permission is an identifier, not the delegated user.
+_ADMIN_GROUP_ADDRESSES = re.compile(r"^aws_admin_groups = \[.*\]$", re.MULTILINE)
 _DRIVE_ID_SHAPE = re.compile(r"[\"'](?=[A-Za-z0-9_-]*[A-Z0-9])[A-Za-z0-9_-]{19,}[\"']")
 
 
@@ -47,7 +49,11 @@ def test_configuration_files_name_no_google_tenant(environment: str) -> None:
 def test_configuration_files_hold_no_google_tenant_value(name: str) -> None:
     """No checked-in file carries the tenant table, a customer id, the key, the delegated user, an email or a Drive id."""
     text = (CONFIG_DIR / name).read_text(encoding="utf-8")
-    values = "\n".join(line for line in _AWS_CODE_LISTS.sub("", text).splitlines() if not line.lstrip().startswith("#"))
+    values = "\n".join(
+        line
+        for line in _ADMIN_GROUP_ADDRESSES.sub("", _AWS_CODE_LISTS.sub("", text)).splitlines()
+        if not line.lstrip().startswith("#")
+    )
 
     for marker in ("google_workspace.tenant", "customer_id", "private_key", "service_account_key", "delegated_user_email", "@"):
         assert marker not in values

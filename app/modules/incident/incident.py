@@ -8,7 +8,6 @@ from slack_sdk.models import blocks, views
 from structlog import get_logger
 
 from contracts.slack.transport import slack_transport_info
-from infrastructure.configuration.features.incident import get_incident_settings
 from integrations.google_workspace.settings import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
@@ -18,10 +17,6 @@ from modules.incident import (
     incident_conversation,
     incident_folder,
 )
-
-incident_settings = get_incident_settings()
-INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
-SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
 
 logger = get_logger()
 

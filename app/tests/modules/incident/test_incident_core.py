@@ -1,9 +1,41 @@
+from collections.abc import Iterator
+from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, call, patch
 
 import pytest
 
 from models.incidents import IncidentPayload
 from modules.incident import core
+
+# The incident slice initiate_resources_creation reads when it runs; each test starts from these values.
+_SETTINGS = SimpleNamespace(
+    INCIDENT_CHANNEL="",
+    SLACK_SECURITY_USER_GROUP_ID="S0SECURITYDEFAULT",
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID="S0NOTIFYDEFAULT",
+)
+
+
+_SLACK_SETTINGS = SimpleNamespace(tenant=SimpleNamespace(team_id="T0TEAM"))
+
+
+@pytest.fixture(autouse=True)
+def _incident_settings() -> Iterator[None]:
+    """Stub the incident slice and the Slack tenant the declare path reads at call time."""
+    with (
+        patch("modules.incident.core.get_incident_settings", return_value=_SETTINGS),
+        patch("modules.incident.core.get_slack_settings", return_value=_SLACK_SETTINGS),
+    ):
+        yield
+
+
+def test_channel_url_is_a_slack_deep_link_into_the_tenant() -> None:
+    """The link names the configured workspace, never a workspace host written in code."""
+    assert core.channel_url("C0123") == "https://slack.com/app_redirect?channel=C0123&team=T0TEAM"
+
+
+def test_channel_url_without_a_tenant_leaves_the_workspace_to_slack() -> None:
+    with patch("modules.incident.core.get_slack_settings", return_value=SimpleNamespace(tenant=None)):
+        assert core.channel_url("C0123") == "https://slack.com/app_redirect?channel=C0123"
 
 
 def helper_generate_default_incident_params():
@@ -44,7 +76,7 @@ def _mock_successful_dependencies(
     mock_db_operations.create_incident.return_value = "incident_id"
 
 
-@patch("modules.incident.core.INCIDENT_CHANNEL", "incident-channel")
+@patch.object(_SETTINGS, "INCIDENT_CHANNEL", "incident-channel")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
@@ -176,7 +208,7 @@ _Type_ `/sre incident help` _for complete command list_"""
         "name",
         "slug",
         "product",
-        "https://gcdigital.slack.com/archives/channel_id",
+        "https://slack.com/app_redirect?channel=channel_id&team=T0TEAM",
     )
 
     mock_db_operations.create_incident.assert_called_once_with(
@@ -220,7 +252,7 @@ _Type_ `/sre incident help` _for complete command list_"""
         "document_id",
         "name",
         "product",
-        "https://gcdigital.slack.com/archives/channel_id",
+        "https://slack.com/app_redirect?channel=channel_id&team=T0TEAM",
         "test user name",
     )
     mock_logger.info.assert_any_call("incident_record_created", incident_id="incident_id")
@@ -465,7 +497,7 @@ def test_initiate_resources_creation_db_fails(
     mock_logger.info.assert_any_call("incident_document_created", document_id="doc_id")
 
 
-@patch("modules.incident.core.SLACK_SECURITY_USER_GROUP_ID", "S0SECURITY")
+@patch.object(_SETTINGS, "SLACK_SECURITY_USER_GROUP_ID", "S0SECURITY")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
@@ -603,7 +635,7 @@ def test_initiate_resources_creation_notify_group_added(
         "ok": True,
         "users": ["notify_user_1", "notify_user_2"],
     }
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
         core.initiate_resources_creation(client, incident_payload)
 
     client.usergroups_users_list.assert_called_once_with(usergroup="NOTIFY_GROUP_ID")
@@ -669,7 +701,7 @@ def test_initiate_resources_creation_notify_group_fails(
     client = MagicMock()
 
     client.usergroups_users_list.side_effect = Exception("notify group error")
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
         try:
             core.initiate_resources_creation(client, incident_payload)
         except Exception as e:
@@ -722,7 +754,7 @@ def test_notify_incident_group_id_not_set_skips_usergroups_call(
     _setup_notify_mocks(mock_incident_document, mock_google_meet, mock_db_operations, mock_get_on_call)
     client = MagicMock()
 
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", None):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", None):
         core.initiate_resources_creation(client, incident_payload)
 
     client.usergroups_users_list.assert_not_called()
@@ -753,7 +785,7 @@ def test_notify_incident_slack_api_returns_ok_false_does_not_invite(
         "error": "no_such_subteam",
     }
 
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
         core.initiate_resources_creation(client, incident_payload)
 
     # Only the creator invite should happen, no batch notify invite
@@ -791,7 +823,7 @@ def test_notify_incident_creator_excluded_from_notify_group_invite(
         "users": ["user_id", "notify_user_1"],
     }
 
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
         core.initiate_resources_creation(client, incident_payload)
 
     # Only notify_user_1 should be in the batch invite (user_id excluded)
@@ -820,14 +852,14 @@ def test_notify_incident_empty_group_does_not_batch_invite(
     client = MagicMock()
     client.usergroups_users_list.return_value = {"ok": True, "users": []}
 
-    with patch("modules.incident.core.SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
+    with patch.object(_SETTINGS, "SLACK_NOTIFY_MGMT_USER_GROUP_ID", "NOTIFY_GROUP_ID"):
         core.initiate_resources_creation(client, incident_payload)
 
     # Only the creator invite should happen, no second batch invite
     client.conversations_invite.assert_called_once_with(channel="channel_id", users="user_id")
 
 
-@patch("modules.incident.core.SLACK_SECURITY_USER_GROUP_ID", "S0SECURITY")
+@patch.object(_SETTINGS, "SLACK_SECURITY_USER_GROUP_ID", "S0SECURITY")
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")
@@ -868,7 +900,7 @@ def test_contract_security_group_invite_uses_environment_not_prefix(
     client.conversations_invite.assert_called_once_with(channel="channel_id", users="user_id")
 
 
-@patch("modules.incident.core.SLACK_SECURITY_USER_GROUP_ID", None)
+@patch.object(_SETTINGS, "SLACK_SECURITY_USER_GROUP_ID", None)
 @patch("modules.incident.core.logger")
 @patch("modules.incident.core.on_call.get_on_call_users_from_folder")
 @patch("modules.incident.core.db_operations")

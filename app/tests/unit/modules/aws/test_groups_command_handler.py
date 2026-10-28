@@ -79,22 +79,14 @@ def test_should_delegate_to_list_handler_when_list_command_given(
 
 
 @pytest.mark.unit
-@patch("modules.aws.groups.request_groups_ops")
-def test_should_delegate_to_ops_handler_when_ops_command_given(
-    mock_request_groups_ops,
-):
-    """Test that ops command delegates to handler."""
-    # Arrange
-    client = MagicMock()
-    body = MagicMock()
+def test_should_answer_invalid_command_when_ops_command_given():
+    """The ops group assignment never ran in production (no group name was ever set) and is gone."""
     respond = MagicMock()
-    args = ["ops"]
 
-    # Act
-    groups.command_handler(client, body, respond, args)
+    groups.command_handler(MagicMock(), MagicMock(), respond, ["ops"])
 
-    # Assert
-    mock_request_groups_ops.assert_called_once_with(client, body, respond, args)
+    respond.assert_called_once_with("Invalid command. Type `/aws groups help` for more information.")
+    assert not hasattr(groups, "request_groups_ops")
 
 
 @pytest.mark.unit

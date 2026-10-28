@@ -15,14 +15,18 @@
 #           [notify.tenant] api_url, any MAXMIND_DB_PATH or Opsgenie host line;
 #           post: no configuration_invalid naming a vendor, no not-configured line, the Opsgenie and MaxMind
 #           healthchecks healthy (TASK-111.12)
+#   features pre: the five Slack id lines (public identifiers, printed) beside production.toml's [incident],
+#           [sre_ops] and [atip] keys, MATCH or DIFFER; AWS_ADMIN_GROUPS and AWS_OPS_GROUP_NAME expected in no blob (production
+#           ran on the code default the file now holds); post: no configuration_invalid naming incident, sre_ops or
+#           cloud_operations; the startup message in the ops channel is a manual Slack check (TASK-111.14)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(vendors)
-PRE_CHECKS=(vendors)  # task checks with a pre part
+TASK_CHECKS=(vendors features)
+PRE_CHECKS=(vendors features)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -143,6 +147,34 @@ if [[ $phase == pre ]]; then
     done
     [[ $vendors_ok == yes ]] && result vendors_pre PASS || result vendors_pre "FAIL (a DIFFER or MISSING parameter, a host DIFFER or an override line blocks the merge: put-parameter or fix the file first)"
   fi
+
+  if (( ${checks[(Ie)features]} )); then  # TASK-111.14
+    section "Incident, SRE ops and ATIP ids against production.toml (TASK-111.14; Slack ids are public identifiers, printed)"
+    # file_value TABLE KEY: a quoted string key of one table in production.toml.
+    file_value() { sed -n "/^\[$1\]/,/^\[/p" $ROOT/app/config/production.toml | sed -nE "s/^$2 = \"(.*)\"/\1/p"; }
+    features_ok=yes
+    for triple in INCIDENT_CHANNEL:incident:incident_channel \
+        SLACK_SECURITY_USER_GROUP_ID:incident:slack_security_user_group_id \
+        SLACK_NOTIFY_MGMT_USER_GROUP_ID:incident:slack_notify_mgmt_user_group_id \
+        SRE_OPS_CHANNEL_ID:sre_ops:sre_ops_channel_id \
+        ATIP_ANNOUNCE_CHANNEL:atip:announce_channel_id; do
+      name=${triple%%:*}; rest=${triple#*:}; table=${rest%%:*}; key=${rest#*:}
+      old=$(blob_value $name) || old=missing
+      new=$(file_value $table $key); new=${new:-missing}
+      [[ $old != missing && $old == $new ]] && line=MATCH || { line=DIFFER; features_ok=no; }
+      print "$name line: $old; production.toml [$table] $key: $new; $line"
+    done
+    for name in AWS_ADMIN_GROUPS AWS_OPS_GROUP_NAME; do
+      where=$(blob_where $name)
+      print "$name in (expected none; production ran on the code default): $where"
+      [[ $where == none ]] || features_ok=no
+    done
+    print "production.toml [cloud_operations]: $(sed -n '/^\[cloud_operations\]/,/^\[/p' $ROOT/app/config/production.toml | grep -E '^aws_admin_groups' || print missing)"
+    for name in GROUP_DOMAIN GROUP_PROVIDERS; do
+      print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
+    done
+    [[ $features_ok == yes ]] && result features_pre PASS || result features_pre "FAIL (copy each DIFFER line's blob value into production.toml; an AWS_* line means production overrode the default: stop and replan)"
+  fi
 fi
 
 if [[ $phase == post ]]; then
@@ -218,6 +250,14 @@ if [[ $phase == post ]]; then
       print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
     done
     [[ $invalid == 0 && $unconfigured == 0 && $unhealthy == 0 && $healthy -gt 0 ]] && result vendors PASS || result vendors "FAIL ($invalid configuration_invalid, $unconfigured not configured, $unhealthy unhealthy, $healthy healthy)"
+  fi
+
+  if (( ${checks[(Ie)features]} )); then  # TASK-111.14
+    section "Incident, SRE ops and cloud operations slices from the files (TASK-111.14)"
+    invalid=$(li_count $since 'filter event = "configuration_invalid" and @message like /incident|sre_ops|cloud_operations|atip|INCIDENT__|SRE_OPS__|CLOUD_OPERATIONS__|ATIP__/')
+    print "configuration_invalid lines naming incident, sre_ops or cloud_operations: $invalid (expected 0)"
+    print "Manual: the 'SRE Bot has started up' message arrived in the ops channel; an sre-ifs member's /aws groups list is answered"
+    [[ $invalid == 0 ]] && result features PASS || result features "FAIL ($invalid configuration_invalid)"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"
