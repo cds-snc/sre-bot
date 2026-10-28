@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-28T23:45:00Z'
+updated_date: '2026-10-28T23:49:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -126,4 +126,6 @@ HUMAN STEPS BEFORE MERGE: run bin/deploy-checks.zsh pre and keep the printed rol
 2026-10-28 found (human: make dev failed, NotifySettings: NOTIFY__SRE_USER_NAME is set but [notify.tenant] is not): the 22:36Z env-checks plan, applied 22:43Z, copied NOTIFY_SRE_USER_NAME and NOTIFY_SRE_CLIENT_SECRET into NOTIFY__* Codespaces secrets because the coverage audit asked for every old-to-new copy, against the 111.12 decision that development stays without Notify. Dev tooling fix riding here: bin/audit_env_coverage.py no longer plans the copy for a slice-level credential whose vendor has a [<slice>.tenant] in production.toml and none in local.toml, and reports such a name present in Codespaces as a check ('fails local boot, delete it'); two tests in test_bin_audit_env_coverage_classify.py; bin tests 348 passed, ruff clean. Human: delete both Codespaces secrets.
 
 2026-10-28 23:40Z pre sentinel (tmp/deploy-checks/pre-sentinel-20261028T234017Z.txt, on :67): blob SENTINEL_LOG_TYPE = SREBot, copied into production.toml [sentinel] log_type (test_production_writes_to_the_table_the_blob_named); SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY MATCH by hash; the log type was DIFFER only because the file had no value yet: rerun pre sentinel expects PASS. Baseline breakdown: the 3 error lines are Socket Mode 'Failed to check the state of sock' ConnectionResetError (level error), so the count was never inflated by info lines; AC #9 checked with the breakdown in place. AC #8: every blob line the current image reads now has its owner (env-checks 23:40:41Z: sre-bot-config none=46, sre-bot-config-infrastructure none=6, GOOGLE_RESOURCES none as split). env-checks 20261028T234041Z: clean except the planned Sentinel Codespaces moves (SENTINEL_CUSTOMER_ID and SENTINEL_LOG_TYPE deleted, SENTINEL_SHARED_KEY copied to SENTINEL__SHARED_KEY then deleted; SENTINEL__CUSTOMER_ID already present) and the 3 org-secret checks; the 7 Actions secrets are gone and no NOTIFY__* Codespaces row remains. Gates after the change: pytest 6067 passed (later +1 Sentinel test), ruff clean, key ownership OK.
+
+2026-10-28 23:45Z env-checks replan (tmp/env-checks/20261028T234533Z.txt) clean: the Sentinel Codespaces moves applied, coverage none=39, only the 3 org-secret checks. 23:47Z pre sentinel (tmp/deploy-checks/pre-sentinel-20261028T234736Z.txt) PASS: log type SREBot MATCH, id and key MATCH. PR #1807 open, awaiting review. Open: AC #6 and the DoD (merge, tf_apply, dispatch deploy, post names_only sentinel, runbook Verify).
 <!-- SECTION:NOTES:END -->
