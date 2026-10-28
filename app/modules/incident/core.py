@@ -1,6 +1,7 @@
 """Core module to handle Incident creation"""
 
 from typing import Any
+from urllib.parse import urlencode
 
 from slack_sdk import WebClient
 from slack_sdk.models import blocks
@@ -10,6 +11,7 @@ from contracts.configuration import host_info
 from features.incident.drive.adapters import google_drive as incident_drive
 from features.incident.meet.adapters import google_meet as meet
 from infrastructure.configuration.features.incident import get_incident_settings
+from integrations.slack.settings import get_slack_settings
 from models.incidents import IncidentPayload
 from modules.incident import (
     db_operations,
@@ -19,12 +21,14 @@ from modules.incident import (
 )
 from modules.incident.incident_folder import channel_slug
 
-incident_settings = get_incident_settings()
-INCIDENT_CHANNEL = incident_settings.INCIDENT_CHANNEL
-SLACK_SECURITY_USER_GROUP_ID = incident_settings.SLACK_SECURITY_USER_GROUP_ID
-SLACK_NOTIFY_MGMT_USER_GROUP_ID = incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID
-
 logger = get_logger()
+
+
+def channel_url(channel_id: str) -> str:
+    """Link to a channel through Slack's deep link, naming the configured workspace when there is one."""
+    tenant = get_slack_settings().tenant
+    query = {"channel": channel_id} | ({"team": tenant.team_id} if tenant else {})
+    return f"https://slack.com/app_redirect?{urlencode(query)}"
 
 
 def _security_answer_to_flag(answer: str) -> bool | None:
@@ -191,7 +195,7 @@ def _create_document_bookmark(
             document_link = f"https://docs.google.com/document/d/{document_id}/edit"
 
             # Update boilerplate if we have the necessary info
-            channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
+            channel_link = channel_url(channel_id)
             oncall = on_call.get_on_call_users_from_folder(client, folder_id)
             oncall_names = ", ".join([user["profile"]["display_name_normalized"] for user in oncall])
 
@@ -199,7 +203,7 @@ def _create_document_bookmark(
                 document_id,
                 incident_name,
                 product,
-                channel_url,
+                channel_link,
                 oncall_names,
             )
             results["success"].append(f"Created incident document: {document_link}")
@@ -258,13 +262,13 @@ def _add_incident_to_sheet(
                 break
 
         if not already_in_sheet:
-            channel_url = f"https://gcdigital.slack.com/archives/{channel_id}"
+            channel_link = channel_url(channel_id)
             incident_folder.add_new_incident_to_list(
                 document_link,
                 incident_name,
                 slug,
                 product,
-                channel_url,
+                channel_link,
             )
             results["success"].append("Added incident to Google Sheets list")
             logger.info(
@@ -420,13 +424,14 @@ def initiate_resources_creation(
     incident_payload: IncidentPayload,
 ):
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
+    incident_settings = get_incident_settings()
 
     # Create channel
     environment = "prod" if host_info().environment == "production" else "dev"
 
     oncall = on_call.get_on_call_users_from_folder(client, incident_payload.folder)
 
-    channel_url = f"https://gcdigital.slack.com/archives/{incident_payload.channel_id}"
+    channel_link = channel_url(incident_payload.channel_id)
 
     # Set topic
     client.conversations_setTopic(
@@ -444,8 +449,8 @@ def initiate_resources_creation(
         f"<@{incident_payload.user_id}> a initié un nouvel incident: {incident_payload.name} pour {incident_payload.product}"
         f" dans <#{incident_payload.channel_id}>"
     )
-    if INCIDENT_CHANNEL:
-        client.chat_postMessage(text=text, channel=INCIDENT_CHANNEL)
+    if incident_settings.INCIDENT_CHANNEL:
+        client.chat_postMessage(text=text, channel=incident_settings.INCIDENT_CHANNEL)
 
     # Add incident creator to channel
     client.conversations_invite(channel=incident_payload.channel_id, users=incident_payload.user_id)
@@ -495,7 +500,7 @@ def initiate_resources_creation(
         incident_payload.name,
         incident_payload.slug,
         incident_payload.product,
-        channel_url,
+        channel_link,
     )
 
     folders = incident_folder.list_incident_folders()
@@ -552,7 +557,7 @@ def initiate_resources_creation(
             users_to_invite.append(user["id"])
 
     # Get users from the @security group
-    security_group_id = SLACK_SECURITY_USER_GROUP_ID
+    security_group_id = incident_settings.SLACK_SECURITY_USER_GROUP_ID
     if incident_payload.security_incident == "yes" and not security_group_id:
         logger.warning("security_user_group_not_configured", channel_id=incident_payload.channel_id)
     elif incident_payload.security_incident == "yes" and security_group_id:
@@ -567,10 +572,10 @@ def initiate_resources_creation(
                     users_to_invite.append(security_user)
 
     # Get users from the @notify-management group
-    if incident_payload.product == "Notify" and SLACK_NOTIFY_MGMT_USER_GROUP_ID:
+    if incident_payload.product == "Notify" and incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID:
         # If this is a Notify product incident, get users from the Notify management user group
         # and add them to the list of users to invite
-        response = client.usergroups_users_list(usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID)
+        response = client.usergroups_users_list(usergroup=incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID)
         if response.get("ok"):
             for notify_user in response["users"]:
                 if notify_user != incident_payload.user_id:
@@ -579,7 +584,7 @@ def initiate_resources_creation(
             logger.warning(
                 "notify_mgmt_group_fetch_failed",
                 error=response.get("error"),
-                usergroup=SLACK_NOTIFY_MGMT_USER_GROUP_ID,
+                usergroup=incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID,
             )
 
     # Invite all collected users to the channel in a single API call
@@ -607,7 +612,7 @@ _Type_ `/sre incident help` _for complete command list_"""
         document_id,
         incident_payload.name,
         incident_payload.product,
-        channel_url,
+        channel_link,
         ", ".join([x["profile"]["display_name_normalized"] for x in oncall]),
     )
     logger.info(

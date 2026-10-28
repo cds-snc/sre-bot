@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-23T17:10:00Z'
+updated_date: '2026-10-28T16:50:00Z'
 labels:
   - migration
   - phase-5
@@ -50,6 +50,7 @@ Steps:
 - [ ] #2 No module imports python-i18n after its migration
 - [ ] #3 Baselines only shrank throughout
 - [ ] #4 The empty app/modules/reports directory is deleted
+- [ ] #5 The sre_ops values move into the owning surface's slice with standardised keys (TASK-111.14 froze [sre_ops] sre_ops_channel_id, which repeats its table): lower snake_case, no table-name repeat, extra=forbid; base.toml, production.toml, HINTS and doc-14 updated in the same PR, values unchanged
 <!-- AC:END -->
 
 ## Definition of Done

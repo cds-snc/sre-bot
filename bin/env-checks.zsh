@@ -13,13 +13,42 @@
 # GitHub listings need your own login where the Codespace token is refused (Actions secrets, repo admin):
 #   env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --web; the script then retries with it automatically.
 # User Codespaces secrets need the codespace scope once: gh auth refresh -h github.com -s codespace
-# Output: tmp/env-checks/<UTC timestamp>.txt (gitignored, never commit it), also echoed.
+# Plan and apply, as terraform does: the audit only plans. It writes tmp/env-checks/<UTC>.txt (gitignored,
+# never commit it, also echoed) and tmp/env-checks/<UTC>.plan.sh, the commands for the delete and rename rows
+# (env files, Codespaces, Actions, Dependabot; never SSM or organization names). Nothing is changed until:
+#   zsh bin/env-checks.zsh apply tmp/env-checks/<UTC>.plan.sh   # or: make env-checks-apply PLAN=<file>
+# which prints that exact plan, asks for 'yes', runs it line by line, logs to <UTC>.plan.applied.txt and
+# renames the plan so it cannot run twice. Plan again afterwards to confirm the rows are gone.
 # Classifier: app/bin/audit_env_names.py (each present name); app/bin/audit_env_coverage.py (where each name
 # supplied through the environment is missing: terraform/ssm.tf, SSM, the blob source line, Codespaces,
 # app/.env.example).
 
 setopt no_unset pipe_fail
 unsetopt xtrace verbose
+
+# apply PLAN: show the saved plan, ask, then run it; never plans or audits.
+if [[ ${1:-} == apply ]]; then
+  plan=${${2:-}:A}
+  [[ -n ${2:-} && -f $plan && $plan == *.plan.sh ]] || { print -u2 "usage: $0 apply tmp/env-checks/<UTC>.plan.sh (a plan this script wrote)"; exit 2 }
+  lines=(${(f)"$(grep -vE '^[[:space:]]*(#|$)' $plan)"})
+  (( ${#lines} )) || { print "No changes in $plan."; exit 0 }
+  age=$(( $(date +%s) - $(stat -c %Y $plan) ))
+  print "Plan $plan ($(( age / 60 )) min old; plan again if anything changed since):\n"
+  cat $plan
+  print "\n${#lines} command(s) will change env files, Codespaces, Actions or Dependabot secrets and variables."
+  read -r "answer?Do you want to apply this plan? Only 'yes' will be accepted: "
+  [[ $answer == yes ]] || { print "Apply cancelled; nothing changed."; exit 1 }
+  log=${plan%.sh}.applied.txt
+  cd ${0:A:h:h}
+  for line in $lines; do
+    if zsh -c $line; then print -r -- "ok      $line"; else print -r -- "FAILED  $line"; fi
+  done 2>&1 | tee $log
+  mv $plan ${plan%.sh}.applied.sh
+  failed=$(grep -c '^FAILED' $log)
+  print "\nApplied: $(grep -c '^ok' $log) ok, $failed failed; log $log; the plan is now ${plan%.sh}.applied.sh."
+  print "Plan again to confirm: zsh bin/env-checks.zsh"
+  exit $(( failed > 0 ))
+fi
 
 ROOT=$(git -C ${0:A:h} rev-parse --show-toplevel)
 APP=$ROOT/app
@@ -31,7 +60,9 @@ BLOBS=(sre-bot-config sre-bot-config-infrastructure)
 PLACEHOLDER=set-outside-terraform   # terraform/ssm.tf value_wo
 OUT_DIR=$ROOT/tmp/env-checks
 mkdir -p $OUT_DIR
-OUT=$OUT_DIR/$(date -u +%Y%m%dT%H%M%SZ).txt
+STAMP=$(date -u +%Y%m%dT%H%M%SZ)
+OUT=$OUT_DIR/$STAMP.txt
+PLAN=$OUT_DIR/$STAMP.plan.sh
 NAMES=$(mktemp)
 BASE_DIR=$(mktemp -d)
 trap 'rm -rf $NAMES $BASE_DIR' EXIT
@@ -124,8 +155,15 @@ scan_lines() {
   sha=$(git -C $ROOT rev-parse $BASELINE)
   if [[ $(cut -d' ' -f1 $OUT_DIR/.baseline-names.txt 2>/dev/null) == $sha ]]; then tree=(); else
     git -C $ROOT archive $sha app | tar -x -C $BASE_DIR && tree=($BASE_DIR/app); fi
-  cd $APP && uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
+  cd $APP && REPO_SLUG=$REPO_SLUG PLAN_FILE=$PLAN uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
   uv run --quiet python -m bin.audit_env_coverage $show $filters < $NAMES
 } 2>&1 | tee $OUT
 
 print "\nwritten: $OUT"
+if [[ -s $PLAN ]]; then
+  print "plan: $PLAN ($(grep -cvE '^[[:space:]]*(#|$)' $PLAN) command(s); nothing has run)"
+  print "apply: zsh bin/env-checks.zsh apply ${PLAN#$ROOT/}   (or make env-checks-apply PLAN=${PLAN#$ROOT/})"
+else
+  rm -f $PLAN
+  print "plan: no changes"
+fi

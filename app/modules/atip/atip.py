@@ -13,6 +13,7 @@ from contracts.slack.transport import slack_transport_info
 from integrations import trello
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
+from modules.atip.settings import get_atip_settings
 
 logger = get_logger()
 
@@ -417,7 +418,9 @@ def atip_view_handler(ack, body, say, client):
         f"<@{user_id}> a initié un nouvel ATIP: {ati_id}"
         f" dans <#{channel_id}>"
     )
-    say(text=text, channel="C033L7RGCT0")
+    announce_channel_id = get_atip_settings().announce_channel_id
+    if announce_channel_id:
+        say(text=text, channel=announce_channel_id)
 
     # Set topic
     client.conversations_setTopic(
@@ -492,7 +495,8 @@ Il est important que vous ne supprimiez aucune documentation relative à la dema
 Merci de votre compréhension! L’accès à l’information renforce notre démocratie. 💪
 """
     )
-    say(text=post_content, channel="C033L7RGCT0")
+    if announce_channel_id:
+        say(text=post_content, channel=announce_channel_id)
     say(text=post_content, channel=channel_id)
 
     # Add trello card

@@ -21,6 +21,9 @@ from fastapi import FastAPI
 from structlog.testing import capture_logs
 
 from contracts.configuration import ConfigurationError
+from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
+from infrastructure.configuration.features.incident import get_incident_settings
+from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from integrations.aws.settings import AWSSettings, get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
@@ -186,6 +189,29 @@ async def test_aws_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatc
     )
 
     await _boot_fails_naming("retry_max_attemps")
+
+
+@pytest.mark.parametrize("table", ["incident", "sre_ops", "cloud_operations"])
+async def test_feature_unknown_key_in_the_table_fails_boot_naming_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, table: str
+) -> None:
+    """The legacy feature slices on the files validate at boot with the vendor slices."""
+    shutil.copytree(CONFIG_DIR, tmp_path / "config")
+    with (tmp_path / "config" / "ci.toml").open("a", encoding="utf-8") as ci_file:
+        ci_file.write(f"\n[{table}]\nnot_a_feature_key = 1\n")
+    monkeypatch.setattr(
+        host_configuration,
+        "load_configuration_files",
+        lambda environment, directory=None: load_configuration_files(environment, tmp_path / "config"),
+    )
+    for getter in (get_incident_settings, get_sre_ops_settings, get_aws_feature_settings):
+        getter.cache_clear()
+
+    try:
+        await _boot_fails_naming("not_a_feature_key")
+    finally:
+        for getter in (get_incident_settings, get_sre_ops_settings, get_aws_feature_settings):
+            getter.cache_clear()
 
 
 async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: pytest.MonkeyPatch) -> None:

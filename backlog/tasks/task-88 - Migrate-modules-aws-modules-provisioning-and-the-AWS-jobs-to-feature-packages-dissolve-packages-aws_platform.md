@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-10-23T17:11:00Z'
+updated_date: '2026-10-28T17:05:00Z'
 labels:
   - phase-5
 dependencies:
@@ -61,7 +61,7 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning features' settings slices (values in the TOML files); integrations/aws/settings.py keeps only the transport fields the client itself needs
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
 - [ ] #6 The spending sheet id move from the interim [google_resources] table into the aws spending feature slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
-- [ ] #7 modules/permissions and the AWS_ADMIN_GROUPS setting (infrastructure/configuration/features/aws_ops.py:28) are deleted; the rebuilt AWS surfaces declare their permissions per decisions/authorization.md
+- [ ] #7 modules/permissions and the AWS_ADMIN_GROUPS setting ([cloud_operations] aws_admin_groups, moved onto the files by TASK-111.14; the table is named for the product area because AWS_* environment names are the SDK's) are deleted with the table and infrastructure/configuration/features/aws_ops.py; the rebuilt AWS surfaces declare their permissions per decisions/authorization.md, and any key a rebuilt slice keeps is standardised (lower snake_case, no table-name repeat)
 <!-- AC:END -->
 
 ## Implementation Notes

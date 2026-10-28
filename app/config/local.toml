@@ -14,6 +14,9 @@ command_prefix = "dev-"
 channel_id = "C033L7RGCT0"
 oncall_group_id = ""
 
+[atip]
+announce_channel_id = "C033L7RGCT0"
+
 [openai.tenant]
 # The model gateway every development environment shares; its key is the repository's Codespaces secret OPENAI__API_KEY.
 base_url = "https://ai.cdssandbox.xyz"

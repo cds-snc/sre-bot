@@ -1,34 +1,33 @@
-"""Incident feature settings."""
+"""Incident feature settings: the [incident] table of the configuration files."""
 
 from functools import lru_cache
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
-from infrastructure.configuration.base import FeatureSettings
+from contracts.configuration import ConfigurationSlice
 
 
-class IncidentFeatureSettings(FeatureSettings):
-    """Incident management feature configuration.
+class IncidentFeatureSettings(ConfigurationSlice):
+    """Where the legacy declare path announces an incident and which user groups it invites.
 
-    Environment Variables:
-        INCIDENT_CHANNEL: Slack channel ID for incident notifications
-        SLACK_SECURITY_USER_GROUP_ID: Security team user group ID for mentions
-        SLACK_NOTIFY_MGMT_USER_GROUP_ID: Notify management team user group ID for Notify product incidents
+    Slack ids are deployment configuration, never a secret: production.toml holds them. Field
+    names stay until the incident response slice takes the table over (TASK-111.15.1), which
+    also standardises the keys.
 
-    Example:
-        ```python
-        from infrastructure.configuration.features.incident import get_incident_settings
-
-        settings = get_incident_settings()
-
-        incident_channel = settings.INCIDENT_CHANNEL
-        security_group = settings.SLACK_SECURITY_USER_GROUP_ID
-        ```
+    Keys of [incident]:
+        incident_channel: channel the declare path announces new incidents in; empty for none.
+        slack_security_user_group_id: user group invited to a security incident; empty for none.
+        slack_notify_mgmt_user_group_id: user group invited to a Notify product incident; empty for none.
     """
 
-    INCIDENT_CHANNEL: str | None = Field(default=None, alias="INCIDENT_CHANNEL")
-    SLACK_SECURITY_USER_GROUP_ID: str | None = Field(default=None, alias="SLACK_SECURITY_USER_GROUP_ID")
-    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str | None = Field(default=None, alias="SLACK_NOTIFY_MGMT_USER_GROUP_ID")
+    model_config = SettingsConfigDict(toml_table_header=("incident",), env_prefix="INCIDENT__")
+
+    INCIDENT_CHANNEL: str = Field(default="", description="Slack channel id for incident announcements")
+    SLACK_SECURITY_USER_GROUP_ID: str = Field(default="", description="Slack user group id invited to security incidents")
+    SLACK_NOTIFY_MGMT_USER_GROUP_ID: str = Field(
+        default="", description="Slack user group id invited to Notify product incidents"
+    )
 
 
 @lru_cache(maxsize=1)

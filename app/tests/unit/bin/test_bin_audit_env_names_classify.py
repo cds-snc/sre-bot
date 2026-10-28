@@ -271,6 +271,52 @@ def test_a_retired_audit_or_coordination_name_is_deleted_with_its_key(name: str,
     assert kept_in in verdict.reason
 
 
+@pytest.mark.parametrize(
+    ("name", "kept_in"),
+    [
+        ("INCIDENT_CHANNEL", "[incident] incident_channel"),
+        ("SLACK_SECURITY_USER_GROUP_ID", "[incident] slack_security_user_group_id"),
+        ("SLACK_NOTIFY_MGMT_USER_GROUP_ID", "[incident] slack_notify_mgmt_user_group_id"),
+        ("SRE_OPS_CHANNEL_ID", "[sre_ops] sre_ops_channel_id"),
+        ("AWS_ADMIN_GROUPS", "[cloud_operations] aws_admin_groups"),
+        ("ATIP_ANNOUNCE_CHANNEL", "[atip] announce_channel_id"),
+    ],
+)
+def test_a_retired_feature_name_is_deleted_with_its_key(name: str, kept_in: str) -> None:
+    """The feature values moved onto the files, so the reason names the key that now holds the value."""
+    verdict = classify("file app/.env", name, "set", CTX)
+
+    assert verdict.action == "delete"
+    assert kept_in in verdict.reason
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "AWS_OPS_GROUP_NAME",
+        "GROUP_DOMAIN",
+        "GROUP_PROVIDERS",
+        "RECONCILIATION_ENABLED",
+        "RECONCILIATION_BACKEND",
+        "RECONCILIATION_MAX_ATTEMPTS",
+        "RECONCILIATION_BASE_DELAY_SECONDS",
+        "RECONCILIATION_MAX_DELAY_SECONDS",
+        "CIRCUIT_BREAKER_ENABLED",
+        "CIRCUIT_BREAKER_FAILURE_THRESHOLD",
+        "CIRCUIT_BREAKER_TIMEOUT_SECONDS",
+        "CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS",
+        "REQUIRE_JUSTIFICATION",
+        "MIN_JUSTIFICATION_LENGTH",
+    ],
+)
+def test_a_retired_feature_name_without_a_reader_is_deleted_with_no_destination(name: str) -> None:
+    """The groups and ops group settings have no successor, so the reason names the deletion."""
+    verdict = classify("file app/.env", name, "set", CTX)
+
+    assert verdict.action == "delete"
+    assert verdict.reason.startswith("retired; nothing (deleted")
+
+
 def test_a_commented_retired_name_reports_the_new_key() -> None:
     verdict = classify("file app/.env.example", "DIRECTORY_REQUIRE_STARTUP_WARMUP", "commented", CTX)
 

@@ -1,53 +1,50 @@
-"""Tests for refactored settings structure.
+"""Tests for what remains of infrastructure/configuration until each slice moves with its feature.
 
-Verifies the domain-based organization of settings modules after Phase 1
-refactoring (split by domain pattern).
+The feature package holds the incident, SRE ops and AWS ops slices, each reading its own table of
+the configuration files; the atip and groups slices had no reader and are gone, and so is the
+flat-name base class every legacy slice inherited.
 """
 
-import infrastructure.configuration.base as configuration_base
-from infrastructure.configuration.base import FeatureSettings
+import importlib
+import importlib.util
+
+import pytest
+
+import infrastructure.configuration.features as features
+from contracts.configuration import ConfigurationSlice
 from infrastructure.configuration.features import (
-    AtipSettings,
     AWSFeatureSettings,
     IncidentFeatureSettings,
     SreOpsSettings,
-)
-from infrastructure.configuration.features.aws_ops import (
     get_aws_feature_settings,
+    get_incident_settings,
+    get_sre_ops_settings,
 )
 
+pytestmark = pytest.mark.unit
 
-class TestSettingsStructure:
-    """Test the new domain-based settings structure."""
 
-    def test_settings_loads_all_feature_sections(self):
-        """Verify feature settings provider loads correctly."""
-        aws_feature_settings = get_aws_feature_settings()
+@pytest.mark.parametrize(
+    ("settings_class", "table"),
+    [(IncidentFeatureSettings, "incident"), (SreOpsSettings, "sre_ops"), (AWSFeatureSettings, "cloud_operations")],
+)
+def test_each_feature_slice_reads_its_own_table(settings_class: type[ConfigurationSlice], table: str) -> None:
+    assert issubclass(settings_class, ConfigurationSlice)
+    assert settings_class.model_config.get("toml_table_header") == (table,)
 
-        assert isinstance(aws_feature_settings, AWSFeatureSettings)
-        assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
 
-    def test_settings_singleton_still_works(self):
-        """Verify provider singleton behavior is preserved."""
-        aws_feature_settings1 = get_aws_feature_settings()
-        aws_feature_settings2 = get_aws_feature_settings()
+@pytest.mark.parametrize("getter", [get_incident_settings, get_sre_ops_settings, get_aws_feature_settings])
+def test_each_provider_returns_one_instance(getter) -> None:
+    getter.cache_clear()
 
-        assert aws_feature_settings1 is aws_feature_settings2
+    assert getter() is getter()
 
-    def test_all_feature_settings_classes_instantiable(self):
-        """Verify all feature settings classes can be instantiated."""
-        # Test that all feature settings classes are functional
-        instances = [
-            IncidentFeatureSettings(),
-            AWSFeatureSettings(),
-            AtipSettings(),
-            SreOpsSettings(),
-        ]
 
-        # Verify they are all instances of FeatureSettings
-        for instance in instances:
-            assert isinstance(instance, FeatureSettings)
+@pytest.mark.parametrize("module", ["atip", "groups"])
+def test_the_atip_and_groups_slices_are_gone(module: str) -> None:
+    assert importlib.util.find_spec(f"infrastructure.configuration.features.{module}") is None
+    assert not any(module in name.lower() for name in features.__all__)
 
-    def test_no_infrastructure_settings_base_remains(self):
-        """Every hosting slice reads the configuration files, so the flat-name base class is gone."""
-        assert not hasattr(configuration_base, "InfrastructureSettings")
+
+def test_no_flat_name_base_class_remains() -> None:
+    assert importlib.util.find_spec("infrastructure.configuration.base") is None

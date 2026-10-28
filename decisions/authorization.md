@@ -96,7 +96,7 @@ Tickets: TASK-129 (this record and its follow-ups), TASK-116 (`app/server/securi
 
 Tolerated until then:
 - Backstage per-feature scopes on the access routes;
-- `is_user_member_of_groups` and `AWS_ADMIN_GROUPS` in legacy Slack AWS commands;
+- `is_user_member_of_groups` and the admin group list in legacy Slack AWS commands (`[cloud_operations] aws_admin_groups` since TASK-111.14; TASK-88 deletes both);
 - approver resolution and group writes inside `packages/access/`;
 - no decision lifetime and no membership comparison.
 
