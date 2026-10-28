@@ -3,10 +3,10 @@ id: TASK-111.13.3
 title: >-
   Move the audit and coordination slices onto the files; delete
   InfrastructureSettings
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T16:05:00Z'
+updated_date: '2026-10-28T19:48:00Z'
 labels:
   - configuration
 milestone: m-7

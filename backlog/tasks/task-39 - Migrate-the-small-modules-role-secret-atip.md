@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-28T17:14:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - migration
   - phase-5
@@ -58,8 +58,9 @@ Targets:
 - [ ] #5 Talent-role records are stored through the records contract; no Google Sheet or Doc is read back as their record of truth (decisions/workplace-systems.md rule 5)
 - [ ] #6 No python-i18n import remains in the rebuilt surfaces, and none of them reads app/infrastructure/configuration/
 - [ ] #7 Each rebuilt feature's settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
-- [ ] #8 The nine talent role folder and template ids move from the interim [google_resources] table into the talent slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #8 The talent feature reads its nine folder and template ids from [talent] (features/talent/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #9 The ATIP Trello board id is a field of the atip slice, a non-public value read only from the environment under the atip slice's own <SLICE>__<FIELD> name (never a configuration file; its parameter lands in an expand PR first), and the Trello vendor slice no longer declares it; TRELLO__ATIP_BOARD is removed in the contract that follows
+- [ ] #10 The ATIP letter and any CDS wording in the rebuilt surfaces are organisation wording: provisioned message overrides by key over the app's generic strings (decisions/organisation-content.md, provisioned-content.md, i18n.md), with generic defaults in the app; no organisation-specific literal remains in app code or app strings
 <!-- AC:END -->
 
 ## Definition of Done

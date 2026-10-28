@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-28T17:26:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - incident
   - features
@@ -44,7 +44,7 @@ THIS SLICE
 - [ ] #2 The sheet import (create_missing_incidents and its caller) is deleted with its tests; no code writes a legacy-shape incident item; the rerun of the TASK-145.5.7 job (dry run then apply, per environment) after deploy is recorded in the notes
 - [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from INCIDENT_CORE__FULL_READ_MAX_ITEMS (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 The incident list sheet id moves from the interim [google_resources] table into the incident slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
+- [ ] #5 The projection reads the incident list sheet id from [incident_core] list_sheet_id and every subdomain that writes the projection states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 <!-- AC:END -->
 
 ## Implementation Plan

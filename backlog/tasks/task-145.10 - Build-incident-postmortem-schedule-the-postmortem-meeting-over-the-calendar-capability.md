@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - incident
   - features
@@ -44,7 +44,7 @@ THIS SLICE
 - [ ] #3 The meeting reference is stored on the record with system, tenant and event id
 - [ ] #4 The pinned schedule flow passes unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The SRE calendar id moves from the interim [google_resources] table into the incident postmortem slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
+- [ ] #6 incident.postmortem reads the retrospective calendar id from [incident_postmortem] calendar_id (features/incident/postmortem/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 <!-- AC:END -->
 
 ## Implementation Plan

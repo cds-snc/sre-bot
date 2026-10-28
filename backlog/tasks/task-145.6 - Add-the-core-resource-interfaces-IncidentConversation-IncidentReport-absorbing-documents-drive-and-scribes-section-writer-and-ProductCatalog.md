@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-26T19:31:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - incident
   - features
@@ -44,7 +44,7 @@ THIS SLICE
 - [ ] #3 IncidentTranscriptReader takes a ConversationReference; IncidentReportLinkLookup no longer exists
 - [ ] #4 No user-visible command, reply or log event changes; the legacy_surface suite and the scribe and comms tests pass
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The incident folder id and the incident report template id move from the interim [google_resources] table into the incident core slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #6 The core reads the incident folder and report template ids from [incident_core] (folder_id, report_template_id) and each subdomain that uses them states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -104,4 +104,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 2026-10-15: Stack K layer 11 after the legacy item bridge (TASK-145.5.8) was inserted as layer 6; depends on it because the report and conversation references come from the record, legacy items included.
 
 2026-10-19: Stack K layer 13 after TASK-145.5.5 was split (TASK-145.5.9 and TASK-145.5.10 are layers 7 and 8, the cutover layer 9); re-plan after the cutover is implemented.
+
+- 2026-10-28 (TASK-167 accepted): the scribe labels carry CDS wording (cyber.gc.ca, security@cds-snc.ca, 'CDS Staff'); organisation wording is provisioned message overrides by key over generic app strings (decisions/organisation-content.md). The surface that absorbs or rebuilds each label moves it there (this task for scribe's section writer, 145.11 for the rest of scribe).
 <!-- SECTION:NOTES:END -->
