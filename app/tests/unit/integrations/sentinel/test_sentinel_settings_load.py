@@ -15,7 +15,7 @@ import pytest
 
 from contracts.configuration import ConfigurationError, ConfigurationSlice, install_configuration_files
 from integrations.sentinel.settings import SentinelSettings, get_sentinel_settings
-from server.configuration.loader import TomlConfigurationFiles
+from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
 
 pytestmark = pytest.mark.unit
 
@@ -114,3 +114,10 @@ def test_an_unknown_key_in_the_table_fails_the_slice(tmp_path: Path) -> None:
 
     with pytest.raises(ConfigurationError, match="unknown"):
         SentinelSettings()
+
+
+def test_production_writes_to_the_table_the_blob_named() -> None:
+    """production.toml holds the blob's SENTINEL_LOG_TYPE (deploy check 'sentinel' compares the two)."""
+    install_configuration_files(load_configuration_files("production"))
+
+    assert SentinelSettings().log_type == "SREBot"

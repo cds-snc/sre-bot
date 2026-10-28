@@ -4,7 +4,7 @@ title: Give each Google document id its own key; GOOGLE_RESOURCES is no longer r
 status: Done
 assignee: []
 created_date: '2026-10-26T18:55:00Z'
-updated_date: '2026-10-28T23:09:00Z'
+updated_date: '2026-10-28T23:45:00Z'
 labels:
   - configuration
   - security
@@ -267,6 +267,8 @@ Decided 2026-10-28 (human, decisions/configuration.md):
 - 2026-10-28 22:46Z env-checks replan after applying 20261028T223652Z.plan.sh (37/37 ok): delete=0, rename=0; expected checks present (SENTINEL__SHARED_KEY Codespaces coverage, row Z2; the 3 org secrets this repo cannot list; the sre-bot-config GOOGLE_RESOURCES line until 111.15.1's audit fix). Not clean: the 7 unreferenced Actions secrets (APP_TOKEN, AWS_SSO_ROLE_ARN, NOTIFY_TEST_KEY, OPSGENIE_KEY, PICKLE_STRING, SLACK_INTERNAL_SRE_ALERTS_WEBHOOK_URL, SLACK_TOKEN) are still listed, and gh secret list at 22:48Z still shows them: the hand deletion did not take. Human: delete them, replan.
 
 2026-10-28 23:05Z: no env-checks replan has run since the human deleted the 7 unreferenced Actions secrets; the latest audit, tmp/env-checks/20261028T224614Z.txt (22:46Z), still lists them (check=11: the 7 Actions secrets, SENTINEL__SHARED_KEY coverage, 3 org secrets, the blob GOOGLE_RESOURCES line; delete=0, rename=0). Pending: replan clean (expected check=4 plus the GOOGLE_RESOURCES line until 111.15.1's audit change). TASK-111.10 Done (human); TASK-158 superseded, still To Do (human closes).
+
+2026-10-28 23:40Z replan tmp/env-checks/20261028T234041Z.txt after the human deleted the 7 Actions secrets: clean (delete=0 and rename=0 outside the Sentinel moves 111.15.1 introduced; actions secret repo none=7; the blob GOOGLE_RESOURCES line none, as split into its 15 set parameters; checks only the 3 org secrets).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

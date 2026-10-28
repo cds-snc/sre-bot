@@ -48,6 +48,11 @@ api_url = "https://api.notification.canada.ca"
 # The account's region (US); its key is the task-definition secret OPSGENIE__INTEGRATIONS_KEY.
 api_url = "https://api.opsgenie.com"
 
+[sentinel]
+# The custom log table production's events go to; the workspace id and its shared key are the
+# task-definition secrets SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY.
+log_type = "SREBot"
+
 [maxmind.tenant]
 # The database the image ships (Dockerfile).
 database_path = "./geodb/GeoLite2-City.mmdb"
