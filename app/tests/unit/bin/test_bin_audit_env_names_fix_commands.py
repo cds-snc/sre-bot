@@ -160,7 +160,7 @@ def test_an_unevidenced_name_never_enters_the_plan(
     monkeypatch.setattr(audit_env_names, "workflow_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "setup_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "doc14_destinations", lambda: {})
-    monkeypatch.setattr(audit_env_names, "dynamic_secret_references", lambda: [])
+    monkeypatch.setattr(audit_env_names, "pass_through_workflow_files", lambda: [])
     rows = [
         f"actions secret repo {REPO}\tUNUSED_SECRET\tpresent",
         f"actions variable repo {REPO}\tUNUSED_VARIABLE\tpresent",

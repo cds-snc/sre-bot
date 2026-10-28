@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from bin import audit_env_names
-from bin.audit_env_names import Context, classify, dynamic_secret_references, read_last_refs
+from bin.audit_env_names import Context, classify, pass_through_workflow_files, read_last_refs
 
 pytestmark = pytest.mark.unit
 
@@ -51,18 +51,18 @@ def test_a_dynamic_secret_reference_is_found(tmp_path: Path, line: str) -> None:
     (tmp_path / "workflows").mkdir()
     (tmp_path / "workflows" / "ci.yml").write_text(f"jobs:\n  a:\n{line}\n")
 
-    assert dynamic_secret_references(tmp_path) == ["workflows/ci.yml"]
+    assert pass_through_workflow_files(tmp_path) == ["workflows/ci.yml"]
 
 
 def test_named_secret_references_are_not_dynamic(tmp_path: Path) -> None:
     (tmp_path / "ci.yaml").write_text("env:\n  TOKEN: ${{ secrets.NAMED }}\n  JSON: ${{ toJSON(github) }}\n")
 
-    assert dynamic_secret_references(tmp_path) == []
+    assert pass_through_workflow_files(tmp_path) == []
 
 
 @pytest.mark.parametrize("name", ["UNUSED_SECRET", "SLACK_ENABLED"])
 def test_a_blind_scan_turns_every_repo_secret_into_none(name: str) -> None:
-    ctx = Context(current=set(), retired={"SLACK_ENABLED"}, secrets_scan_blind=True)
+    ctx = Context(current=set(), retired={"SLACK_ENABLED"}, workflow_scan_blind=True)
 
     verdict = classify(SECRET_SOURCE, name, "present", ctx)
 
@@ -72,7 +72,7 @@ def test_a_blind_scan_turns_every_repo_secret_into_none(name: str) -> None:
 
 def test_a_blind_scan_still_judges_variables() -> None:
     """Secrets are what a reusable workflow inherits; variables are always named in the workflow."""
-    ctx = Context(current=set(), secrets_scan_blind=True)
+    ctx = Context(current=set(), workflow_scan_blind=True)
 
     assert classify(f"actions variable repo {REPO}", "UNUSED_VARIABLE", "present", ctx).action == "check"
 
@@ -95,7 +95,7 @@ def _pure_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(audit_env_names, "workflow_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "setup_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "doc14_destinations", lambda: {})
-    monkeypatch.setattr(audit_env_names, "dynamic_secret_references", lambda: [])
+    monkeypatch.setattr(audit_env_names, "pass_through_workflow_files", lambda: [])
     rows = [
         f"{SECRET_SOURCE}\tUNUSED_SECRET\tpresent",
         f"codespaces repo {REPO}\tUNREAD_NAME\tpresent",

@@ -212,7 +212,7 @@ class Context:
     workflow_refs: dict[str, list[str]] = field(default_factory=dict)
     setup_refs: dict[str, list[str]] = field(default_factory=dict)
     last_refs: dict[str, str] = field(default_factory=dict)  # name -> its last reference in git history
-    secrets_scan_blind: bool = False  # .github passes secrets dynamically: any repository secret may be read
+    workflow_scan_blind: bool = False  # .github passes secrets dynamically: any repository secret may be read
 
 
 def env_names(root: Path) -> set[str]:
@@ -243,7 +243,7 @@ def workflow_references(root: Path = WORKFLOW_DIR) -> dict[str, list[str]]:
     return {name: sorted(files) for name, files in refs.items()}
 
 
-def dynamic_secret_references(root: Path = WORKFLOW_DIR) -> list[str]:
+def pass_through_workflow_files(root: Path = WORKFLOW_DIR) -> list[str]:
     """Workflow files under ``root`` that pass secrets without naming them (``secrets: inherit``, ``secrets[...]``)."""
     return sorted(str(path.relative_to(root)) for path in root.rglob("*.y*ml") if DYNAMIC_SECRETS.search(path.read_text()))
 
@@ -359,7 +359,7 @@ def _actions(source: str, name: str, ctx: Context) -> Verdict:
         return Verdict("none", f"used by {', '.join(files)}")
     if " org" in source:
         return Verdict("none", "organization-level; other repositories may use it")
-    if ctx.secrets_scan_blind and " secret " in source:
+    if ctx.workflow_scan_blind and " secret " in source:
         return Verdict("none", "the scan is blind: a workflow passes secrets without naming them")
     if name in HINTS or name in SUPERSEDED or name in ctx.retired:
         return _developer(name, "present", ctx)
@@ -504,7 +504,7 @@ def main(argv: list[str]) -> None:
     if not 1 <= len(args) <= 2:
         raise SystemExit("usage: python -m bin.audit_env_names [--all | --lookups] BASELINE_SHA [BASELINE_APP_DIR] < names.tsv")
     current = env_names(APP_ROOT)
-    blind = dynamic_secret_references()
+    pass_through = pass_through_workflow_files()
     entries = [line.rstrip("\n").split("\t") for line in sys.stdin if line.strip()]
     ctx = Context(
         current=current,
@@ -514,7 +514,7 @@ def main(argv: list[str]) -> None:
         workflow_refs=workflow_references(),
         setup_refs=setup_references(),
         last_refs=read_last_refs(os.environ.get("LAST_REFS_FILE")),
-        secrets_scan_blind=bool(blind),
+        workflow_scan_blind=bool(pass_through),
     )
 
     sections: defaultdict[str, list[tuple[str, str, Verdict]]] = defaultdict(list)
@@ -533,8 +533,8 @@ def main(argv: list[str]) -> None:
         return
 
     print(LEGEND)
-    if blind:
-        print(f"workflow scan blind for repository secrets: {', '.join(blind)} pass secrets without naming them")
+    if pass_through:
+        print(f"workflow scan blind for repository secrets: {', '.join(pass_through)} pass values through without naming them")
     totals: Counter[str] = Counter()
     for source, rows in sections.items():
         counts = Counter(verdict.action for _, _, verdict in rows)
