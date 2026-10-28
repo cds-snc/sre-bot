@@ -60,8 +60,7 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
 
     resources = [
       "${aws_dynamodb_table.incidents_table.arn}/index/*",
-      "${aws_dynamodb_table.sre_bot_audit_trail.arn}/index/*",
-      "${aws_dynamodb_table.sre_bot_retry_records.arn}/index/*"
+      "${aws_dynamodb_table.sre_bot_audit_trail.arn}/index/*"
     ]
   }
 }

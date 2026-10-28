@@ -260,3 +260,25 @@ def test_a_commented_retired_name_reports_the_new_key() -> None:
 
     assert verdict.action == "delete"
     assert "[directory] require_startup_warmup" in verdict.reason
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "RETRY_ENABLED",
+        "RETRY_BACKEND",
+        "RETRY_DYNAMODB_TABLE_NAME",
+        "RETRY_DYNAMODB_TTL_DAYS",
+        "RETRY_MAX_ATTEMPTS",
+        "RETRY_BASE_DELAY_SECONDS",
+        "RETRY_MAX_DELAY_SECONDS",
+        "RETRY_BATCH_SIZE",
+        "RETRY_CLAIM_LEASE_SECONDS",
+    ],
+)
+def test_a_retired_retry_name_is_deleted_with_no_destination(name: str) -> None:
+    """The retry store has no successor setting, so the reason names the deletion, not an unknown name."""
+    verdict = classify("file app/.env", name, "set", CTX)
+
+    assert verdict.action == "delete"
+    assert verdict.reason.startswith("retired; nothing (deleted")

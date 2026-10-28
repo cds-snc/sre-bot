@@ -10,7 +10,7 @@ scope: The app's layers (host, contracts, features, capabilities, infrastructure
 ## Context
 
 The former three-tier model (`packages/`, `infrastructure/`, `integrations/`) sorted code by one question: how close is it to a vendor? That put three different kinds of code in `app/infrastructure/`:
-- hosting adapters: `records`, `coordination`, `resilience`, logging setup;
+- hosting adapters: `records`, `coordination`, logging setup;
 - framework services that features plug into: `plugins`, `i18n`, `security`, `events`, `audit`, and the planned `approvals` engine ([approvals.md](approvals.md));
 - workplace systems: `directory`, `drive`, `spreadsheets` ([workplace-systems.md](workplace-systems.md)).
 
@@ -137,7 +137,6 @@ Tickets to create:
 Tolerated until then:
 - features importing `infrastructure` providers;
 - framework and workplace code in `infrastructure/`;
-- the DynamoDB `RetryStore` used as a queue;
 - the blinker-backed event dispatcher, used only by `access/request` and `access/sync`, which are rebuilt anyway;
 - feature switches and settings read from environment variables;
 - legacy `modules/` surfaces not yet rebuilt;

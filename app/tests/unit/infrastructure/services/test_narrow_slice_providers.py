@@ -10,8 +10,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from infrastructure.configuration.infrastructure.retry import RetrySettings
-from infrastructure.resilience.service import ResilienceService
 from integrations.maxmind.client import MaxMindClient
 
 pytestmark = pytest.mark.unit
@@ -35,21 +33,3 @@ class TestMaxMindClientNarrowSlice:
         mock_settings = MagicMock()
         with pytest.raises(TypeError):
             MaxMindClient(settings=mock_settings)
-
-
-class TestResilienceServiceNarrowSlice:
-    """ResilienceService accepts retry_settings instead of full Settings."""
-
-    def test_accepts_retry_settings_with_store(self):
-        """ResilienceService constructs with retry_settings + injected store."""
-        mock_settings = MagicMock(spec=RetrySettings)
-        mock_store = MagicMock()
-        service = ResilienceService(retry_settings=mock_settings, retry_store=mock_store)
-        assert service is not None
-
-    def test_rejects_full_settings_kwarg(self):
-        """ResilienceService does not accept 'settings' kwarg."""
-        mock_settings = MagicMock()
-        mock_store = MagicMock()
-        with pytest.raises(TypeError):
-            ResilienceService(settings=mock_settings, retry_store=mock_store)

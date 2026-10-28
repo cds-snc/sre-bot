@@ -403,7 +403,7 @@ type = "forbidden"
 # A service family joins forbidden_modules when its contract is registered. The
 # infrastructure siblings are listed one by one: "infrastructure" as a source would
 # flag a family importing its own modules. Direct imports only.
-source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.resilience", "infrastructure.security", "infrastructure.spreadsheets"]
+source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.security", "infrastructure.spreadsheets"]
 forbidden_modules = ["infrastructure.records", "infrastructure.coordination"]
 allow_indirect_imports = true
 unmatched_ignore_imports_alerting = "error"
