@@ -7,7 +7,8 @@ per-attempt timeouts fixed once at construction, AssumeRole goes through the
 public STS API. The region and the dynamodb-local endpoint are the SDK's to
 resolve (AWS_DEFAULT_REGION or the shared config file, AWS_ENDPOINT_URL_DYNAMODB),
 so the factory names neither. Clients are built per call and never cached, so assumed credentials never
-need refreshing.
+need refreshing. AWS DevOps Agent adds a few codes of its own, classified by
+``classify_devops_agent_error``, which defers every other code to ``classify_aws_error``.
 """
 
 from typing import TYPE_CHECKING, Any, Literal, overload
@@ -22,12 +23,14 @@ from integrations.aws.settings import AWSSettings, get_aws_settings
 if TYPE_CHECKING:
     from types_boto3_ce.client import CostExplorerClient
     from types_boto3_config.client import ConfigServiceClient
+    from types_boto3_devops_agent.client import DevOpsAgentServiceClient
     from types_boto3_dynamodb.client import DynamoDBClient
     from types_boto3_guardduty.client import GuardDutyClient
     from types_boto3_identitystore.client import IdentityStoreClient
     from types_boto3_lambda.client import LambdaClient
     from types_boto3_organizations.client import OrganizationsClient
     from types_boto3_securityhub.client import SecurityHubClient
+    from types_boto3_ssm.client import SSMClient
     from types_boto3_sso_admin.client import SSOAdminClient
     from types_boto3_sts.client import STSClient
     from types_boto3_sts.type_defs import CredentialsTypeDef
@@ -43,6 +46,8 @@ type AwsServiceName = Literal[
     "securityhub",
     "lambda",
     "sts",
+    "devops-agent",
+    "ssm",
 ]
 
 _DEFAULT_SESSION_NAME = "sre-bot"
@@ -120,6 +125,22 @@ def get_aws_client(
     session_name: str = _DEFAULT_SESSION_NAME,
     retries: bool = True,
 ) -> LambdaClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["devops-agent"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> DevOpsAgentServiceClient: ...
+@overload
+def get_aws_client(
+    service_name: Literal["ssm"],
+    *,
+    role_arn: str | None = None,
+    session_name: str = _DEFAULT_SESSION_NAME,
+    retries: bool = True,
+) -> SSMClient: ...
 @overload
 def get_aws_client(
     service_name: Literal["sts"],
@@ -208,3 +229,28 @@ def classify_aws_error(exc: Exception) -> tuple[OperationStatus, str | None, int
         return OperationStatus.PERMANENT_ERROR, code, None
 
     raise exc
+
+
+# Codes the AWS DevOps Agent API reference lists that the shared catalogues do not name
+# (https://docs.aws.amazon.com/devopsagent/latest/APIReference/API_CreateBacklogTask.html).
+# Kept out of the shared catalogues so other services' handling of these codes does not move.
+_DEVOPS_AGENT_TRANSIENT_CODES = frozenset({"InternalServerException"})
+_DEVOPS_AGENT_PERMANENT_CODES = frozenset(
+    {
+        "ValidationException",
+        "InvalidParameterException",
+        "ContentSizeExceededException",
+        "ServiceQuotaExceededException",
+    }
+)
+
+
+def classify_devops_agent_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify AWS DevOps Agent errors; every code it does not add defers to ``classify_aws_error``."""
+    if isinstance(exc, ClientError):
+        code = (exc.response.get("Error") or {}).get("Code")
+        if code in _DEVOPS_AGENT_TRANSIENT_CODES:
+            return OperationStatus.TRANSIENT_ERROR, code, get_aws_settings().transient_retry_after_seconds
+        if code in _DEVOPS_AGENT_PERMANENT_CODES:
+            return OperationStatus.PERMANENT_ERROR, code, None
+    return classify_aws_error(exc)

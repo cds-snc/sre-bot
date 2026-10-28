@@ -42,7 +42,7 @@ def test_instance_id_without_the_instance_arn_fails_naming_the_variable(monkeypa
     _fails_naming(ARN_NAME)
 
 
-@pytest.mark.parametrize("name", [ARN_NAME, "AWS__TENANT__ORG_ROLE_ARN"])
+@pytest.mark.parametrize("name", [ARN_NAME, "AWS__TENANT__ORG_ROLE_ARN", "AWS__TENANT__DEVOPS_AGENT_ROLE_ARN"])
 def test_a_tenant_value_without_the_instance_id_fails_naming_it(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
     """An ARN or role without an instance id is a half configuration, so boot fails naming the variable."""
     monkeypatch.setenv(name, INSTANCE_ARN)
@@ -81,7 +81,7 @@ def test_instance_arn_off_the_documented_format_fails_naming_the_variable(monkey
 
 def test_empty_values_count_as_unset(monkeypatch: pytest.MonkeyPatch) -> None:
     """Blank tenant variables, as the test run sets them, leave the tenant absent."""
-    for field in ("INSTANCE_ID", "INSTANCE_ARN", "AUDIT_ROLE_ARN", "ORG_ROLE_ARN", "LOGGING_ROLE_ARN"):
+    for field in ("INSTANCE_ID", "INSTANCE_ARN", "AUDIT_ROLE_ARN", "ORG_ROLE_ARN", "LOGGING_ROLE_ARN", "DEVOPS_AGENT_ROLE_ARN"):
         monkeypatch.setenv(f"AWS__TENANT__{field}", "")
 
     assert AWSSettings().tenant is None
@@ -98,6 +98,51 @@ def test_empty_role_arns_count_as_unset(monkeypatch: pytest.MonkeyPatch) -> None
 
     assert settings.service_role_map == {}
     assert settings.identity_store_id == INSTANCE_ID
+
+
+_DEVOPS_ROLE_NAME = "AWS__TENANT__DEVOPS_AGENT_ROLE_ARN"
+_DEVOPS_ROLE_ARN = "arn:aws:iam::834287107169:role/DevOpsAgentInvestigationSlackApp"
+
+
+def test_devops_agent_role_arn_is_read_from_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The investigation role the bot assumes in the ops account comes from the environment, on the tenant entry."""
+    monkeypatch.setenv(ID_NAME, INSTANCE_ID)
+    monkeypatch.setenv(ARN_NAME, INSTANCE_ARN)
+    monkeypatch.setenv(_DEVOPS_ROLE_NAME, _DEVOPS_ROLE_ARN)
+
+    assert AWSSettings().devops_agent_role_arn == _DEVOPS_ROLE_ARN
+
+
+@pytest.mark.parametrize("value", [None, ""])
+def test_devops_agent_role_arn_absent_or_empty_is_unset(monkeypatch: pytest.MonkeyPatch, value: str | None) -> None:
+    """Without the variable, or with it empty, the role is unset and the other services keep their roles."""
+    monkeypatch.setenv(ID_NAME, INSTANCE_ID)
+    monkeypatch.setenv(ARN_NAME, INSTANCE_ARN)
+    monkeypatch.setenv("AWS__TENANT__ORG_ROLE_ARN", "arn:aws:iam::123456789012:role/org")
+    if value is not None:
+        monkeypatch.setenv(_DEVOPS_ROLE_NAME, value)
+
+    settings = AWSSettings()
+
+    assert settings.devops_agent_role_arn == ""
+    assert settings.service_role_map["organizations"] == "arn:aws:iam::123456789012:role/org"
+
+
+def test_devops_agent_role_arn_is_empty_without_a_tenant() -> None:
+    """A deployment with no tenant entry has no investigation role and boots as before."""
+    settings = AWSSettings()
+
+    assert settings.tenant is None
+    assert settings.devops_agent_role_arn == ""
+
+
+def test_devops_agent_role_is_not_mapped_to_any_service(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The investigation role is used only by the investigation feature, never picked up by service name."""
+    monkeypatch.setenv(ID_NAME, INSTANCE_ID)
+    monkeypatch.setenv(ARN_NAME, INSTANCE_ARN)
+    monkeypatch.setenv(_DEVOPS_ROLE_NAME, _DEVOPS_ROLE_ARN)
+
+    assert _DEVOPS_ROLE_ARN not in AWSSettings().service_role_map.values()
 
 
 def test_unknown_key_in_the_aws_table_fails_naming_the_key(tmp_path: Path) -> None:

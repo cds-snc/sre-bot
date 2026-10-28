@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14"
 resolution-markers = [
     "python_full_version >= '3.15' and sys_platform == 'win32'",
@@ -2167,7 +2167,7 @@ dev = [
     { name = "requests-mock" },
     { name = "ruff" },
     { name = "setuptools" },
-    { name = "types-boto3", extra = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin", "sts"] },
+    { name = "types-boto3", extra = ["ce", "config", "devops-agent", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "ssm", "sso-admin", "sts"] },
 ]
 
 [package.metadata]
@@ -2218,7 +2218,7 @@ dev = [
     { name = "requests-mock", specifier = "==1.12.1" },
     { name = "ruff", specifier = "==0.17.1" },
     { name = "setuptools", specifier = "==84.2.1" },
-    { name = "types-boto3", extras = ["ce", "config", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "sso-admin", "sts"], specifier = ">=1.43.116" },
+    { name = "types-boto3", extras = ["ce", "config", "devops-agent", "dynamodb", "guardduty", "identitystore", "lambda", "organizations", "securityhub", "sqs", "ssm", "sso-admin", "sts"], specifier = ">=1.43.116" },
 ]
 
 [[package]]
@@ -2284,6 +2284,9 @@ ce = [
 config = [
     { name = "types-boto3-config" },
 ]
+devops-agent = [
+    { name = "types-boto3-devops-agent" },
+]
 dynamodb = [
     { name = "types-boto3-dynamodb" },
 ]
@@ -2304,6 +2307,9 @@ securityhub = [
 ]
 sqs = [
     { name = "types-boto3-sqs" },
+]
+ssm = [
+    { name = "types-boto3-ssm" },
 ]
 sso-admin = [
     { name = "types-boto3-sso-admin" },
@@ -2328,6 +2334,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/18/b2/24ce6e96ebfac4900daf1edfd42f1e9aa14e50c56bf4081a88a8be6cf515/types_boto3_config-1.43.42.tar.gz", hash = "sha256:bf9f7b392bbf8ae6249c69c3e014e7aea48fb2e3730b4f34d639ac0661b6f741", size = 72319, upload-time = "2026-07-07T21:09:37.695Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/c0/0f32d789ddd7db0b02500252c5194ee39ebcded16476b29d8e32b1f48990/types_boto3_config-1.43.42-py3-none-any.whl", hash = "sha256:7d06a35c44fb9449a878f4ae1438a960634292c64ea3223ea1fe8ad24dd9912c", size = 72486, upload-time = "2026-07-07T21:09:34.334Z" },
+]
+
+[[package]]
+name = "types-boto3-devops-agent"
+version = "1.43.117"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/4f/54/9756a49e7a1a5d1e6e07faef5178e3695f93b3511e4bb7c8b40ae68b3cb2/types_boto3_devops_agent-1.43.117.tar.gz", hash = "sha256:4a1aa7d16e0d40dcf629f30f360fb65bf02460ddb156b8b39eb6e24052bdf8d9", size = 43576, upload-time = "2026-10-21T22:27:36.121Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/07/57/2d1da096bedad63f12d37e9debe37b3fc0933bafc57a74b3f5fe9cb3e9b6/types_boto3_devops_agent-1.43.117-py3-none-any.whl", hash = "sha256:358373260624620178105fa234bd6473cc95e46962f3905c4ec3f46003a036d4", size = 49255, upload-time = "2026-10-21T22:27:32.316Z" },
 ]
 
 [[package]]
@@ -2391,6 +2406,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/79/be/353e9d04a06a48227af527d7e1da5c580f562b87d8b400532e8fe4eac498/types_boto3_sqs-1.43.0.tar.gz", hash = "sha256:a699170d774fb5dfab8d7881e02f102e07706cbfc44874825d4d6ddee77edf61", size = 23183, upload-time = "2026-04-29T23:07:09.111Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/39/c6/6e7daea77680793a1410f134869008f8199ef3c3277c1d6144460cbfd536/types_boto3_sqs-1.43.0-py3-none-any.whl", hash = "sha256:c23e43a13822208d26a946c991ebf9b4ba7194dec5b5537fd4eb850a2a5c25a7", size = 33398, upload-time = "2026-04-29T23:07:06.97Z" },
+]
+
+[[package]]
+name = "types-boto3-ssm"
+version = "1.43.104"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/f6/79/ce0a5c1e63a5e45d4bbe0b8339281dd46ba5df69a547b3c164a56a0d4b92/types_boto3_ssm-1.43.104.tar.gz", hash = "sha256:0ffc6d32ce491ef18d0dc2d95514015ee71aef9c51c73cee1930a0c9e0cfce5b", size = 98031, upload-time = "2026-09-28T20:23:49.06Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/95/07/1119c02f66d487bee5379cb6ca390b2156931e3d07521a475d9524e07007/types_boto3_ssm-1.43.104-py3-none-any.whl", hash = "sha256:1a98230c4e9604dc286b10f28e9043e0404a03f5da2b4e33b1d96d97c42b40e1", size = 99668, upload-time = "2026-09-28T20:23:46.678Z" },
 ]
 
 [[package]]

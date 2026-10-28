@@ -65,9 +65,9 @@ api_timeout_seconds = 10.0
 # reaches DynamoDB through the same clients. The region and the dynamodb-local endpoint are the
 # SDK's: AWS_DEFAULT_REGION (or the shared config file) and AWS_ENDPOINT_URL_DYNAMODB.
 # The tenant entry is never in a file: the Identity Center identity store id and instance ARN
-# (internal tenant identifiers, non-public values) and the optional audit, org and logging role
-# ARNs come from the environment as AWS__TENANT__<FIELD>: INSTANCE_ID, INSTANCE_ARN,
-# AUDIT_ROLE_ARN, ORG_ROLE_ARN, LOGGING_ROLE_ARN.
+# (internal tenant identifiers, non-public values) and the optional audit, org, logging and
+# DevOps Agent investigation role ARNs come from the environment as AWS__TENANT__<FIELD>:
+# INSTANCE_ID, INSTANCE_ARN, AUDIT_ROLE_ARN, ORG_ROLE_ARN, LOGGING_ROLE_ARN, DEVOPS_AGENT_ROLE_ARN.
 retry_max_attempts = 3
 retry_mode = "standard"
 connect_timeout_seconds = 10
