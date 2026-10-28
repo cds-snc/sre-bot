@@ -46,24 +46,12 @@
     "cpu": 0,
     "environment": [
       {
-        "name": "BACKEND_URL",
-        "value": "${backend_url}"
-      },
-      {
         "name": "ENVIRONMENT",
         "value": "production"
       },
       {
-        "name": "CORS_ALLOWED_ORIGINS",
-        "value": "${cors_allowed_origins}"
-      },
-      {
         "name": "FORWARDED_ALLOW_IPS",
         "value": "${forwarded_allow_ips}"
-      },
-      {
-        "name": "SLACK__COMMAND_PREFIX",
-        "value": ""
       }
     ],
     "essential": true,

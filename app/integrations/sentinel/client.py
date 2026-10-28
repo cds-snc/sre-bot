@@ -12,10 +12,6 @@ from infrastructure.audit.models import AuditEvent
 from integrations.sentinel.settings import get_sentinel_settings
 
 logger = structlog.get_logger()
-sentinel_settings = get_sentinel_settings()
-SENTINEL_CUSTOMER_ID = sentinel_settings.sentinel_customer_id
-SENTINEL_LOG_TYPE = sentinel_settings.sentinel_log_type
-SENTINEL_SHARED_KEY = sentinel_settings.sentinel_shared_key
 
 
 def _json_default(value: Any) -> Any:
@@ -41,11 +37,13 @@ def _payload_size_bytes(payload: Any) -> int | None:
 
 
 def send_event(payload: Any) -> bool:
-    customer_id = SENTINEL_CUSTOMER_ID
-    log_type = SENTINEL_LOG_TYPE
-    shared_key = SENTINEL_SHARED_KEY
+    # Read at send time: the configuration files are installed after this module is imported.
+    settings = get_sentinel_settings()
+    customer_id = settings.customer_id
+    log_type = settings.log_type
+    shared_key = settings.shared_key.get_secret_value()
 
-    if customer_id is None or shared_key is None:
+    if not customer_id or not shared_key:
         logger.error("send_event_error", error="customer_id or shared_key is missing")
         return False
 
@@ -73,10 +71,8 @@ def build_signature(
 
 
 def post_data(customer_id: str, shared_key: str, body: str, log_type: str) -> bool:
-    log = logger.bind(
-        customer_id=customer_id,
-        log_type=log_type,
-    )
+    # The workspace id is a non-public value: never logged.
+    log = logger.bind(log_type=log_type)
     method = "POST"
     content_type = "application/json"
     resource = "/api/logs"

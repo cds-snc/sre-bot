@@ -8,7 +8,9 @@ hold them:
     terraform  ``terraform/ssm.tf`` creates ``/sre-bot/<NAME>`` (none for a development-only value)
     ssm        the parameter is set, not missing or on the terraform placeholder
     source     the production blob line doc-14 moves to it exists, while the parameter still needs it
-    codespaces a Codespace that still has the old name also has the new one
+    codespaces a Codespace that still has the old name also has the new one, unless development leaves the
+               vendor unconfigured (a [<slice>.tenant] entry in production.toml and none in local.toml): then the
+               slice-level credential alone fails local boot, so a Codespace must not hold it
 
 ``app/.env.example`` is not judged: ``bin/generate_env_example.py`` writes it from the settings classes
 and a test fails when it drifts.
@@ -32,6 +34,7 @@ from bin.audit_env_names import (
     REPO_ROOT,
     Destinations,
     Verdict,
+    config_table,
     doc14_destinations,
 )
 
@@ -47,6 +50,14 @@ def terraform_parameters(path: Path = SSM_TF) -> set[str]:
     """The ``sre_bot_secret_names`` set of ``terraform/ssm.tf``: each becomes ``/sre-bot/<NAME>``."""
     match = SECRET_NAMES.search(path.read_text())
     return set(QUOTED.findall(match[1])) if match else set()
+
+
+def unconfigured_in_development(name: str) -> str | None:
+    """The tenant table a slice-level credential needs when production configures it and local does not, else None."""
+    if "__" not in name or "__TENANT__" in name:
+        return None
+    tenant = f"{name.split('__')[0].lower()}.tenant"
+    return tenant if config_table("production", tenant) and not config_table("local", tenant) else None
 
 
 def _gaps(name: str, old: str | None, dev_only: bool, terraform: set[str], entries: list[Entry]) -> list[str]:
@@ -77,7 +88,10 @@ def _gaps(name: str, old: str | None, dev_only: bool, terraform: set[str], entri
         elif state != "set":
             gaps.append(f"parameter is {state}, and there is no {old} line in the production blobs to copy")
 
-    if old and old in codespaces and name not in codespaces:
+    if tenant := unconfigured_in_development(name):
+        if name in codespaces:
+            gaps.append(f"Codespaces has {name}, but local.toml has no [{tenant}]: it fails local boot, delete it")
+    elif old and old in codespaces and name not in codespaces:
         gaps.append(f"Codespaces has {old} but not {name}: set {name} to the same value")
     return gaps
 

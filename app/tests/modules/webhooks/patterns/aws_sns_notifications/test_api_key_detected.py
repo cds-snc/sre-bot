@@ -1,4 +1,3 @@
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,7 +21,7 @@ def configured_notify_settings(monkeypatch):
 
 
 def mock_api_key_detected():
-    NOTIFY_TEST_KEY = os.getenv("NOTIFY_TEST_KEY", "api-key-blah")
+    NOTIFY_TEST_KEY = "api-key-blah"
     return MagicMock(
         Type="Notification",
         MessageId="1e5f5647g-adb5-5d6f-ab5e-c2e508881361",

@@ -27,7 +27,6 @@ from features.incident.postmortem.settings import get_incident_postmortem_settin
 from features.incident.response.settings import get_incident_response_settings
 from features.talent.settings import get_talent_settings
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
-from infrastructure.configuration.features.incident import get_incident_settings
 from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from integrations.aws.settings import AWSSettings, get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
@@ -35,6 +34,7 @@ from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
 from integrations.notify.settings import NotifySettings, get_notify_settings
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 from integrations.opsgenie.settings import OpsGenieSettings, get_opsgenie_settings
+from integrations.sentinel.settings import SentinelSettings, get_sentinel_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from integrations.trello.settings import TrelloSettings, get_trello_settings
 from server.configuration import host_configuration
@@ -52,10 +52,11 @@ _VENDOR_SECRETS = (
     "TRELLO__TENANT__APP_KEY",
     "TRELLO__TENANT__TOKEN",
     "TRELLO__ATIP_BOARD",
+    "SENTINEL__CUSTOMER_ID",
+    "SENTINEL__SHARED_KEY",
 )
 _VENDOR_GETTERS = (get_notify_settings, get_trello_settings, get_opsgenie_settings, get_maxmind_settings)
 _FEATURE_GETTERS = (
-    get_incident_settings,
     get_sre_ops_settings,
     get_aws_feature_settings,
     get_incident_core_settings,
@@ -74,7 +75,7 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     monkeypatch.setitem(AWSSettings.model_config, "env_file", None)
     monkeypatch.setitem(OpenAISettings.model_config, "env_file", None)
     monkeypatch.setenv("OPENAI__API_KEY", "")
-    for slice_class in (NotifySettings, TrelloSettings, OpsGenieSettings, MaxMindSettings):
+    for slice_class in (NotifySettings, TrelloSettings, OpsGenieSettings, MaxMindSettings, SentinelSettings):
         monkeypatch.setitem(slice_class.model_config, "env_file", None)
     for name in _VENDOR_SECRETS:
         monkeypatch.setenv(name, "")
@@ -90,7 +91,7 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
     get_openai_settings.cache_clear()
-    for getter in _VENDOR_GETTERS:
+    for getter in (*_VENDOR_GETTERS, get_sentinel_settings):
         getter.cache_clear()
     yield
     get_slack_settings.cache_clear()
@@ -98,7 +99,7 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
     get_openai_settings.cache_clear()
-    for getter in _VENDOR_GETTERS:
+    for getter in (*_VENDOR_GETTERS, get_sentinel_settings):
         getter.cache_clear()
 
 
@@ -210,7 +211,6 @@ async def test_aws_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatc
 @pytest.mark.parametrize(
     "table",
     [
-        "incident",
         "sre_ops",
         "cloud_operations",
         "incident_core",
@@ -218,6 +218,7 @@ async def test_aws_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatc
         "incident_postmortem",
         "cloud_operations_spending",
         "talent",
+        "sentinel",
     ],
 )
 async def test_feature_unknown_key_in_the_table_fails_boot_naming_the_key(
@@ -264,6 +265,7 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
     assert get_aws_settings().tenant is None
     assert get_openai_settings().tenant is None
     assert all(getter().tenant is None for getter in _VENDOR_GETTERS)
+    assert get_sentinel_settings().customer_id == ""
     assert connects == []
 
 

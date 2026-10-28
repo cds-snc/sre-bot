@@ -179,9 +179,9 @@ env = [
     "TRELLO__TENANT__TOKEN=",
     "TRELLO__ATIP_BOARD=",
     "OPSGENIE__INTEGRATIONS_KEY=",
-    "SENTINEL_CUSTOMER_ID=SENTINEL_CUSTOMER_ID",
-    "SENTINEL_LOG_TYPE=SENTINEL_LOG_TYPE",
-    "SENTINEL_SHARED_KEY=SENTINEL_SHARED_KEY",
+    # Likewise Sentinel: the workspace id (non-public) and its shared key are environment only.
+    "SENTINEL__CUSTOMER_ID=",
+    "SENTINEL__SHARED_KEY=",
 ]
 norecursedirs = ["tests/smoke"]
 filterwarnings = [

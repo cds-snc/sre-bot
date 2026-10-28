@@ -3,10 +3,10 @@ id: TASK-111.10
 title: >-
   Move the Google Workspace slice onto the files; GOOGLE_RESOURCES becomes a
   table
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T19:47:00Z'
+updated_date: '2026-10-28T22:50:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -34,9 +34,9 @@ The Google Workspace vendor slice (integrations/google_workspace/settings.py) mo
 <!-- AC:BEGIN -->
 - [x] #1 The Google slice reads its non-secret values, the tenant customer_id included, from the files and its key only as GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY
 - [x] #2 A tenant entry missing the key, or the key set without a tenant entry, fails boot naming the missing key; a blank or my_customer customer_id fails boot
-- [ ] #3 Each Google document, folder, sheet and calendar id has its own key, a non-public value supplied only from the environment (decisions/configuration.md, TASK-167 ruling; TASK-111.10.3); GOOGLE_RESOURCES is no longer read; incident_drive_id is deleted
+- [x] #3 Each Google document, folder, sheet and calendar id has its own key, a non-public value supplied only from the environment (decisions/configuration.md, TASK-167 ruling; TASK-111.10.3); GOOGLE_RESOURCES is no longer read; incident_drive_id is deleted
 - [x] #4 production.toml values equal the sre-bot-config values they replace, and the GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY SecureString equals the gcp_sre_service_account_key parameter
-- [ ] #5 The old names (GOOGLE_DELEGATED_ADMIN_EMAIL, SRE_BOT_EMAIL, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, GOOGLE_RESOURCES) are no longer read from the environment or .env
+- [x] #5 The old names (GOOGLE_DELEGATED_ADMIN_EMAIL, SRE_BOT_EMAIL, GOOGLE_WORKSPACE_CUSTOMER_ID, GCP_SRE_SERVICE_ACCOUNT_KEY_FILE, GOOGLE_RESOURCES) are no longer read from the environment or .env
 - [x] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
@@ -50,4 +50,6 @@ COORDINATOR. Split 2026-10-26 (human approved): TASK-111.10.1 reads the Google s
 
 <!-- SECTION:NOTES:BEGIN -->
 - 2026-10-28: ACs #1, #2, #4 and #6 checked from TASK-111.10.2 (Done 2026-10-27: post google PASS on sre-bot-task:58, pre google MATCH, gates green). AC #3 reworded to the TASK-167 ruling (the ids never go in the files); #3 and #5 close with TASK-111.10.3.
+
+- 2026-10-28: ACs #3 and #5 checked from TASK-111.10.3 (Done; #1805, #1806 on sre-bot-task:67, pre google_ids all 15 MATCH, post all PASS); rg over app/ outside tests: the old names are read nowhere, only named by the dev audit's retirement maps. All subtasks Done; ready for Done (human).
 <!-- SECTION:NOTES:END -->

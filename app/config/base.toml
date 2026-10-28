@@ -163,6 +163,12 @@ timeout_seconds = 30.0
 # TRELLO__TENANT__APP_KEY and TRELLO__TENANT__TOKEN. The ATIP board (a non-public value) comes
 # from TRELLO__ATIP_BOARD.
 
+[sentinel]
+# The custom log table events are written to; each deployment that sends names its own. The
+# workspace id (non-public) and its shared key (secret) come from the environment only:
+# SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY; with either unset nothing is sent.
+log_type = "DevSREBot"
+
 [maxmind]
 # No key: the GeoIP2 database file is the [maxmind.tenant] entry (database_path), named in the
 # deployment's environment file; with no entry MaxMind is not configured.
@@ -181,14 +187,6 @@ oncall_group_id = ""
 # The channel a new ATIP request is announced in; empty means none.
 announce_channel_id = ""
 
-[incident]
-# Where the legacy declare path announces an incident and which user groups it invites.
-# Slack ids are deployment configuration, never a secret; empty means none. Local shares
-# the production workspace, so no production id is a default here.
-incident_channel = ""
-slack_security_user_group_id = ""
-slack_notify_mgmt_user_group_id = ""
-
 [incident_core]
 # The incident record tables (terraform/dynamodb.tf) and the system that hosts a new
 # incident (new_incident_system: slack or google; absent means the only configured one).
@@ -202,6 +200,12 @@ report_template_id = ""
 list_sheet_id = ""
 
 [incident_response]
+# Where the declare path announces an incident and which user groups it invites. Slack ids
+# are deployment configuration, never a secret; empty means none. Local shares the
+# production workspace, so no production id is a default here.
+announcement_channel_id = ""
+security_group_id = ""
+notify_management_group_id = ""
 # Non-public: set from the environment as INCIDENT_RESPONSE__HANDBOOK_ID.
 handbook_id = ""
 

@@ -27,16 +27,13 @@ resource "aws_ecs_task_definition" "sre-bot" {
     awslogs-region        = "ca-central-1"
     awslogs-stream-prefix = "ecs-sre-bot"
     image                 = "${aws_ecr_repository.sre-bot.repository_url}:latest"
-    backend_url           = "https://${aws_route53_zone.sre_bot.name}"
-    fargate_cpu           = var.fargate_cpu
-    fargate_memory        = var.fargate_memory
-    aws_region            = "ca-central-1"
-    cors_allowed_origins  = jsonencode(var.cors_allowed_origins)
     forwarded_allow_ips   = join(",", module.vpc.public_subnet_cidr_blocks)
-    secrets = jsonencode(concat(
-      [{ name = "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", valueFrom = aws_ssm_parameter.gcp_sre_service_account_key.arn }],
-      [for name in sort(local.sre_bot_secret_names) : { name = name, valueFrom = aws_ssm_parameter.sre_bot_secret[name].arn }],
-    ))
+    # Every parameter but the never-read TRELLO__APP_KEY and TRELLO__TOKEN, which stay until
+    # TASK-111.15.2 because earlier revisions, still rollback targets, reference them.
+    secrets = jsonencode([
+      for name in sort(setsubtract(local.sre_bot_secret_names, local.sre_bot_unread_secret_names)) :
+      { name = name, valueFrom = aws_ssm_parameter.sre_bot_secret[name].arn }
+    ])
   })
 }
 

@@ -58,12 +58,12 @@ Env var `ACCESS_CONFIG_SOURCE` controls which loader is used. It is read by `Acc
 | `bundle` (default) | ignored | No built-in configuration — loading fails with `CONFIG_NOT_CONFIGURED` when access is enabled but unconfigured |
 | `file_json` | Absolute path to a local JSON file | Local dev with a real config (e.g. `access-sync.local.json`) |
 | `inline_json` | The full JSON document as a string | Useful in CI or one-off testing |
-| `env` | ignored | **Production via SSM bundle** — reads flat env vars (see below) |
+| `env` | ignored | Reads flat env vars from the process environment (see below) |
 | `dynamodb` / `s3` / `ssm` | Key/path in that store | Not yet implemented |
 
-### env source (production)
+### env source
 
-When `ACCESS_CONFIG_SOURCE=env`, no JSON file or inline document is needed. The loader reads flat env vars that `entry.sh` populates from the SSM parameter bundle at container startup:
+When `ACCESS_CONFIG_SOURCE=env`, no JSON file or inline document is needed. The loader reads flat env vars from the process environment:
 
 ```
 ACCESS_CONFIG_SOURCE=env
@@ -73,7 +73,7 @@ ACCESS_CONFIG_ENV_DIR_SEPARATOR=-
 ACCESS_CONFIG_ENV_PLATFORMS_JSON={"aws": {"adapter_type": "aws_identity_center", "authn_token": "authn", "authn_removal_mode": "delete"}}
 ```
 
-`ACCESS_CONFIG_ENV_PLATFORMS_JSON` is the platforms block only — not the full config document. Add these vars to the `sre-bot-config` (or `sre-bot-config-infrastructure`) SSM parameter alongside the other app config.
+`ACCESS_CONFIG_ENV_PLATFORMS_JSON` is the platforms block only — not the full config document. Production sets none of them: the access plugins are off there, and the container no longer reads a `.env` from SSM (TASK-111.15.1). Where a deployment's access configuration lives is TASK-166's (the access rebuild).
 
 **For local development**, use `file_json` instead:
 
