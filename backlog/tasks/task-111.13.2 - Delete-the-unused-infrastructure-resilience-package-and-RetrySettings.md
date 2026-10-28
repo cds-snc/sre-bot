@@ -4,7 +4,7 @@ title: Delete the unused infrastructure/resilience package and RetrySettings
 status: To Do
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T13:46:00Z'
+updated_date: '2026-10-28T14:37:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -51,3 +51,9 @@ Gates: ruff, mypy (baseline 47), pytest, make check-import-contracts, make check
 Rollout: merge deploys and tf_apply destroys one empty table and its IAM grant; nothing in the running app reads either. Rollback: git revert restores code and recreates the empty table.
 Independent of TASK-111.13.1; either may merge first. ~1930 LOC deleted across ~12 production files plus terraform; deletion only, no behaviour change.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-28: decisions/reliability.md amendment went in with PR #1801 (TASK-111.13.1) instead of this PR; this PR only checks it still matches what it deletes.
+<!-- SECTION:NOTES:END -->
