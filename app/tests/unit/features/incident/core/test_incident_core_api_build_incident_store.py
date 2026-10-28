@@ -43,8 +43,8 @@ class _FakeConfiguredSystems(ConfiguredSystems):
 
 def _settings(*, table_name: str = TABLE_NAME, new_incident_system: WorkplaceSystem | None = None) -> IncidentCoreSettings:
     return IncidentCoreSettings(
-        INCIDENT_CORE__INCIDENTS_TABLE=table_name,
-        INCIDENT_CORE__NEW_INCIDENT_SYSTEM=new_incident_system,
+        incidents_table=table_name,
+        new_incident_system=new_incident_system,
     )
 
 
@@ -112,7 +112,7 @@ def test_build_ignores_the_new_incident_policy(new_incident_system: WorkplaceSys
 
 
 def test_builder_source_never_names_the_new_incident_policy() -> None:
-    assert "NEW_INCIDENT_SYSTEM" not in inspect.getsource(build_incident_store)
+    assert "new_incident_system" not in inspect.getsource(build_incident_store)
 
 
 def test_legacy_item_reads_with_the_configured_tenants() -> None:

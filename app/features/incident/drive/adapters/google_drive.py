@@ -11,11 +11,11 @@ import structlog
 from googleapiclient.errors import HttpError
 
 from contracts.operations import OperationResult
+from features.incident.common.settings import get_incident_core_settings
 from infrastructure.drive import DRIVE_SCOPES
 from infrastructure.drive.factory import get_drive_provider
 from infrastructure.drive.models import DriveFile
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace.settings import get_google_resources_config
 
 if TYPE_CHECKING:
     from googleapiclient._apis.drive.v3 import DriveResource, File  # pyright: ignore[reportMissingModuleSource]
@@ -134,7 +134,7 @@ def get_metadata(file_id: str, fields: str | None = None) -> dict[str, Any]:
 def incident_drive_healthcheck() -> bool:
     healthy = False
     try:
-        metadata = get_metadata(get_google_resources_config().incident_template_id)
+        metadata = get_metadata(get_incident_core_settings().report_template_id)
         if metadata is not None:
             healthy = "id" in metadata
         logger.info(

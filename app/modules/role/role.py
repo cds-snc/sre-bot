@@ -4,7 +4,7 @@ from slack_sdk import WebClient
 from structlog import get_logger
 
 from contracts.slack.transport import slack_transport_info
-from integrations.google_workspace.settings import get_google_resources_config
+from features.talent.settings import get_talent_settings
 from integrations.slack import commands as slack_commands
 from integrations.slack import users as slack_users
 from packages.talent.adapters import google_drive as talent_drive
@@ -189,12 +189,10 @@ def role_view_handler(ack, body, say, client):
     # 1. Create a new folder in the Google Drive
     # 2. Copy the template files into the new folder
     # 3. Create a new channel and invite users
-    google_resources = get_google_resources_config()
+    talent = get_talent_settings()
 
     def copy_template(template_id, document_name, label):
-        file_id = talent_drive.copy_template_to_role_folder(
-            template_id, document_name, google_resources.templates_folder_id, folder_id
-        )
+        file_id = talent_drive.copy_template_to_role_folder(template_id, document_name, talent.templates_folder_id, folder_id)
         if file_id is None:
             log.error("talent_role_document_copy_failed", document_name=label)
         else:
@@ -202,7 +200,7 @@ def role_view_handler(ack, body, say, client):
         return file_id
 
     # Step 1: Create a new folder in the Google Drive
-    folder = talent_drive.create_role_folder(role_name, google_resources.internal_talent_folder_id)
+    folder = talent_drive.create_role_folder(role_name, talent.internal_folder_id)
     if folder is None:
         log.error(
             "talent_role_folder_creation_failed",
@@ -221,7 +219,7 @@ def role_view_handler(ack, body, say, client):
     # Step 2: Copy the template files into the new folder (Scoring Guilde, Template for Core Values interview notes, Template for Technical interview notes
     # Intake form, Phone screen template)
     scoring_guide_id = copy_template(
-        google_resources.scoring_guide_template_id,
+        talent.scoring_guide_template_id,
         f"Template 2022/06 - {role_name} Interview Panel Scoring Document - <year/month> ",
         "Scoring Guide",
     )
@@ -229,7 +227,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     core_values_interview_notes_id = copy_template(
-        google_resources.core_values_interview_notes_id,
+        talent.core_values_interview_notes_id,
         f"Template EN+FR 2022/09- {role_name} - Core Values Panel - Interview Guide - <year/month> - <candidate initials> ",
         "Core Values Interview Notes",
     )
@@ -237,7 +235,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     technical_interview_notes_id = copy_template(
-        google_resources.technical_interview_notes_id,
+        talent.technical_interview_notes_id,
         f"Template EN+FR 2022/09 - {role_name} - Technical Panel - Interview Guide - <year/month> - <candidate initials> ",
         "Technical Interview Notes",
     )
@@ -245,7 +243,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     intake_form_id = copy_template(
-        google_resources.intake_form_template_id,
+        talent.intake_form_template_id,
         f"TEMPLATE Month YYYY - {role_name} - Kick-off form",
         "Intake Form",
     )
@@ -253,7 +251,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     phone_screen_template_id = copy_template(
-        google_resources.phone_screen_template_id,
+        talent.phone_screen_template_id,
         "Phone Screen - Template",
         "Phone Screen Template",
     )
@@ -261,7 +259,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     recruitment_feedback_template_id = copy_template(
-        google_resources.recruitment_feedback_template_id,
+        talent.recruitment_feedback_template_id,
         f"Recruitment Feedback - {role_name}",
         "Recruitment Feedback Template",
     )
@@ -269,7 +267,7 @@ def role_view_handler(ack, body, say, client):
         return
 
     panelist_guidebook_template_id = copy_template(
-        google_resources.panelist_guidebook_template_id,
+        talent.panelist_guidebook_template_id,
         f"Panelist Guidebook - Interview Best Practices - {role_name}",
         "Panelist Guidebook Template",
     )

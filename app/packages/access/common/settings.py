@@ -23,7 +23,7 @@ from typing import Literal
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 
 class AccessConfigSettings(BaseSettings):
@@ -106,14 +106,14 @@ class AccessPermissionSetsSettings(ConfigurationSlice):
         system_admin_permissions — permission set ARN the "write" alias resolves to
         view_only_permissions    — permission set ARN the "read" alias resolves to
 
-    Both are public values, empty until an environment file names them; the permission-set
-    policy itself is redesigned in the access feature.
+    Both embed the Identity Center instance id, a non-public value, so they come only from the
+    environment; the permission-set policy itself is redesigned in the access feature.
     """
 
     model_config = SettingsConfigDict(toml_table_header=("access_permission_sets",), env_prefix="ACCESS_PERMISSION_SETS__")
 
-    system_admin_permissions: str = ""
-    view_only_permissions: str = ""
+    system_admin_permissions: str = env_only("Permission set ARN the access write alias resolves to.", "codespaces", default="")
+    view_only_permissions: str = env_only("Permission set ARN the access read alias resolves to.", "codespaces", default="")
 
 
 @lru_cache(maxsize=1)

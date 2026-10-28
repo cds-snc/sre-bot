@@ -16,7 +16,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 
@@ -55,7 +55,7 @@ class OpenAISettings(ConfigurationSlice):
     model_config = SettingsConfigDict(toml_table_header=("openai",), env_prefix="OPENAI__")
 
     tenant: OpenAITenant | None = Field(default=None, description="The model endpoint this instance works with.")
-    api_key: SecretStr = Field(default=SecretStr(""), repr=False, description="API key for the tenant's endpoint.")
+    api_key: SecretStr = env_only("API key for the tenant's endpoint.", "codespaces", default=SecretStr(""))
     max_output_tokens: int = 3000
     # Summarising wants reproducibility, not creativity, so a temperature of 0
     # is worth having where the model supports it. It is omitted by default

@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, ClassVar, Literal, Protocol
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -96,6 +96,20 @@ def host_info() -> HostInfo:
     if _host is None:
         raise ConfigurationError("host info not installed: the app factory (create_app) installs it")
     return _host
+
+
+type EnvSource = Literal["codespaces", "devcontainer", "local"]
+"""Where a developer's value for an environment-only name comes from: a Codespaces secret,
+the devcontainer's compose file, or the developer's own app/.env."""
+
+
+def env_only(description: str, source: EnvSource, **field: Any) -> Any:
+    """Declare a field whose value comes only from the environment: a secret or a non-public value.
+
+    No configuration file holds it (decisions/configuration.md). The metadata drives the
+    generated app/.env.example (bin/generate_env_example.py); the value is never in the repr.
+    """
+    return Field(description=description, repr=False, json_schema_extra={"env_only": True, "source": source}, **field)
 
 
 def _read(path: Path) -> dict[str, Any]:

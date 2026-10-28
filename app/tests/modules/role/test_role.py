@@ -5,7 +5,7 @@ from modules import role
 
 
 def role_resources(**overrides: str) -> SimpleNamespace:
-    """The talent ids the role handler reads from the Google resources settings when a role is submitted."""
+    """The talent ids the role handler reads from the [talent] settings when a role is submitted."""
     ids = {
         "scoring_guide_template_id": "scoring_guide_template",
         "core_values_interview_notes_id": "core_values_template",
@@ -14,7 +14,7 @@ def role_resources(**overrides: str) -> SimpleNamespace:
         "phone_screen_template_id": "phone_screen_template",
         "recruitment_feedback_template_id": "recruitment_feedback_template",
         "panelist_guidebook_template_id": "panelist_guidebook_template",
-        "internal_talent_folder_id": "mock_internal_talent_folder",
+        "internal_folder_id": "mock_internal_talent_folder",
         "templates_folder_id": "mock_templates_folder",
     }
     return SimpleNamespace(**(ids | overrides))
@@ -311,7 +311,7 @@ def test_update_modal_locale_to_FR():
     assert kwargs["view"]["blocks"][0]["elements"][0]["value"] == "fr-FR"
 
 
-@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
+@patch.object(role, "get_talent_settings", new=lambda: role_resources(internal_folder_id="internal_talent_folder"))
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")
 def test_create_new_folder(mock_create_role_folder, mock_copy_template_to_role_folder):
@@ -325,7 +325,7 @@ def test_create_new_folder(mock_create_role_folder, mock_copy_template_to_role_f
     mock_create_role_folder.assert_called_once_with("foo", "internal_talent_folder")
 
 
-@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
+@patch.object(role, "get_talent_settings", new=lambda: role_resources(internal_folder_id="internal_talent_folder"))
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")
@@ -343,7 +343,7 @@ def test_create_new_folder_failed(mock_create_role_folder, mock_copy_template_to
     mock_copy_template_to_role_folder.assert_not_called()
 
 
-@patch.object(role, "get_google_resources_config", new=role_resources)
+@patch.object(role, "get_talent_settings", new=role_resources)
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.create_role_folder")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
@@ -412,7 +412,7 @@ def test_copy_files_to_internal_talent_folder(mock_copy_template_to_role_folder,
     assert bound_logger.info.call_count == 10
 
 
-@patch.object(role, "get_google_resources_config", new=lambda: role_resources(internal_talent_folder_id="internal_talent_folder"))
+@patch.object(role, "get_talent_settings", new=lambda: role_resources(internal_folder_id="internal_talent_folder"))
 @patch("modules.role.role.logger")
 @patch("modules.role.role.talent_drive.copy_template_to_role_folder")
 @patch("modules.role.role.talent_drive.create_role_folder")

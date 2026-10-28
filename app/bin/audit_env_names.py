@@ -9,6 +9,19 @@ Each name gets one action:
     rename  set the new name to the same value, then delete the old one
     check   something disagrees (a destination, a parameter, a workflow reference): investigate
 
+A delete needs positive evidence of retirement: a name the configuration migration retired, or a HINTS or
+SUPERSEDED entry. Absence of a reference is not evidence (a workflow on another branch, a reusable workflow's
+``secrets: inherit`` or a dynamic ``secrets[...]`` is invisible to the scan), so a name nothing in the
+repository reads, or a repository Actions secret or variable no workflow on the default branch references, is
+a check showing its last reference in git history. When ``.github`` passes secrets dynamically, the workflow
+scan is blind and every repository Actions secret is none.
+
+The audit stays pure; git history is looked up by the wrapper in two passes. ``--lookups`` prints
+``kind<TAB>name`` for each check row that needs its last reference (kind ``workflow``: a
+``secrets.NAME``/``vars.NAME`` in ``.github``; kind ``repo``: the name anywhere outside the planning docs),
+then the wrapper runs ``git log`` for those names only and passes the ``name<TAB>reference`` file it wrote as
+``LAST_REFS_FILE`` to the second, reporting pass.
+
 Durable part: env files, Codespaces and GitHub Actions names are judged against what the app reads
 (derived the way CI derives it: ``check_settings_key_ownership`` scans the settings classes with ``ast``)
 and what the workflows under ``.github/`` reference.
@@ -17,7 +30,7 @@ Migration part (TASK-111.15.2 deletes it with the SSM blobs, along with HINTS an
 (the parent of TASK-111.1; the wrapper extracts it with ``git archive``) read and the app no longer
 reads; production blob names are judged against doc-14 and ``config/{base,production}.toml``.
 
-Usage (from app/): ``uv run python -m bin.audit_env_names [--all] BASELINE_SHA [BASELINE_APP_DIR] < names.tsv``;
+Usage (from app/): ``uv run python -m bin.audit_env_names [--all | --lookups] BASELINE_SHA [BASELINE_APP_DIR] < names.tsv``;
 the baseline directory is needed only when the cached names are for another commit.
 """
 
@@ -140,33 +153,40 @@ HINTS = {
     "CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS": "nothing (deleted: the groups slice had no reader)",
     "REQUIRE_JUSTIFICATION": "nothing (deleted: the groups slice had no reader)",
     "MIN_JUSTIFICATION_LENGTH": "nothing (deleted: the groups slice had no reader)",
+    # Not "secret <NAME>": the JSON value must never be copied into one of the per-id secrets.
+    "GOOGLE_RESOURCES": "one secret per id (INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, "
+    "INCIDENT_CORE__LIST_SHEET_ID, INCIDENT_RESPONSE__HANDBOOK_ID, INCIDENT_POSTMORTEM__CALENDAR_ID, "
+    "CLOUD_OPERATIONS_SPENDING__SHEET_ID and the nine TALENT__* ids; doc-14 GOOGLE_RESOURCES ids)",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
-# GOOGLE_RESOURCES JSON secret; #976 removed the frontend). Their old secrets are leftovers.
+# GOOGLE_RESOURCES JSON secret; #976 removed the frontend). Their old secrets are leftovers. TASK-111.10.3
+# gave each id its own secret; inc.d and rep.g had no reader and were not carried.
 SUPERSEDED = {
-    "SRE_DRIVE_ID": "GOOGLE_RESOURCES inc.d",
-    "SRE_INCIDENT_FOLDER": "GOOGLE_RESOURCES inc.f",
-    "INCIDENT_TEMPLATE": "GOOGLE_RESOURCES inc.t",
-    "INCIDENT_LIST": "GOOGLE_RESOURCES inc.l",
-    "INTERNAL_TALENT_FOLDER": "GOOGLE_RESOURCES tal.i",
-    "SCORING_GUIDE_TEMPLATE": "GOOGLE_RESOURCES tal.s",
-    "TEMPLATES_FOLDER": "GOOGLE_RESOURCES tal.t",
-    "CORE_VALUES_INTERVIEW_NOTES_TEMPLATE": "GOOGLE_RESOURCES tal.c",
-    "TECHNICAL_INTERVIEW_NOTES_TEMPLATE": "GOOGLE_RESOURCES tal.tech",
-    "INTAKE_FORM_TEMPLATE": "GOOGLE_RESOURCES tal.int",
-    "PHONE_SCREEN_TEMPLATE": "GOOGLE_RESOURCES tal.ph",
-    "RECRUITMENT_FEEDBACK_TEMPLATE": "GOOGLE_RESOURCES tal.rec",
-    "PANELIST_GUIDEBOOK_TEMPLATE": "GOOGLE_RESOURCES tal.pan",
-    "SPENDING_SHEET_ID": "GOOGLE_RESOURCES aws.s",
-    "GOOGLE_SRE_CALENDAR_ID": "GOOGLE_RESOURCES cal.sre",
-    "FOLDER_REPORTS_GOOGLE_GROUPS": "GOOGLE_RESOURCES rep.g (itself unread)",
+    "SRE_DRIVE_ID": "GOOGLE_RESOURCES inc.d, itself unread and not carried",
+    "SRE_INCIDENT_FOLDER": "GOOGLE_RESOURCES inc.f, now secret INCIDENT_CORE__FOLDER_ID",
+    "INCIDENT_TEMPLATE": "GOOGLE_RESOURCES inc.t, now secret INCIDENT_CORE__REPORT_TEMPLATE_ID",
+    "INCIDENT_LIST": "GOOGLE_RESOURCES inc.l, now secret INCIDENT_CORE__LIST_SHEET_ID",
+    "INTERNAL_TALENT_FOLDER": "GOOGLE_RESOURCES tal.i, now secret TALENT__INTERNAL_FOLDER_ID",
+    "SCORING_GUIDE_TEMPLATE": "GOOGLE_RESOURCES tal.s, now secret TALENT__SCORING_GUIDE_TEMPLATE_ID",
+    "TEMPLATES_FOLDER": "GOOGLE_RESOURCES tal.t, now secret TALENT__TEMPLATES_FOLDER_ID",
+    "CORE_VALUES_INTERVIEW_NOTES_TEMPLATE": "GOOGLE_RESOURCES tal.c, now secret TALENT__CORE_VALUES_INTERVIEW_NOTES_ID",
+    "TECHNICAL_INTERVIEW_NOTES_TEMPLATE": "GOOGLE_RESOURCES tal.tech, now secret TALENT__TECHNICAL_INTERVIEW_NOTES_ID",
+    "INTAKE_FORM_TEMPLATE": "GOOGLE_RESOURCES tal.int, now secret TALENT__INTAKE_FORM_TEMPLATE_ID",
+    "PHONE_SCREEN_TEMPLATE": "GOOGLE_RESOURCES tal.ph, now secret TALENT__PHONE_SCREEN_TEMPLATE_ID",
+    "RECRUITMENT_FEEDBACK_TEMPLATE": "GOOGLE_RESOURCES tal.rec, now secret TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID",
+    "PANELIST_GUIDEBOOK_TEMPLATE": "GOOGLE_RESOURCES tal.pan, now secret TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID",
+    "SPENDING_SHEET_ID": "GOOGLE_RESOURCES aws.s, now secret CLOUD_OPERATIONS_SPENDING__SHEET_ID",
+    "GOOGLE_SRE_CALENDAR_ID": "GOOGLE_RESOURCES cal.sre, now secret INCIDENT_POSTMORTEM__CALENDAR_ID",
+    "FOLDER_REPORTS_GOOGLE_GROUPS": "GOOGLE_RESOURCES rep.g, itself unread and not carried",
     "FRONTEND_URL": "nothing (the frontend was removed in #976)",
 }
 
 FILE_DESTINATION = re.compile(r"(?:production\.toml |file )\[([a-z0-9_.]+)\] ?([a-z0-9_]*)")
 PARAMETER_DESTINATION = re.compile(r"secret ([A-Z0-9_]+)")
 WORKFLOW_REFERENCE = re.compile(r"\b(?:secrets|vars)\.([A-Za-z0-9_]+)")
+# Secrets passed without naming them: every repository secret may be read.
+DYNAMIC_SECRETS = re.compile(r"secrets:\s*inherit\b|\bsecrets\[|\b(?:toJSON|fromJSON)\(\s*secrets\b")
 # Developer setup that reads the environment: devcontainer files, Makefiles and shell scripts.
 SETUP_FILES = (".devcontainer/*", "Makefile", "app/Makefile", "app/bin/*.sh", "bin/*.sh")
 SHELL_REFERENCE = re.compile(r"\$\{?([A-Z][A-Z0-9_]+)")
@@ -180,6 +200,7 @@ class Verdict:
     action: str
     reason: str
     new: str | None = None  # the name the value moves to, when it still has to be copied
+    lookup: str | None = None  # a check whose last git reference the wrapper looks up: "workflow" or "repo"
 
 
 @dataclass(frozen=True)
@@ -190,6 +211,8 @@ class Context:
     parameter_states: dict[str, str] = field(default_factory=dict)
     workflow_refs: dict[str, list[str]] = field(default_factory=dict)
     setup_refs: dict[str, list[str]] = field(default_factory=dict)
+    last_refs: dict[str, str] = field(default_factory=dict)  # name -> its last reference in git history
+    workflow_scan_blind: bool = False  # .github passes secrets dynamically: any repository secret may be read
 
 
 def env_names(root: Path) -> set[str]:
@@ -218,6 +241,11 @@ def workflow_references(root: Path = WORKFLOW_DIR) -> dict[str, list[str]]:
             refs[name].add(path.name)
     refs.pop("GITHUB_TOKEN", None)
     return {name: sorted(files) for name, files in refs.items()}
+
+
+def pass_through_workflow_files(root: Path = WORKFLOW_DIR) -> list[str]:
+    """Workflow files under ``root`` that pass secrets without naming them (``secrets: inherit``, ``secrets[...]``)."""
+    return sorted(str(path.relative_to(root)) for path in root.rglob("*.y*ml") if DYNAMIC_SECRETS.search(path.read_text()))
 
 
 def setup_references(root: Path = REPO_ROOT) -> dict[str, list[str]]:
@@ -282,14 +310,27 @@ def staged_parameters(ctx: Context) -> dict[str, str]:
     return {m[1]: old for old, (destination, _) in ctx.doc14.items() if (m := PARAMETER_DESTINATION.match(destination))}
 
 
+def _is_retired(name: str, ctx: Context) -> bool:
+    """Positive evidence of retirement: the migration retired it, or a HINTS or SUPERSEDED entry names it."""
+    return name in ctx.retired or name in HINTS or name in SUPERSEDED
+
+
+def _unevidenced(what: str, name: str, kind: str, ctx: Context) -> Verdict:
+    """A check for a name with no reader and no evidence of retirement, showing its last git reference."""
+    last = ctx.last_refs.get(name, "not looked up")
+    return Verdict("check", f"{what}, and nothing records its retirement; last reference: {last}", lookup=kind)
+
+
 def _developer(name: str, state: str, ctx: Context) -> Verdict:
     """An env-file line or a Codespaces secret: what a developer's process would read."""
     read = name in ctx.current or _is_runtime(name) or name in ctx.setup_refs
     if state == "commented":
         if read:
             return Verdict("none", "commented example of a name the app reads")
-        now = HINTS.get(name) or replacement(name, ctx.current)
-        return Verdict("delete", f"commented line of a name nothing reads{'; now ' + now if now else ''}")
+        if not _is_retired(name, ctx):
+            return _unevidenced("commented line of a name nothing reads", name, "repo", ctx)
+        now = HINTS.get(name) or SUPERSEDED.get(name) or replacement(name, ctx.current)
+        return Verdict("delete", f"commented line of a retired name{'; now ' + now if now else ''}")
     if name in ctx.current:
         return Verdict("none", "read by the app")
     if _is_runtime(name):
@@ -304,12 +345,12 @@ def _developer(name: str, state: str, ctx: Context) -> Verdict:
         secret = PARAMETER_DESTINATION.match(HINTS[name])
         return Verdict("delete", f"retired; set {HINTS[name]} instead", new=secret[1] if secret else None)
     if name in SUPERSEDED:
-        return Verdict("delete", f"superseded before the migration by {SUPERSEDED[name]}, which stays")
+        return Verdict("delete", f"superseded before the migration by {SUPERSEDED[name]}")
     if name in ctx.retired:
         if new := replacement(name, ctx.current):
             return Verdict("rename", f"set {new} to the same value, then delete {name}", new=new)
         return Verdict("delete", "retired by the configuration migration; the value lives in app/config/*.toml now")
-    return Verdict("delete", "nothing in the repository reads it (confirm nobody uses it outside the repository)")
+    return _unevidenced("nothing in the repository reads it", name, "repo", ctx)
 
 
 def _actions(source: str, name: str, ctx: Context) -> Verdict:
@@ -318,7 +359,11 @@ def _actions(source: str, name: str, ctx: Context) -> Verdict:
         return Verdict("none", f"used by {', '.join(files)}")
     if " org" in source:
         return Verdict("none", "organization-level; other repositories may use it")
-    return Verdict("delete", "no workflow under .github/ references it")
+    if ctx.workflow_scan_blind and " secret " in source:
+        return Verdict("none", "the scan is blind: a workflow passes secrets without naming them")
+    if name in HINTS or name in SUPERSEDED or name in ctx.retired:
+        return _developer(name, "present", ctx)
+    return _unevidenced("no workflow under .github/ on the default branch references it", name, "workflow", ctx)
 
 
 def _production_blob(name: str, ctx: Context) -> Verdict:
@@ -403,6 +448,9 @@ def _github_target(source: str, repo: str) -> str | None:
     return None
 
 
+GENERATED_ENV_EXAMPLE = "app/.env.example"
+
+
 def fix_commands(sections: dict[str, list[tuple[str, str, Verdict]]], repo: str) -> list[str]:
     """Shell lines that apply each delete or rename row; production and organization rows get none."""
     lines: list[str] = []
@@ -411,6 +459,9 @@ def fix_commands(sections: dict[str, list[tuple[str, str, Verdict]]], repo: str)
             ((name, verdict) for name, _, verdict in rows if verdict.action in {"delete", "rename"}), key=lambda row: row[0]
         )
         commands: list[str] = []
+        if source == f"file {GENERATED_ENV_EXAMPLE}":
+            # Generated from the settings classes (make env-example); never edited by a plan.
+            continue
         if source.startswith("file "):
             path = source.removeprefix("file ")
             renamed = [(name, verdict.new) for name, verdict in acting if verdict.new]
@@ -438,12 +489,22 @@ value, then delete the old one; check = something disagrees, investigate. Produc
 edited by hand: the blobs are deleted as a whole (TASK-111.15), so their migrated or unread lines show none."""
 
 
+def read_last_refs(path: str | None) -> dict[str, str]:
+    """The wrapper's ``name<TAB>reference`` lines; empty when it looked nothing up."""
+    if not path or not Path(path).exists():
+        return {}
+    lines = (line.partition("\t") for line in Path(path).read_text().splitlines() if "\t" in line)
+    return {name: ref for name, _, ref in lines}
+
+
 def main(argv: list[str]) -> None:
     show_all = "--all" in argv
-    args = [a for a in argv if a != "--all"]
+    lookups = "--lookups" in argv
+    args = [a for a in argv if a not in {"--all", "--lookups"}]
     if not 1 <= len(args) <= 2:
-        raise SystemExit("usage: python -m bin.audit_env_names [--all] BASELINE_SHA [BASELINE_APP_DIR] < names.tsv")
+        raise SystemExit("usage: python -m bin.audit_env_names [--all | --lookups] BASELINE_SHA [BASELINE_APP_DIR] < names.tsv")
     current = env_names(APP_ROOT)
+    pass_through = pass_through_workflow_files()
     entries = [line.rstrip("\n").split("\t") for line in sys.stdin if line.strip()]
     ctx = Context(
         current=current,
@@ -452,6 +513,8 @@ def main(argv: list[str]) -> None:
         parameter_states={name: state for source, name, state in entries if source == "ssm-param"},
         workflow_refs=workflow_references(),
         setup_refs=setup_references(),
+        last_refs=read_last_refs(os.environ.get("LAST_REFS_FILE")),
+        workflow_scan_blind=bool(pass_through),
     )
 
     sections: defaultdict[str, list[tuple[str, str, Verdict]]] = defaultdict(list)
@@ -464,7 +527,14 @@ def main(argv: list[str]) -> None:
         listed = {name for source, name, _ in entries if source.startswith(("actions", "dependabot"))}
         sections["github actions: workflow references with no secret or variable"] = unprovided_workflow_references(listed, ctx)
 
+    if lookups:
+        wanted = {(verdict.lookup, name) for rows in sections.values() for name, _, verdict in rows if verdict.lookup}
+        print("".join(f"{kind}\t{name}\n" for kind, name in sorted(wanted)), end="")
+        return
+
     print(LEGEND)
+    if pass_through:
+        print(f"workflow scan blind for repository secrets: {', '.join(pass_through)} pass values through without naming them")
     totals: Counter[str] = Counter()
     for source, rows in sections.items():
         counts = Counter(verdict.action for _, _, verdict in rows)

@@ -8,8 +8,8 @@ import structlog
 from pandas.core.frame import DataFrame
 
 from contracts.operations import OperationResult
+from features.cloud_operations.spending.settings import get_cloud_operations_spending_settings
 from infrastructure.spreadsheets import get_spreadsheet_provider
-from integrations.google_workspace.settings import get_google_resources_config
 from packages.aws_platform.adapters.cost_explorer import CostExplorerAdapter, build_cost_explorer_adapter
 from packages.aws_platform.adapters.organizations import OrganizationsAdapter, build_organizations_adapter
 
@@ -212,7 +212,7 @@ def update_spending_data(
         True if the write succeeded, False if it was skipped or failed.
     """
     if spreadsheet_id is None:
-        spreadsheet_id = get_google_resources_config().spending_sheet_id
+        spreadsheet_id = get_cloud_operations_spending_settings().sheet_id
     log = logger.bind(spreadsheet_id=spreadsheet_id)
     if not spreadsheet_id:
         log.error("update_spending_data", error="spending sheet id is not set")

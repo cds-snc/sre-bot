@@ -14,14 +14,14 @@ import pytest
 from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.google_workspace.settings import (
     GoogleWorkspaceSettings,
-    GoogleWorkspaceTenant,
     get_google_workspace_settings,
 )
+from tests.factories.google_service_account import service_account_key
 from tests.unit.integrations.google_workspace.conftest import RETIRED_NAMES, install_google_files
 
 pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("google_slice_env")]
 
-KEY = '{"type": "service_account", "private_key": "secret-key-0001"}'
+KEY = service_account_key()
 DELEGATED_USER = "delegated-user-0001@example.com"
 CUSTOMER = "C0tenant0001"
 
@@ -62,7 +62,8 @@ def test_google_settings_reads_the_tenant_from_the_environment(tmp_path: Path, m
 
     tenant = GoogleWorkspaceSettings().tenant
 
-    assert tenant == GoogleWorkspaceTenant(customer_id=CUSTOMER, service_account_key=KEY, delegated_user_email=DELEGATED_USER)
+    assert tenant is not None
+    assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (CUSTOMER, KEY, DELEGATED_USER)
 
 
 def test_google_settings_reads_the_tenant_secrets_from_a_dotenv_file(tmp_path: Path) -> None:

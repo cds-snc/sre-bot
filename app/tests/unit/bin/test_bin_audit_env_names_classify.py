@@ -50,7 +50,7 @@ def _action(source: str, name: str, state: str = "set", ctx: Context = CTX) -> s
         ("SESSION_SECRET_KEY", "set", "delete"),
         ("SLACK_ENABLED", "set", "delete"),
         ("LOG_LEVEL", "commented", "delete"),
-        ("REACT_APP_API_URL", "present", "delete"),
+        ("REACT_APP_API_URL", "present", "check"),
         ("GEO_DB_BUCKET", "present", "none"),
     ],
 )
@@ -68,7 +68,7 @@ def test_a_parameter_destination_set_ahead_of_its_reader_is_kept() -> None:
 
     assert verdict.action == "none"
     assert "SRE_BOT_EMAIL" in verdict.reason
-    assert _action("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__UNKNOWN", "present", ctx) == "delete"
+    assert _action("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__UNKNOWN", "present", ctx) == "check"
 
 
 def test_the_real_setup_scripts_read_the_geodb_bucket() -> None:
@@ -84,6 +84,24 @@ def test_a_superseded_google_id_names_the_secret_that_holds_it_now() -> None:
 
     assert verdict.action == "delete"
     assert "GOOGLE_RESOURCES tal.c" in verdict.reason
+    assert "TALENT__CORE_VALUES_INTERVIEW_NOTES_ID" in verdict.reason
+
+
+@pytest.mark.parametrize("name", ["SRE_DRIVE_ID", "FOLDER_REPORTS_GOOGLE_GROUPS"])
+def test_a_superseded_google_id_with_no_reader_says_it_was_not_carried(name: str) -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert "not carried" in verdict.reason
+
+
+def test_the_google_resources_json_is_deleted_without_copying_it_into_a_per_id_secret() -> None:
+    """Each id has its own secret now; the JSON value must never be copied into one of them."""
+    verdict = classify("codespaces repo cds-snc/sre-bot", "GOOGLE_RESOURCES", "present", CTX)
+
+    assert verdict.action == "delete"
+    assert verdict.new is None
+    assert "INCIDENT_CORE__FOLDER_ID" in verdict.reason
 
 
 def test_a_retired_switch_points_to_its_configuration_key() -> None:
@@ -192,9 +210,11 @@ def test_the_retired_flat_lease_ttl_is_deleted_for_its_scheduler_key_not_renamed
     ("source", "name", "action"),
     [
         ("actions secret repo cds-snc/sre-bot", "GEO_DB_BUCKET", "none"),
-        ("actions secret repo cds-snc/sre-bot", "OLD_SECRET", "delete"),
+        ("actions secret repo cds-snc/sre-bot", "OLD_SECRET", "check"),
         ("actions secret org cds-snc (shared with this repo)", "OLD_SECRET", "none"),
-        ("dependabot secret repo cds-snc/sre-bot", "OLD_SECRET", "delete"),
+        ("dependabot secret repo cds-snc/sre-bot", "OLD_SECRET", "check"),
+        ("actions secret repo cds-snc/sre-bot", "SLACK_ENABLED", "delete"),
+        ("actions variable repo cds-snc/sre-bot", "SESSION_SECRET_KEY", "delete"),
     ],
 )
 def test_actions_names_are_judged_by_workflow_references(source: str, name: str, action: str) -> None:

@@ -163,7 +163,7 @@ def build_incident_store(records: RecordStore, systems: ConfiguredSystems, setti
     new-incident policy is not read: only the declare path resolves it, so
     reading existing incidents never depends on it.
     """
-    return RecordIncidentStore(records, incidents_table(settings.INCIDENTS_TABLE), dict(systems.tenants()))
+    return RecordIncidentStore(records, incidents_table(settings.incidents_table), dict(systems.tenants()))
 
 
 @lru_cache(maxsize=1)

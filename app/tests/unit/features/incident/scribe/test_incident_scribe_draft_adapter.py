@@ -14,7 +14,7 @@ from integrations.google_workspace import client as google_workspace_client
 pytestmark = pytest.mark.unit
 
 _CLIENT = "features.incident.scribe.adapters.google_docs.google_workspace_client"
-_RESOURCES = "features.incident.scribe.adapters.google_docs.get_google_resources_config"
+_RESOURCES = "features.incident.scribe.adapters.google_docs.get_incident_core_settings"
 
 
 def _utf16_units(text: str) -> int:
@@ -332,7 +332,7 @@ class TestWriteDraftDocument:
             service = _drive_resource_fake(copy_response={"id": "NEW1"}, get_error=_http_error(404))
             google_client.get_drive_service.return_value = service
             google_client.classify_google_error.return_value = (OperationStatus.NOT_FOUND, "404", None)
-            mock_resources.return_value.incident_folder_id = "FALLBACK_FOLDER"
+            mock_resources.return_value.folder_id = "FALLBACK_FOLDER"
             written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
 
         assert written is not None

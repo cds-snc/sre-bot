@@ -6,8 +6,8 @@ from slack_bolt import Ack, App, Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.drive.adapters import google_drive as incident_drive
-from integrations.google_workspace.settings import get_google_resources_config
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import (
     channels as slack_channels,
@@ -349,7 +349,7 @@ Use `/sre incident help` to see a list of commands."""
             if not name:
                 respond("Please provide a product name using `create <product_name>`")
                 return
-            folder = incident_drive.create_folder(name, get_google_resources_config().incident_folder_id)
+            folder = incident_drive.create_folder(name, get_incident_core_settings().folder_id)
             folder_name = None
             if folder:
                 folder_name = folder.get("name")

@@ -121,14 +121,14 @@ def test_codespaces_holding_only_the_old_name_is_a_check() -> None:
     assert "Codespaces has TRELLO_ATIP_BOARD" in reason
 
 
-def test_a_name_missing_from_the_env_example_is_a_check() -> None:
-    """Every name supplied through the environment has a line in app/.env.example, commented or not."""
+def test_the_generated_env_example_is_never_judged() -> None:
+    """bin/generate_env_example.py writes app/.env.example and a test catches drift, so no row asks for a line."""
     entries = [e for e in _complete("SLACK__BOT_TOKEN", "SLACK_BOT_TOKEN") if e[0] != EXAMPLE]
     entries.append((EXAMPLE, "OTHER", "set"))
 
     action, reason = _rows({"SLACK__BOT_TOKEN"}, entries)["SLACK__BOT_TOKEN"]
-    assert action == "check"
-    assert "app/.env.example" in reason
+    assert action == "none"
+    assert "app/.env.example" not in reason
 
 
 def test_terraform_parameters_reads_the_secret_names_set(tmp_path: Path) -> None:
@@ -162,19 +162,6 @@ def test_a_development_only_name_production_sets_is_a_check() -> None:
     action, reason = _rows({"SLACK__BOT_TOKEN"}, entries)["AWS__TENANT__AUDIT_ROLE_ARN"]
     assert action == "check"
     assert "production sets AWS_AUDIT_ACCOUNT_ROLE_ARN" in reason
-
-
-def test_the_env_example_is_judged_only_for_names_the_app_reads() -> None:
-    """A parameter staged ahead of its slice needs no example line yet; one the app reads does."""
-    entries = [("ssm-param", "TRELLO__TOKEN", "set"), ("ssm-param", "SLACK__BOT_TOKEN", "set"), (EXAMPLE, "OTHER", "set")]
-
-    rows = {
-        name: verdict
-        for name, _, verdict in coverage_rows(DOC14, {"TRELLO__TOKEN", "SLACK__BOT_TOKEN"}, entries, read={"SLACK__BOT_TOKEN"})
-    }
-
-    assert "app/.env.example" not in rows["TRELLO__TOKEN"].reason
-    assert "app/.env.example" in rows["SLACK__BOT_TOKEN"].reason
 
 
 def test_a_placeholder_parameter_whose_value_sits_inside_a_blob_line_names_put_parameter() -> None:

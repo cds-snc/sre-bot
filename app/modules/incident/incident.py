@@ -8,7 +8,7 @@ from slack_sdk.models import blocks, views
 from structlog import get_logger
 
 from contracts.slack.transport import slack_transport_info
-from integrations.google_workspace.settings import get_google_resources_config
+from features.incident.response.settings import get_incident_response_settings
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from models.incidents import IncidentPayload
@@ -228,7 +228,7 @@ def generate_incident_modal_view(command, options=None, private_metadata=None, l
         options = []
     if not private_metadata:
         private_metadata = ""
-    handbook_string = f"For more details on what constitutes a security incident, visit our <https://docs.google.com/document/d/{get_google_resources_config().incident_handbook_id}|Incident Management Handbook>"
+    handbook_string = f"For more details on what constitutes a security incident, visit our <https://docs.google.com/document/d/{get_incident_response_settings().handbook_id}|Incident Management Handbook>"
     return {
         "type": "modal",
         "callback_id": "incident_view",

@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from googleapiclient.errors import HttpError
 
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.scribe.domain import (
     DocumentField,
     DocumentSection,
@@ -28,7 +29,6 @@ from features.incident.scribe.domain import (
 )
 from infrastructure.drive import DRIVE_SCOPES
 from integrations.google_workspace import client as google_workspace_client
-from integrations.google_workspace.settings import get_google_resources_config
 
 if TYPE_CHECKING:
     from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]
@@ -1344,7 +1344,7 @@ def _source_name_and_folder(document_id: str) -> tuple[str, str]:
             folder = str(parents[0])
     if not folder:
         logger.warning("incident_draft_parent_folder_not_found", document_id=document_id)
-        folder = get_google_resources_config().incident_folder_id
+        folder = get_incident_core_settings().folder_id
     return name, folder
 
 

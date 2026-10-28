@@ -115,7 +115,11 @@ if [[ $phase == pre ]]; then
 
   if (( ${checks[(Ie)google_ids]} )); then  # TASK-111.10.3
     section "Google document ids against the GOOGLE_RESOURCES paths they replace (TASK-111.10.3; values never printed)"
-    resources=$(blob_value GOOGLE_RESOURCES) || resources=
+    # The value as the app reads it: both blobs in entry.sh order, through python-dotenv and the JSON parse
+    # (app/bin/google_resources_json.py); a sed over the line misses the dotenv unescaping.
+    resources=$(for b in $BLOBS; do
+        aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text | tr -d '\r'
+      done | uv run --quiet --project $ROOT/app python $ROOT/app/bin/google_resources_json.py) || resources=
     [[ -n $resources ]] && print "GOOGLE_RESOURCES line: present" || print "GOOGLE_RESOURCES line: missing"
     # path_hash PATH: sha256 of one GOOGLE_RESOURCES value (a jq path such as inc.f), or 'missing'; the value never
     # leaves this function.

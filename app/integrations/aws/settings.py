@@ -26,7 +26,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 # The tenant entry's fields, read from the environment as AWS__TENANT__<FIELD>; empty counts as unset.
 _TENANT_FIELDS = ("instance_id", "instance_arn", "audit_role_arn", "org_role_arn", "logging_role_arn")
@@ -46,19 +46,22 @@ class AwsTenant(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    instance_id: str = Field(
+    instance_id: str = env_only(
+        "Identity Center identity store id (d-xxxxxxxxxx), the AWS tenant id every Identity Store call carries.",
+        "codespaces",
         pattern=_IDENTITY_STORE_ID,
-        description="Identity Center identity store id (d-xxxxxxxxxx), the AWS tenant id every Identity Store call carries.",
     )
-    instance_arn: str = Field(pattern=_INSTANCE_ARN, description="Identity Center instance ARN, as sso-admin calls name it.")
-    audit_role_arn: str = Field(
-        default="", description="Role assumed in the audit account; empty uses the bot's own credentials."
+    instance_arn: str = env_only("Identity Center instance ARN, as sso-admin calls name it.", "codespaces", pattern=_INSTANCE_ARN)
+    audit_role_arn: str = env_only(
+        "Role assumed in the audit account; empty uses the bot's own credentials.", "codespaces", default=""
     )
-    org_role_arn: str = Field(
-        default="", description="Role assumed in the organisation management account; empty uses the bot's own credentials."
+    org_role_arn: str = env_only(
+        "Role assumed in the organisation management account; empty uses the bot's own credentials.",
+        "codespaces",
+        default="",
     )
-    logging_role_arn: str = Field(
-        default="", description="Role assumed in the logging account; empty uses the bot's own credentials."
+    logging_role_arn: str = env_only(
+        "Role assumed in the logging account; empty uses the bot's own credentials.", "codespaces", default=""
     )
 
 

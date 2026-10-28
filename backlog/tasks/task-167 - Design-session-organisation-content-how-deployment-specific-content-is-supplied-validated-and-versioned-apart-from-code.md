@@ -3,10 +3,10 @@ id: TASK-167
 title: >-
   Design session: organisation content - how deployment-specific content is
   supplied, validated and versioned apart from code
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-10-28T19:43:00Z'
+updated_date: '2026-10-28T20:54:00Z'
 labels:
   - architecture
   - configuration
