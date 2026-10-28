@@ -452,7 +452,6 @@ def make_mock_settings():
         def mock_settings(make_mock_settings):
             return make_mock_settings(
                 **{
-                    'idempotency.IDEMPOTENCY_TTL_SECONDS': 3600,
                     'commands.providers': {},
                 }
             )
@@ -468,7 +467,7 @@ def make_mock_settings():
         # Apply package-specific overrides
         for key, value in overrides.items():
             if "." in key:
-                # Handle nested attributes: 'idempotency.IDEMPOTENCY_TTL_SECONDS' -> settings.idempotency.IDEMPOTENCY_TTL_SECONDS
+                # Handle nested attributes: 'commands.providers' -> settings.commands.providers
                 parts = key.split(".")
                 obj = settings
                 for part in parts[:-1]:

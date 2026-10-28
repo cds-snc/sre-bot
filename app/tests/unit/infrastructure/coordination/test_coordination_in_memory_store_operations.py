@@ -8,24 +8,13 @@ import pytest
 
 from contracts.coordination import ClaimResult
 from infrastructure.coordination.in_memory import InMemoryConditionalWriteStore
-from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
 
 @pytest.fixture
-def settings():
-    return ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-
-
-@pytest.fixture
-def expiring_settings():
-    return ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
-
-
-@pytest.fixture
-def store(settings):
-    return InMemoryConditionalWriteStore(settings=settings)
+def store():
+    return InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300)
 
 
 class TestInMemoryConditionalWriteStoreClaim:
@@ -48,8 +37,8 @@ class TestInMemoryConditionalWriteStoreClaim:
         assert outcome.result is ClaimResult.COMPLETED
         assert outcome.outcome == {"status": "ok"}
 
-    def test_claim_on_expired_in_progress_key_returns_new(self, expiring_settings):
-        store = InMemoryConditionalWriteStore(settings=expiring_settings)
+    def test_claim_on_expired_in_progress_key_returns_new(self):
+        store = InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=-1)
         key = "feature:intent:crashed-claimant"
 
         first = store.claim(key)

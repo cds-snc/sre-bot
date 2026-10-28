@@ -14,12 +14,15 @@ logger = structlog.get_logger().bind(component="coordination.factory")
 
 def build_conditional_write_store(in_progress_ttl_seconds: int) -> ConditionalWriteStore:
     """Build a non-singleton conditional-write store with a custom in-progress TTL."""
-    settings = get_conditional_write_settings().model_copy(
-        update={"idempotency_in_progress_ttl_seconds": in_progress_ttl_seconds}
-    )
+    settings = get_conditional_write_settings()
     dynamodb = get_aws_client("dynamodb")
     logger.debug("built_conditional_write_store", backend="dynamodb", in_progress_ttl_seconds=in_progress_ttl_seconds)
-    return DynamoDBConditionalWriteStore(dynamodb, settings=settings)
+    return DynamoDBConditionalWriteStore(
+        dynamodb,
+        table_name=settings.table_name,
+        record_ttl_seconds=settings.record_ttl_seconds,
+        in_progress_ttl_seconds=in_progress_ttl_seconds,
+    )
 
 
 def build_lease_store(in_progress_ttl_seconds: int) -> LeaseStore:

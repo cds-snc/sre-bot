@@ -1,10 +1,10 @@
-"""Integration tests for the directory slice in lifespan's configuration phase.
+"""Integration tests for the hosting slices in lifespan's configuration phase.
 
 The real lifespan runs with every later phase stubbed, so only the configuration phase does
-real work. The directory slice is built from a copy of the checked-in files with its cache
-cleared and the .env file disabled. An unknown or deleted key in [directory] must stop startup
-with a ConfigurationError naming the key, before the lifespan yields and before core services
-are built; the checked-in files boot.
+real work. The directory, audit and coordination slices are built from a copy of the checked-in
+files with their caches cleared and the .env file disabled. An unknown or deleted key in
+[directory], [audit] or [coordination] must stop startup with a ConfigurationError naming the
+key, before the lifespan yields and before core services are built; the checked-in files boot.
 """
 
 import shutil
@@ -18,6 +18,8 @@ from fastapi import FastAPI
 from structlog.testing import capture_logs
 
 from contracts.configuration import ConfigurationError
+from infrastructure.audit.settings import AuditSettings, get_audit_settings
+from infrastructure.coordination.settings import ConditionalWriteSettings, get_conditional_write_settings
 from infrastructure.directory.settings import DirectorySettings, get_directory_settings
 from server.configuration import host_configuration
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
@@ -34,6 +36,20 @@ def _directory_slice_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator
     get_directory_settings.cache_clear()
     yield
     get_directory_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _audit_and_coordination_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    """Build the audit and coordination slices from the files only, fresh for each test."""
+    for settings_class in (AuditSettings, ConditionalWriteSettings):
+        monkeypatch.setitem(settings_class.model_config, "env_file", None)
+    for name in ("AUDIT__TABLE_NAME", "COORDINATION__TABLE_NAME"):
+        monkeypatch.delenv(name, raising=False)
+    get_audit_settings.cache_clear()
+    get_conditional_write_settings.cache_clear()
+    yield
+    get_audit_settings.cache_clear()
+    get_conditional_write_settings.cache_clear()
 
 
 def _stub_later_phases(stack: ExitStack) -> AsyncMock:
@@ -85,6 +101,22 @@ async def test_unknown_or_deleted_directory_key_fails_boot_naming_the_key(
     await _boot_fails_naming(key)
 
 
+@pytest.mark.parametrize(
+    ("table", "key"),
+    [
+        ("audit", "audit_table_name"),
+        ("coordination", "idempotency_in_progress_ttl_seconds"),
+        ("coordination", "table"),
+    ],
+)
+async def test_unknown_audit_or_coordination_key_fails_boot_naming_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, table: str, key: str
+) -> None:
+    _with_ci_file_lines(monkeypatch, tmp_path, f"\n[{table}]\n{key} = 1\n")
+
+    await _boot_fails_naming(key)
+
+
 async def test_checked_in_files_boot_with_no_startup_warmup() -> None:
     reached_yield = False
 
@@ -95,3 +127,5 @@ async def test_checked_in_files_boot_with_no_startup_warmup() -> None:
 
     assert reached_yield is True
     assert get_directory_settings().require_startup_warmup is False
+    assert get_audit_settings().table_name == "sre_bot_audit_trail"
+    assert get_conditional_write_settings().table_name == "sre_bot_idempotency"

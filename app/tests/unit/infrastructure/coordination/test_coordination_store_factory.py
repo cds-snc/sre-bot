@@ -1,4 +1,9 @@
-"""Unit tests for the conditional-write store and lease store providers."""
+"""Unit tests for the conditional-write store and lease store providers.
+
+The coordination slice is replaced with one built from constructor arguments, so each test
+observes that the builder passes the slice's table name and record TTL to the store and the
+caller's in-progress TTL in place of the slice's, as plain arguments.
+"""
 
 from collections.abc import Iterator
 from unittest.mock import MagicMock
@@ -25,7 +30,7 @@ def mock_get_aws_client(monkeypatch: pytest.MonkeyPatch) -> tuple[MagicMock, Mag
 
 @pytest.fixture
 def base_settings(monkeypatch: pytest.MonkeyPatch) -> ConditionalWriteSettings:
-    base = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=900, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=30)
+    base = ConditionalWriteSettings(table_name="leases_elsewhere", record_ttl_seconds=900, in_progress_ttl_seconds=30)
     monkeypatch.setattr("infrastructure.coordination.factory.get_conditional_write_settings", lambda: base)
     return base
 
@@ -39,13 +44,14 @@ def clear_lease_store_cache() -> Iterator[None]:
 
 @pytest.mark.usefixtures("mock_get_aws_client", "base_settings")
 def test_build_conditional_write_store_overrides_in_progress_ttl_only() -> None:
-    """Builder should allow lock-specific in-progress TTL without changing record TTL."""
+    """The lock's in-progress TTL replaces the slice's; the table and record TTL stay the slice's."""
     build_conditional_write_store = getattr(coordination, "build_conditional_write_store", None)
     assert callable(build_conditional_write_store), "infrastructure.coordination.build_conditional_write_store must be exported"
 
     store = build_conditional_write_store(in_progress_ttl_seconds=14400)
 
     assert isinstance(store, DynamoDBConditionalWriteStore)
+    assert store.table_name == "leases_elsewhere"
     assert store.record_ttl_seconds == 900
     assert store.in_progress_ttl_seconds == 14400
 

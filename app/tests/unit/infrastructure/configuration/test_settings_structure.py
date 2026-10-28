@@ -4,10 +4,8 @@ Verifies the domain-based organization of settings modules after Phase 1
 refactoring (split by domain pattern).
 """
 
-from infrastructure.configuration.base import (
-    FeatureSettings,
-    InfrastructureSettings,
-)
+import infrastructure.configuration.base as configuration_base
+from infrastructure.configuration.base import FeatureSettings
 from infrastructure.configuration.features import (
     AtipSettings,
     AWSFeatureSettings,
@@ -17,7 +15,6 @@ from infrastructure.configuration.features import (
 from infrastructure.configuration.features.aws_ops import (
     get_aws_feature_settings,
 )
-from infrastructure.coordination.settings import ConditionalWriteSettings
 
 
 class TestSettingsStructure:
@@ -51,13 +48,6 @@ class TestSettingsStructure:
         for instance in instances:
             assert isinstance(instance, FeatureSettings)
 
-    def test_all_infrastructure_settings_classes_instantiable(self):
-        """Verify all infrastructure settings classes can be instantiated."""
-        # Test that all infrastructure settings classes are functional
-        instances = [
-            ConditionalWriteSettings(),
-        ]
-
-        # Verify they are all instances of InfrastructureSettings
-        for instance in instances:
-            assert isinstance(instance, InfrastructureSettings)
+    def test_no_infrastructure_settings_base_remains(self):
+        """Every hosting slice reads the configuration files, so the flat-name base class is gone."""
+        assert not hasattr(configuration_base, "InfrastructureSettings")

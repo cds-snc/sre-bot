@@ -3,10 +3,10 @@ id: TASK-111.13.3
 title: >-
   Move the audit and coordination slices onto the files; delete
   InfrastructureSettings
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T13:46:00Z'
+updated_date: '2026-10-28T16:05:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -29,13 +29,13 @@ Slice C of TASK-111.13. AuditSettings reads [audit] and ConditionalWriteSettings
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ConditionalWriteSettings reads [coordination] (table_name, record_ttl_seconds, in_progress_ttl_seconds) with extra=forbid and its defaults in base.toml; IDEMPOTENCY_TABLE and the IDEMPOTENCY_* names are no longer read
-- [ ] #2 The coordination stores take the table name and both TTLs as constructor arguments; the lease factory passes its TTL directly, with no model_copy
-- [ ] #3 AuditSettings reads [audit] table_name with extra=forbid and its default in base.toml; AUDIT_TABLE_NAME is no longer read
-- [ ] #4 InfrastructureSettings and the infrastructure/configuration/infrastructure package are deleted
-- [ ] #5 An unknown key in [audit] or [coordination] fails boot naming it
-- [ ] #6 bin/unlock-sync-job.sh takes the table name as an argument; the retired names are in the env audit HINTS
-- [ ] #7 ruff, mypy (no new errors), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
+- [x] #1 ConditionalWriteSettings reads [coordination] (table_name, record_ttl_seconds, in_progress_ttl_seconds) with extra=forbid and its defaults in base.toml; IDEMPOTENCY_TABLE and the IDEMPOTENCY_* names are no longer read
+- [x] #2 The coordination stores take the table name and both TTLs as constructor arguments; the lease factory passes its TTL directly, with no model_copy
+- [x] #3 AuditSettings reads [audit] table_name with extra=forbid and its default in base.toml; AUDIT_TABLE_NAME is no longer read
+- [x] #4 InfrastructureSettings and the infrastructure/configuration/infrastructure package are deleted
+- [x] #5 An unknown key in [audit] or [coordination] fails boot naming it
+- [x] #6 bin/unlock-sync-job.sh takes the table name as an argument; the retired names are in the env audit HINTS
+- [x] #7 ruff, mypy (no new errors), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -61,3 +61,17 @@ Gates: ruff, mypy (baseline 47), pytest, make check-import-contracts, make check
 Rollout: merge deploys; no terraform or SSM change; values equal today's defaults and table names. Circuit breaker and one git revert as rollback.
 Waits on TASK-111.13.1 and TASK-111.13.2 (both touch base.toml, HINTS and the configuration package; InfrastructureSettings goes only once no slice inherits it). ~14 production files, ~200 LOC.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Plan approved 2026-10-28 (human). Implemented on task-111.13.3-audit-coordination-slices from main 4c914688, tests first.
+
+ConditionalWriteSettings is a ConfigurationSlice on [coordination] (table_name, record_ttl_seconds, in_progress_ttl_seconds; COORDINATION__ prefix, extra forbid) and AuditSettings on [audit] (table_name; AUDIT__); both tables are in base.toml with today's values (sre_bot_idempotency, 3600, 300; sre_bot_audit_trail), and _validate_slices builds both, so an unknown key fails boot naming it. DynamoDBConditionalWriteStore and InMemoryConditionalWriteStore take table_name (DynamoDB) and both TTLs as keyword arguments; IDEMPOTENCY_TABLE is deleted; the lease factory passes the slice's table and record TTL and its own in-progress TTL directly (no model_copy); server/services.py builds the store from the slice. InfrastructureSettings is deleted (its package went with 111.13.2). HINTS map IDEMPOTENCY_TTL_SECONDS, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS and AUDIT_TABLE_NAME to their keys; bin/unlock-sync-job.sh takes --table (default the base.toml name). The mock-settings helpers' retired idempotency example key removed. Docs: configuration.md tolerated IDEMPOTENCY_TABLE and unlock-script items closed and a Changes line, reliability.md Changes line, doc-14 facts line (production sets none of the three names).
+
+Tests: new test_coordination_settings_load.py and test_audit_settings_load.py replace test_coordination_settings.py and test_audit_settings_table_name.py; store, factory, lease and fixture call sites take plain arguments; the lifespan hosting-slice test covers [audit] and [coordination]; the checked-in files test pins both tables; the env-audit classifier pins the three hints; the production-names test drops the two slices (their case-insensitivity examples now use SentinelSettings).
+
+Gates (2026-10-28): ruff All checks passed; mypy Found 43 errors in 15 files (= baseline after 111.13.2, none in touched files); pytest tests --ignore=tests/smoke 5900 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK; make check-fake-coverage OK (4 baselined gaps).
+
+Rollout: merge deploys; no terraform or SSM change; values equal the former defaults and table names. Rollback: circuit breaker, or one git revert. After deploy: post (generic).
+<!-- SECTION:NOTES:END -->

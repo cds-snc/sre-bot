@@ -125,11 +125,7 @@ def mock_settings(make_mock_settings):
 
     Uses the factory from root conftest to avoid duplication.
     """
-    return make_mock_settings(
-        **{
-            "idempotency.IDEMPOTENCY_TTL_SECONDS": 3600,
-        }
-    )
+    return make_mock_settings()
 
 
 # ============================================================================

@@ -13,7 +13,6 @@ from contracts.coordination import (
     ClaimResult,
     ConditionalWriteStore,
 )
-from infrastructure.coordination.settings import ConditionalWriteSettings
 from integrations.aws.client import classify_aws_error
 
 if TYPE_CHECKING:
@@ -21,8 +20,6 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger().bind(component="coordination.dynamodb")
 
-# DynamoDB table configuration
-IDEMPOTENCY_TABLE = "sre_bot_idempotency"
 PARTITION_KEY = "idempotency_key"
 
 
@@ -32,13 +29,15 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
     def __init__(
         self,
         dynamodb: DynamoDBClient,
-        settings: ConditionalWriteSettings,
-        table_name: str = IDEMPOTENCY_TABLE,
+        *,
+        table_name: str,
+        record_ttl_seconds: int,
+        in_progress_ttl_seconds: int,
     ) -> None:
         self._dynamodb = dynamodb
         self.table_name = table_name
-        self.record_ttl_seconds = settings.idempotency_ttl_seconds
-        self.in_progress_ttl_seconds = settings.idempotency_in_progress_ttl_seconds
+        self.record_ttl_seconds = record_ttl_seconds
+        self.in_progress_ttl_seconds = in_progress_ttl_seconds
         self.log = logger.bind(table_name=table_name)
 
     def claim(self, key: str) -> ClaimOutcome:

@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from contracts.coordination import ClaimOutcome, ClaimResult, LeaseStore, ReadFailurePolicy
-from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore, run_if_leased
+from infrastructure.coordination import InMemoryConditionalWriteStore, run_if_leased
 
 pytestmark = pytest.mark.unit
 
@@ -19,8 +19,7 @@ NAME = "scheduler:test_job"
 
 
 def _lease_store(in_progress_ttl_seconds: int = 300) -> LeaseStore:
-    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=in_progress_ttl_seconds)
-    return LeaseStore(InMemoryConditionalWriteStore(settings=settings), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
+    return LeaseStore(InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=in_progress_ttl_seconds), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 
 def test_run_if_leased_executes_job_when_acquired() -> None:

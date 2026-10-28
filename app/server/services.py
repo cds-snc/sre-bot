@@ -41,7 +41,13 @@ def _build_record_store() -> RecordStore:
 
 
 def _build_conditional_write_store() -> ConditionalWriteStore:
-    return DynamoDBConditionalWriteStore(get_aws_client("dynamodb"), settings=get_conditional_write_settings())
+    settings = get_conditional_write_settings()
+    return DynamoDBConditionalWriteStore(
+        get_aws_client("dynamodb"),
+        table_name=settings.table_name,
+        record_ttl_seconds=settings.record_ttl_seconds,
+        in_progress_ttl_seconds=settings.in_progress_ttl_seconds,
+    )
 
 
 def _build_configured_systems() -> ConfiguredSystems:

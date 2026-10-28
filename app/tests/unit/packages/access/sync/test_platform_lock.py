@@ -9,15 +9,14 @@ from unittest.mock import MagicMock
 import pytest
 
 from contracts.coordination import LeaseStore, ReadFailurePolicy
-from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
+from infrastructure.coordination import InMemoryConditionalWriteStore
 from packages.access.sync import platform_lock
 
 pytestmark = pytest.mark.unit
 
 
 def _store() -> LeaseStore:
-    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return LeaseStore(InMemoryConditionalWriteStore(settings=settings), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
+    return LeaseStore(InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 
 def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:

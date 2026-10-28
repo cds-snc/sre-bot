@@ -116,6 +116,9 @@ HINTS = {
     "RETRY_MAX_DELAY_SECONDS": "nothing (deleted: the retry store had no consumer)",
     "RETRY_BATCH_SIZE": "nothing (deleted: the retry store had no consumer)",
     "RETRY_CLAIM_LEASE_SECONDS": "nothing (deleted: the retry store had no consumer)",
+    "IDEMPOTENCY_TTL_SECONDS": "[coordination] record_ttl_seconds",
+    "IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS": "[coordination] in_progress_ttl_seconds",
+    "AUDIT_TABLE_NAME": "[audit] table_name",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one

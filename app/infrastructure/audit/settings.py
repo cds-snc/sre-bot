@@ -1,18 +1,23 @@
-"""Audit trail settings owned by the audit package."""
+"""Audit trail settings: the [audit] table of the configuration files."""
 
 from functools import lru_cache
 
-from infrastructure.configuration.base import InfrastructureSettings
+from pydantic import Field
+from pydantic_settings import SettingsConfigDict
+
+from contracts.configuration import ConfigurationSlice
 
 
-class AuditSettings(InfrastructureSettings):
-    """Configuration for the audit trail store.
+class AuditSettings(ConfigurationSlice):
+    """The audit trail's record table.
 
-    Environment Variables:
-        AUDIT_TABLE_NAME: Record table holding audit events (default: sre_bot_audit_trail)
+    Keys of [audit]:
+        table_name: the record table holding audit events. Default: sre_bot_audit_trail.
     """
 
-    audit_table_name: str = "sre_bot_audit_trail"
+    model_config = SettingsConfigDict(toml_table_header=("audit",), env_prefix="AUDIT__")
+
+    table_name: str = Field(default="sre_bot_audit_trail", description="Record table holding audit events")
 
 
 @lru_cache(maxsize=1)

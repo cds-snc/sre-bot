@@ -43,8 +43,6 @@ import pytest
 from pydantic import SecretStr, ValidationError
 from pydantic_settings import BaseSettings
 
-from infrastructure.audit.settings import AuditSettings
-from infrastructure.coordination.settings import ConditionalWriteSettings
 from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
 from integrations.maxmind.settings import MaxMindSettings
@@ -58,15 +56,6 @@ from packages.access.common.settings import AccessPermissionSetsSettings
 from server.configuration import IdentitySettings
 
 PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
-    (AuditSettings, "AUDIT_TABLE_NAME", "audit_table_name", "sentinel_audit", "sentinel_audit"),
-    (ConditionalWriteSettings, "IDEMPOTENCY_TTL_SECONDS", "idempotency_ttl_seconds", "1234", 1234),
-    (
-        ConditionalWriteSettings,
-        "IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS",
-        "idempotency_in_progress_ttl_seconds",
-        "567",
-        567,
-    ),
     (
         GoogleResourcesConfig,
         "GOOGLE_RESOURCES",
@@ -105,18 +94,18 @@ def test_configuration_settings_production_name_reaches_field(
 
 def test_configuration_settings_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Names match case-insensitively, so the lower-case spelling of a name is read too."""
-    monkeypatch.setenv("audit_table_name", "lower_sentinel")
+    monkeypatch.setenv("sentinel_log_type", "lower_sentinel")
 
-    settings = AuditSettings(_env_file=None)  # type: ignore[call-arg]
+    settings = SentinelSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert settings.audit_table_name == "lower_sentinel"
+    assert settings.sentinel_log_type == "lower_sentinel"
 
 
 def test_configuration_settings_upper_case_keyword_accepted() -> None:
     """Constructor keywords in the environment spelling still set the lower-case field."""
-    settings = ConditionalWriteSettings(_env_file=None, IDEMPOTENCY_TTL_SECONDS=42)  # type: ignore[call-arg]
+    settings = SentinelSettings(_env_file=None, SENTINEL_LOG_TYPE="UpperSentinel")  # type: ignore[call-arg]
 
-    assert settings.idempotency_ttl_seconds == 42
+    assert settings.sentinel_log_type == "UpperSentinel"
 
 
 SLACK_NAMES: list[tuple[str, str, str, Any]] = [

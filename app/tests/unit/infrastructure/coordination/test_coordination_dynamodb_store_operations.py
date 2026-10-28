@@ -8,7 +8,6 @@ from botocore.exceptions import ClientError
 
 from contracts.coordination import ClaimOutcome, ClaimResult
 from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
-from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
@@ -29,24 +28,17 @@ def conditional_check_failed() -> ClientError:
 
 
 @pytest.fixture
-def store_settings():
-    settings = MagicMock(spec=ConditionalWriteSettings)
-    settings.idempotency_ttl_seconds = 3600
-    settings.idempotency_in_progress_ttl_seconds = 300
-    return settings
-
-
-@pytest.fixture
 def dynamodb_client():
     return MagicMock(spec=["put_item", "get_item", "delete_item"])
 
 
 @pytest.fixture
-def store(dynamodb_client, store_settings):
+def store(dynamodb_client):
     return DynamoDBConditionalWriteStore(
         dynamodb_client,
-        settings=store_settings,
         table_name="test_idempotency_store",
+        record_ttl_seconds=3600,
+        in_progress_ttl_seconds=300,
     )
 
 
