@@ -21,6 +21,7 @@ Usage (from app/): ``uv run python -m bin.audit_env_names [--all] BASELINE_SHA [
 the baseline directory is needed only when the cached names are for another commit.
 """
 
+import os
 import re
 import sys
 import tomllib
@@ -178,6 +179,7 @@ type Destinations = dict[str, tuple[str, str]]
 class Verdict:
     action: str
     reason: str
+    new: str | None = None  # the name the value moves to, when it still has to be copied
 
 
 @dataclass(frozen=True)
@@ -299,12 +301,13 @@ def _developer(name: str, state: str, ctx: Context) -> Verdict:
     if name in HINTS:
         if HINTS[name].startswith("nothing"):
             return Verdict("delete", f"retired; {HINTS[name]}")
-        return Verdict("delete", f"retired; set {HINTS[name]} instead")
+        secret = PARAMETER_DESTINATION.match(HINTS[name])
+        return Verdict("delete", f"retired; set {HINTS[name]} instead", new=secret[1] if secret else None)
     if name in SUPERSEDED:
         return Verdict("delete", f"superseded before the migration by {SUPERSEDED[name]}, which stays")
     if name in ctx.retired:
         if new := replacement(name, ctx.current):
-            return Verdict("rename", f"set {new} to the same value, then delete {name}")
+            return Verdict("rename", f"set {new} to the same value, then delete {name}", new=new)
         return Verdict("delete", "retired by the configuration migration; the value lives in app/config/*.toml now")
     return Verdict("delete", "nothing in the repository reads it (confirm nobody uses it outside the repository)")
 
@@ -380,6 +383,56 @@ def unprovided_workflow_references(listed: set[str], ctx: Context) -> list[tuple
     ]
 
 
+GH = "env -u GITHUB_TOKEN -u GH_TOKEN gh"  # the user's own login: the Codespace token cannot write secrets
+ENV_PREFIX = "[[:space:]]*#?[[:space:]]*(export[[:space:]]+)?"  # an env-file line, commented or exported
+
+
+def _github_target(source: str, repo: str) -> str | None:
+    """The gh flags that address a GitHub secret source; None for organization and production sources."""
+    words = source.split()
+    if source.startswith("codespaces repo"):
+        return f"secret {{verb}} {{name}} --app codespaces --repo {repo}"
+    if source.startswith("codespaces user"):
+        return "secret {verb} {name} --user"
+    if source.startswith(("actions secret repo", "actions variable repo", "dependabot secret repo")):
+        kind = "variable" if words[1] == "variable" else "secret"
+        app = " --app dependabot" if words[0] == "dependabot" else ""
+        return f"{kind} {{verb}} {{name}}{app} --repo {repo}"
+    if source.startswith(("actions secret environment", "actions variable environment")):
+        return f"{words[1]} {{verb}} {{name}} --env {words[3]} --repo {repo}"
+    return None
+
+
+def fix_commands(sections: dict[str, list[tuple[str, str, Verdict]]], repo: str) -> list[str]:
+    """Shell lines that apply each delete or rename row; production and organization rows get none."""
+    lines: list[str] = []
+    for source, rows in sections.items():
+        acting = sorted(
+            ((name, verdict) for name, _, verdict in rows if verdict.action in {"delete", "rename"}), key=lambda row: row[0]
+        )
+        commands: list[str] = []
+        if source.startswith("file "):
+            path = source.removeprefix("file ")
+            renamed = [(name, verdict.new) for name, verdict in acting if verdict.new]
+            dropped = [name for name, verdict in acting if not verdict.new]
+            commands += [f"sed -i -E 's/^({ENV_PREFIX}){old}=/\\1{new}=/' {path}" for old, new in renamed]
+            if dropped:
+                commands.append(f"sed -i -E '/^{ENV_PREFIX}({'|'.join(dropped)})=/d' {path}")
+        elif (target := _github_target(source, repo)) is not None:
+            present = {name for name, _, _ in rows}
+            for name, verdict in acting:
+                delete = f"{GH} {target.format(verb='delete', name=name)}"
+                if verdict.new and verdict.new not in present and source.startswith("codespaces"):
+                    copy = f"printenv {name} | {GH} {target.format(verb='set', name=verdict.new)}"
+                    kept = f'echo "kept {name}: set {verdict.new} by hand, then delete it"'
+                    commands.append(f"printenv {name} >/dev/null && {copy} && {delete} || {kept}")
+                else:
+                    commands.append(delete)
+        if commands:
+            lines += [f"# {source}", *commands]
+    return lines
+
+
 LEGEND = """actions: none = nothing to do; delete = remove the line or secret; rename = set the new name to the same
 value, then delete the old one; check = something disagrees, investigate. Production blob lines are never
 edited by hand: the blobs are deleted as a whole (TASK-111.15), so their migrated or unread lines show none."""
@@ -421,6 +474,14 @@ def main(argv: list[str]) -> None:
             if show_all or verdict.action != "none":
                 print(f"{verdict.action:<6} {name} [{state}]: {verdict.reason}")
     print("\ntotal: " + " ".join(f"{action}={n}" for action, n in sorted(totals.items())))
+    repo = os.environ.get("REPO_SLUG")
+    commands = fix_commands(sections, repo) if repo else []
+    if commands:
+        print("\n== plan: commands for the delete and rename rows (nothing has run) ==")
+        print("# A secret whose value moves is copied from this Codespace first; GitHub never returns a value.")
+        print("\n".join(commands))
+    if plan := os.environ.get("PLAN_FILE"):
+        Path(plan).write_text("".join(f"{line}\n" for line in commands))
     if not show_all:
         print("rows with action none are hidden; rerun with --all to list them")
 

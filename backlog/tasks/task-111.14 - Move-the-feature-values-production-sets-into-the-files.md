@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T17:33:00Z'
+updated_date: '2026-10-28T18:18:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -218,4 +218,21 @@ ruff; mypy (no new errors in touched files); pytest tests --ignore=tests/smoke; 
 - ATIP_ANNOUNCE_CHANNEL C033L7RGCT0, the same test channel the code had hard-coded, so production ATIP behaviour is unchanged.
 AWS_ADMIN_GROUPS and AWS_OPS_GROUP_NAME are in no blob and not in the task definition, so production ran on the code default. Rollback tag at that run: 0995888b958034f520dd99e324827e93937daeb0-2026-10-28. Tests pin the literal ids.
 Gates: ruff and format clean; mypy 41 (baseline 43); pytest 5912 passed; contracts 13 kept, key ownership OK, fake coverage OK, aws-platform seam OK. ACs 1-9 checked. Before merge: the human reruns pre features for MATCH on all five.
+
+2026-10-28 merge gate and audit commands:
+- pre features 17:51Z: all five ids MATCH, RESULT features_pre PASS. Rollback tag 0995888b958034f520dd99e324827e93937daeb0-2026-10-28.
+- env-checks 17:50Z: 56 delete and 3 check rows.
+- Following the human's question, audit_env_names.py now ends its report with the commands that apply its delete and rename rows. bin/env-checks.zsh passes REPO_SLUG.
+  - Env-file lines: one sed per file. A line whose value moves to a new name is renamed in place, not deleted.
+  - Codespaces, Actions, Dependabot and environment secrets and variables: gh under the user's own login.
+  - A retired Codespaces secret whose value moves is copied from the running Codespace (printenv into gh secret set) before the delete, unless the new name already exists. Without that, the old 'delete' rows would have lost NOTIFY_SRE_*, TRELLO_* and the AWS role values, since GitHub never returns a value.
+  - No command for SSM or organization-level names.
+- Tests: tests/unit/bin/test_bin_audit_env_names_fix_commands.py.
+- Gates: pytest 5928 passed, ruff clean, mypy 41, contracts 13 kept, key ownership OK, fake coverage OK, seam OK.
+
+2026-10-28 env-checks plan/apply (human). Like terraform, make env-checks only plans:
+- It writes tmp/env-checks/<UTC>.plan.sh beside the report and changes nothing.
+- zsh bin/env-checks.zsh apply <plan> (make env-checks-apply PLAN=<plan>) prints that saved plan and its age, and asks for 'yes'.
+- It then runs the plan line by line, logs ok/FAILED to <plan>.applied.txt, renames the plan to .applied.sh so it cannot run twice, and exits 1 on any failure.
+- Verified: smoke tests for cancel, apply, empty and bad paths; bin tests 310 passed; ruff clean. The full app gates were not rerun: dev tooling only (human).
 <!-- SECTION:NOTES:END -->
