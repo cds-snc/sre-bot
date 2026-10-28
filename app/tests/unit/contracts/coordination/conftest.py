@@ -5,7 +5,7 @@ from typing import Any
 import pytest
 
 from contracts.coordination import ClaimOutcome
-from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
+from infrastructure.coordination import InMemoryConditionalWriteStore
 
 
 class ScriptedConditionalWriteStore:
@@ -36,12 +36,10 @@ class ScriptedConditionalWriteStore:
 @pytest.fixture
 def in_memory_store() -> InMemoryConditionalWriteStore:
     """Real in-memory primitive for full claim/complete/release lifecycles."""
-    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return InMemoryConditionalWriteStore(settings=settings)
+    return InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300)
 
 
 @pytest.fixture
 def expired_store() -> InMemoryConditionalWriteStore:
     """In-memory primitive whose in-progress claims are already expired, so any claim can be taken over."""
-    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=-1)
-    return InMemoryConditionalWriteStore(settings=settings)
+    return InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=-1)

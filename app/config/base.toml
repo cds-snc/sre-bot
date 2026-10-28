@@ -133,6 +133,19 @@ timeout_seconds = 180.0
 # the directory warmup fails.
 require_startup_warmup = false
 
+[audit]
+# The record table holding audit events; the default is the table this repository's terraform
+# creates, and a deployment that names its own overrides it in its environment file.
+table_name = "sre_bot_audit_trail"
+
+[coordination]
+# The conditional-write store behind idempotency and leases: its table (the default is the one this
+# repository's terraform creates), how long a completed record lives, and how long an in-progress
+# claim lives before another worker may take it over. A lease passes its own in-progress TTL.
+table_name = "sre_bot_idempotency"
+record_ttl_seconds = 3600
+in_progress_ttl_seconds = 300
+
 [notify]
 # The GC Notify request timeout. The API host is the [notify.tenant] entry (api_url), named in the
 # deployment's environment file; with no entry Notify is not configured. The credentials are secrets

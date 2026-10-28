@@ -16,7 +16,6 @@ from botocore.stub import ANY, Stubber
 
 from contracts.coordination import ClaimResult
 from infrastructure.coordination.dynamodb import DynamoDBConditionalWriteStore
-from infrastructure.coordination.settings import ConditionalWriteSettings
 
 pytestmark = pytest.mark.unit
 
@@ -42,8 +41,7 @@ def client() -> Any:
 
 @pytest.fixture
 def store(client: Any) -> DynamoDBConditionalWriteStore:
-    settings = ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-    return DynamoDBConditionalWriteStore(client, settings=settings, table_name=TABLE_NAME)
+    return DynamoDBConditionalWriteStore(client, table_name=TABLE_NAME, record_ttl_seconds=3600, in_progress_ttl_seconds=300)
 
 
 def _complete_params() -> dict[str, Any]:

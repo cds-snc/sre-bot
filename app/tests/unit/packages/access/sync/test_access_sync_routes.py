@@ -8,7 +8,7 @@ from fastapi.routing import APIRoute
 
 from contracts.coordination import LeaseStore, ReadFailurePolicy
 from contracts.operations import OperationResult, OperationStatus
-from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
+from infrastructure.coordination import InMemoryConditionalWriteStore
 from infrastructure.security.models import AuthPrincipalSource, User
 from packages.access.sync.domain import SyncOutcome
 from packages.access.sync.interactions.http import router, sync_endpoint
@@ -57,12 +57,7 @@ class _Settings:
 
 
 def _lock_store() -> LeaseStore:
-    store = InMemoryConditionalWriteStore(
-        settings=ConditionalWriteSettings(
-            IDEMPOTENCY_TTL_SECONDS=86400,
-            IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=14400,
-        )
-    )
+    store = InMemoryConditionalWriteStore(record_ttl_seconds=86400, in_progress_ttl_seconds=14400)
     return LeaseStore(store, read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
 
 

@@ -15,17 +15,3 @@ class FeatureSettings(BaseSettings):
         case_sensitive=True,
         extra="ignore",
     )
-
-
-class InfrastructureSettings(BaseSettings):
-    """Base class for infrastructure-level settings.
-
-    Infrastructure settings control core system behavior like retry logic,
-    idempotency, and server configuration.
-    """
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
-    )

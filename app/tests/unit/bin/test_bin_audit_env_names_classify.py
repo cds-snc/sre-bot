@@ -255,6 +255,22 @@ def test_a_retired_directory_hosting_name_is_deleted_with_its_destination(name: 
     assert "set nothing" not in verdict.reason
 
 
+@pytest.mark.parametrize(
+    ("name", "kept_in"),
+    [
+        ("IDEMPOTENCY_TTL_SECONDS", "[coordination] record_ttl_seconds"),
+        ("IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS", "[coordination] in_progress_ttl_seconds"),
+        ("AUDIT_TABLE_NAME", "[audit] table_name"),
+    ],
+)
+def test_a_retired_audit_or_coordination_name_is_deleted_with_its_key(name: str, kept_in: str) -> None:
+    """The flat names moved onto the files, so the reason names the key that now holds the value."""
+    verdict = classify("file app/.env", name, "set", CTX)
+
+    assert verdict.action == "delete"
+    assert kept_in in verdict.reason
+
+
 def test_a_commented_retired_name_reports_the_new_key() -> None:
     verdict = classify("file app/.env.example", "DIRECTORY_REQUIRE_STARTUP_WARMUP", "commented", CTX)
 

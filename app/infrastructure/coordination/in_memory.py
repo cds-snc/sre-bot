@@ -10,7 +10,6 @@ from contracts.coordination import (
     ClaimResult,
     ConditionalWriteStore,
 )
-from infrastructure.coordination.settings import ConditionalWriteSettings
 
 
 class InMemoryConditionalWriteStore(ConditionalWriteStore):
@@ -20,11 +19,11 @@ class InMemoryConditionalWriteStore(ConditionalWriteStore):
     data local to process memory for deterministic tests and development.
     """
 
-    def __init__(self, settings: ConditionalWriteSettings) -> None:
+    def __init__(self, *, record_ttl_seconds: int, in_progress_ttl_seconds: int) -> None:
         self._store: dict[str, dict[str, Any]] = {}
         self._lock = threading.Lock()
-        self._record_ttl_seconds = settings.idempotency_ttl_seconds
-        self._in_progress_ttl_seconds = settings.idempotency_in_progress_ttl_seconds
+        self._record_ttl_seconds = record_ttl_seconds
+        self._in_progress_ttl_seconds = in_progress_ttl_seconds
 
     def claim(self, key: str) -> ClaimOutcome:
         """Atomically claim key unless it is already in progress or completed."""

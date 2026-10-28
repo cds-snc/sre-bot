@@ -11,14 +11,16 @@
 
 set -euo pipefail
 
-TABLE="sre_bot_idempotency"
+# The [coordination] table_name default in app/config/base.toml; --table names another.
+DEFAULT_TABLE="sre_bot_idempotency"
+TABLE="$DEFAULT_TABLE"
 HASH_KEY="idempotency_key"
 DEFAULT_ENDPOINT="http://dynamodb-local:8000"
 ENDPOINT="${DYNAMODB_ENDPOINT:-$DEFAULT_ENDPOINT}"
 
 show_usage() {
   cat << EOF
-Usage: $0 --platform <platform> [--user-email <email>] [--dry-run] [--endpoint <url>]
+Usage: $0 --platform <platform> [--user-email <email>] [--dry-run] [--endpoint <url>] [--table <name>]
 
 Options:
   --platform    Platform key to unlock (e.g. aws)             [required]
@@ -27,12 +29,16 @@ Options:
   --dry-run     Print current lock state without modifying    [optional]
   --endpoint    DynamoDB endpoint URL                         [optional]
                 (default: http://dynamodb-local:8000)
+  --table       Coordination table name ([coordination]
+                table_name)                                   [optional]
+                (default: ${DEFAULT_TABLE})
 
 Examples:
   $0 --platform aws
   $0 --platform aws --user-email alice@example.com
   $0 --platform aws --dry-run
   $0 --platform aws --endpoint http://dynamodb-local:8000
+  $0 --platform aws --table my_coordination_table
 
 Environment:
   DYNAMODB_ENDPOINT   Override default endpoint (flag takes precedence)
@@ -54,6 +60,7 @@ while [[ $# -gt 0 ]]; do
     --user-email)  USER_EMAIL="$2";  shift 2 ;;
     --dry-run)     DRY_RUN=true;     shift   ;;
     --endpoint)    ENDPOINT="$2";   shift 2 ;;
+    --table)       TABLE="$2";       shift 2 ;;
     --help|-h)     show_usage; exit 0 ;;
     *) echo "Error: unknown option '$1'"; echo ""; show_usage; exit 1 ;;
   esac
@@ -108,6 +115,7 @@ ddb_delete() {
 # ---------------------------------------------------------------------------
 
 echo ""
+echo "Table:  ${TABLE}"
 echo "Target: ${TARGET_DESC}"
 echo "Key:    ${LOCK_KEY}"
 

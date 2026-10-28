@@ -12,7 +12,7 @@ import svcs
 from contracts.coordination import ConditionalWriteStore
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
-from infrastructure.coordination import ConditionalWriteSettings, InMemoryConditionalWriteStore
+from infrastructure.coordination import InMemoryConditionalWriteStore
 from infrastructure.records.in_memory import InMemoryRecordStore
 from server.configured_systems import StaticConfiguredSystems
 
@@ -28,9 +28,7 @@ def build_fake_service_registry(*, configured_tenants: Mapping[WorkplaceSystem, 
     registry.register_value(RecordStore, InMemoryRecordStore())
     registry.register_value(
         ConditionalWriteStore,
-        InMemoryConditionalWriteStore(
-            settings=ConditionalWriteSettings(IDEMPOTENCY_TTL_SECONDS=3600, IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS=300)
-        ),
+        InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
     )
     registry.register_value(
         ConfiguredSystems,

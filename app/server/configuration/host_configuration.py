@@ -15,7 +15,9 @@ from contracts.configuration import (
     install_host_info,
 )
 from contracts.slack.transport import SlackTransportInfo, install_slack_transport_info
+from infrastructure.audit.settings import get_audit_settings
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
+from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import configure_logging
@@ -150,6 +152,8 @@ def _validate_slices(
     server = get_server_settings()
     security = get_security_settings()
     directory_settings = get_directory_settings()
+    get_audit_settings()
+    get_conditional_write_settings()
     sre_ops = get_sre_ops_settings()
     # Vendor and feature slices validate with the host slices: an invalid entry fails boot here.
     slack_transport = get_slack_transport_settings()
