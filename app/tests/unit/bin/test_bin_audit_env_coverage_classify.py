@@ -175,3 +175,21 @@ def test_the_env_example_is_judged_only_for_names_the_app_reads() -> None:
 
     assert "app/.env.example" not in rows["TRELLO__TOKEN"].reason
     assert "app/.env.example" in rows["SLACK__BOT_TOKEN"].reason
+
+
+def test_a_placeholder_parameter_whose_value_sits_inside_a_blob_line_names_put_parameter() -> None:
+    """A doc-14 key naming a path inside a blob line ("GOOGLE_RESOURCES inc.f") is copied from that line.
+
+    The blob holds the line ``GOOGLE_RESOURCES``, never the key itself, so the check must resolve the line from
+    the key's first word; otherwise the placeholder parameter would report that there is nothing to copy.
+    """
+    doc14 = {"GOOGLE_RESOURCES inc.f": ("secret INCIDENT_CORE__FOLDER_ID (non-public value)", "111.10.3")}
+    entries = [
+        ("ssm-param", "INCIDENT_CORE__FOLDER_ID", "placeholder"),
+        ("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set"),
+    ]
+
+    rows = {name: verdict for name, _, verdict in coverage_rows(doc14, {"INCIDENT_CORE__FOLDER_ID"}, entries)}
+
+    assert rows["INCIDENT_CORE__FOLDER_ID"].action == "check"
+    assert "put-parameter from GOOGLE_RESOURCES inc.f" in rows["INCIDENT_CORE__FOLDER_ID"].reason

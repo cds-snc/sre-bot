@@ -46,7 +46,7 @@ Destinations:
 | GOOGLE_CLIENT_ID | ServerSettings (unused field) | delete | 111.7 |
 | GOOGLE_CLIENT_SECRET | ServerSettings (unused field) | delete | 111.7 |
 | GOOGLE_DELEGATED_ADMIN_EMAIL | no longer read (TASK-111.10.2, 2026-10-26); the field is deleted | delete; the blob line stays inert until 111.15 removes the blob | 111.10.2 |
-| GOOGLE_RESOURCES | GoogleResourcesConfig (interim) | one key per id, never one JSON; Drive item ids are non-public values (never in the files), supplied as TASK-167 rules for document ids | 111.10.3 |
+| GOOGLE_RESOURCES | GoogleResourcesConfig (interim, deleted by 111.10.3) | one key per id on its end-state slice, never one JSON; each id a non-public value from the environment (configuration.md, TASK-167): see GOOGLE_RESOURCES ids below; the blob line stays inert until 111.15 removes the blobs | 111.10.3 |
 | GOOGLE_WORKSPACE_CUSTOMER_ID | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID (non-public value: Google shows it only to domain-settings admins; parameter added by a terraform-only PR before 111.10.2, decided 2026-10-26); the blob line stays inert until 111.15 removes the blob | 111.10.2 |
 | GROUP_DOMAIN | no longer read (TASK-111.14, 2026-10-28; GroupsFeatureSettings deleted) | delete; the blob line stays inert until 111.15 removes the blobs | 111.14 |
 | GROUP_PROVIDERS | no longer read (TASK-111.14, 2026-10-28; GroupsFeatureSettings deleted) | delete; the blob line stays inert until 111.15 removes the blobs | 111.14 |
@@ -76,6 +76,30 @@ Destinations:
 | TRELLO_TOKEN | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO__APP_KEY | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__APP_KEY) | secret TRELLO__APP_KEY until the task definition drops it | 111.15.1 |
 | TRELLO__TOKEN | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__TOKEN) | secret TRELLO__TOKEN until the task definition drops it | 111.15.1 |
+
+## GOOGLE_RESOURCES ids
+
+One row per id in the sre-bot-config `GOOGLE_RESOURCES` JSON, keyed `GOOGLE_RESOURCES <path>`. The terraform-only PR of TASK-111.10.3 creates each parameter; the human sets it with put-parameter from that path, and `zsh bin/deploy-checks.zsh pre google_ids` compares them without printing a value. `inc.d` (`incident_drive_id`) and `rep.g` have no reader and are not carried.
+
+| Key | Owning slice | Destination | Subtask |
+| --- | --- | --- | --- |
+| GOOGLE_RESOURCES inc.f | [incident_core] folder_id | secret INCIDENT_CORE__FOLDER_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES inc.t | [incident_core] report_template_id | secret INCIDENT_CORE__REPORT_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES inc.l | [incident_core] list_sheet_id | secret INCIDENT_CORE__LIST_SHEET_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES inc.h | [incident_response] handbook_id | secret INCIDENT_RESPONSE__HANDBOOK_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES cal.sre | [incident_postmortem] calendar_id | secret INCIDENT_POSTMORTEM__CALENDAR_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES aws.s | [cloud_operations_spending] sheet_id | secret CLOUD_OPERATIONS_SPENDING__SHEET_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.i | [talent] internal_folder_id | secret TALENT__INTERNAL_FOLDER_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.t | [talent] templates_folder_id | secret TALENT__TEMPLATES_FOLDER_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.s | [talent] scoring_guide_template_id | secret TALENT__SCORING_GUIDE_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.c | [talent] core_values_interview_notes_id | secret TALENT__CORE_VALUES_INTERVIEW_NOTES_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.tech | [talent] technical_interview_notes_id | secret TALENT__TECHNICAL_INTERVIEW_NOTES_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.int | [talent] intake_form_template_id | secret TALENT__INTAKE_FORM_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.ph | [talent] phone_screen_template_id | secret TALENT__PHONE_SCREEN_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.rec | [talent] recruitment_feedback_template_id | secret TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES tal.pan | [talent] panelist_guidebook_template_id | secret TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID (non-public value: a Drive or calendar item id) | 111.10.3 |
+| GOOGLE_RESOURCES inc.d | none (incident_drive_id, unread) | not carried | 111.10.3 |
+| GOOGLE_RESOURCES rep.g | none (unread) | not carried | 111.10.3 |
 
 ## sre-bot-config-infrastructure
 

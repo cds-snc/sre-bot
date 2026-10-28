@@ -10,23 +10,16 @@
 #   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, runtime errors,
 #                                               # Slack up, HTTP, plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   vendors pre: the six Notify, Opsgenie and Trello parameters compared by hash with the blob lines they replace
-#           (MATCH, DIFFER or MISSING, never printed), the NOTIFY_API_URL line (public) against production.toml's
-#           [notify.tenant] api_url, any MAXMIND_DB_PATH or Opsgenie host line;
-#           post: no configuration_invalid naming a vendor, no not-configured line, the Opsgenie and MaxMind
-#           healthchecks healthy (TASK-111.12)
-#   features pre: the five Slack id lines (public identifiers, printed) beside production.toml's [incident],
-#           [sre_ops] and [atip] keys, MATCH or DIFFER; AWS_ADMIN_GROUPS and AWS_OPS_GROUP_NAME expected in no blob (production
-#           ran on the code default the file now holds); post: no configuration_invalid naming incident, sre_ops or
-#           cloud_operations; the startup message in the ops channel is a manual Slack check (TASK-111.14)
+#   google_ids pre: the 15 Google document id parameters compared by hash with the GOOGLE_RESOURCES paths they
+#           replace (MATCH, DIFFER or MISSING, never printed); inc.d and rep.g are not carried (TASK-111.10.3)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(vendors features)
-PRE_CHECKS=(vendors features)  # task checks with a pre part
+TASK_CHECKS=(google_ids)
+PRE_CHECKS=(google_ids)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -120,60 +113,31 @@ if [[ $phase == pre ]]; then
   print "error or critical lines: $(li_count $since 'filter level in ["error","critical"]')"
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | sort @timestamp desc | limit 3'
 
-  if (( ${checks[(Ie)vendors]} )); then  # TASK-111.12
-    section "Notify, Opsgenie and Trello parameters against the blob lines they replace (TASK-111.12; values never printed)"
-    # line_hash NAME: sha256 of a blob line's value, or 'missing'; the value never leaves this function.
-    line_hash() { local v; v=$(blob_value $1) && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
-    vendors_ok=yes
-    for pair in NOTIFY__SRE_USER_NAME:NOTIFY_SRE_USER_NAME NOTIFY__SRE_CLIENT_SECRET:NOTIFY_SRE_CLIENT_SECRET \
-        OPSGENIE__INTEGRATIONS_KEY:OPSGENIE_INTEGRATIONS_KEY TRELLO__TENANT__APP_KEY:TRELLO_APP_KEY \
-        TRELLO__TENANT__TOKEN:TRELLO_TOKEN TRELLO__ATIP_BOARD:TRELLO_ATIP_BOARD; do
-      new=$(param_hash /sre-bot/${pair%%:*}); old=$(line_hash ${pair##*:})
+  if (( ${checks[(Ie)google_ids]} )); then  # TASK-111.10.3
+    section "Google document ids against the GOOGLE_RESOURCES paths they replace (TASK-111.10.3; values never printed)"
+    resources=$(blob_value GOOGLE_RESOURCES) || resources=
+    [[ -n $resources ]] && print "GOOGLE_RESOURCES line: present" || print "GOOGLE_RESOURCES line: missing"
+    # path_hash PATH: sha256 of one GOOGLE_RESOURCES value (a jq path such as inc.f), or 'missing'; the value never
+    # leaves this function.
+    path_hash() { local v; v=$(print -rn -- $resources | jq -er ".$1 // empty" 2>/dev/null) && [[ -n $v ]] && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
+    google_ok=yes
+    for pair in INCIDENT_CORE__FOLDER_ID:inc.f INCIDENT_CORE__REPORT_TEMPLATE_ID:inc.t \
+        INCIDENT_CORE__LIST_SHEET_ID:inc.l INCIDENT_RESPONSE__HANDBOOK_ID:inc.h \
+        INCIDENT_POSTMORTEM__CALENDAR_ID:cal.sre CLOUD_OPERATIONS_SPENDING__SHEET_ID:aws.s \
+        TALENT__INTERNAL_FOLDER_ID:tal.i TALENT__TEMPLATES_FOLDER_ID:tal.t \
+        TALENT__SCORING_GUIDE_TEMPLATE_ID:tal.s TALENT__CORE_VALUES_INTERVIEW_NOTES_ID:tal.c \
+        TALENT__TECHNICAL_INTERVIEW_NOTES_ID:tal.tech TALENT__INTAKE_FORM_TEMPLATE_ID:tal.int \
+        TALENT__PHONE_SCREEN_TEMPLATE_ID:tal.ph TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID:tal.rec \
+        TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID:tal.pan; do
+      new=$(param_hash /sre-bot/${pair%%:*}); old=$(path_hash ${pair##*:})
       if [[ $new == missing ]]; then line="MISSING (no such parameter)"
-      elif [[ $old == missing ]]; then line="MISSING (no such blob line)"
+      elif [[ $old == missing ]]; then line="MISSING (no such GOOGLE_RESOURCES path)"
       else line=$(same_hash $new $old); fi
-      print "${pair%%:*} vs the ${pair##*:} line: $line"
-      [[ $line == MATCH ]] || vendors_ok=no
+      print "${pair%%:*} vs GOOGLE_RESOURCES ${pair##*:}: $line"
+      [[ $line == MATCH ]] || google_ok=no
     done
-    # The Notify API host is public: print the blob's and compare it with the file's.
-    url_blob=$(blob_value NOTIFY_API_URL) || url_blob=
-    url_file=$(sed -n '/^\[notify\.tenant\]/,/^\[/p' $ROOT/app/config/production.toml | sed -nE 's/^api_url = "(.*)"/\1/p')
-    print "NOTIFY_API_URL line: ${url_blob:-missing}; production.toml [notify.tenant] api_url: ${url_file:-missing}"
-    [[ -n $url_blob && ${url_blob%/} == ${url_file%/} ]] && print "Notify API host: MATCH" || { print "Notify API host: DIFFER (set production.toml to the blob's value first)"; vendors_ok=no; }
-    for name in MAXMIND_DB_PATH OPSGENIE_API_URL; do
-      where=$(blob_where $name)
-      print "$name in (expected none; production.toml names the entry): $where"
-      [[ $where == none ]] || vendors_ok=no
-    done
-    [[ $vendors_ok == yes ]] && result vendors_pre PASS || result vendors_pre "FAIL (a DIFFER or MISSING parameter, a host DIFFER or an override line blocks the merge: put-parameter or fix the file first)"
-  fi
-
-  if (( ${checks[(Ie)features]} )); then  # TASK-111.14
-    section "Incident, SRE ops and ATIP ids against production.toml (TASK-111.14; Slack ids are public identifiers, printed)"
-    # file_value TABLE KEY: a quoted string key of one table in production.toml.
-    file_value() { sed -n "/^\[$1\]/,/^\[/p" $ROOT/app/config/production.toml | sed -nE "s/^$2 = \"(.*)\"/\1/p"; }
-    features_ok=yes
-    for triple in INCIDENT_CHANNEL:incident:incident_channel \
-        SLACK_SECURITY_USER_GROUP_ID:incident:slack_security_user_group_id \
-        SLACK_NOTIFY_MGMT_USER_GROUP_ID:incident:slack_notify_mgmt_user_group_id \
-        SRE_OPS_CHANNEL_ID:sre_ops:sre_ops_channel_id \
-        ATIP_ANNOUNCE_CHANNEL:atip:announce_channel_id; do
-      name=${triple%%:*}; rest=${triple#*:}; table=${rest%%:*}; key=${rest#*:}
-      old=$(blob_value $name) || old=missing
-      new=$(file_value $table $key); new=${new:-missing}
-      [[ $old != missing && $old == $new ]] && line=MATCH || { line=DIFFER; features_ok=no; }
-      print "$name line: $old; production.toml [$table] $key: $new; $line"
-    done
-    for name in AWS_ADMIN_GROUPS AWS_OPS_GROUP_NAME; do
-      where=$(blob_where $name)
-      print "$name in (expected none; production ran on the code default): $where"
-      [[ $where == none ]] || features_ok=no
-    done
-    print "production.toml [cloud_operations]: $(sed -n '/^\[cloud_operations\]/,/^\[/p' $ROOT/app/config/production.toml | grep -E '^aws_admin_groups' || print missing)"
-    for name in GROUP_DOMAIN GROUP_PROVIDERS; do
-      print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
-    done
-    [[ $features_ok == yes ]] && result features_pre PASS || result features_pre "FAIL (copy each DIFFER line's blob value into production.toml; an AWS_* line means production overrode the default: stop and replan)"
+    print "GOOGLE_RESOURCES inc.d and rep.g: not carried (no reader), not compared"
+    [[ $google_ok == yes ]] && result google_ids_pre PASS || result google_ids_pre "FAIL (a DIFFER or MISSING parameter blocks the merge of the reader PR: put-parameter from the named path first)"
   fi
 fi
 
@@ -234,31 +198,6 @@ if [[ $phase == post ]]; then
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | limit 4'
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
-
-  if (( ${checks[(Ie)vendors]} )); then  # TASK-111.12
-    section "Notify, Trello, Opsgenie and MaxMind from the files and their secrets (TASK-111.12)"
-    invalid=$(li_count $since 'filter event = "configuration_invalid" and @message like /notify|trello|opsgenie|maxmind|NOTIFY__|TRELLO__|OPSGENIE__|MAXMIND__/')
-    print "configuration_invalid lines naming a vendor: $invalid (expected 0)"
-    unconfigured=$(li_count $since 'filter event in ["revoke_api_key_not_configured","opsgenie_not_configured","maxmind_not_configured"]')
-    li $since 'filter event in ["revoke_api_key_not_configured","opsgenie_not_configured","maxmind_not_configured"] | fields @timestamp, event | limit 5'
-    print "not-configured lines: $unconfigured (expected 0)"
-    li $since 'filter event = "integration_healthcheck_result" and integration in ["opsgenie","maxmind"] | stats count() as n by integration, result'
-    unhealthy=$(li_count $since 'filter event = "integration_healthcheck_result" and integration in ["opsgenie","maxmind"] and result = "unhealthy"')
-    healthy=$(li_count $since 'filter event = "integration_healthcheck_result" and integration in ["opsgenie","maxmind"] and result = "healthy"')
-    print "opsgenie and maxmind healthchecks: $healthy healthy, $unhealthy unhealthy (expected > 0 and 0; they run every 5 minutes)"
-    for name in NOTIFY_SRE_CLIENT_SECRET OPSGENIE_INTEGRATIONS_KEY TRELLO_TOKEN; do
-      print "$name in (unread, inert until the blobs go in TASK-111.15): $(blob_where $name)"
-    done
-    [[ $invalid == 0 && $unconfigured == 0 && $unhealthy == 0 && $healthy -gt 0 ]] && result vendors PASS || result vendors "FAIL ($invalid configuration_invalid, $unconfigured not configured, $unhealthy unhealthy, $healthy healthy)"
-  fi
-
-  if (( ${checks[(Ie)features]} )); then  # TASK-111.14
-    section "Incident, SRE ops and cloud operations slices from the files (TASK-111.14)"
-    invalid=$(li_count $since 'filter event = "configuration_invalid" and @message like /incident|sre_ops|cloud_operations|atip|INCIDENT__|SRE_OPS__|CLOUD_OPERATIONS__|ATIP__/')
-    print "configuration_invalid lines naming incident, sre_ops or cloud_operations: $invalid (expected 0)"
-    print "Manual: the 'SRE Bot has started up' message arrived in the ops channel; an sre-ifs member's /aws groups list is answered"
-    [[ $invalid == 0 ]] && result features PASS || result features "FAIL ($invalid configuration_invalid)"
-  fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"
   version=$(curl -s $BASE_URL/version)
