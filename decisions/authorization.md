@@ -14,7 +14,7 @@ Callers reach the bot through Slack, Backstage and later Teams. The entry point 
 Current state:
 - **Three unrelated mechanisms.** HTTP routes require scopes in the Backstage-issued JWT (`sre-bot:access-requests`, `sre-bot:access-sync`, `sre-bot:access-catalog`, in `infrastructure/security/current_user.py`), and Backstage decides who gets them. Legacy Slack AWS commands call `is_user_member_of_groups` (`modules/permissions/handler.py`), which lists each group in `AWS_ADMIN_GROUPS` and compares emails, so nested groups are missed. The access feature resolves approvers inside its own service.
 - **No rule for Slack guests or unlinked callers.**
-- **No caching.** `DIRECTORY_CACHE_TTL_SECONDS` exists but no provider reads it.
+- **No caching.** The directory has no cache; the decision lifetime is this decision's (the unread `DIRECTORY_CACHE_TTL_SECONDS` setting was deleted 2026-10-28).
 - **The access feature (`packages/access/`) predates `decisions/`.** It is an early attempt, not a reference; this record sets the target and that code is realigned to it.
 
 Current practice:
@@ -103,3 +103,4 @@ Tolerated until then:
 **Changes:**
 - 2026-09-25: Accepted.
 - 2026-09-25: membership checks use the Directory API `members.hasMember` per role, and time-bound grants end on the bot's own grant record, not an IdP expiry field.
+- 2026-10-28: the unread directory cache TTL setting is deleted; the decision lifetime stays authorization's.

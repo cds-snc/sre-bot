@@ -21,7 +21,7 @@ Destinations:
 ## Facts recorded for TASK-111 AC6
 
 - Production sets `AWS_ORG_ACCOUNT_ROLE_ARN` and `ISSUER_CONFIG`.
-- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP`, `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults.
+- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP` (now `[directory] require_startup_warmup`, default false), `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults.
 - Production `CORS_ALLOWED_ORIGINS` is the terraform variable default, an empty list.
 
 ## sre-bot-config

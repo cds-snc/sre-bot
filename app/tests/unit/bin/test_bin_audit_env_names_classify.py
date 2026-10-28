@@ -233,3 +233,30 @@ def test_a_migrated_secret_whose_parameter_is_not_set_is_a_check() -> None:
 
 def test_replacement_prefers_the_shortest_table_prefixed_name() -> None:
     assert replacement("LOG_LEVEL", {"LOGGING__LOG_LEVEL", "OTHER__LOGGING__LOG_LEVEL"}) == "LOGGING__LOG_LEVEL"
+
+
+@pytest.mark.parametrize(
+    ("name", "kept_in"),
+    [
+        ("DIRECTORY_REQUIRE_STARTUP_WARMUP", "[directory] require_startup_warmup"),
+        ("DIRECTORY_PROVIDER", "nothing"),
+        ("DIRECTORY_CACHE_TTL_SECONDS", "nothing"),
+        ("DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "nothing"),
+        ("DRIVE_PROVIDER", "nothing"),
+        ("SPREADSHEET_PROVIDER", "nothing"),
+    ],
+)
+def test_a_retired_directory_hosting_name_is_deleted_with_its_destination(name: str, kept_in: str) -> None:
+    """A retired name in a developer file is deleted, and the reason names its key or says it is deleted."""
+    verdict = classify("file app/.env", name, "set", CTX)
+
+    assert verdict.action == "delete"
+    assert kept_in in verdict.reason
+    assert "set nothing" not in verdict.reason
+
+
+def test_a_commented_retired_name_reports_the_new_key() -> None:
+    verdict = classify("file app/.env.example", "DIRECTORY_REQUIRE_STARTUP_WARMUP", "commented", CTX)
+
+    assert verdict.action == "delete"
+    assert "[directory] require_startup_warmup" in verdict.reason

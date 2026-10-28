@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from infrastructure.spreadsheets.google import GoogleSpreadsheetProvider
 from infrastructure.spreadsheets.provider import SpreadsheetProvider
-from infrastructure.spreadsheets.settings import SpreadsheetSettings, get_spreadsheet_settings
 from integrations.google_workspace.client import get_sheets_service
 
 if TYPE_CHECKING:
@@ -16,19 +15,12 @@ if TYPE_CHECKING:
 def build_google_spreadsheet_provider(
     *,
     get_service: Callable[[list[str], str | None], SheetsResource],
-    spreadsheet_settings: SpreadsheetSettings,
 ) -> SpreadsheetProvider:
     """Build a Google Spreadsheet provider with injected dependencies."""
-    return GoogleSpreadsheetProvider(get_service=get_service, spreadsheet_settings=spreadsheet_settings)
+    return GoogleSpreadsheetProvider(get_service=get_service)
 
 
 @cache
 def get_spreadsheet_provider() -> SpreadsheetProvider:
-    """Return the singleton configured SpreadsheetProvider."""
-    spreadsheet_settings = get_spreadsheet_settings()
-    if spreadsheet_settings.provider == "google":
-        return build_google_spreadsheet_provider(
-            get_service=get_sheets_service,
-            spreadsheet_settings=spreadsheet_settings,
-        )
-    raise ValueError(f"Unsupported spreadsheet provider: {spreadsheet_settings.provider!r}")
+    """Return the singleton SpreadsheetProvider: Google Sheets, the only implementation."""
+    return build_google_spreadsheet_provider(get_service=get_sheets_service)

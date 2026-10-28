@@ -101,6 +101,12 @@ HINTS = {
     "TRELLO_ATIP_BOARD": "secret TRELLO__ATIP_BOARD",
     "OPSGENIE_INTEGRATIONS_KEY": "secret OPSGENIE__INTEGRATIONS_KEY",
     "MAXMIND_DB_PATH": "[maxmind.tenant] database_path",
+    "DIRECTORY_REQUIRE_STARTUP_WARMUP": "[directory] require_startup_warmup",
+    "DIRECTORY_PROVIDER": "nothing (deleted: the directory follows the IdP in the data, never a setting)",
+    "DIRECTORY_CACHE_TTL_SECONDS": "nothing (deleted: no reader)",
+    "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS": "nothing (deleted: no reader)",
+    "DRIVE_PROVIDER": "nothing (deleted: Google Drive is the only provider)",
+    "SPREADSHEET_PROVIDER": "nothing (deleted: Google Sheets is the only provider)",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
@@ -259,6 +265,8 @@ def _developer(name: str, state: str, ctx: Context) -> Verdict:
     if old := staged_parameters(ctx).get(name):
         return Verdict("none", f"staged ahead of its reader: doc-14 moves {old} to this secret")
     if name in HINTS:
+        if HINTS[name].startswith("nothing"):
+            return Verdict("delete", f"retired; {HINTS[name]}")
         return Verdict("delete", f"retired; set {HINTS[name]} instead")
     if name in SUPERSEDED:
         return Verdict("delete", f"superseded before the migration by {SUPERSEDED[name]}, which stays")

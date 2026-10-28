@@ -6,8 +6,8 @@ title: >-
   DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS
 status: To Do
 assignee: []
-created_date: '2026-09-25 14:58'
-updated_date: '2026-10-15 17:50'
+created_date: 2026-09-25 14:58
+updated_date: '2026-10-28T13:46:00Z'
 labels:
   - lifecycle
   - clients
@@ -18,7 +18,7 @@ references:
   - app/server/lifespan.py
   - app/infrastructure/directory/settings.py
   - decisions/lifecycle.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1674'
+  - https://github.com/cds-snc/sre-bot/issues/1674
 priority: medium
 ordinal: 276000
 ---
@@ -37,8 +37,20 @@ Standalone PR: it changes boot behaviour (backlog doc-2). Where production had t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DIRECTORY_REQUIRE_STARTUP_WARMUP and DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS no longer exist in code, tests, terraform or docs (rg), and the production SSM parameter no longer sets them (recorded in notes)
+- [ ] #1 The [directory] require_startup_warmup key (DIRECTORY__REQUIRE_STARTUP_WARMUP; the flat DIRECTORY_REQUIRE_STARTUP_WARMUP until TASK-111.13.1 lands) and DirectorySettings, if it is then empty, no longer exist in code, tests, the configuration files or docs (rg); DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS is already deleted by TASK-111.13.1
 - [ ] #2 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [ ] #3 decisions/lifecycle.md Migration drops the directory warmup from its tolerated network I/O
 - [ ] #4 Lifespan runs the directory credential check: an UNAUTHORIZED result logs ERROR credential_check_failed and a TRANSIENT_ERROR result logs WARNING credential_check_inconclusive; boot completes in both cases (lifespan tests with a fake directory)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-28T13:46:00Z
+
+---
+
+2026-10-28 (TASK-111.13 planning): AC #1 reworded; the warmup key moves to [directory] in TASK-111.13.1 and the timeout key is deleted there as unread. Production never set either (doc-14).
+
+---
+<!-- COMMENTS:END -->

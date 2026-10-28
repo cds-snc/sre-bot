@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-14 23:09
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-10-28T13:47:00Z'
 labels:
   - incident
   - features
@@ -45,3 +45,15 @@ THIS SLICE
 - [ ] #3 Comms entry points build the store from a RecordStore resolved through the ServiceScopeOpener; no cached provider remains
 - [ ] #4 The existing status-update behaviour tests pass unchanged against the new store, plus conditional-create and guard-lost cases
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-28T13:47:00Z
+
+---
+
+2026-10-28: decisions/configuration.md now makes every backing-resource name deployment configuration on the owning slice (one owning key, default in base.toml); STATUS_UPDATES_TABLE is listed as tolerated until this task.
+
+---
+<!-- COMMENTS:END -->

@@ -5,8 +5,8 @@ title: >-
   unimplemented SQS retry backend
 status: To Do
 assignee: []
-created_date: '2026-07-28 13:20'
-updated_date: '2026-10-14 14:41'
+created_date: 2026-07-28 13:20
+updated_date: '2026-10-28T13:46:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -16,7 +16,7 @@ dependencies:
   - TASK-34
 references:
   - decisions/reliability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1367'
+  - https://github.com/cds-snc/sre-bot/issues/1367
 priority: medium
 ordinal: 89000
 ---
@@ -55,11 +55,22 @@ Depends on TASK-34 (QueueService must exist before retry can fold onto it). Step
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-15 20:06
+
 ---
+
 2026-09-15 follow-up from TASK-25.2.5 planning (human decision): three classify-and-continue sites in infrastructure/resilience/retry/dynamodb_store.py were found and deliberately NOT fixed in TASK-25.2.5, because the DynamoDB retry store is not used in production today (RetrySettings.backend defaults to "memory", and create_retry_store / get_resilience_service / RetryWorker are only constructed in tests). Decide raise vs keep for each one when this task consolidates or deletes the store:
 - fetch_due (~:162-169): a query failure logs dynamodb_fetch_due_failed and returns [], so a DynamoDB outage looks like "nothing due".
 - increment_attempt (~:334-347): a get_item failure logs retry_record_not_found_for_increment and returns without incrementing, so the record is retried again at its old schedule.
 - _count_by_status (~:424-445): a query failure returns None, which get_stats reports as a count.
 If the store is deleted outright (AC#3), these go with it and no decision is needed.
+
+---
+
+created: 2026-10-28T13:46:00Z
+
+---
+
+2026-10-28 (TASK-111.13 planning, human-approved): infrastructure/resilience/ has no production consumer; TASK-111.13.2 deletes it with RetrySettings and the sre_bot_retry_records table. This task is superseded; durable retry is built on QueueService (TASK-34) when a consumer needs it (decisions/reliability.md 2026-10-28). Human: close it.
+
 ---
 <!-- COMMENTS:END -->

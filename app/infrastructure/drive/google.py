@@ -8,7 +8,6 @@ from googleapiclient.errors import HttpError
 
 from contracts.operations import OperationResult
 from infrastructure.drive.models import DriveFile
-from infrastructure.drive.settings import DriveSettings
 from integrations.google_workspace.client import classify_google_error
 
 # Shared with Google Path B adapters via infrastructure.drive; revisit when another Drive provider is added.
@@ -25,9 +24,8 @@ if TYPE_CHECKING:
 class GoogleDriveProvider:
     """DriveProvider backed by the Google Drive API."""
 
-    def __init__(self, get_service: Callable[[list[str], str | None], DriveResource], drive_settings: DriveSettings) -> None:
+    def __init__(self, get_service: Callable[[list[str], str | None], DriveResource]) -> None:
         self._get_service = get_service
-        self._drive_settings = drive_settings
 
     def _map_sdk_exception(self, exc: HttpError, operation: str) -> OperationResult[Any]:
         status, error_code, retry_after = classify_google_error(exc)

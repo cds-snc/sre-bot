@@ -9,7 +9,6 @@ from googleapiclient.errors import HttpError
 from contracts.operations import OperationResult
 from contracts.operations.status import OperationStatus
 from infrastructure.spreadsheets.models import SheetCell
-from infrastructure.spreadsheets.settings import SpreadsheetSettings
 from integrations.google_workspace.client import classify_google_error
 
 SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -30,13 +29,8 @@ if TYPE_CHECKING:
 class GoogleSpreadsheetProvider:
     """SpreadsheetProvider backed by the Google Sheets API."""
 
-    def __init__(
-        self,
-        get_service: Callable[[list[str], str | None], SheetsResource],
-        spreadsheet_settings: SpreadsheetSettings,
-    ) -> None:
+    def __init__(self, get_service: Callable[[list[str], str | None], SheetsResource]) -> None:
         self._get_service = get_service
-        self._spreadsheet_settings = spreadsheet_settings
 
     def _map_sdk_exception(self, exc: HttpError, operation: str) -> OperationResult[Any]:
         if int(exc.resp.status) == 400 and "Unable to parse range" in str(exc):
