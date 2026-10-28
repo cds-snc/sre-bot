@@ -44,7 +44,6 @@ from pydantic import SecretStr, ValidationError
 from pydantic_settings import BaseSettings
 
 from infrastructure.audit.settings import AuditSettings
-from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.coordination.settings import ConditionalWriteSettings
 from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
@@ -68,15 +67,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         "567",
         567,
     ),
-    (RetrySettings, "RETRY_ENABLED", "enabled", "false", False),
-    (RetrySettings, "RETRY_BACKEND", "backend", "dynamodb", "dynamodb"),
-    (RetrySettings, "RETRY_DYNAMODB_TABLE_NAME", "dynamodb_table_name", "sentinel-retry", "sentinel-retry"),
-    (RetrySettings, "RETRY_DYNAMODB_TTL_DAYS", "dynamodb_ttl_days", "9", 9),
-    (RetrySettings, "RETRY_MAX_ATTEMPTS", "max_attempts", "8", 8),
-    (RetrySettings, "RETRY_BASE_DELAY_SECONDS", "base_delay_seconds", "61", 61),
-    (RetrySettings, "RETRY_MAX_DELAY_SECONDS", "max_delay_seconds", "3601", 3601),
-    (RetrySettings, "RETRY_BATCH_SIZE", "batch_size", "11", 11),
-    (RetrySettings, "RETRY_CLAIM_LEASE_SECONDS", "claim_lease_seconds", "301", 301),
     (
         GoogleResourcesConfig,
         "GOOGLE_RESOURCES",

@@ -17,10 +17,6 @@ from infrastructure.configuration.features import (
 from infrastructure.configuration.features.aws_ops import (
     get_aws_feature_settings,
 )
-from infrastructure.configuration.infrastructure.retry import (
-    RetrySettings,
-    get_retry_settings,
-)
 from infrastructure.coordination.settings import ConditionalWriteSettings
 
 
@@ -34,43 +30,11 @@ class TestSettingsStructure:
         assert isinstance(aws_feature_settings, AWSFeatureSettings)
         assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
 
-    def test_settings_loads_all_infrastructure_sections(self):
-        """Verify infrastructure settings providers load correctly."""
-        retry_settings = get_retry_settings()
-
-        assert isinstance(retry_settings, RetrySettings)
-
-    def test_settings_preserves_field_access(self):
-        """Verify settings values are accessible from narrow providers."""
-        aws_feature_settings = get_aws_feature_settings()
-        retry_settings = get_retry_settings()
-
-        assert hasattr(aws_feature_settings, "AWS_ADMIN_GROUPS")
-        assert hasattr(retry_settings, "enabled")
-        assert hasattr(retry_settings, "backend")
-
-    def test_retry_settings_can_be_imported_separately(self):
-        """Verify RetrySettings can be imported separately for testing."""
-        retry = RetrySettings()
-        assert retry.enabled is not None
-        assert retry.backend in ["memory", "dynamodb", "sqs"]
-        assert retry.max_attempts >= 1
-        assert retry.base_delay_seconds >= 1
-        assert retry.max_delay_seconds >= retry.base_delay_seconds
-
-    def test_settings_classes_have_proper_base_classes(self):
-        """Verify settings classes inherit from appropriate base classes."""
-        # Check inheritance
-        assert issubclass(RetrySettings, InfrastructureSettings)
-
     def test_settings_singleton_still_works(self):
         """Verify provider singleton behavior is preserved."""
-        retry_settings1 = get_retry_settings()
-        retry_settings2 = get_retry_settings()
         aws_feature_settings1 = get_aws_feature_settings()
         aws_feature_settings2 = get_aws_feature_settings()
 
-        assert retry_settings1 is retry_settings2
         assert aws_feature_settings1 is aws_feature_settings2
 
     def test_all_feature_settings_classes_instantiable(self):
@@ -92,7 +56,6 @@ class TestSettingsStructure:
         # Test that all infrastructure settings classes are functional
         instances = [
             ConditionalWriteSettings(),
-            RetrySettings(),
         ]
 
         # Verify they are all instances of InfrastructureSettings

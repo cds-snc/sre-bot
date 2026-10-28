@@ -1,10 +1,10 @@
 ---
 id: TASK-111.13.2
 title: Delete the unused infrastructure/resilience package and RetrySettings
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T14:37:00Z'
+updated_date: '2026-10-28T14:50:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -24,12 +24,12 @@ Slice B of TASK-111.13 (program-scope finding 2026-10-28). The retry store, retr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/infrastructure/resilience/ and its tests are deleted and nothing imports infrastructure.resilience
-- [ ] #2 RetrySettings and infrastructure/configuration/infrastructure/retry.py are deleted, no [retry] table exists, and every RETRY_* name is in the env audit HINTS as deleted
-- [ ] #3 The import-linter source_modules and the fake-coverage baseline no longer name the resilience package, and make check-fake-coverage passes
+- [x] #1 app/infrastructure/resilience/ and its tests are deleted and nothing imports infrastructure.resilience
+- [x] #2 RetrySettings and infrastructure/configuration/infrastructure/retry.py are deleted, no [retry] table exists, and every RETRY_* name is in the env audit HINTS as deleted
+- [x] #3 The import-linter source_modules and the fake-coverage baseline no longer name the resilience package, and make check-fake-coverage passes
 - [ ] #4 The sre_bot_retry_records table and its IAM grant are removed from terraform and the devcontainer table script after the human confirms the table is empty
-- [ ] #5 decisions/reliability.md and plugin-architecture.md no longer list the retry store or the resilience adapter
-- [ ] #6 ruff, mypy (no new errors), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
+- [x] #5 decisions/reliability.md and plugin-architecture.md no longer list the retry store or the resilience adapter
+- [x] #6 ruff, mypy (no new errors), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -55,5 +55,5 @@ Independent of TASK-111.13.1; either may merge first. ~1930 LOC deleted across ~
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-2026-10-28: decisions/reliability.md amendment went in with PR #1801 (TASK-111.13.1) instead of this PR; this PR only checks it still matches what it deletes.
+Implemented 2026-10-28 on task-111.13.2-delete-resilience from main fe571ad2. Deleted infrastructure/resilience/ (retry store, DynamoDB store, worker, ResilienceService, circuit breaker), infrastructure/configuration/infrastructure/ (RetrySettings was its only module) and their tests; infrastructure/configuration/__init__ no longer exports RetrySettings. HINTS lists the nine RETRY_* names as deleted. import-linter source_modules and the fake-coverage baseline drop the package. Terraform drops aws_dynamodb_table.sre_bot_retry_records (no deletion_protection_enabled set), its ARN in local.dynamodb_table_arns (task role and backup selection) and its index ARN in the iam.tf Query statement; .devcontainer/dynamodb-create.sh no longer creates it. plugin-architecture.md drops resilience from the hosting adapters and the RetryStore from the tolerated list; reliability.md drops the RetryStore tolerance (the 2026-10-28 amendment from #1801 otherwise matches). Tests: test_infrastructure_resilience_removed.py (modules gone), RETRY_* HINTS cases in test_bin_audit_env_names_classify.py. Gates: ruff clean; mypy 43 errors (baseline 47, the 4 removed lived in deleted files, none in touched files); pytest 5879 passed; contracts 13 kept; key ownership OK; fake coverage OK (4 baselined); terraform fmt clean, validate OK. AC 4 waits on the human: table item count 0 and the tf plan showing a destroy of one table without deletion protection. Merge destroys one empty table and its IAM grant; nothing in the running app reads either; git revert recreates an empty table.
 <!-- SECTION:NOTES:END -->

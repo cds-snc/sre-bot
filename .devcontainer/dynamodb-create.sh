@@ -221,27 +221,6 @@ else
   echo "✓ sre_bot_audit_trail table created"
 fi
 
-# sre_bot_retry_records table - Distributed retry system with TTL and GSI
-if table_exists "sre_bot_retry_records"; then
-  echo "✓ sre_bot_retry_records table already exists"
-else
-  echo "Creating sre_bot_retry_records table..."
-  aws dynamodb create-table \
-    --table-name sre_bot_retry_records \
-    --attribute-definitions \
-      AttributeName=record_id,AttributeType=S \
-      AttributeName=status,AttributeType=S \
-      AttributeName=next_retry_at,AttributeType=N \
-    --key-schema \
-      AttributeName=record_id,KeyType=HASH \
-    --provisioned-throughput ReadCapacityUnits=2,WriteCapacityUnits=2 \
-    --global-secondary-indexes \
-      "[{\"IndexName\":\"status-next_retry_at-index\",\"KeySchema\":[{\"AttributeName\":\"status\",\"KeyType\":\"HASH\"},{\"AttributeName\":\"next_retry_at\",\"KeyType\":\"RANGE\"}],\"Projection\":{\"ProjectionType\":\"ALL\"},\"ProvisionedThroughput\":{\"ReadCapacityUnits\":2,\"WriteCapacityUnits\":2}}]" \
-    --endpoint-url "$ENDPOINT" \
-    --no-cli-pager >/dev/null
-  echo "✓ sre_bot_retry_records table created"
-fi
-
 echo ""
 echo "✓ All DynamoDB tables ready for local development"
 echo ""

@@ -51,7 +51,7 @@ Slack redelivers, queues redeliver, retries retry, and multiple replicas race. *
 
 ## Migration
 
-Tickets: idempotency rewrite (Phase 0 — security-grade); `QueueService` Protocol + outbox relay (TASK-34); the unused retry store, worker and circuit breaker deleted (TASK-111.13.2, superseding TASK-59); coordination-store rename with idempotency/lease facades (TASK-58: path move and rename TASK-58.1, facades TASK-58.2, both done). Tolerated until closed: features importing `infrastructure.coordination` directly instead of resolving the coordination contract from the registry; the bespoke DynamoDB `RetryStore` beside the not-yet-built `QueueService`. None for new mutating handlers — they must use the corrected primitive from its first PR.
+Tickets: idempotency rewrite (Phase 0 — security-grade); `QueueService` Protocol + outbox relay (TASK-34); the unused retry store, worker and circuit breaker deleted (TASK-111.13.2, superseding TASK-59); coordination-store rename with idempotency/lease facades (TASK-58: path move and rename TASK-58.1, facades TASK-58.2, both done). Tolerated until closed: features importing `infrastructure.coordination` directly instead of resolving the coordination contract from the registry. None for new mutating handlers — they must use the corrected primitive from its first PR.
 
 **Changes:**
 - 2026-09-24: queue, outbox and coordination are hosting contracts; cross-replica reactions go through them, and singleton jobs take a lease; dropped the stale claim that `platform_lock.py` races, since it now takes a lease.

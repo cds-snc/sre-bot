@@ -107,6 +107,15 @@ HINTS = {
     "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS": "nothing (deleted: no reader)",
     "DRIVE_PROVIDER": "nothing (deleted: Google Drive is the only provider)",
     "SPREADSHEET_PROVIDER": "nothing (deleted: Google Sheets is the only provider)",
+    "RETRY_ENABLED": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_BACKEND": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_DYNAMODB_TABLE_NAME": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_DYNAMODB_TTL_DAYS": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_MAX_ATTEMPTS": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_BASE_DELAY_SECONDS": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_MAX_DELAY_SECONDS": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_BATCH_SIZE": "nothing (deleted: the retry store had no consumer)",
+    "RETRY_CLAIM_LEASE_SECONDS": "nothing (deleted: the retry store had no consumer)",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
