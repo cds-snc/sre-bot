@@ -15,6 +15,11 @@ from contracts.configuration import (
     install_host_info,
 )
 from contracts.slack.transport import SlackTransportInfo, install_slack_transport_info
+from features.cloud_operations.spending.settings import get_cloud_operations_spending_settings
+from features.incident.common.settings import get_incident_core_settings
+from features.incident.postmortem.settings import get_incident_postmortem_settings
+from features.incident.response.settings import get_incident_response_settings
+from features.talent.settings import get_talent_settings
 from infrastructure.audit.settings import get_audit_settings
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 from infrastructure.configuration.features.incident import get_incident_settings
@@ -173,6 +178,12 @@ def _validate_slices(
     get_incident_settings()
     get_atip_settings()
     get_aws_feature_settings()
+    # The feature slices the legacy modules read; a rebuilt subdomain states its required ids when it registers.
+    get_incident_core_settings()
+    get_incident_response_settings()
+    get_incident_postmortem_settings()
+    get_cloud_operations_spending_settings()
+    get_talent_settings()
     plugins = get_plugins_settings()
     check_plugin_enablement(plugins, installed_plugin_names())
     host = build_host_info(identity, server)

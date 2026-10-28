@@ -12,7 +12,9 @@ as task-definition secrets) beside a tenant entry, and the retired SLACK_<FIELD>
 names are pinned as unread. The Google Workspace slice follows the same rule: its
 key and delegated user are pinned under GOOGLE_WORKSPACE__TENANT__<FIELD> (production
 sets both as task-definition secrets) beside a tenant entry, and the retired flat names
-are pinned as unread; production still sets GOOGLE_RESOURCES. The AWS slice reads the [aws] table and its tenant entry from AWS__TENANT__<FIELD>
+are pinned as unread. GOOGLE_RESOURCES is no longer read: each Google document id is pinned
+under its owner's <SLICE>__<FIELD> name (production sets all fifteen as task-definition
+secrets), and the retired blob name is pinned as unread. The AWS slice reads the [aws] table and its tenant entry from AWS__TENANT__<FIELD>
 (production sets INSTANCE_ID, INSTANCE_ARN and ORG_ROLE_ARN as task-definition secrets),
 and the access slice the [access_permission_sets] table with its two values from
 ACCESS_PERMISSION_SETS__<FIELD>: non-public values, so no file names them; the fifteen
@@ -43,8 +45,13 @@ import pytest
 from pydantic import SecretStr, ValidationError
 from pydantic_settings import BaseSettings
 
+from features.cloud_operations.spending.settings import CloudOperationsSpendingSettings
+from features.incident.common.settings import IncidentCoreSettings
+from features.incident.postmortem.settings import IncidentPostmortemSettings
+from features.incident.response.settings import IncidentResponseSettings
+from features.talent.settings import TalentSettings
 from integrations.aws.settings import AWSSettings
-from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings
 from integrations.maxmind.settings import MaxMindSettings
 from integrations.notify.settings import NotifySettings
 from integrations.openai.settings import OpenAISettings
@@ -54,15 +61,30 @@ from integrations.slack.settings import SlackSettings
 from integrations.trello.settings import TrelloSettings
 from packages.access.common.settings import AccessPermissionSetsSettings
 from server.configuration import IdentitySettings
+from tests.factories.google_service_account import service_account_key
 
 PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
+    (IncidentCoreSettings, "INCIDENT_CORE__FOLDER_ID", "folder_id", "sentinel-id", "sentinel-id"),
+    (IncidentCoreSettings, "INCIDENT_CORE__REPORT_TEMPLATE_ID", "report_template_id", "sentinel-id", "sentinel-id"),
+    (IncidentCoreSettings, "INCIDENT_CORE__LIST_SHEET_ID", "list_sheet_id", "sentinel-id", "sentinel-id"),
+    (IncidentResponseSettings, "INCIDENT_RESPONSE__HANDBOOK_ID", "handbook_id", "sentinel-id", "sentinel-id"),
+    (IncidentPostmortemSettings, "INCIDENT_POSTMORTEM__CALENDAR_ID", "calendar_id", "sentinel-id", "sentinel-id"),
+    (CloudOperationsSpendingSettings, "CLOUD_OPERATIONS_SPENDING__SHEET_ID", "sheet_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__INTERNAL_FOLDER_ID", "internal_folder_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__TEMPLATES_FOLDER_ID", "templates_folder_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__SCORING_GUIDE_TEMPLATE_ID", "scoring_guide_template_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__CORE_VALUES_INTERVIEW_NOTES_ID", "core_values_interview_notes_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__TECHNICAL_INTERVIEW_NOTES_ID", "technical_interview_notes_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__INTAKE_FORM_TEMPLATE_ID", "intake_form_template_id", "sentinel-id", "sentinel-id"),
+    (TalentSettings, "TALENT__PHONE_SCREEN_TEMPLATE_ID", "phone_screen_template_id", "sentinel-id", "sentinel-id"),
     (
-        GoogleResourcesConfig,
-        "GOOGLE_RESOURCES",
-        "resources",
-        '{"inc":{"d":"sentinel-drive"}}',
-        {"inc": {"d": "sentinel-drive"}},
+        TalentSettings,
+        "TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID",
+        "recruitment_feedback_template_id",
+        "sentinel-id",
+        "sentinel-id",
     ),
+    (TalentSettings, "TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID", "panelist_guidebook_template_id", "sentinel-id", "sentinel-id"),
     (SentinelSettings, "SENTINEL_CUSTOMER_ID", "sentinel_customer_id", "sentinel-customer", "sentinel-customer"),
     (SentinelSettings, "SENTINEL_LOG_TYPE", "sentinel_log_type", "SentinelLogs", "SentinelLogs"),
     (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
@@ -203,7 +225,7 @@ def test_configuration_settings_google_name_reaches_field(
 def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
     """The key and the delegated user reach the tenant entry under their GOOGLE_WORKSPACE__TENANT__ names."""
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C0sentinel")
-    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", '{"type":"service_account"}')
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "bot@sentinel.example")
 
     tenant = GoogleWorkspaceSettings(_env_file=None).tenant  # type: ignore[call-arg]
@@ -211,7 +233,7 @@ def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monke
     assert tenant is not None
     assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (
         "C0sentinel",
-        '{"type":"service_account"}',
+        service_account_key(),
         "bot@sentinel.example",
     )
 
@@ -225,6 +247,20 @@ def test_configuration_settings_google_retired_name_is_unread(monkeypatch: pytes
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert settings.model_dump() == baseline
+
+
+@pytest.mark.parametrize(
+    "settings_class",
+    [IncidentCoreSettings, IncidentResponseSettings, IncidentPostmortemSettings, CloudOperationsSpendingSettings, TalentSettings],
+)
+def test_configuration_settings_google_resources_blob_is_unread(
+    monkeypatch: pytest.MonkeyPatch, settings_class: type[BaseSettings]
+) -> None:
+    """The retired GOOGLE_RESOURCES line stays in the blob for the rollback image; no slice reads it."""
+    baseline = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
+    monkeypatch.setenv("GOOGLE_RESOURCES", '{"inc": {"f": "sentinel"}, "tal": {"i": "sentinel"}}')
+
+    assert settings_class(_env_file=None).model_dump() == baseline  # type: ignore[call-arg]
 
 
 def test_configuration_settings_slack_and_google_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:

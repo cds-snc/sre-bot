@@ -242,7 +242,6 @@ def test_sheets_factory_resource_inherits_configured_retry_default(
     captured: dict[str, Any] = {}
     settings = SimpleNamespace(
         tenant=SimpleNamespace(
-            service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
             delegated_user_email="sre-bot@example.com",
         ),
         api_num_retries=3,
@@ -257,11 +256,8 @@ def test_sheets_factory_resource_inherits_configured_retry_default(
             return self
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    monkeypatch.setattr(
-        google_client_module.service_account.Credentials,
-        "from_service_account_info",
-        lambda info: FakeCredentials(),
-    )
+    # The slice builds the base credentials once at boot; the client derives from them.
+    settings.tenant.credentials = FakeCredentials()
     monkeypatch.setattr(
         google_client_module,
         "build",

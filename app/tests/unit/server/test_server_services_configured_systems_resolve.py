@@ -17,6 +17,7 @@ from integrations.google_workspace.settings import GoogleWorkspaceSettings, Goog
 from integrations.slack.settings import SlackSettings, SlackTenant
 from server.configured_systems import StaticConfiguredSystems
 from server.services import register_core_services
+from tests.factories.google_service_account import service_account_key
 
 pytestmark = pytest.mark.unit
 
@@ -30,7 +31,7 @@ def _stub_settings_and_aws(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "server.configured_systems.get_google_workspace_settings",
         lambda: GoogleWorkspaceSettings.model_construct(
-            tenant=GoogleWorkspaceTenant(customer_id="C0abc", service_account_key="{}")
+            tenant=GoogleWorkspaceTenant(customer_id="C0abc", service_account_key=service_account_key())
         ),
     )
 

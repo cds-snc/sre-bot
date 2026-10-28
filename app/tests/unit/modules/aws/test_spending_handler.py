@@ -173,7 +173,7 @@ def test_should_update_spending_data_in_sheet(spreadsheet_provider):
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.get_google_resources_config")
+@patch("modules.aws.spending.get_cloud_operations_spending_settings")
 def test_should_skip_update_when_spreadsheet_id_not_set(mock_get_config, spreadsheet_provider):
     """Test that the write is skipped when the configured spreadsheet ID is empty.
 
@@ -181,7 +181,7 @@ def test_should_skip_update_when_spreadsheet_id_not_set(mock_get_config, spreads
     the ID is resolved per call, not bound at import time.
     """
     # Arrange
-    mock_get_config.return_value = SimpleNamespace(spending_sheet_id="")
+    mock_get_config.return_value = SimpleNamespace(sheet_id="")
     df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
 
     # Act
@@ -207,7 +207,7 @@ def test_should_skip_update_when_spreadsheet_id_is_empty_string(spreadsheet_prov
 
 
 @pytest.mark.unit
-@patch("modules.aws.spending.get_google_resources_config")
+@patch("modules.aws.spending.get_cloud_operations_spending_settings")
 def test_should_resolve_spreadsheet_id_from_config_on_every_call(mock_get_config, spreadsheet_provider):
     """Test that an omitted spreadsheet ID is read from configuration on each call.
 
@@ -217,8 +217,8 @@ def test_should_resolve_spreadsheet_id_from_config_on_every_call(mock_get_config
     # Arrange
     df = pd.DataFrame({"Account": ["123456789012"], "Cost": [100.00]})
     mock_get_config.side_effect = [
-        SimpleNamespace(spending_sheet_id="first_sheet_id"),
-        SimpleNamespace(spending_sheet_id="second_sheet_id"),
+        SimpleNamespace(sheet_id="first_sheet_id"),
+        SimpleNamespace(sheet_id="second_sheet_id"),
     ]
 
     # Act

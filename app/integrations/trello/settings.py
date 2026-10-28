@@ -15,7 +15,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 # The tenant entry's fields, read from the environment as TRELLO__TENANT__<FIELD>; empty counts as unset.
 _TENANT_FIELDS = ("app_key", "token")
@@ -27,8 +27,8 @@ class TrelloTenant(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    app_key: SecretStr = Field(description="Trello Power-Up API key.")
-    token: SecretStr = Field(description="Trello user token the API key acts with.")
+    app_key: SecretStr = env_only("Trello Power-Up API key.", "codespaces")
+    token: SecretStr = env_only("Trello user token the API key acts with.", "codespaces")
 
 
 class TrelloSettings(ConfigurationSlice):
@@ -46,7 +46,7 @@ class TrelloSettings(ConfigurationSlice):
     tenant: TrelloTenant | None = Field(default=None, description="The Trello credentials this instance works with.")
     # A non-public board id the legacy ATIP command posts to; tolerated on the vendor slice until
     # TASK-39 moves it to the ATIP feature (decisions/configuration.md).
-    atip_board: str = Field(default="", repr=False, description="Id of the ATIP Trello board.")
+    atip_board: str = env_only("Id of the ATIP Trello board.", "codespaces", default="")
 
     @model_validator(mode="before")
     @classmethod

@@ -189,6 +189,38 @@ incident_channel = ""
 slack_security_user_group_id = ""
 slack_notify_mgmt_user_group_id = ""
 
+[incident_core]
+# The incident record tables (terraform/dynamodb.tf) and the system that hosts a new
+# incident (new_incident_system: slack or google; absent means the only configured one).
+# The incident folder, report template and list sheet ids are non-public values: set
+# from the environment as INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID and
+# INCIDENT_CORE__LIST_SHEET_ID, never in a configuration file.
+incidents_table = "incidents"
+timeline_table = "sre_bot_incident_timeline"
+folder_id = ""
+report_template_id = ""
+list_sheet_id = ""
+
+[incident_response]
+# Non-public: set from the environment as INCIDENT_RESPONSE__HANDBOOK_ID.
+handbook_id = ""
+
+[incident_postmortem]
+# Non-public: set from the environment as INCIDENT_POSTMORTEM__CALENDAR_ID.
+calendar_id = ""
+
+[talent]
+# Non-public: each id is set from the environment as TALENT__<KEY>.
+internal_folder_id = ""
+templates_folder_id = ""
+scoring_guide_template_id = ""
+core_values_interview_notes_id = ""
+technical_interview_notes_id = ""
+intake_form_template_id = ""
+phone_screen_template_id = ""
+recruitment_feedback_template_id = ""
+panelist_guidebook_template_id = ""
+
 [sre_ops]
 # The channel the startup message and ops notifications go to; empty means none.
 sre_ops_channel_id = ""
@@ -197,6 +229,10 @@ sre_ops_channel_id = ""
 # Google group addresses whose members may run the legacy /aws admin commands; empty
 # denies every caller. A developer sets CLOUD_OPERATIONS__AWS_ADMIN_GROUPS='["..."]' in app/.env.
 aws_admin_groups = []
+
+[cloud_operations_spending]
+# Non-public: set from the environment as CLOUD_OPERATIONS_SPENDING__SHEET_ID.
+sheet_id = ""
 
 # Plugin enablement (decisions/plugins.md): one table per product area
 # (decisions/product-scope.md), one key per entry point, named as in

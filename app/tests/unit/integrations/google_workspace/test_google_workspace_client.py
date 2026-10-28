@@ -90,7 +90,6 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
 
     settings = SimpleNamespace(
         tenant=SimpleNamespace(
-            service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
             delegated_user_email="sre-bot@example.com",
         ),
         api_num_retries=3,
@@ -109,11 +108,8 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
     fake_service = MagicMock()
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    monkeypatch.setattr(
-        google_client_module.service_account.Credentials,
-        "from_service_account_info",
-        lambda info: FakeCredentials(),
-    )
+    # The slice builds the base credentials once at boot; the client derives from them.
+    settings.tenant.credentials = FakeCredentials()
 
     def fake_build(api_name: str, api_version: str, **kwargs: Any) -> Any:
         captured["build_api_name"] = api_name
@@ -144,7 +140,6 @@ def _install_fake_build(
 ) -> Any:
     settings = SimpleNamespace(
         tenant=SimpleNamespace(
-            service_account_key='{"client_email":"sre-bot@example.com","private_key":"FAKE"}',
             delegated_user_email="sre-bot@example.com",
         ),
         api_num_retries=3,
@@ -163,11 +158,8 @@ def _install_fake_build(
     fake_service = MagicMock()
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    monkeypatch.setattr(
-        google_client_module.service_account.Credentials,
-        "from_service_account_info",
-        lambda info: FakeCredentials(),
-    )
+    # The slice builds the base credentials once at boot; the client derives from them.
+    settings.tenant.credentials = FakeCredentials()
 
     def fake_build(api_name: str, api_version: str, **kwargs: Any) -> Any:
         captured["build_api_name"] = api_name

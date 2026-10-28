@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 _CREDENTIALS = {"sre_user_name": "NOTIFY__SRE_USER_NAME", "sre_client_secret": "NOTIFY__SRE_CLIENT_SECRET"}
 
@@ -50,8 +50,8 @@ class NotifySettings(ConfigurationSlice):
     model_config = SettingsConfigDict(toml_table_header=("notify",), env_prefix="NOTIFY__")
 
     tenant: NotifyTenant | None = Field(default=None, description="The GC Notify API this instance works with.")
-    sre_user_name: SecretStr = Field(default=SecretStr(""), repr=False, description="Client id the JWT is issued for.")
-    sre_client_secret: SecretStr = Field(default=SecretStr(""), repr=False, description="Secret the JWT is signed with.")
+    sre_user_name: SecretStr = env_only("Client id the JWT is issued for.", "codespaces", default=SecretStr(""))
+    sre_client_secret: SecretStr = env_only("Secret the JWT is signed with.", "codespaces", default=SecretStr(""))
     timeout_seconds: float = Field(default=60.0, gt=0, description="Per-request HTTP timeout in seconds.")
 
     @model_validator(mode="after")

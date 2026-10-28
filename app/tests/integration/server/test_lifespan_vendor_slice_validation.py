@@ -21,6 +21,11 @@ from fastapi import FastAPI
 from structlog.testing import capture_logs
 
 from contracts.configuration import ConfigurationError
+from features.cloud_operations.spending.settings import get_cloud_operations_spending_settings
+from features.incident.common.settings import get_incident_core_settings
+from features.incident.postmortem.settings import get_incident_postmortem_settings
+from features.incident.response.settings import get_incident_response_settings
+from features.talent.settings import get_talent_settings
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 from infrastructure.configuration.features.incident import get_incident_settings
 from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
@@ -35,6 +40,7 @@ from integrations.trello.settings import TrelloSettings, get_trello_settings
 from server.configuration import host_configuration
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
 from server.slack.settings import get_slack_transport_settings
+from tests.factories.google_service_account import private_key_body, service_account_key
 from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration
@@ -48,6 +54,16 @@ _VENDOR_SECRETS = (
     "TRELLO__ATIP_BOARD",
 )
 _VENDOR_GETTERS = (get_notify_settings, get_trello_settings, get_opsgenie_settings, get_maxmind_settings)
+_FEATURE_GETTERS = (
+    get_incident_settings,
+    get_sre_ops_settings,
+    get_aws_feature_settings,
+    get_incident_core_settings,
+    get_incident_response_settings,
+    get_incident_postmortem_settings,
+    get_cloud_operations_spending_settings,
+    get_talent_settings,
+)
 
 
 @pytest.fixture(autouse=True)
@@ -141,12 +157,12 @@ async def test_slack_secret_without_the_tenant_fails_boot_naming_the_key(monkeyp
 
 
 async def test_google_key_with_the_my_customer_alias_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", '{"private_key": "secret-key-boot-0001"}')
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "my_customer")
 
     rendered = await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID")
 
-    assert "secret-key-boot-0001" not in rendered
+    assert private_key_body() not in rendered
 
 
 async def test_google_tenant_without_the_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -191,11 +207,23 @@ async def test_aws_unknown_key_in_the_table_fails_boot_naming_the_key(monkeypatc
     await _boot_fails_naming("retry_max_attemps")
 
 
-@pytest.mark.parametrize("table", ["incident", "sre_ops", "cloud_operations"])
+@pytest.mark.parametrize(
+    "table",
+    [
+        "incident",
+        "sre_ops",
+        "cloud_operations",
+        "incident_core",
+        "incident_response",
+        "incident_postmortem",
+        "cloud_operations_spending",
+        "talent",
+    ],
+)
 async def test_feature_unknown_key_in_the_table_fails_boot_naming_the_key(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, table: str
 ) -> None:
-    """The legacy feature slices on the files validate at boot with the vendor slices."""
+    """The feature slices the legacy modules read validate at boot with the vendor slices."""
     shutil.copytree(CONFIG_DIR, tmp_path / "config")
     with (tmp_path / "config" / "ci.toml").open("a", encoding="utf-8") as ci_file:
         ci_file.write(f"\n[{table}]\nnot_a_feature_key = 1\n")
@@ -204,13 +232,13 @@ async def test_feature_unknown_key_in_the_table_fails_boot_naming_the_key(
         "load_configuration_files",
         lambda environment, directory=None: load_configuration_files(environment, tmp_path / "config"),
     )
-    for getter in (get_incident_settings, get_sre_ops_settings, get_aws_feature_settings):
+    for getter in _FEATURE_GETTERS:
         getter.cache_clear()
 
     try:
         await _boot_fails_naming("not_a_feature_key")
     finally:
-        for getter in (get_incident_settings, get_sre_ops_settings, get_aws_feature_settings):
+        for getter in _FEATURE_GETTERS:
             getter.cache_clear()
 
 

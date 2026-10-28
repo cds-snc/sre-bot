@@ -18,11 +18,12 @@ import pytest
 
 from contracts.configuration import ConfigurationError
 from integrations.google_workspace.settings import GoogleWorkspaceSettings
+from tests.factories.google_service_account import private_key_body, service_account_key
 from tests.unit.integrations.google_workspace.conftest import install_google_files
 
 pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("google_slice_env")]
 
-KEY = '{"type": "service_account", "private_key": "secret-key-0001"}'
+KEY = service_account_key()
 CUSTOMER = "C0tenant0001"
 DELEGATED_USER = "delegated-user-0001@example.com"
 CUSTOMER_NAME = "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID"
@@ -34,7 +35,7 @@ def _build_error() -> str:
     with pytest.raises(ConfigurationError) as caught:
         GoogleWorkspaceSettings()
     rendered = "".join(traceback.format_exception(caught.value))
-    for value in (KEY, "secret-key-0001", DELEGATED_USER, CUSTOMER):
+    for value in (KEY, private_key_body(), DELEGATED_USER, CUSTOMER):
         assert value not in rendered
     return str(caught.value)
 

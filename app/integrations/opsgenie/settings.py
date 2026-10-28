@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 
 class OpsGenieTenant(BaseModel):
@@ -49,9 +49,7 @@ class OpsGenieSettings(ConfigurationSlice):
     model_config = SettingsConfigDict(toml_table_header=("opsgenie",), env_prefix="OPSGENIE__")
 
     tenant: OpsGenieTenant | None = Field(default=None, description="The Opsgenie API region this instance works with.")
-    integrations_key: SecretStr = Field(
-        default=SecretStr(""), repr=False, description="API key sent as the GenieKey authorization."
-    )
+    integrations_key: SecretStr = env_only("API key sent as the GenieKey authorization.", "codespaces", default=SecretStr(""))
     timeout_seconds: float = Field(default=30.0, gt=0, description="Per-request HTTP timeout in seconds.")
 
     @model_validator(mode="after")

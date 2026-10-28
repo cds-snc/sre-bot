@@ -15,9 +15,7 @@ def logger_mock():
         yield mock
 
 
-@patch.object(
-    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
-)
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders(incident_drive_mock):
     incident_drive_mock.list_child_folders.return_value = [{"id": "foo", "name": "bar"}]
@@ -25,9 +23,7 @@ def test_list_incident_folders(incident_drive_mock):
     incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
 
 
-@patch.object(
-    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
-)
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders_sorted(incident_drive_mock):
     incident_drive_mock.list_child_folders.return_value = [
@@ -41,9 +37,7 @@ def test_list_incident_folders_sorted(incident_drive_mock):
     incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
 
 
-@patch.object(
-    incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_folder_id="SRE_INCIDENT_FOLDER")
-)
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
 @patch("modules.incident.incident_folder.incident_drive")
 def test_list_incident_folders_truncates_to_the_display_limit(incident_drive_mock):
     """Drive listings are unbounded now, so the Slack option limit is enforced here."""
@@ -57,19 +51,33 @@ def test_list_incident_folders_truncates_to_the_display_limit(incident_drive_moc
     assert result[-1]["name"] == f"folder-{limit - 1:03d}"
 
 
+def _view_client() -> MagicMock:
+    client = MagicMock()
+    client.views_open.return_value = {"view": {"id": "V_LOADING"}}
+    return client
+
+
 @patch("modules.incident.incident_folder.incident_drive.list_child_folders")
 @patch("modules.incident.incident_folder.folder_item")
 def test_list_folders_view(folder_item_mock, list_child_folders_mock):
-    client = MagicMock()
+    """The loading modal opens before the Drive read, so the trigger_id is spent within Slack's 3 seconds."""
+    client = _view_client()
+    order: list[str] = []
+    client.views_open.side_effect = lambda **kwargs: order.append("views_open") or {"view": {"id": "V_LOADING"}}
+    list_child_folders_mock.side_effect = lambda folder_id: order.append("drive_read") or [{"id": "foo", "name": "bar"}]
     body = {"trigger_id": "foo"}
     ack = MagicMock()
-    list_child_folders_mock.return_value = [{"id": "foo", "name": "bar"}]
     folder_item_mock.return_value = [["folder item"]]
+
     incident_folder.list_folders_view(client, body, ack)
-    list_child_folders_mock.assert_called_once()
+
+    assert order == ["views_open", "drive_read"]
     folder_item_mock.assert_called_once_with({"id": "foo", "name": "bar"})
     ack.assert_called_once()
     client.views_open.assert_called_once_with(trigger_id="foo", view=ANY)
+    assert "Loading" in str(client.views_open.call_args.kwargs["view"])
+    client.views_update.assert_called_once_with(view_id="V_LOADING", view=ANY)
+    assert client.views_update.call_args.kwargs["view"]["blocks"] == [["folder item"]]
 
 
 @patch("modules.incident.incident_folder.incident_drive.list_child_folders")
@@ -77,7 +85,7 @@ def test_list_folders_view(folder_item_mock, list_child_folders_mock):
 def test_list_folders_view_truncates_to_the_display_limit(folder_item_mock, list_child_folders_mock):
     """folder_item emits three blocks per folder, so the modal must stay under Slack's 100-block cap."""
     limit = incident_folder.LEGACY_FOLDER_DISPLAY_LIMIT
-    client = MagicMock()
+    client = _view_client()
     ack = MagicMock()
     list_child_folders_mock.return_value = [{"id": str(i), "name": f"folder-{i:03d}"} for i in range(limit + 10)]
     folder_item_mock.return_value = [{"type": "section"}, {"type": "actions"}, {"type": "divider"}]
@@ -85,7 +93,35 @@ def test_list_folders_view_truncates_to_the_display_limit(folder_item_mock, list
     incident_folder.list_folders_view(client, {"trigger_id": "foo"}, ack)
 
     assert folder_item_mock.call_count == limit
-    assert len(client.views_open.call_args.kwargs["view"]["blocks"]) == limit * 3
+    assert len(client.views_update.call_args.kwargs["view"]["blocks"]) == limit * 3
+
+
+@patch("modules.incident.incident_folder.incident_drive.list_child_folders")
+def test_list_folders_view_with_no_folders_updates_to_a_message(list_child_folders_mock):
+    """An empty or failed read (the adapter returns []) replaces the loading text with a message."""
+    client = _view_client()
+    list_child_folders_mock.return_value = []
+
+    incident_folder.list_folders_view(client, {"trigger_id": "foo"}, MagicMock())
+
+    view = client.views_update.call_args.kwargs["view"]
+    assert client.views_update.call_args.kwargs["view_id"] == "V_LOADING"
+    assert "No products could be listed" in view["blocks"][0]["text"]["text"]
+
+
+@patch("modules.incident.incident_folder.logger")
+@patch("modules.incident.incident_folder.incident_drive.list_child_folders")
+def test_list_folders_view_drive_failure_updates_to_a_message_without_its_text(list_child_folders_mock, logger_mock):
+    """A raised error (a refused credential) is logged by type and never shown or logged as text."""
+    client = _view_client()
+    list_child_folders_mock.side_effect = RuntimeError("folder 1AbCsecret unreachable")
+
+    incident_folder.list_folders_view(client, {"trigger_id": "foo"}, MagicMock())
+
+    view = client.views_update.call_args.kwargs["view"]
+    assert "No products could be listed" in view["blocks"][0]["text"]["text"]
+    assert "1AbCsecret" not in str(view)
+    logger_mock.error.assert_called_once_with("incident_folders_list_failed", error_type="RuntimeError")
 
 
 @patch("modules.incident.incident_folder.logger")
@@ -309,7 +345,7 @@ class FakeSpreadsheetProvider:
         return self.read_cells_result
 
 
-@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(list_sheet_id="INCIDENT_LIST"))
 @patch("modules.incident.incident_folder.datetime")
 def test_add_new_incident_to_list_success(datetime_mock):
     provider = FakeSpreadsheetProvider()
@@ -333,7 +369,7 @@ def test_add_new_incident_to_list_success(datetime_mock):
     assert provider.append_values_calls == [("INCIDENT_LIST", "Sheet1!A:A", values)]
 
 
-@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(list_sheet_id="INCIDENT_LIST"))
 def test_add_new_incident_to_list_raises_on_failure():
     provider = FakeSpreadsheetProvider()
     provider.append_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "write failed")
@@ -374,7 +410,7 @@ def test_update_spreadsheet_incident_status_read_failure_raises():
             incident_folder.update_spreadsheet_incident_status("foo", "Closed")
 
 
-@patch.object(incident_folder, "get_google_resources_config", new=lambda: SimpleNamespace(incident_list_id="INCIDENT_LIST"))
+@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(list_sheet_id="INCIDENT_LIST"))
 def test_update_spreadsheet_incident_status_channel_found():
     provider = FakeSpreadsheetProvider()
     provider.read_values_result = OperationResult.success(data=[["foo", "bar", "baz", "qux"]])

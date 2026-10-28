@@ -19,9 +19,12 @@
 #   zsh bin/env-checks.zsh apply tmp/env-checks/<UTC>.plan.sh   # or: make env-checks-apply PLAN=<file>
 # which prints that exact plan, asks for 'yes', runs it line by line, logs to <UTC>.plan.applied.txt and
 # renames the plan so it cannot run twice. Plan again afterwards to confirm the rows are gone.
+# A delete needs evidence of retirement (a retired app name, a HINTS or SUPERSEDED entry); a name nothing reads
+# or no default-branch workflow references is a check showing its last reference in git history, looked up here
+# for those names only (the audit's --lookups pass lists them) and handed to the audit as LAST_REFS_FILE.
 # Classifier: app/bin/audit_env_names.py (each present name); app/bin/audit_env_coverage.py (where each name
-# supplied through the environment is missing: terraform/ssm.tf, SSM, the blob source line, Codespaces,
-# app/.env.example).
+# supplied through the environment is missing: terraform/ssm.tf, SSM, the blob source line, Codespaces).
+# app/.env.example is not scanned: make env-example generates it from the settings classes.
 
 setopt no_unset pipe_fail
 unsetopt xtrace verbose
@@ -64,8 +67,9 @@ STAMP=$(date -u +%Y%m%dT%H%M%SZ)
 OUT=$OUT_DIR/$STAMP.txt
 PLAN=$OUT_DIR/$STAMP.plan.sh
 NAMES=$(mktemp)
+REFS=$(mktemp)
 BASE_DIR=$(mktemp -d)
-trap 'rm -rf $NAMES $BASE_DIR' EXIT
+trap 'rm -rf $NAMES $REFS $BASE_DIR' EXIT
 show=()
 filters=()
 for a in "$@"; do [[ $a == --all ]] && show=(--all) || filters+=($a); done
@@ -73,6 +77,18 @@ for a in "$@"; do [[ $a == --all ]] && show=(--all) || filters+=($a); done
 keep() { (( ${#filters} == 0 )) && return 0; local f; for f in $filters; do [[ $1 == $f* ]] && return 0; done; return 1; }
 emit() { keep $2 && print -r -- "$1	$2	$3" >> $NAMES; }
 note() { print -r -- "$*" >&2; }
+# last_ref KIND NAME: the newest commit whose diff mentions the name, on the default branch first.
+# workflow: a secrets.NAME or vars.NAME in .github; repo: the name anywhere but the planning docs.
+last_ref() {
+  local kind=$1 n=$2 main ref
+  main=$(git -C $ROOT rev-parse -q --verify origin/main || git -C $ROOT rev-parse -q --verify main)
+  local -a pattern paths
+  if [[ $kind == workflow ]]; then pattern=(-G "(secrets|vars)\.$n\b"); paths=(-- .github)
+  else pattern=(-G "\b$n\b"); paths=(-- . ':(exclude)backlog' ':(exclude)decisions'); fi
+  ref=$(git -C $ROOT log $main -1 $pattern --format='%h %as %s' $paths)
+  [[ -z $ref ]] && ref=$(git -C $ROOT log --all -1 $pattern --format='%h %as %s' $paths) && [[ -n $ref ]] && ref="$ref (unmerged branch only)"
+  print -r -- "${ref:-no reference in git history}"
+}
 # gh with the session's token, then with the user's own login (the Codespace token cannot list everything).
 ghx() { gh "$@" 2>/dev/null || env -u GITHUB_TOKEN -u GH_TOKEN gh "$@" 2>/dev/null; }
 # list_names SOURCE STATE COMMAND...: emit one row per name the command prints; false when it fails.
@@ -99,7 +115,8 @@ scan_lines() {
 {
   print "run_at=$(date -u +%Y-%m-%dT%H:%M:%SZ) filters=${filters:-none}"
 
-  for f in $APP/.env.example $APP/.env; do
+  # app/.env.example is generated (make env-example) and a test fails when it drifts, so only app/.env is scanned.
+  for f in $APP/.env; do
     [[ -r $f ]] && scan_lines "file ${f#$ROOT/}" < $f || note "skipped ${f#$ROOT/}: not readable"
   done
 
@@ -155,7 +172,11 @@ scan_lines() {
   sha=$(git -C $ROOT rev-parse $BASELINE)
   if [[ $(cut -d' ' -f1 $OUT_DIR/.baseline-names.txt 2>/dev/null) == $sha ]]; then tree=(); else
     git -C $ROOT archive $sha app | tar -x -C $BASE_DIR && tree=($BASE_DIR/app); fi
-  cd $APP && REPO_SLUG=$REPO_SLUG PLAN_FILE=$PLAN uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
+  cd $APP
+  for row in ${(f)"$(uv run --quiet python -m bin.audit_env_names --lookups $sha $tree < $NAMES)"}; do
+    [[ -n $row ]] && print -r -- "${row#*$'\t'}	$(last_ref ${row%%$'\t'*} ${row#*$'\t'})" >> $REFS
+  done
+  LAST_REFS_FILE=$REFS REPO_SLUG=$REPO_SLUG PLAN_FILE=$PLAN uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
   uv run --quiet python -m bin.audit_env_coverage $show $filters < $NAMES
 } 2>&1 | tee $OUT
 

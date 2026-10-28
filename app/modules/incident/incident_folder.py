@@ -15,9 +15,9 @@ from slack_sdk.web import WebClient
 from structlog import get_logger
 
 from contracts.operations import OperationStatus
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.drive.adapters import google_drive as incident_drive
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
-from integrations.google_workspace.settings import get_google_resources_config
 from modules.incident import db_operations
 
 logger = get_logger()
@@ -34,24 +34,50 @@ class IncidentSheetError(Exception):
 
 
 def list_incident_folders():
-    folders = incident_drive.list_child_folders(get_google_resources_config().incident_folder_id)
+    folders = incident_drive.list_child_folders(get_incident_core_settings().folder_id)
     folders.sort(key=lambda x: x["name"])
     return folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
 
 
-def list_folders_view(client: WebClient, body, ack: Ack):
-    ack()
-    folders = incident_drive.list_child_folders(get_google_resources_config().incident_folder_id)
-    folders.sort(key=lambda x: x["name"])
-    folders = folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
-    blocks = {
+def _folders_modal(blocks: list[dict]) -> dict:
+    return {
         "type": "modal",
         "callback_id": "list_folders_view",
         "title": {"type": "plain_text", "text": "SRE - Listing folders"},
         "close": {"type": "plain_text", "text": "Close"},
-        "blocks": [item for sublist in list(map(folder_item, folders)) for item in sublist],
+        "blocks": blocks,
     }
-    client.views_open(trigger_id=body["trigger_id"], view=blocks)
+
+
+def _text_block(text: str) -> dict:
+    return {"type": "section", "text": {"type": "mrkdwn", "text": text}}
+
+
+def list_folders_view(client: WebClient, body, ack: Ack):
+    """Open a loading modal first, then fill it from Drive.
+
+    The trigger_id expires 3 seconds after the command; a cold Drive read can outlast it,
+    so the modal opens before the read and views_update fills it.
+    """
+    ack()
+    opened = client.views_open(
+        trigger_id=body["trigger_id"], view=_folders_modal([_text_block(":hourglass: Loading products...")])
+    )
+    view_id = opened["view"]["id"]
+    try:
+        folders = incident_drive.list_child_folders(get_incident_core_settings().folder_id)
+    except Exception as error:
+        # The library's text may name ids or credentials, so only the type is logged.
+        logger.error("incident_folders_list_failed", error_type=type(error).__name__)
+        folders = []
+    if not folders:
+        message = ":warning: No products could be listed. Try again; if it keeps failing, ask SRE to check the Google Drive configuration."
+        client.views_update(view_id=view_id, view=_folders_modal([_text_block(message)]))
+        return
+    folders.sort(key=lambda x: x["name"])
+    folders = folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
+    blocks = [item for sublist in list(map(folder_item, folders)) for item in sublist]
+    client.views_update(view_id=view_id, view=_folders_modal(blocks))
 
 
 def delete_folder_metadata(client: WebClient, body, ack):
@@ -275,7 +301,7 @@ def add_new_incident_to_list(document_link, name, slug, product, channel_url):
             f'=HYPERLINK("{channel_url}", "#{slug}")',
         ]
     ]
-    result = get_spreadsheet_provider().append_values(get_google_resources_config().incident_list_id, "Sheet1!A:A", incident_data)
+    result = get_spreadsheet_provider().append_values(get_incident_core_settings().list_sheet_id, "Sheet1!A:A", incident_data)
     if not result.is_success:
         logger.error("add_new_incident_to_list_failed", error=result.message, error_code=result.error_code)
         raise IncidentSheetError(result.message, result.error_code)
@@ -309,7 +335,7 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         return False
     sheet_name = "Sheet1"
     provider = get_spreadsheet_provider()
-    result = provider.read_values(get_google_resources_config().incident_list_id, sheet_name)
+    result = provider.read_values(get_incident_core_settings().list_sheet_id, sheet_name)
     if not result.is_success:
         logger.error(
             "update_incident_spreadsheet_error",
@@ -333,7 +359,7 @@ def update_spreadsheet_incident_status(channel_name, status="Closed"):
         if channel_name in row:
             # Update the 4th column (index 3) of the found row
             update_range = f"{sheet_name}!D{i + 1}"  # Column D, Rows are 1-indexed in Sheets
-            update_result = provider.update_values(get_google_resources_config().incident_list_id, update_range, [[status]])
+            update_result = provider.update_values(get_incident_core_settings().list_sheet_id, update_range, [[status]])
             if not update_result.is_success:
                 logger.error(
                     "update_incident_spreadsheet_error",
@@ -386,7 +412,7 @@ def get_incidents_from_sheet(days=0) -> list:
     """Get incidents from the incident list spreadsheet."""
     date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
     date_lookback_str = date_lookback.strftime("%Y-%m-%d")
-    result = get_spreadsheet_provider().read_cells(get_google_resources_config().incident_list_id, "Sheet1")
+    result = get_spreadsheet_provider().read_cells(get_incident_core_settings().list_sheet_id, "Sheet1")
     if not result.is_success:
         if result.status is OperationStatus.NOT_FOUND and result.error_code == RANGE_NOT_FOUND:
             logger.warning("get_incidents_from_sheet_unable_to_parse_range", error=result.message)

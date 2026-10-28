@@ -10,27 +10,49 @@ key a secret (decisions/configuration.md), so no configuration file names the te
 A customer id needs the key, and the key or the delegated user set without a customer
 id fails, so Google is never half configured. Which principal and scopes each caller
 uses is TASK-169's.
-
-Also holds ``GoogleResourcesConfig`` (GOOGLE_RESOURCES) and ``get_google_resources_config()``:
-the Google document and folder ids of several features, tolerated here until TASK-111.10.3
-gives each id its own key.
 """
 
 import json
 from functools import lru_cache
 from typing import Any, cast
 
-import structlog
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from google.oauth2 import service_account
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
+from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
-
-logger = structlog.get_logger().bind(component="config.google")
+from contracts.configuration import ConfigurationSlice, env_only
 
 # The tenant entry's fields, read from the environment as GOOGLE_WORKSPACE__TENANT__<FIELD>; empty counts as unset.
 _TENANT_FIELDS = ("customer_id", "service_account_key", "delegated_user_email")
 _TENANT_VARIABLE = "GOOGLE_WORKSPACE__TENANT__{}"
+# The fields google-auth needs to build service-account credentials locally.
+_KEY_FIELDS = ("client_email", "private_key", "token_uri")
+
+
+def build_service_account_credentials(raw_key: str) -> service_account.Credentials:
+    """Shape-check a service-account key and build its credentials, with no network call.
+
+    Strict JSON (a private_key with literal newlines fails), type service_account, the
+    fields google-auth needs, and a private key it can load into a signer. Every message
+    describes the problem, never the key. A revoked key or a missing delegation only shows
+    when the first token is fetched (client.py).
+    """
+    try:
+        info = json.loads(raw_key)
+    except json.JSONDecodeError as error:
+        raise ValueError(f"is not valid JSON ({error.msg} at line {error.lineno} column {error.colno})") from None
+    if not isinstance(info, dict):
+        raise ValueError("is not a JSON object")
+    if info.get("type") != "service_account":
+        raise ValueError("is not a service-account key (type must be service_account)")
+    missing = [field for field in _KEY_FIELDS if not info.get(field)]
+    if missing:
+        raise ValueError(f"is missing {', '.join(missing)}")
+    try:
+        return cast(service_account.Credentials, service_account.Credentials.from_service_account_info(info))
+    except Exception:
+        # The library's message may quote the key material, so only the problem is named.
+        raise ValueError("has a private_key that cannot be loaded") from None
 
 
 class GoogleWorkspaceTenant(BaseModel):
@@ -38,14 +60,16 @@ class GoogleWorkspaceTenant(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    customer_id: str = Field(
-        repr=False, description="Real Google Workspace customer id, never the my_customer alias; a non-public value."
+    _credentials: service_account.Credentials = PrivateAttr()
+
+    customer_id: str = env_only(
+        "Real Google Workspace customer id, never the my_customer alias; a non-public value.", "codespaces"
     )
-    service_account_key: str = Field(repr=False, description="Service-account key JSON for this tenant.")
-    delegated_user_email: str | None = Field(
+    service_account_key: str = env_only("Service-account key JSON for this tenant.", "codespaces")
+    delegated_user_email: str | None = env_only(
+        "Workspace user the service account impersonates when a caller names none; a non-public value.",
+        "codespaces",
         default=None,
-        repr=False,
-        description="Workspace user the service account impersonates when a caller names none; a non-public value.",
     )
 
     @field_validator("customer_id")
@@ -56,6 +80,20 @@ class GoogleWorkspaceTenant(BaseModel):
         if not value or value == "my_customer":
             raise ValueError("customer_id must be the real Google Workspace customer id, not blank or my_customer")
         return value
+
+    @model_validator(mode="after")
+    def _key_builds_credentials(self) -> GoogleWorkspaceTenant:
+        # Raised as a field error so the configuration error names the key's variable.
+        try:
+            self._credentials = build_service_account_credentials(self.service_account_key)
+        except ValueError as error:
+            raise ValueError(f"{_TENANT_VARIABLE.format('SERVICE_ACCOUNT_KEY')} {error}") from None
+        return self
+
+    @property
+    def credentials(self) -> service_account.Credentials:
+        """The tenant's base credentials, built once at boot; callers derive subject and scopes per call."""
+        return self._credentials
 
 
 class GoogleWorkspaceSettings(ConfigurationSlice):
@@ -104,188 +142,7 @@ class GoogleWorkspaceSettings(ConfigurationSlice):
         return {**data, "tenant": tenant}
 
 
-class GoogleResourcesConfig(BaseSettings):
-    """Consolidated Google Drive/Document resources configuration.
-
-    Feature data, not vendor settings: it waits here until TASK-111.10.3 gives each
-    id its own key (decisions/configuration.md).
-
-    Stores all Google resource IDs (folders, documents, sheets) in a
-    single compact JSON structure to reduce AWS Parameter Store footprint.
-
-    Environment Variables:
-        GOOGLE_RESOURCES: JSON dict of resource IDs organized by domain
-
-    Structure:
-        {
-            "inc": {  # Incident resources
-                "d": <drive_id>,
-                "f": <folder_id>,
-                "t": <template_id>,
-                "l": <list_id>,
-                "h": <handbook_id>
-            },
-            "tal": {  # Talent role resources
-                "i": <internal_folder_id>,
-                "s": <scoring_guide_id>,
-                "t": <templates_folder_id>,
-                "c": <core_values_notes_id>,
-                "tech": <technical_notes_id>,
-                "int": <intake_form_id>,
-                "ph": <phone_screen_id>,
-                "rec": <recruitment_feedback_id>,
-                "pan": <panelist_guidebook_id>
-            },
-            "aws": {  # AWS resources
-                "s": <spending_sheet_id>
-            },
-            "cal": {  # Calendar resources
-                "sre": <sre_calendar_id>
-            },
-        }
-
-    Example:
-        ```python
-        from integrations.google_workspace.settings import get_google_resources_config
-
-        settings = get_google_resources_config()
-
-        incident_drive = settings.incident_drive_id
-        incident_folder = settings.incident_folder_id
-        ```
-    """
-
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        extra="ignore",
-    )
-
-    resources: dict[str, Any] = Field(
-        default_factory=dict,
-        alias="GOOGLE_RESOURCES",
-        description="Consolidated Google resources in nested dict format",
-    )
-
-    @field_validator("resources", mode="before")
-    @classmethod
-    def _parse_resources(cls, v: Any | None) -> dict[str, Any]:
-        """Parse GOOGLE_RESOURCES from JSON string or dict."""
-        if v is None:
-            return {}
-        if isinstance(v, dict):
-            return v
-        if isinstance(v, str):
-            s = v.strip()
-            if (s.startswith("'") and s.endswith("'")) or (s.startswith('"') and s.endswith('"')):
-                s = s[1:-1]
-            try:
-                return dict(cast(dict[str, Any], json.loads(s)))
-            except (json.JSONDecodeError, ValueError) as e:
-                logger.error("failed_to_parse_google_resources", error=str(e))
-                raise ValueError(f"GOOGLE_RESOURCES must be valid JSON: {e}") from e
-        raise ValueError("GOOGLE_RESOURCES must be a JSON string or a mapping")
-
-    def _get_resource(self, scope: str, key: str) -> str:
-        """Helper to safely retrieve a resource ID."""
-        raw = getattr(self, "resources", {}) or {}
-        if not isinstance(raw, dict):
-            return ""
-        scope_dict = raw.get(scope, {})
-        return scope_dict.get(key, "") if isinstance(scope_dict, dict) else ""
-
-    # --- Incident Resources ---
-    @property
-    def incident_drive_id(self) -> str:
-        """SRE Drive ID for incident management."""
-        return self._get_resource("inc", "d")
-
-    @property
-    def incident_folder_id(self) -> str:
-        """Incident folder ID in Google Drive."""
-        return self._get_resource("inc", "f")
-
-    @property
-    def incident_template_id(self) -> str:
-        """Incident document template ID."""
-        return self._get_resource("inc", "t")
-
-    @property
-    def incident_list_id(self) -> str:
-        """Incident tracking spreadsheet ID."""
-        return self._get_resource("inc", "l")
-
-    @property
-    def incident_handbook_id(self) -> str:
-        """Incident handbook document ID."""
-        return self._get_resource("inc", "h")
-
-    # --- Talent Role Resources ---
-    @property
-    def internal_talent_folder_id(self) -> str:
-        """Internal talent management folder."""
-        return self._get_resource("tal", "i")
-
-    @property
-    def scoring_guide_template_id(self) -> str:
-        """Scoring guide template document ID."""
-        return self._get_resource("tal", "s")
-
-    @property
-    def templates_folder_id(self) -> str:
-        """Talent templates folder ID."""
-        return self._get_resource("tal", "t")
-
-    @property
-    def core_values_interview_notes_id(self) -> str:
-        """Core values interview notes template ID."""
-        return self._get_resource("tal", "c")
-
-    @property
-    def technical_interview_notes_id(self) -> str:
-        """Technical interview notes template ID."""
-        return self._get_resource("tal", "tech")
-
-    @property
-    def intake_form_template_id(self) -> str:
-        """Intake form template ID."""
-        return self._get_resource("tal", "int")
-
-    @property
-    def phone_screen_template_id(self) -> str:
-        """Phone screen template ID."""
-        return self._get_resource("tal", "ph")
-
-    @property
-    def recruitment_feedback_template_id(self) -> str:
-        """Recruitment feedback template ID."""
-        return self._get_resource("tal", "rec")
-
-    @property
-    def panelist_guidebook_template_id(self) -> str:
-        """Panelist guidebook template ID."""
-        return self._get_resource("tal", "pan")
-
-    # --- AWS Resources ---
-    @property
-    def spending_sheet_id(self) -> str:
-        """AWS Spending Google Sheet ID."""
-        return self._get_resource("aws", "s")
-
-    # --- Calendar Resources ---
-    @property
-    def sre_calendar_id(self) -> str:
-        """SRE Calendar ID."""
-        return self._get_resource("cal", "sre")
-
-
 @lru_cache(maxsize=1)
 def get_google_workspace_settings() -> GoogleWorkspaceSettings:
     """Singleton provider for Google Workspace integration settings."""
     return GoogleWorkspaceSettings()
-
-
-@lru_cache(maxsize=1)
-def get_google_resources_config() -> GoogleResourcesConfig:
-    """Singleton provider for Google Resources configuration."""
-    return GoogleResourcesConfig()

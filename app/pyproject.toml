@@ -156,6 +156,22 @@ env = [
     "ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS=",
     # Likewise OpenAI: its key is environment only (blank = unset).
     "OPENAI__API_KEY=",
+    # Likewise the Google document ids: non-public, environment only (blank = unset).
+    "INCIDENT_CORE__FOLDER_ID=",
+    "INCIDENT_CORE__REPORT_TEMPLATE_ID=",
+    "INCIDENT_CORE__LIST_SHEET_ID=",
+    "INCIDENT_RESPONSE__HANDBOOK_ID=",
+    "INCIDENT_POSTMORTEM__CALENDAR_ID=",
+    "CLOUD_OPERATIONS_SPENDING__SHEET_ID=",
+    "TALENT__INTERNAL_FOLDER_ID=",
+    "TALENT__TEMPLATES_FOLDER_ID=",
+    "TALENT__SCORING_GUIDE_TEMPLATE_ID=",
+    "TALENT__CORE_VALUES_INTERVIEW_NOTES_ID=",
+    "TALENT__TECHNICAL_INTERVIEW_NOTES_ID=",
+    "TALENT__INTAKE_FORM_TEMPLATE_ID=",
+    "TALENT__PHONE_SCREEN_TEMPLATE_ID=",
+    "TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID=",
+    "TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID=",
     # Likewise Notify, Trello and Opsgenie: their credentials are environment only (blank = unset).
     "NOTIFY__SRE_USER_NAME=",
     "NOTIFY__SRE_CLIENT_SECRET=",
@@ -334,7 +350,9 @@ modules = [
     "packages.access",
     "packages.aws_platform",
     "packages.geolocate",
+    "features.cloud_operations",
     "features.incident",
+    "features.talent",
     "packages.oncall_sync",
     "packages.rant",
     "packages.talent",
@@ -373,7 +391,7 @@ name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
 containers = ["features.incident"]
 layers = [
-    "comms | documents | drive | meet | scheduling | scribe",
+    "comms | documents | drive | meet | postmortem | response | scheduling | scribe",
     "core",
     "common",
 ]

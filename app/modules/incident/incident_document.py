@@ -7,13 +7,13 @@ from typing import Any
 
 from structlog import get_logger
 
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.documents.adapters.google_docs import (
     apply_document_edits,
     fetch_document_snapshot,
     replace_placeholders,
 )
 from features.incident.drive.adapters import google_drive as incident_drive
-from integrations.google_workspace.settings import get_google_resources_config
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
@@ -32,7 +32,7 @@ def create_incident_document(title, folder):
         str: The ID of the new document.
     """
     document_id = ""
-    response = incident_drive.create_document_from_template(title, folder, get_google_resources_config().incident_template_id)
+    response = incident_drive.create_document_from_template(title, folder, get_incident_core_settings().report_template_id)
     if response:
         document_id = str(response.get("id") or "")
 

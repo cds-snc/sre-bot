@@ -18,9 +18,7 @@ def create_mock_document(content):
     return [create_paragraph_element(text) for text in content]
 
 
-@patch.object(
-    incident_document, "get_google_resources_config", new=lambda: SimpleNamespace(incident_template_id="test_template_id")
-)
+@patch.object(incident_document, "get_incident_core_settings", new=lambda: SimpleNamespace(report_template_id="test_template_id"))
 @patch("modules.incident.incident_document.incident_drive")
 def test_create_incident_document_calls_create_file_from_template(mock_incident_drive):
     title = "Incident 123"

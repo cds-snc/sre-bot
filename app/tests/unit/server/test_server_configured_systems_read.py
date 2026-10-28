@@ -26,6 +26,7 @@ from server.configured_systems import (
     read_configured_systems,
     slack_tenant,
 )
+from tests.factories.google_service_account import service_account_key
 
 pytestmark = pytest.mark.unit
 
@@ -39,7 +40,11 @@ def _slack(team_id: str | None = None) -> SlackSettings:
 
 
 def _google(customer_id: str | None = None) -> GoogleWorkspaceSettings:
-    tenant = GoogleWorkspaceTenant(customer_id=customer_id, service_account_key="{}") if customer_id is not None else None
+    tenant = (
+        GoogleWorkspaceTenant(customer_id=customer_id, service_account_key=service_account_key())
+        if customer_id is not None
+        else None
+    )
     return GoogleWorkspaceSettings.model_construct(tenant=tenant)
 
 
@@ -87,7 +92,7 @@ def test_google_without_an_entry_is_not_configured() -> None:
 def test_validated_settings_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without a [slack.tenant] entry Slack is absent after validation; a tenant entry and its key configure Google."""
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C0abc")
-    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", "{}")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
 
     assert slack_tenant(SlackSettings(_env_file=None)) is None  # type: ignore[call-arg]
     assert google_tenant(GoogleWorkspaceSettings(_env_file=None)) == "C0abc"  # type: ignore[call-arg]

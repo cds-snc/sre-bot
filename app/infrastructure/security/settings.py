@@ -14,7 +14,7 @@ from urllib.parse import urlsplit
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationSlice, env_only
 
 ASYMMETRIC_ALGORITHMS = frozenset({"RS256", "RS384", "RS512", "ES256", "ES384", "ES512", "PS256", "PS384", "PS512"})
 
@@ -73,7 +73,11 @@ class SecuritySettings(ConfigurationSlice):
         default_factory=lambda: ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
     )
     dev_bypass_enabled: bool = False
-    dev_bypass_token: SecretStr | None = None
+    dev_bypass_token: SecretStr | None = env_only(
+        "Static bearer token the dev bypass accepts; set only with dev_bypass_enabled, never in production.",
+        "local",
+        default=None,
+    )
 
     @field_validator("issuers")
     @classmethod

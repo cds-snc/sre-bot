@@ -5,16 +5,22 @@ Calendar, Meet, Docs) and shared error classification per
 decisions/outbound-clients.md — clients raise typed SDK exceptions; adapters
 classify them. Each factory returns a stub-typed Resource built with the
 narrow OAuth scopes its caller needs.
+
+Nothing here runs at boot: the tenant's credentials are shape-checked and built once
+by the settings slice, with no network call. The first token is fetched when the
+first API call runs, so a revoked key, a deleted project or a missing domain-wide
+delegation surfaces there, as GoogleCredentialsRefused: the token endpoint's error
+code is logged as the cause and the message is fixed, never the library's text.
 """
 
-import json
+import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any, cast
 
 import google_auth_httplib2
 import httplib2
 import structlog
-from google.oauth2 import service_account
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
@@ -37,6 +43,41 @@ logger = structlog.get_logger()
 _NOT_FOUND_STATUSES = {404}
 _UNAUTHORIZED_STATUSES = {401, 403}
 _TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
+# An OAuth error code (RFC 6749 section 5.2) is lower snake case; anything else is not logged.
+_OAUTH_ERROR_CODE = re.compile(r"^[a-z_]{1,64}$")
+
+
+class GoogleCredentialsRefused(Exception):
+    """Google refused the service account's token request; ``cause`` is the OAuth error code."""
+
+    message = (
+        "Google Workspace refused the service account's credentials. An administrator must check the key and its delegation."
+    )
+
+    def __init__(self, cause: str) -> None:
+        super().__init__(self.message)
+        self.cause = cause
+
+
+def _token_error_code(error: RefreshError) -> str:
+    """The token endpoint's error code (invalid_grant, unauthorized_client), or unknown."""
+    details = error.args[1] if len(error.args) > 1 else None
+    code = details.get("error") if isinstance(details, dict) else None
+    if not isinstance(code, str) and error.args and isinstance(error.args[0], str):
+        code = error.args[0].split(":", 1)[0].strip()
+    return code if isinstance(code, str) and _OAUTH_ERROR_CODE.match(code) else "unknown"
+
+
+class _TokenCheckedHttp(google_auth_httplib2.AuthorizedHttp):
+    """AuthorizedHttp that reports a refused token request as GoogleCredentialsRefused."""
+
+    def request(self, *args: Any, **kwargs: Any) -> Any:
+        try:
+            return super().request(*args, **kwargs)
+        except RefreshError as error:
+            cause = _token_error_code(error)
+            logger.error("google_token_refused", cause=cause)
+            raise GoogleCredentialsRefused(cause) from None
 
 
 class _DefaultingRetryHttpRequest(HttpRequest):
@@ -60,7 +101,7 @@ def _build_request_builder(num_retries: int) -> Callable[..., HttpRequest]:
     return request_builder
 
 
-def _build_authorized_http(credentials: Any, timeout_seconds: float) -> google_auth_httplib2.AuthorizedHttp:
+def _build_authorized_http(credentials: Any, timeout_seconds: float) -> _TokenCheckedHttp:
     """Build a new authorized http with an explicit per-attempt timeout.
 
     Mirrors googleapiclient.http.build_http, which otherwise falls back to the
@@ -69,7 +110,7 @@ def _build_authorized_http(credentials: Any, timeout_seconds: float) -> google_a
     """
     http = httplib2.Http(timeout=timeout_seconds)
     http.redirect_codes = http.redirect_codes - {308}
-    return google_auth_httplib2.AuthorizedHttp(credentials, http=http)
+    return _TokenCheckedHttp(credentials, http=http)
 
 
 def get_admin_directory_service(
@@ -141,14 +182,8 @@ def _build_service(
             "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"
         )
 
-    try:
-        creds_info = json.loads(tenant.service_account_key)
-    except json.JSONDecodeError as exc:
-        logger.error("invalid_credentials_json", error=str(exc))
-        raise ValueError("Invalid credentials JSON") from exc
-
-    creds = service_account.Credentials.from_service_account_info(creds_info)
-
+    # Built once at boot by the settings slice; with_subject and with_scopes return copies.
+    creds = tenant.credentials
     delegation_email = delegated_user_email or tenant.delegated_user_email
     if delegation_email:
         creds = creds.with_subject(delegation_email)
@@ -172,7 +207,9 @@ def _build_service(
 
 
 def classify_google_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
-    """Classify expected googleapiclient HttpError statuses; propagate unknown exceptions."""
+    """Classify expected googleapiclient HttpError statuses and refused credentials; propagate unknown exceptions."""
+    if isinstance(exc, GoogleCredentialsRefused):
+        return OperationStatus.UNAUTHORIZED, exc.cause, None
     if not isinstance(exc, HttpError):
         raise exc
 

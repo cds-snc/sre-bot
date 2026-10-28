@@ -9,11 +9,13 @@ hold them:
     ssm        the parameter is set, not missing or on the terraform placeholder
     source     the production blob line doc-14 moves to it exists, while the parameter still needs it
     codespaces a Codespace that still has the old name also has the new one
-    example    ``app/.env.example`` has a line for it, commented or not, once the app reads it
+
+``app/.env.example`` is not judged: ``bin/generate_env_example.py`` writes it from the settings classes
+and a test fails when it drifts.
 
 The names are the parameter destinations of doc-14 and the names ``terraform/ssm.tf`` creates. A row
 is ``check`` when any place disagrees, ``none`` otherwise. Without SSM rows (no AWS credentials) the
-ssm and source columns are not judged; without an ``app/.env.example`` row, the example column is not.
+ssm and source columns are not judged.
 
 Usage (from app/): ``uv run python -m bin.audit_env_coverage [--all] [PREFIX...] < names.tsv``; with
 prefixes (the wrapper's name filters, which also limit what it collects) only matching names are judged.
@@ -26,17 +28,14 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from bin.audit_env_names import (
-    APP_ROOT,
     PARAMETER_DESTINATION,
     REPO_ROOT,
     Destinations,
     Verdict,
     doc14_destinations,
-    env_names,
 )
 
 SSM_TF = REPO_ROOT / "terraform/ssm.tf"
-EXAMPLE_SOURCE = "file app/.env.example"
 SECRET_NAMES = re.compile(r"sre_bot_secret_names\s*=\s*toset\(\[(.*?)\]\)", re.S)
 QUOTED = re.compile(r'"([A-Z0-9_]+)"')
 DEVELOPMENT_ONLY = "development only"
@@ -50,16 +49,13 @@ def terraform_parameters(path: Path = SSM_TF) -> set[str]:
     return set(QUOTED.findall(match[1])) if match else set()
 
 
-def _gaps(
-    name: str, old: str | None, dev_only: bool, terraform: set[str], entries: list[Entry], read: set[str] | None
-) -> list[str]:
+def _gaps(name: str, old: str | None, dev_only: bool, terraform: set[str], entries: list[Entry]) -> list[str]:
     in_doc14 = old is not None
     # A doc-14 key may name a path inside a blob line ("GOOGLE_RESOURCES inc.f"); the line is its first word.
     line = old.split()[0] if old else None
     parameters = {n: s for source, n, s in entries if source == "ssm-param"}
     blob = {n for source, n, s in entries if source.startswith("ssm-blob") and s == "set"}
     codespaces = {n for source, n, _ in entries if source.startswith("codespaces")}
-    example = {n for source, n, _ in entries if source == EXAMPLE_SOURCE}
     gaps: list[str] = []
 
     if dev_only and line in blob:
@@ -83,19 +79,11 @@ def _gaps(
 
     if old and old in codespaces and name not in codespaces:
         gaps.append(f"Codespaces has {old} but not {name}: set {name} to the same value")
-    if example and name not in example and (read is None or name in read):
-        gaps.append("no line in app/.env.example: add one (commented is fine)")
     return gaps
 
 
-def coverage_rows(
-    doc14: Destinations, terraform: set[str], entries: Iterable[Entry], read: set[str] | None = None
-) -> list[tuple[str, str, Verdict]]:
-    """One row per name that must be supplied: (name, summary of where it is, verdict).
-
-    ``read`` is the names the app reads now; only those need an ``app/.env.example`` line (a parameter staged
-    ahead of its slice does not). ``None`` judges every name.
-    """
+def coverage_rows(doc14: Destinations, terraform: set[str], entries: Iterable[Entry]) -> list[tuple[str, str, Verdict]]:
+    """One row per name that must be supplied: (name, summary of where it is, verdict)."""
     collected = list(entries)
     moves: dict[str, tuple[str, bool]] = {}
     for source_name, (destination, _) in doc14.items():
@@ -105,7 +93,7 @@ def coverage_rows(
     rows = []
     for name in sorted(moves.keys() | terraform):
         old, dev_only = moves.get(name, (None, False))
-        gaps = _gaps(name, old, dev_only, terraform, collected, read)
+        gaps = _gaps(name, old, dev_only, terraform, collected)
         where = [
             "terraform" if name in terraform else ("no terraform (development only)" if dev_only else "no terraform"),
             f"ssm {parameters.get(name, 'missing')}" if parameters and name in terraform else "",
@@ -123,9 +111,7 @@ def main(argv: list[str]) -> None:
         if len(fields := line.rstrip("\n").split("\t")) == 3:
             entries.append((fields[0], fields[1], fields[2]))
     rows = [
-        row
-        for row in coverage_rows(doc14_destinations(), terraform_parameters(), entries, env_names(APP_ROOT))
-        if row[0].startswith(prefixes or "")
+        row for row in coverage_rows(doc14_destinations(), terraform_parameters(), entries) if row[0].startswith(prefixes or "")
     ]
     counts = Counter(verdict.action for _, _, verdict in rows)
     print("\n== coverage: names supplied through the environment == " + " ".join(f"{a}={n}" for a, n in sorted(counts.items())))
