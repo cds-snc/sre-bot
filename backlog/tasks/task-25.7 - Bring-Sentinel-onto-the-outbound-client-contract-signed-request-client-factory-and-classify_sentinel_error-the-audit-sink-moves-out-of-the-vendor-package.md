@@ -6,8 +6,8 @@ title: >-
   package
 status: To Do
 assignee: []
-created_date: '2026-09-18 16:51'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-18 16:51
+updated_date: '2026-10-27T20:32:00Z'
 labels:
   - clients
   - phase-3
@@ -15,13 +15,14 @@ milestone: m-3
 dependencies:
   - TASK-106
   - TASK-122
+  - TASK-171
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
   - app/integrations/sentinel/client.py
   - app/infrastructure/audit
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1603'
+  - https://github.com/cds-snc/sre-bot/issues/1603
 parent_task_id: TASK-25
 priority: medium
 ordinal: 240000
@@ -58,7 +59,18 @@ TARGET. The vendor package exports a factory for the signed HTTP client (explici
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-24 20:10
+
 ---
+
 2026-09-24: the owner of the audit sink is decided by decisions/plugin-architecture.md. The audit trail is a capability (app/capabilities/audit/, TASK-122), and Sentinel is one of its sinks, so the sink goes to that capability's adapters/. It does not go to infrastructure/, which is hosting-only. Integrations may import only app/contracts/ shared types (TASK-106).
+
+---
+
+created: 2026-10-27T20:32:00Z
+
+---
+
+2026-10-27 (TASK-111.12 planning): depends on TASK-171. If 171 rules the Sentinel integration deleted, this task closes as superseded; if rebuilt, the contract applies to the Logs Ingestion client.
+
 ---
 <!-- COMMENTS:END -->

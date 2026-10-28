@@ -23,14 +23,28 @@ from structlog.testing import capture_logs
 from contracts.configuration import ConfigurationError
 from integrations.aws.settings import AWSSettings, get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
+from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
+from integrations.notify.settings import NotifySettings, get_notify_settings
 from integrations.openai.settings import OpenAISettings, get_openai_settings
+from integrations.opsgenie.settings import OpsGenieSettings, get_opsgenie_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
+from integrations.trello.settings import TrelloSettings, get_trello_settings
 from server.configuration import host_configuration
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
 from server.slack.settings import get_slack_transport_settings
 from tests.factories.lifespan import lifespan
 
 pytestmark = pytest.mark.integration
+
+_VENDOR_SECRETS = (
+    "NOTIFY__SRE_USER_NAME",
+    "NOTIFY__SRE_CLIENT_SECRET",
+    "OPSGENIE__INTEGRATIONS_KEY",
+    "TRELLO__TENANT__APP_KEY",
+    "TRELLO__TENANT__TOKEN",
+    "TRELLO__ATIP_BOARD",
+)
+_VENDOR_GETTERS = (get_notify_settings, get_trello_settings, get_opsgenie_settings, get_maxmind_settings)
 
 
 @pytest.fixture(autouse=True)
@@ -41,6 +55,10 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     monkeypatch.setitem(AWSSettings.model_config, "env_file", None)
     monkeypatch.setitem(OpenAISettings.model_config, "env_file", None)
     monkeypatch.setenv("OPENAI__API_KEY", "")
+    for slice_class in (NotifySettings, TrelloSettings, OpsGenieSettings, MaxMindSettings):
+        monkeypatch.setitem(slice_class.model_config, "env_file", None)
+    for name in _VENDOR_SECRETS:
+        monkeypatch.setenv(name, "")
     monkeypatch.delenv("SLACK_TRANSPORT__ENABLED", raising=False)
     monkeypatch.delenv("SLACK__TENANT__TEAM_ID", raising=False)
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
@@ -53,12 +71,16 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
     get_openai_settings.cache_clear()
+    for getter in _VENDOR_GETTERS:
+        getter.cache_clear()
     yield
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
     get_google_workspace_settings.cache_clear()
     get_aws_settings.cache_clear()
     get_openai_settings.cache_clear()
+    for getter in _VENDOR_GETTERS:
+        getter.cache_clear()
 
 
 def _stub_later_phases(stack: ExitStack) -> AsyncMock:
@@ -187,6 +209,7 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
     assert get_google_workspace_settings().tenant is None
     assert get_aws_settings().tenant is None
     assert get_openai_settings().tenant is None
+    assert all(getter().tenant is None for getter in _VENDOR_GETTERS)
     assert connects == []
 
 
@@ -219,3 +242,38 @@ async def test_openai_key_without_the_tenant_fails_boot_naming_the_key(monkeypat
     rendered = await _boot_fails_naming("OPENAI__API_KEY")
 
     assert "sk-boot-0001" not in rendered
+
+
+async def test_notify_tenant_without_the_secret_fails_boot_naming_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _with_ci_file_lines(monkeypatch, tmp_path, '\n[notify.tenant]\napi_url = "https://notify.example.test"\n')
+    monkeypatch.setenv("NOTIFY__SRE_USER_NAME", "notify-boot-0001")
+
+    rendered = await _boot_fails_naming("NOTIFY__SRE_CLIENT_SECRET")
+
+    assert "notify-boot-0001" not in rendered
+
+
+async def test_trello_token_without_the_app_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TRELLO__TENANT__TOKEN", "trello-boot-0001")
+
+    rendered = await _boot_fails_naming("TRELLO__TENANT__APP_KEY")
+
+    assert "trello-boot-0001" not in rendered
+
+
+async def test_opsgenie_key_without_the_tenant_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPSGENIE__INTEGRATIONS_KEY", "genie-boot-0001")
+
+    rendered = await _boot_fails_naming("OPSGENIE__INTEGRATIONS_KEY")
+
+    assert "genie-boot-0001" not in rendered
+
+
+async def test_maxmind_unknown_key_in_the_table_fails_boot_naming_the_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    _with_ci_file_lines(monkeypatch, tmp_path, '\n[maxmind]\ndb_path = "./geodb/GeoLite2-City.mmdb"\n')
+
+    await _boot_fails_naming("db_path")

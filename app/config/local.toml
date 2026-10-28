@@ -18,3 +18,11 @@ oncall_group_id = ""
 # The model gateway every development environment shares; its key is the repository's Codespaces secret OPENAI__API_KEY.
 base_url = "https://ai.cdssandbox.xyz"
 model = "gpt-5.6-luna"
+
+[opsgenie.tenant]
+# The region of the account whose development key is the repository's Codespaces secret OPSGENIE__INTEGRATIONS_KEY.
+api_url = "https://api.opsgenie.com"
+
+[maxmind.tenant]
+# The database the devcontainer downloads (.devcontainer/maxmind-create.sh).
+database_path = "./geodb/GeoLite2-City.mmdb"

@@ -127,6 +127,27 @@ max_output_tokens = 3000
 temperature = -1.0
 timeout_seconds = 180.0
 
+[notify]
+# The GC Notify request timeout. The API host is the [notify.tenant] entry (api_url), named in the
+# deployment's environment file; with no entry Notify is not configured. The credentials are secrets
+# from NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET.
+timeout_seconds = 60.0
+
+[opsgenie]
+# The Opsgenie request timeout. The account's regional API host is the [opsgenie.tenant] entry
+# (api_url), named in the deployment's environment file; with no entry Opsgenie is not configured.
+# The key is a secret from OPSGENIE__INTEGRATIONS_KEY.
+timeout_seconds = 30.0
+
+[trello]
+# No key: the SDK fixes Trello's host, so the tenant entry is the credentials, never in a file:
+# TRELLO__TENANT__APP_KEY and TRELLO__TENANT__TOKEN. The ATIP board (a non-public value) comes
+# from TRELLO__ATIP_BOARD.
+
+[maxmind]
+# No key: the GeoIP2 database file is the [maxmind.tenant] entry (database_path), named in the
+# deployment's environment file; with no entry MaxMind is not configured.
+
 [scheduler]
 # Each deployment that runs the scheduled jobs switches them on in its own file;
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.

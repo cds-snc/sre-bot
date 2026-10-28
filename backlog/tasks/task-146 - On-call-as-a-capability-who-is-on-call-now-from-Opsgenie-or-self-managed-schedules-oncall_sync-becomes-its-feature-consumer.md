@@ -5,8 +5,8 @@ title: >-
   schedules; oncall_sync becomes its feature consumer
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:44'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-09 16:44
+updated_date: '2026-10-27T20:32:00Z'
 labels:
   - oncall
   - capabilities
@@ -15,7 +15,7 @@ dependencies: []
 references:
   - decisions/oncall.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1701'
+  - https://github.com/cds-snc/sre-bot/issues/1701
 priority: medium
 type: feature
 ordinal: 364000
@@ -43,3 +43,15 @@ LAYERS, each a single PR under the size gate: TASK-146.1 (the capability, with b
 <!-- AC:BEGIN -->
 - [ ] #1 Every subtask is done
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-27T20:32:00Z
+
+---
+
+2026-10-27 (human, TASK-111.12 planning): Atlassian ends Opsgenie support on 2027-04-05 (decisions/oncall.md). Opsgenie is only ever an adapter, behind on-call and user rotations; the on-call and user-rotations features are to be re-architected for alignment with the rest of the codebase and the product vision, and the incident feature is expected to change at a larger scale, so this task is re-cut before it is planned. The replacement schedule source is chosen in that re-cut, before the end of support. TASK-111.12 still moves the Opsgenie slice onto the files so its old names are unread before TASK-111.15.
+
+---
+<!-- COMMENTS:END -->

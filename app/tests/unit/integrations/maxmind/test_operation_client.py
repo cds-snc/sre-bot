@@ -1,6 +1,6 @@
 """Unit tests for the OperationResult MaxMind integration client."""
 
-from unittest.mock import MagicMock, Mock
+from unittest.mock import Mock
 
 import pytest
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
@@ -9,17 +9,11 @@ import integrations.maxmind as maxmind_package
 from contracts.operations import OperationStatus
 from integrations.maxmind.client import GeoLocationData, MaxMindClient, classify_maxmind_error
 
-
-@pytest.fixture
-def mock_settings() -> MagicMock:
-    """Provide MaxMind settings with a deterministic DB path."""
-    settings = MagicMock()
-    settings.maxmind_db_path = "/path/to/GeoLite2-City.mmdb"
-    return settings
+DATABASE_PATH = "/path/to/GeoLite2-City.mmdb"
 
 
 @pytest.mark.unit
-def test_maxmind_client_geolocate_success(mock_settings: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maxmind_client_geolocate_success(monkeypatch: pytest.MonkeyPatch) -> None:
     """A successful lookup opens the configured database path and returns OperationResult success with location data."""
     mock_response = Mock()
     mock_response.country.iso_code = "US"
@@ -34,7 +28,7 @@ def test_maxmind_client_geolocate_success(mock_settings: MagicMock, monkeypatch:
     reader_factory = Mock(return_value=mock_reader)
     monkeypatch.setattr("geoip2.database.Reader", reader_factory)
 
-    client = MaxMindClient(maxmind_settings=mock_settings)
+    client = MaxMindClient(database_path=DATABASE_PATH)
     result = client.geolocate(ip_address="8.8.8.8")
 
     assert result.is_success
@@ -50,13 +44,13 @@ def test_maxmind_client_geolocate_success(mock_settings: MagicMock, monkeypatch:
 
 
 @pytest.mark.unit
-def test_maxmind_client_geolocate_not_found(mock_settings: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maxmind_client_geolocate_not_found(monkeypatch: pytest.MonkeyPatch) -> None:
     """Address-not-found maps to NOT_FOUND with a stable error code."""
     mock_reader = Mock()
     mock_reader.city.side_effect = AddressNotFoundError("Not found")
     monkeypatch.setattr("geoip2.database.Reader", Mock(return_value=mock_reader))
 
-    client = MaxMindClient(maxmind_settings=mock_settings)
+    client = MaxMindClient(database_path=DATABASE_PATH)
     result = client.geolocate(ip_address="192.168.1.1")
 
     assert result.status == OperationStatus.NOT_FOUND
@@ -65,13 +59,13 @@ def test_maxmind_client_geolocate_not_found(mock_settings: MagicMock, monkeypatc
 
 
 @pytest.mark.unit
-def test_maxmind_client_geolocate_invalid_ip(mock_settings: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maxmind_client_geolocate_invalid_ip(monkeypatch: pytest.MonkeyPatch) -> None:
     """Invalid input maps to PERMANENT_ERROR with INVALID_IP_FORMAT."""
     mock_reader = Mock()
     mock_reader.city.side_effect = ValueError("invalid")
     monkeypatch.setattr("geoip2.database.Reader", Mock(return_value=mock_reader))
 
-    client = MaxMindClient(maxmind_settings=mock_settings)
+    client = MaxMindClient(database_path=DATABASE_PATH)
     result = client.geolocate(ip_address="not-an-ip")
 
     assert result.status == OperationStatus.PERMANENT_ERROR
@@ -80,13 +74,13 @@ def test_maxmind_client_geolocate_invalid_ip(mock_settings: MagicMock, monkeypat
 
 
 @pytest.mark.unit
-def test_maxmind_client_geolocate_geoip2_error(mock_settings: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maxmind_client_geolocate_geoip2_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """GeoIP2 errors map to TRANSIENT_ERROR with GEOIP2_ERROR."""
     mock_reader = Mock()
     mock_reader.city.side_effect = GeoIP2Error("db error")
     monkeypatch.setattr("geoip2.database.Reader", Mock(return_value=mock_reader))
 
-    client = MaxMindClient(maxmind_settings=mock_settings)
+    client = MaxMindClient(database_path=DATABASE_PATH)
     result = client.geolocate(ip_address="8.8.8.8")
 
     assert result.status == OperationStatus.TRANSIENT_ERROR
@@ -95,7 +89,7 @@ def test_maxmind_client_geolocate_geoip2_error(mock_settings: MagicMock, monkeyp
 
 
 @pytest.mark.unit
-def test_maxmind_client_healthcheck_success(mock_settings: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_maxmind_client_healthcheck_success(monkeypatch: pytest.MonkeyPatch) -> None:
     """Healthcheck reports healthy when test geolocation succeeds."""
     mock_response = Mock()
     mock_response.country.iso_code = "US"
@@ -109,7 +103,7 @@ def test_maxmind_client_healthcheck_success(mock_settings: MagicMock, monkeypatc
     mock_reader.city.return_value = mock_response
     monkeypatch.setattr("geoip2.database.Reader", Mock(return_value=mock_reader))
 
-    client = MaxMindClient(maxmind_settings=mock_settings)
+    client = MaxMindClient(database_path=DATABASE_PATH)
     result = client.healthcheck()
 
     assert result.is_success

@@ -3,10 +3,10 @@ id: TASK-111.10.2
 title: >-
   Move the Google Workspace slice onto the files; the delegation subject becomes
   a non-public value
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T18:29:00Z'
-updated_date: '2026-10-26T21:46:00Z'
+updated_date: '2026-10-27T20:00:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -37,7 +37,7 @@ The Google Workspace slice (integrations/google_workspace/settings.py) reads [go
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Deployed; zsh bin/deploy-checks.zsh post google PASS and the manual checks recorded
+- [x] #1 Deployed; zsh bin/deploy-checks.zsh post google PASS and the manual checks recorded
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -128,4 +128,8 @@ D5 Authlib and google-auth-oauthlib, leftovers of the pickle-string OAuth admin 
 2026-10-26 merge gate: pre google 21:37Z (tmp/deploy-checks/pre-google-20261026T213759Z.txt) google_pre PASS: CUSTOMER_ID, SERVICE_ACCOUNT_KEY and DELEGATED_USER_EMAIL all MATCH their old values; GOOGLE_DELEGATED_ADMIN_EMAIL still a sre-bot-config line (inert, goes with the blob), GOOGLE_API_* in no blob. Rollback image_tag bcbfe9377fa2174cf51cc132dbd8d59fb8aaa669-2026-10-26 (sre-bot-task running revision). Codespaces secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID set (human); no Actions secret needed (CI blanks the tenant). All six ACs checked; DoD after the deploy.
 
 2026-10-26 pre at merge 21:44Z (tmp/deploy-checks/pre-20261026T214442Z.txt): running sre-bot-task:50, rollback image_tag bcbfe9377fa2174cf51cc132dbd8d59fb8aaa669-2026-10-26 unchanged.
+
+post google 2026-10-27 19:46Z on sre-bot-task:58: rollout, boot_errors, runtime_errors, slack_up, google and version PASS; google configured on 2/2 tasks; 0 credential or delegation lines. Waiting: the manual checks (/sre incident product list shows the product folders; /incident with no text opens the modal with the folders and the handbook link, then cancel), then the cleanup.
+
+Manual checks 2026-10-27 (human): /sre incident product list shows the product folders; /incident with no text opens the creation modal with the folders and the handbook link (cancelled). DoD checked. Remaining: the cleanup (four Codespaces secrets, Actions SRE_BOT_EMAIL; env-checks GOOGLE_ GCP_ SRE_BOT_EMAIL), then Done (human).
 <!-- SECTION:NOTES:END -->

@@ -19,11 +19,14 @@ ACCESS_PERMISSION_SETS__<FIELD>: non-public values, so no file names them; the f
 retired AWS_* names are pinned as unread; the region and the dynamodb-local endpoint are the SDK's
 (AWS_DEFAULT_REGION, AWS_ENDPOINT_URL_DYNAMODB), declared by no field. The OpenAI slice
 reads the [openai] table with its key under OPENAI__API_KEY (a task-definition secret) beside a
-tenant entry; the six retired OPENAI_* names are pinned as unread. The
-Notify, Trello, OpsGenie, MaxMind and Sentinel slices likewise: production sets
-NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET, NOTIFY_API_URL,
-the TRELLO_* names, OPSGENIE_INTEGRATIONS_KEY and the SENTINEL_* names, some of
-them written 'NAME =value' in the .env file; the remaining names stay part of the interface. The identity,
+tenant entry; the six retired OPENAI_* names are pinned as unread. The Notify and
+Opsgenie slices read their tables with their credentials under NOTIFY__SRE_USER_NAME,
+NOTIFY__SRE_CLIENT_SECRET and OPSGENIE__INTEGRATIONS_KEY beside a tenant entry; Trello's
+entry is its credentials, TRELLO__TENANT__APP_KEY and TRELLO__TENANT__TOKEN, with the board
+under TRELLO__ATIP_BOARD; MaxMind's entry is its database file; their retired flat names
+(and the unread TRELLO__APP_KEY and TRELLO__TOKEN) are pinned as unread. The Sentinel slice
+still reads the SENTINEL_* names production sets, some of them written 'NAME =value' in the
+.env file. The identity,
 server, dev and Slack transport slices too: production sets ENVIRONMENT,
 BACKEND_URL and SLACK__COMMAND_PREFIX (task definition), GIT_SHA (image),
 NOTIFY_OPS_CHANNEL_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY
@@ -88,26 +91,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         '{"inc":{"d":"sentinel-drive"}}',
         {"inc": {"d": "sentinel-drive"}},
     ),
-    (NotifySettings, "NOTIFY_SRE_USER_NAME", "notify_sre_user_name", "sentinel-user", "sentinel-user"),
-    (NotifySettings, "NOTIFY_SRE_CLIENT_SECRET", "notify_sre_client_secret", "sentinel-secret", "sentinel-secret"),
-    (
-        NotifySettings,
-        "NOTIFY_API_URL",
-        "notify_api_url",
-        "https://notify.sentinel.example",
-        "https://notify.sentinel.example",
-    ),
-    (TrelloSettings, "TRELLO_APP_KEY", "trello_app_key", "sentinel-app-key", "sentinel-app-key"),
-    (TrelloSettings, "TRELLO_TOKEN", "trello_token", "sentinel-token", "sentinel-token"),
-    (TrelloSettings, "TRELLO_ATIP_BOARD", "trello_atip_board", "sentinel-board", "sentinel-board"),
-    (
-        OpsGenieSettings,
-        "OPSGENIE_INTEGRATIONS_KEY",
-        "opsgenie_integrations_key",
-        "sentinel-opsgenie-key",
-        "sentinel-opsgenie-key",
-    ),
-    (MaxMindSettings, "MAXMIND_DB_PATH", "maxmind_db_path", "/sentinel/GeoLite2.mmdb", "/sentinel/GeoLite2.mmdb"),
     (SentinelSettings, "SENTINEL_CUSTOMER_ID", "sentinel_customer_id", "sentinel-customer", "sentinel-customer"),
     (SentinelSettings, "SENTINEL_LOG_TYPE", "sentinel_log_type", "SentinelLogs", "SentinelLogs"),
     (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
@@ -445,11 +428,11 @@ def test_configuration_settings_no_slice_declares_an_sdk_aws_name() -> None:
 
 def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """The lower-case spelling of a Notify name is read too."""
-    monkeypatch.setenv("notify_api_url", "https://lower.sentinel.example")
+    monkeypatch.setenv("notify__timeout_seconds", "23")
 
     notify = NotifySettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert notify.notify_api_url == "https://lower.sentinel.example"
+    assert notify.timeout_seconds == 23
 
 
 def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -480,3 +463,85 @@ def test_configuration_settings_identity_missing_environment_names_field(monkeyp
         IdentitySettings()
 
     assert exc_info.value.errors()[0]["loc"] == ("environment",)
+
+
+VENDOR_RETIRED_NAMES: list[tuple[type[BaseSettings], str]] = [
+    (NotifySettings, "NOTIFY_SRE_USER_NAME"),
+    (NotifySettings, "NOTIFY_SRE_CLIENT_SECRET"),
+    (NotifySettings, "NOTIFY_API_URL"),
+    (TrelloSettings, "TRELLO_APP_KEY"),
+    (TrelloSettings, "TRELLO_TOKEN"),
+    (TrelloSettings, "TRELLO_ATIP_BOARD"),
+    (TrelloSettings, "TRELLO__APP_KEY"),
+    (TrelloSettings, "TRELLO__TOKEN"),
+    (OpsGenieSettings, "OPSGENIE_INTEGRATIONS_KEY"),
+    (OpsGenieSettings, "OPSGENIE_KEY"),
+    (MaxMindSettings, "MAXMIND_DB_PATH"),
+    (MaxMindSettings, "MAXMIND_KEY"),
+]
+
+
+def test_configuration_settings_notify_names_configure_notify(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The two NOTIFY__ credentials reach their secret fields beside a tenant entry."""
+    monkeypatch.setenv("NOTIFY__SRE_USER_NAME", "sentinel-user")
+    monkeypatch.setenv("NOTIFY__SRE_CLIENT_SECRET", "sentinel-secret")
+    monkeypatch.setenv("NOTIFY__TENANT__API_URL", "https://notify.sentinel.example")
+    monkeypatch.setenv("NOTIFY__TIMEOUT_SECONDS", "17")
+
+    settings = NotifySettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.sre_user_name.get_secret_value() == "sentinel-user"
+    assert settings.sre_client_secret.get_secret_value() == "sentinel-secret"
+    assert settings.tenant is not None
+    assert settings.tenant.api_url == "https://notify.sentinel.example"
+    assert settings.timeout_seconds == 17
+
+
+def test_configuration_settings_opsgenie_names_configure_opsgenie(monkeypatch: pytest.MonkeyPatch) -> None:
+    """OPSGENIE__INTEGRATIONS_KEY reaches the secret field beside a tenant entry."""
+    monkeypatch.setenv("OPSGENIE__INTEGRATIONS_KEY", "sentinel-opsgenie-key")
+    monkeypatch.setenv("OPSGENIE__TENANT__API_URL", "https://api.eu.opsgenie.com")
+    monkeypatch.setenv("OPSGENIE__TIMEOUT_SECONDS", "17")
+
+    settings = OpsGenieSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.integrations_key.get_secret_value() == "sentinel-opsgenie-key"
+    assert settings.tenant is not None
+    assert settings.tenant.api_url == "https://api.eu.opsgenie.com"
+    assert settings.timeout_seconds == 17
+
+
+def test_configuration_settings_trello_names_configure_trello(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The two TRELLO__TENANT__ names build the tenant entry; TRELLO__ATIP_BOARD reaches the board."""
+    monkeypatch.setenv("TRELLO__TENANT__APP_KEY", "sentinel-app-key")
+    monkeypatch.setenv("TRELLO__TENANT__TOKEN", "sentinel-token")
+    monkeypatch.setenv("TRELLO__ATIP_BOARD", "sentinel-board")
+
+    settings = TrelloSettings(_env_file=None)  # type: ignore[call-arg]
+
+    assert settings.tenant is not None
+    assert settings.tenant.app_key.get_secret_value() == "sentinel-app-key"
+    assert settings.tenant.token.get_secret_value() == "sentinel-token"
+    assert settings.atip_board == "sentinel-board"
+
+
+def test_configuration_settings_maxmind_name_configures_maxmind(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("MAXMIND__TENANT__DATABASE_PATH", "/sentinel/GeoLite2.mmdb")
+
+    tenant = MaxMindSettings(_env_file=None).tenant  # type: ignore[call-arg]
+
+    assert tenant is not None
+    assert tenant.database_path == "/sentinel/GeoLite2.mmdb"
+
+
+@pytest.mark.parametrize(("settings_class", "env_name"), VENDOR_RETIRED_NAMES, ids=[row[1] for row in VENDOR_RETIRED_NAMES])
+def test_configuration_settings_vendor_retired_name_is_unread(
+    monkeypatch: pytest.MonkeyPatch, settings_class: type[BaseSettings], env_name: str
+) -> None:
+    """The old flat names are read by no field: the slice builds exactly as without them."""
+    baseline = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
+    monkeypatch.setenv(env_name, "https://retired.example" if env_name.endswith("URL") else "retired")
+
+    settings = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
+
+    assert settings == baseline

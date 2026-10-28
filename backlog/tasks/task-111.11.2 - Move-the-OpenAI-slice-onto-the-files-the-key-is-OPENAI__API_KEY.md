@@ -1,10 +1,10 @@
 ---
 id: TASK-111.11.2
 title: Move the OpenAI slice onto the files; the key is OPENAI__API_KEY
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T22:21:00Z'
-updated_date: '2026-10-27T18:28:00Z'
+updated_date: '2026-10-27T19:56:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -27,7 +27,7 @@ OpenAISettings (integrations/openai/settings.py) becomes the [openai] Configurat
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The OpenAI slice reads max_output_tokens, temperature and timeout_seconds from [openai], base_url and model from the optional [openai.tenant] entry (both required in an entry), and the key only as OPENAI__API_KEY (hidden in repr and logs; empty counts as unset); the slice is validated at boot and an unknown key in [openai] or [openai.tenant] fails boot naming it
-- [ ] #2 /sre-bot/OPENAI__API_KEY equals the OPENAI_API_KEY line it replaces (pre openai: MATCH, compared by hash, never printed)
+- [x] #2 /sre-bot/OPENAI__API_KEY equals the OPENAI_API_KEY line it replaces (pre openai: MATCH, compared by hash, never printed)
 - [x] #3 A tenant entry without the key, or the key without a tenant entry, fails boot naming the key; with neither the app boots, incident text generation is reported unavailable exactly as today, the summarizer returns not configured without an API call, and no message or log line carries a key value
 - [x] #4 OPENAI_API_KEY, OPENAI_MODEL, OPENAI_MAX_OUTPUT_TOKENS, OPENAI_TEMPERATURE, OPENAI_TIMEOUT_SECONDS and OPENAI_BASE_URL are no longer read from the environment or .env
 - [x] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass; make check-import-contracts and make check-settings-key-ownership pass
@@ -37,7 +37,7 @@ OpenAISettings (integrations/openai/settings.py) becomes the [openai] Configurat
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Deployed; zsh bin/deploy-checks.zsh post openai PASS and the manual check recorded
+- [x] #1 Deployed; zsh bin/deploy-checks.zsh post openai PASS and the manual check recorded
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -113,5 +113,5 @@ Codespaces: gh secret delete OPENAI_API_KEY --app codespaces -R cds-snc/sre-bot 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
-Plan approved 2026-10-27 (human). Implemented 2026-10-27 in the working tree from main 903eed3f: [openai] tuning in base.toml; optional [openai.tenant] (base_url https or loopback http, model) in production.toml and local.toml; OPENAI__API_KEY on the slice (SecretStr, empty = unset); a tenant without the key or the key without a tenant fails boot naming OPENAI__API_KEY; get_openai_settings() in the boot validation list; summarizer returns CONFIG_NOT_CONFIGURED without a client when no tenant; comms adapter keys its fallback on the tenant (ValidationError branch removed); HINTS for the six old names; deploy-checks openai pre and post; doc-14, configuration.md, scribe README. Shipped with this PR: the 2026-10-27 ADR amendments (one vendor shape; required dependencies abort boot) and the TASK-172, TASK-173, TASK-126, TASK-25.10 and TASK-145.7 task changes. Gates: ruff clean; mypy 47 errors = baseline, none in touched files; pytest 5917 passed; contracts 13 kept; key ownership OK; env coverage lists OPENAI__API_KEY supplied everywhere (no rule change). The OPENAI_API_KEY line sits in sre-bot-config-infrastructure per doc-14, not sre-bot-config; pre openai searches both blobs. ACs 1, 3-7 checked; AC 2 waits on pre openai.
+Plan approved 2026-10-27 (human). Implemented 2026-10-27 in the working tree from main 903eed3f: [openai] tuning in base.toml; optional [openai.tenant] (base_url https or loopback http, model) in production.toml and local.toml; OPENAI__API_KEY on the slice (SecretStr, empty = unset); a tenant without the key or the key without a tenant fails boot naming OPENAI__API_KEY; get_openai_settings() in the boot validation list; summarizer returns CONFIG_NOT_CONFIGURED without a client when no tenant; comms adapter keys its fallback on the tenant (ValidationError branch removed); HINTS for the six old names; deploy-checks openai pre and post; doc-14, configuration.md, scribe README. Shipped with this PR: the 2026-10-27 ADR amendments (one vendor shape; required dependencies abort boot) and the TASK-172, TASK-173, TASK-126, TASK-25.10 and TASK-145.7 task changes. Gates: ruff clean; mypy 47 errors = baseline, none in touched files; pytest 5917 passed; contracts 13 kept; key ownership OK; env coverage lists OPENAI__API_KEY supplied everywhere (no rule change). The OPENAI_API_KEY line sits in sre-bot-config-infrastructure per doc-14, not sre-bot-config; pre openai searches both blobs. ACs 1, 3-7 checked; AC 2 waits on pre openai. pre openai 2026-10-27 19:10Z: OPENAI__API_KEY vs the OPENAI_API_KEY line MATCH, no OPENAI_* tuning lines, openai_pre PASS; rollback tag 903eed3fea58e3612872fde3af8514df59a27bab-2026-10-27 (sre-bot-task:57). env-checks OPENAI_ 19:11Z: Codespaces OPENAI_API_KEY delete (after the deploy), OPENAI__API_KEY parameter and coverage none. Merged #1797 (1270ea35, 19:27Z); deployed sre-bot-task:58, image tag 1270ea357ac6d0ce14c8b74e4895d130eb51b53b-2026-10-27. post openai 19:39Z: rollout, boot_errors, runtime_errors, slack_up, openai and version PASS (sbom job failed: the known trivy-db rate limit; build and deploy success); 0 configuration_invalid, 0 unconfigured, 0 401/403 lines, 1 openai_summarize_usage. Manual (human): /sre incident summarize produced a summary of an incident channel. Remaining: delete the Codespaces secret OPENAI_API_KEY and confirm with env-checks OPENAI_.
 <!-- SECTION:NOTES:END -->

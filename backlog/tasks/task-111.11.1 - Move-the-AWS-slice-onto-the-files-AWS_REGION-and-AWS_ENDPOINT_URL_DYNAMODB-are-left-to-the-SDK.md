@@ -3,10 +3,10 @@ id: TASK-111.11.1
 title: >-
   Move the AWS slice onto the files; AWS_REGION and AWS_ENDPOINT_URL_DYNAMODB
   are left to the SDK
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-26T22:21:00Z'
-updated_date: '2026-10-27T14:15:00Z'
+updated_date: '2026-10-27T19:56:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -158,6 +158,8 @@ Human steps: after the terraform expand PR applies, put-parameter /sre-bot/AWS__
 2026-10-27 pre aws run 13:28Z: all five MATCH, both formats OK, but it showed AWS_AUDIT_ACCOUNT_ROLE_ARN and AWS_LOGGING_ACCOUNT_ROLE_ARN set in sre-bot-config, and the check passed anyway. The plan had assumed production sets only the org role (a misreading of doc-14's AC6 facts); shipping on that assumption would drop the audit and logging roles in production, against AC #8. Fixed: pre aws compares all seven parameters, the two roles included, and fails on a MISSING one; doc-14 rows and the audit HINTS corrected. The parameters come from a second terraform-only PR (ssm.tf +2) before this one merges, which also carries an env-checks coverage rule (a development-only doc-14 value whose blob line is set is a check) and limits the .env.example check to names the app reads. ECS sets AWS_DEFAULT_REGION on Fargate tasks (AWS docs), so the region needs no task-definition change. Gates on the working tree: ruff clean, mypy 47 = baseline, contracts 13 kept, key ownership OK, pytest 5875 passed.
 
 2026-10-27 merge-gate evidence: #1796 merged 14:10Z (ssm.tf +2), both values put; pre aws 14:13Z: seven MATCH (instance id, instance ARN, org, audit and logging roles, both permission sets), both formats OK, no retired tuning line, aws_pre PASS; rollback tag 5b0a7cb1e6044bb7b382275157d7abcea5498260-2026-10-27 (sre-bot-task:56). AC #3 and #8 checked (docker-compose sets AWS_DEFAULT_REGION; ECS sets it on Fargate). pre aws's task-definition line now excludes the AWS__* slice names it wrongly listed. Remaining: pre at merge, deploy, post aws and a DynamoDB-backed read (DoD), then the cleanup.
+
+post aws 2026-10-27 19:45Z on sre-bot-task:58 (deploy of #1797, which carries this slice unchanged): rollout, boot_errors, runtime_errors, slack_up, aws and version PASS; 0 region, endpoint, credential or AssumeRole lines; 0 configuration_invalid; 2 DynamoDB-backed events (the DynamoDB-backed read). Waiting: the Identity Center read (integration_healthcheck_result integration=aws result=healthy since the deploy), then the cleanup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -2,17 +2,14 @@
 
 from dataclasses import dataclass
 from functools import cache
-from typing import TYPE_CHECKING
 
 import geoip2.database
 import structlog
 from geoip2.errors import AddressNotFoundError, GeoIP2Error
 
 from contracts.operations import OperationResult, OperationStatus
+from contracts.operations.codes import ErrorCode
 from integrations.maxmind.settings import get_maxmind_settings
-
-if TYPE_CHECKING:
-    from integrations.maxmind.settings import MaxMindSettings
 
 logger = structlog.get_logger()
 
@@ -52,15 +49,20 @@ class GeoLocationData:
 
 
 class MaxMindClient:
-    """Client for MaxMind GeoIP2 database operations."""
+    """Client for MaxMind GeoIP2 database operations; ``database_path=None`` is MaxMind not configured."""
 
-    def __init__(self, maxmind_settings: MaxMindSettings) -> None:
-        self._db_path = maxmind_settings.maxmind_db_path
+    def __init__(self, database_path: str | None) -> None:
+        self._db_path = database_path
         self._logger = logger.bind(component="maxmind_client")
 
     def geolocate(self, ip_address: str) -> OperationResult:
         """Geolocate an IP address using MaxMind GeoIP2 database."""
         log = self._logger.bind(ip_address=ip_address)
+        if self._db_path is None:
+            log.warning("maxmind_not_configured")
+            return OperationResult.permanent_error(
+                message="MaxMind is not configured", error_code=ErrorCode.CONFIG_NOT_CONFIGURED
+            )
         log.debug("geolocating_ip")
 
         try:
@@ -131,6 +133,11 @@ class MaxMindClient:
     def healthcheck(self) -> OperationResult:
         """Check if MaxMind database is accessible."""
         log = self._logger.bind(operation="healthcheck")
+        if self._db_path is None:
+            log.warning("maxmind_not_configured")
+            return OperationResult.permanent_error(
+                message="MaxMind is not configured", error_code=ErrorCode.CONFIG_NOT_CONFIGURED
+            )
         log.debug("performing_healthcheck")
 
         result = self.geolocate("8.8.8.8")
@@ -151,5 +158,6 @@ class MaxMindClient:
 
 @cache
 def get_maxmind_client() -> MaxMindClient:
-    """Get singleton MaxMindClient instance."""
-    return MaxMindClient(maxmind_settings=get_maxmind_settings())
+    """Get singleton MaxMindClient instance for the [maxmind.tenant] database, if any."""
+    tenant = get_maxmind_settings().tenant
+    return MaxMindClient(database_path=tenant.database_path if tenant else None)

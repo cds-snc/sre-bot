@@ -93,6 +93,14 @@ HINTS = {
     "OPENAI_MAX_OUTPUT_TOKENS": "[openai] max_output_tokens",
     "OPENAI_TEMPERATURE": "[openai] temperature",
     "OPENAI_TIMEOUT_SECONDS": "[openai] timeout_seconds",
+    "NOTIFY_SRE_USER_NAME": "secret NOTIFY__SRE_USER_NAME",
+    "NOTIFY_SRE_CLIENT_SECRET": "secret NOTIFY__SRE_CLIENT_SECRET",
+    "NOTIFY_API_URL": "[notify.tenant] api_url",
+    "TRELLO_APP_KEY": "secret TRELLO__TENANT__APP_KEY",
+    "TRELLO_TOKEN": "secret TRELLO__TENANT__TOKEN",
+    "TRELLO_ATIP_BOARD": "secret TRELLO__ATIP_BOARD",
+    "OPSGENIE_INTEGRATIONS_KEY": "secret OPSGENIE__INTEGRATIONS_KEY",
+    "MAXMIND_DB_PATH": "[maxmind.tenant] database_path",
 }
 
 # Names whose values moved before the configuration migration (#975 folded the Google IDs into the one
