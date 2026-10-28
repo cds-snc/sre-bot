@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-10-26T14:03:00Z'
+updated_date: '2026-10-28T19:42:00Z'
 labels:
   - incident
 milestone: m-7
@@ -45,4 +45,5 @@ This coordinator is broken out into subtasks as the incident-management ADR is a
 - [ ] #1 The incident-management ADR records the coordinated-incident model and the decisions above
 - [ ] #2 Subtasks cover engagement and triage, workstreams and links, embargo, roll-up and the senior-management summary, playbooks and feature personalisation, GoAlert on-call and paging, and cloud investigations, each a single PR
 - [ ] #3 A CVE can be run end to end in Slack by hand, with API parity, before playbooks exist
+- [ ] #4 Team playbooks, incident types and per-type document templates are managed content with a provisioned starting set (decisions/organisation-content.md, managed-content.md, provisioned-content.md): read through ports the incident feature owns, written through one validated, authorised, versioned and audited path; the template a type uses is managed and the configured Google template id is the default
 <!-- AC:END -->

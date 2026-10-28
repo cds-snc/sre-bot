@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-27T20:32:00Z'
+updated_date: '2026-10-28T19:43:00Z'
 labels:
   - oncall
   - capabilities
@@ -43,6 +43,12 @@ LAYERS, each a single PR under the size gate: TASK-146.1 (the capability, with b
 <!-- AC:BEGIN -->
 - [ ] #1 Every subtask is done
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-10-28 (TASK-167 accepted, decisions/organisation-content.md): the re-cut assigns two content kinds. On-call schedule mappings (a schedule source's schedule to a Slack user group; today oncall_sync/rotations.json, pointers only, swaps live in Opsgenie) are provisioned content (provisioned-content.md). Self-managed rosters (members and cadence; today user_rotations/rotations/) are managed content (managed-content.md). Both stay tolerated in the code until the re-cut slices land. If Opsgenie's replacement supports overrides, self-managed rosters may not be needed (human).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

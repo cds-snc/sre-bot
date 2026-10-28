@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
+updated_date: '2026-10-28T19:43:00Z'
 labels:
   - architecture
   - webhooks
@@ -38,4 +39,5 @@ Invariants carried over (not reopened): nothing registers at import time and not
 - [ ] #1 decisions/webhooks.md is rewritten (or superseded) from the session, with cited sources, and is consistent with the TASK-167 organisation-content decision
 - [ ] #2 TASK-37 and its subtasks, and TASK-47, 48 and 49, are rewritten, superseded or archived to match, each remaining slice a single PR under the size gate
 - [ ] #3 The re-cut slices are placed in the doc-11 work queue ahead of the rows that wait on TASK-37 (TASK-88, TASK-40)
+- [ ] #4 Webhook sender kinds (match, extract, template) are provisioned content and webhook instances managed content (decisions/organisation-content.md, provisioned-content.md, managed-content.md); the session chooses the matching and template engine for every content kind: declarative matching, logic-light templates over a fixed data model with an undefined name an error, size and count limits; the re-cut slices delete the per-sender Python in modules/webhooks/patterns/ and its import-time walk
 <!-- AC:END -->

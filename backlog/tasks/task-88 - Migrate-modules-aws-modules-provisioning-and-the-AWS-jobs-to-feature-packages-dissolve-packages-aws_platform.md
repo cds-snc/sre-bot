@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-10-28T17:05:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - phase-5
 dependencies:
@@ -55,12 +55,12 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Feature boundaries for the former modules/aws, modules/provisioning and AWS jobs are decided and recorded against the TASK-36 inventory, with one subtask per feature, each rebuilt in app/features/<feature>/
+- [ ] #1 Feature boundaries for the former modules/aws, modules/provisioning and AWS jobs are decided and recorded against the TASK-36 inventory, with one subtask per feature, each rebuilt in app/features/<feature>/; spending is already decided (TASK-111.10.3, 2026-10-28): the subdomain features/cloud_operations/spending of a features/cloud_operations umbrella, slice [cloud_operations_spending]
 - [ ] #2 Every adapter under packages/aws_platform/adapters/ lives in its eventual home (the owning feature's adapters/, a capability with a recorded second-feature justification, or the records contract for DynamoDB callers) and returns typed domain values; no new infrastructure/<service> Protocol was introduced
 - [ ] #3 packages/aws_platform, modules/aws, modules/provisioning and the migrated jobs are deleted
 - [ ] #4 Feature-level AWS settings (permission sets, role ARNs, SSO instance, SERVICE_ROLE_MAP) move from integrations/aws/settings.py into the owning features' settings slices (values in the TOML files); integrations/aws/settings.py keeps only the transport fields the client itself needs
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
-- [ ] #6 The spending sheet id move from the interim [google_resources] table into the aws spending feature slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
+- [ ] #6 The spending subdomain reads the spending sheet id from [cloud_operations_spending] sheet_id (features/cloud_operations/spending/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #7 modules/permissions and the AWS_ADMIN_GROUPS setting ([cloud_operations] aws_admin_groups, moved onto the files by TASK-111.14; the table is named for the product area because AWS_* environment names are the SDK's) are deleted with the table and infrastructure/configuration/features/aws_ops.py; the rebuilt AWS surfaces declare their permissions per decisions/authorization.md, and any key a rebuilt slice keeps is standardised (lower snake_case, no table-name repeat)
 <!-- AC:END -->
 

@@ -3,10 +3,10 @@ id: TASK-111.13
 title: >-
   Move the hosting slices onto the files: retry, audit, coordination, directory,
   drive, spreadsheets
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T13:46:00Z'
+updated_date: '2026-10-28T19:48:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -32,10 +32,10 @@ The hosting slices (RetrySettings, AuditSettings, ConditionalWriteSettings, Dire
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each remaining hosting slice (directory, audit, coordination) reads its table from the files with extra=forbid and its defaults in base.toml, no longer reads its old flat environment names, and its unread fields are deleted (TASK-111.13.1, 111.13.3)
-- [ ] #2 RetrySettings is deleted with the unused infrastructure/resilience package (TASK-111.13.2), and InfrastructureSettings and the infrastructure/configuration/infrastructure package are deleted (TASK-111.13.3)
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #4 The provider fields of DirectorySettings, DriveSettings and SpreadsheetSettings (DIRECTORY_PROVIDER, DRIVE_PROVIDER, SPREADSHEET_PROVIDER) are deleted, not moved (decisions/workplace-systems.md, 2026-10-26); each factory builds the Google adapter directly and the adapters take no settings argument; DriveSettings and SpreadsheetSettings are deleted with their [drive] and [spreadsheets] tables, and [directory] holds only require_startup_warmup until TASK-128 deletes it (TASK-111.13.1)
+- [x] #1 Each remaining hosting slice (directory, audit, coordination) reads its table from the files with extra=forbid and its defaults in base.toml, no longer reads its old flat environment names, and its unread fields are deleted (TASK-111.13.1, 111.13.3)
+- [x] #2 RetrySettings is deleted with the unused infrastructure/resilience package (TASK-111.13.2), and InfrastructureSettings and the infrastructure/configuration/infrastructure package are deleted (TASK-111.13.3)
+- [x] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #4 The provider fields of DirectorySettings, DriveSettings and SpreadsheetSettings (DIRECTORY_PROVIDER, DRIVE_PROVIDER, SPREADSHEET_PROVIDER) are deleted, not moved (decisions/workplace-systems.md, 2026-10-26); each factory builds the Google adapter directly and the adapters take no settings argument; DriveSettings and SpreadsheetSettings are deleted with their [drive] and [spreadsheets] tables, and [directory] holds only require_startup_warmup until TASK-128 deletes it (TASK-111.13.1)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,6 +50,8 @@ Coordinator since 2026-10-28 (human approved the split). The original single-PR 
 2026-10-26 (human approved): delete the three provider fields instead of moving them (TASK-111.10 review of the workplace capability shape; workplace-systems.md amended).
 
 2026-10-28: split into 111.13.1 to 111.13.3 (human); ACs reworded to the split and the dead-code rulings.
+
+- 2026-10-28: all ACs checked from the subtasks: 111.13.1 (#1801), 111.13.2 (#1802) and 111.13.3 (#1803) merged and in production on sre-bot-task:64 (the 111.14 deploy; post features PASS 19:17Z, app working, human). Done (human).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

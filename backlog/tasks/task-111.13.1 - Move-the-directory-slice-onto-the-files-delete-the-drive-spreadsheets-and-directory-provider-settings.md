@@ -3,10 +3,10 @@ id: TASK-111.13.1
 title: >-
   Move the directory slice onto the files; delete the drive, spreadsheets and
   directory provider settings
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T14:25:00Z'
+updated_date: '2026-10-28T19:48:00Z'
 labels:
   - configuration
 milestone: m-7

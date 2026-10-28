@@ -3,10 +3,10 @@ id: TASK-59
 title: >-
   Consolidate the DynamoDB RetryStore onto QueueService; delete the
   unimplemented SQS retry backend
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-07-28 13:20
-updated_date: '2026-10-28T13:46:00Z'
+updated_date: '2026-10-28T19:48:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -50,6 +50,12 @@ Depends on TASK-34 (QueueService must exist before retry can fold onto it). Step
 - [ ] #1 Retry consumers migrated onto QueueService; tests green; no back-compat shim remains
 - [ ] #2 PR references decisions/reliability.md
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Superseded by TASK-111.13.2 (#1802).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

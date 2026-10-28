@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-26T22:21:00Z'
-updated_date: '2026-10-27T19:56:00Z'
+updated_date: '2026-10-28T19:47:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -160,6 +160,8 @@ Human steps: after the terraform expand PR applies, put-parameter /sre-bot/AWS__
 2026-10-27 merge-gate evidence: #1796 merged 14:10Z (ssm.tf +2), both values put; pre aws 14:13Z: seven MATCH (instance id, instance ARN, org, audit and logging roles, both permission sets), both formats OK, no retired tuning line, aws_pre PASS; rollback tag 5b0a7cb1e6044bb7b382275157d7abcea5498260-2026-10-27 (sre-bot-task:56). AC #3 and #8 checked (docker-compose sets AWS_DEFAULT_REGION; ECS sets it on Fargate). pre aws's task-definition line now excludes the AWS__* slice names it wrongly listed. Remaining: pre at merge, deploy, post aws and a DynamoDB-backed read (DoD), then the cleanup.
 
 post aws 2026-10-27 19:45Z on sre-bot-task:58 (deploy of #1797, which carries this slice unchanged): rollout, boot_errors, runtime_errors, slack_up, aws and version PASS; 0 region, endpoint, credential or AssumeRole lines; 0 configuration_invalid; 2 DynamoDB-backed events (the DynamoDB-backed read). Waiting: the Identity Center read (integration_healthcheck_result integration=aws result=healthy since the deploy), then the cleanup.
+
+- 2026-10-28: AC #1 checked from the recorded evidence (post aws PASS on sre-bot-task:58, 2026-10-27 19:45Z); it was left unchecked when the task was set Done.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -4,7 +4,7 @@ title: Delete GoogleResourcesConfig and the interim google_resources table
 status: To Do
 assignee: []
 created_date: 2026-10-20 23:28
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -35,4 +35,11 @@ After TASK-145.6, 145.7, 145.10, 145.12, 39 and 88 move their ids into their own
 - [ ] #2 No configuration file has a [google_resources] table and the ownership check passes
 - [ ] #3 decisions/configuration.md no longer tolerates GOOGLE_RESOURCES
 - [ ] #4 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [ ] #5 No reader of a Google document, folder, sheet or calendar id remains outside its owner's slice, and each owner's key is environment-only (decisions/configuration.md non-public values)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-10-28 (human, TASK-111.10.3 planning): superseded. A value moves once to its end-state owner (decisions/configuration.md), so TASK-111.10.3 moves every id and deletes GoogleResourcesConfig, get_google_resources_config, the [google_resources] table and the tolerated GOOGLE_RESOURCES item; nothing is left for this task. Proposed: close as superseded by TASK-111.10.3 (human closes).
+<!-- SECTION:NOTES:END -->

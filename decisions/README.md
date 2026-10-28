@@ -55,6 +55,9 @@ The app is the organisation's internal operations platform, with incident respon
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |
 | [i18n.md](i18n.md) | EN/FR translation | target |
+| [organisation-content.md](organisation-content.md) | choosing configuration, code or content, and a content kind's source; rules every kind follows | target |
+| [provisioned-content.md](provisioned-content.md) | content as files: format, schema, loading, ownership, rollback with the image | target |
+| [managed-content.md](managed-content.md) | content as records changed in flight: validated, authorised, versioned, audited writes; untrusted reads; schema evolution | target |
 | [migration.md](migration.md) | The strangler plan for `app/modules/`: rebuild by surface, non-layer directories | now |
 
 `Applies: now` means the record's Checks pass on `main` today. `Applies: target` means the record describes the destination and names its migration ticket — the code is allowed to diverge *only* in the ways the record's Migration section lists.

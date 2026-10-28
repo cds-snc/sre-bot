@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-27T18:11:00Z'
+updated_date: '2026-10-28T20:13:00Z'
 labels:
   - incident
   - features
@@ -63,7 +63,7 @@ RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 - [ ] #7 create imports RECORD_VERSION and OPEN_BUCKET from core/store.py and sets record_version, open_bucket and opened_at in the same write; opened_at comes from format_stored_time in core/adapters/incident_items.py (fixed-width ISO-8601 UTC, isoformat(timespec="microseconds"), +00:00), tested for width and offset
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, boot fails with one CRITICAL plugin_boot_failed event naming the key (declare is the feature's core path, so an enabled incident feature requires it: decisions/plugins.md, TASK-172) (tested)
-- [ ] #10 The incident handbook id moves from the interim [google_resources] table into the incident response slice's table in the configuration files, and GoogleResourcesConfig stops exposing it
+- [ ] #10 incident.response reads the handbook id from [incident_response] handbook_id (features/incident/response/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -107,4 +107,6 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 2026-10-14 (TASK-145.5 split): create sets open_bucket OPEN and opened_at (fixed-width ISO-8601 UTC, microseconds, +00:00) in the same write, and every reference takes its tenant from the event payload (Slack team_id), not from settings.
 
 2026-10-20 (SLACK_TEAM_ID review): writers stamp the configured Slack tenant, which TASK-157's runtime guard has verified against the request (decisions/workplace-systems.md rule 3); with SLACK_ENTERPRISE_ID set the tenant is the Enterprise org id. Depends on TASK-157.
+
+- 2026-10-28 (TASK-167 accepted): locales/incident.*.yml carry CDS wording; each incident surface rebuild moves the strings it touches to provisioned organisation wording (message overrides by key over generic app strings, decisions/organisation-content.md, i18n.md), keeping generic defaults in the app.
 <!-- SECTION:NOTES:END -->

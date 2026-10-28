@@ -54,13 +54,15 @@ def _gaps(
     name: str, old: str | None, dev_only: bool, terraform: set[str], entries: list[Entry], read: set[str] | None
 ) -> list[str]:
     in_doc14 = old is not None
+    # A doc-14 key may name a path inside a blob line ("GOOGLE_RESOURCES inc.f"); the line is its first word.
+    line = old.split()[0] if old else None
     parameters = {n: s for source, n, s in entries if source == "ssm-param"}
     blob = {n for source, n, s in entries if source.startswith("ssm-blob") and s == "set"}
     codespaces = {n for source, n, _ in entries if source.startswith("codespaces")}
     example = {n for source, n, _ in entries if source == EXAMPLE_SOURCE}
     gaps: list[str] = []
 
-    if dev_only and old in blob:
+    if dev_only and line in blob:
         gaps.append(f"doc-14 says development only, but production sets {old}: it needs a parameter (fix doc-14)")
     elif dev_only and name in terraform:
         gaps.append("development only, but terraform/ssm.tf creates it (its placeholder would reach production)")
@@ -72,9 +74,9 @@ def _gaps(
     if name in terraform and parameters:
         state = parameters.get(name, "missing")
         if state == "missing":
-            source = "" if old is None or old in blob else f", and there is no {old} line in the production blobs to copy"
+            source = "" if old is None or line in blob else f", and there is no {old} line in the production blobs to copy"
             gaps.append(f"terraform/ssm.tf creates it, but SSM has no parameter yet (tf_apply pending){source}")
-        elif state != "set" and old in blob:
+        elif state != "set" and line in blob:
             gaps.append(f"parameter is {state}: put-parameter from {old}")
         elif state != "set":
             gaps.append(f"parameter is {state}, and there is no {old} line in the production blobs to copy")

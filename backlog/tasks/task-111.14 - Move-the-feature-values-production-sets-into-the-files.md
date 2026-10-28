@@ -3,10 +3,10 @@ id: TASK-111.14
 title: >-
   Move the feature values production sets into the files; delete the dead atip
   and groups slices
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T18:18:00Z'
+updated_date: '2026-10-28T19:48:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -235,4 +235,11 @@ Gates: ruff and format clean; mypy 41 (baseline 43); pytest 5912 passed; contrac
 - zsh bin/env-checks.zsh apply <plan> (make env-checks-apply PLAN=<plan>) prints that saved plan and its age, and asks for 'yes'.
 - It then runs the plan line by line, logs ok/FAILED to <plan>.applied.txt, renames the plan to .applied.sh so it cannot run twice, and exits 1 on any failure.
 - Verified: smoke tests for cancel, apply, empty and bad paths; bin tests 310 passed; ruff clean. The full app gates were not rerun: dev tooling only (human).
+
+2026-10-28 merged #1804 (75757c6b, 19:04:20Z).
+- Pre at merge (19:04Z): rollback tag 0995888b958034f520dd99e324827e93937daeb0-2026-10-28 (sre-bot-task:63).
+- Deploy run 40750960654: build, sbom and deploy all success; sre-bot-task:64 runs image 75757c6b.
+- post features (19:17Z): rollout, boot_errors, runtime_errors, slack_up, features (0 configuration_invalid) and version all PASS.
+- Manual: the startup message arrived in the ops channel, and an admin's /aws groups list succeeded.
+- env-checks plan 19:18Z (tmp/env-checks/20261028T191835Z.plan.sh), same 56 delete rows as before the merge: awaiting the human's apply.
 <!-- SECTION:NOTES:END -->
