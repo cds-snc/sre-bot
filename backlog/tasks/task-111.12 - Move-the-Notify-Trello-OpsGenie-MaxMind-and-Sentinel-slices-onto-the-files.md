@@ -1,10 +1,10 @@
 ---
 id: TASK-111.12
 title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the files
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T02:39:00Z'
+updated_date: '2026-10-28T13:13:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -36,7 +36,7 @@ The Notify, Trello, OpsGenie, MaxMind and Sentinel slices (integrations/<vendor>
 - [x] #4 Every reader of the four slices builds them at use, not at import (integrations/trello/client.py:7, opsgenie/client.py:10, notify/client.py:15 today); a fresh-interpreter import test proves the provider caches stay empty, as tests/unit/server/test_server_app_import_google_settings_lazy.py does
 - [x] #5 Each of the four slices is validated at boot: a half-configured tenant entry or an unknown key fails boot naming the key; no entry boots with the vendor not configured and no network call, and its client reports not configured at use
 - [x] #6 Notify's revoke no longer reads ENVIRONMENT: without [notify.tenant] it returns error and logs revoke_api_key_not_configured with no HTTP call
-- [ ] #7 Before merge, pre vendors PASSES (six parameters MATCH their blob lines, the Notify URL recorded); after deploy, post vendors PASSES; the google, aws and openai deploy checks are deleted
+- [x] #7 Before merge, pre vendors PASSES (six parameters MATCH their blob lines, the Notify URL recorded); after deploy, post vendors PASSES; the google, aws and openai deploy checks are deleted
 - [x] #8 The configuration files hold no credential or non-public value; production.toml carries [notify.tenant], [opsgenie.tenant] and [maxmind.tenant], local.toml [maxmind.tenant]
 <!-- AC:END -->
 
@@ -121,6 +121,8 @@ Actions secrets NOTIFY_TEST_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET;
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-28 implementation (branch task-111.12-vendor-slices, from main 7315e957). Notify, Trello, Opsgenie and MaxMind are ConfigurationSlices: [notify] timeout_seconds 60 and [notify.tenant] api_url (production.toml, https://api.notification.canada.ca, to be confirmed by pre vendors against the blob's NOTIFY_API_URL); [opsgenie] timeout_seconds 30 (urlopen had none) and [opsgenie.tenant] api_url (production.toml and local.toml, https://api.opsgenie.com); Trello's entry TRELLO__TENANT__APP_KEY/TOKEN from the environment with TRELLO__ATIP_BOARD beside it (empty counts as unset; board without entry fails); [maxmind.tenant] database_path (production.toml and local.toml). Credentials SecretStr; half entries and unknown keys fail boot naming the key (host_configuration validates all four). Clients read at use: no module-level settings; Notify revoke without an entry logs revoke_api_key_not_configured and returns error, ENVIRONMENT check and host_info import gone; Opsgenie api_get_request(path) builds the tenant URL, raises OpsGenieAPIError when not configured, healthcheck logs opsgenie_not_configured; create_alert and api_post_request deleted with exports and tests; Trello raises TrelloNotConfiguredError; MaxMindClient(database_path) returns CONFIG_NOT_CONFIGURED without an entry. Retired names (flat NOTIFY_/TRELLO_/OPSGENIE_/MAXMIND_ and TRELLO__APP_KEY/TOKEN) pinned unread; pytest env and ci_code.yml moved off them; audit HINTS added. deploy-checks: google, aws, openai removed (tasks Done), vendors added. configuration.md D1 amendment, current state, tolerated list and Changes; doc-14 rows. Gates: ruff ok; mypy 47 errors = main baseline, none in touched files; pytest tests --ignore=tests/smoke 5999 passed; import contracts 13 kept; settings key ownership OK. AC #7 waits on pre vendors before merge and post vendors after deploy.
+
+2026-10-28 pre vendors PASS (tmp/deploy-checks/pre-vendors-20261028T025350Z.txt): six parameters MATCH, Notify host MATCH (https://api.notification.canada.ca), no MAXMIND_DB_PATH or Opsgenie host line. Rollback image_tag 1270ea357ac6d0ce14c8b74e4895d130eb51b53b-2026-10-27. AC #7 waits on post vendors.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-28T13:46:00Z'
-updated_date: '2026-10-28T14:15:00Z'
+updated_date: '2026-10-28T14:25:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -31,7 +31,7 @@ Slice A of TASK-111.13. DirectorySettings becomes a ConfigurationSlice on [direc
 - [x] #2 DIRECTORY_PROVIDER, DRIVE_PROVIDER and SPREADSHEET_PROVIDER are deleted, not moved; each factory builds the Google adapter directly and the entra_id path is gone; DriveSettings and SpreadsheetSettings are deleted and no file has a [drive] or [spreadsheets] table
 - [x] #3 The Google directory, drive and spreadsheet adapters take no settings argument, and the unread cache_ttl_seconds, startup_warmup_timeout_seconds and startup_preload_groups are deleted
 - [x] #4 An unknown or deleted key in [directory] fails boot naming it
-- [ ] #5 Every retired name is in the env audit HINTS and app/.env.example holds none
+- [x] #5 Every retired name is in the env audit HINTS and app/.env.example holds none
 - [x] #6 ruff, mypy (no new errors), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
