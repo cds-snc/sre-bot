@@ -66,7 +66,6 @@ def provider(drive_service):
     get_service = MagicMock(return_value=drive_service)
     return GoogleDriveProvider(
         get_service=get_service,
-        drive_settings=MagicMock(),
     )
 
 

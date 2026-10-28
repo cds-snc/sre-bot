@@ -66,7 +66,6 @@ def spreadsheet_service() -> MagicMock:
 def provider(spreadsheet_service: MagicMock) -> GoogleSpreadsheetProvider:
     return GoogleSpreadsheetProvider(
         get_service=MagicMock(return_value=spreadsheet_service),
-        spreadsheet_settings=MagicMock(),
     )
 
 

@@ -1,61 +1,36 @@
-"""Directory service settings."""
+"""Directory service settings: the [directory] table of the configuration files."""
 
 from functools import lru_cache
-from typing import Literal
 
 from pydantic import Field
+from pydantic_settings import SettingsConfigDict
 
-from infrastructure.configuration.base import InfrastructureSettings
+from contracts.configuration import ConfigurationSlice
 
 
-class DirectorySettings(InfrastructureSettings):
-    """Directory core service configuration.
+class DirectorySettings(ConfigurationSlice):
+    """Startup behaviour of the directory service.
 
-    Controls which IDP provider backs the directory service and governs
-    startup behaviour for ECS task readiness.
+    Which directory answers a lookup is data (the IdP in a group reference, available when its
+    tenant entry is configured), never a setting; Google is the only adapter today.
 
-    Environment Variables:
-        DIRECTORY_PROVIDER: IDP backend to activate (default: google)
-        DIRECTORY_REQUIRE_STARTUP_WARMUP: Fail startup if warmup fails (default: False)
-        DIRECTORY_CACHE_TTL_SECONDS: In-process membership cache TTL (default: 60)
-        DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS: Startup warmup timeout in seconds
+    Keys of [directory]:
+        require_startup_warmup: fail startup when the remote directory warmup fails. Default: false.
 
     Example:
         ```python
-        from infrastructure.directory.settings import get_directory_settings
-
         settings = get_directory_settings()
-
-        provider = settings.provider
         if settings.require_startup_warmup:
             # Opt in to fail-fast remote validation before accepting traffic
             ...
         ```
     """
 
-    provider: Literal["google", "entra_id"] = Field(
-        default="google",
-        alias="DIRECTORY_PROVIDER",
-        description="IDP backend - 'google' or 'entra_id'",
-    )
+    model_config = SettingsConfigDict(toml_table_header=("directory",), env_prefix="DIRECTORY__")
+
     require_startup_warmup: bool = Field(
         default=False,
-        alias="DIRECTORY_REQUIRE_STARTUP_WARMUP",
         description="Opt in to fail-fast startup validation against the remote directory",
-    )
-    startup_preload_groups: list[str] = Field(
-        default_factory=list,
-        description="Group keys to pre-load into cache at startup",
-    )
-    cache_ttl_seconds: int = Field(
-        default=60,
-        alias="DIRECTORY_CACHE_TTL_SECONDS",
-        description="In-process membership cache TTL in seconds",
-    )
-    startup_warmup_timeout_seconds: int = Field(
-        default=2,
-        alias="DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS",
-        description="Timeout for the lightweight startup warmup probe",
     )
 
 

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-10-26T19:31:00Z'
+updated_date: '2026-10-28T14:15:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -55,7 +55,18 @@ Behaviour-preserving. migration.md rule 6: the capability is not widened to repr
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-20 23:28
+
 ---
+
 2026-10-20 (TASK-111 planning): TASK-111 moves this slice's values into the configuration files under a table whose name does not depend on the module path, so this move relocates the settings class only; the files and env names stay as they are.
+
+---
+
+created: 2026-10-28T14:15:00Z
+
+---
+
+2026-10-28: TASK-174 (Entra directory adapter, unscheduled) depends on this move; adapters/ is where it lands, and get_directory_provider becomes per-IdP resolution there.
+
 ---
 <!-- COMMENTS:END -->

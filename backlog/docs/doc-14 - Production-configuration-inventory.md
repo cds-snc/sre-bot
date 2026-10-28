@@ -21,7 +21,7 @@ Destinations:
 ## Facts recorded for TASK-111 AC6
 
 - Production sets `AWS_ORG_ACCOUNT_ROLE_ARN` and `ISSUER_CONFIG`.
-- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP`, `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults.
+- Production does not set `ACCESS_SYNC_ENABLED`, `DIRECTORY_REQUIRE_STARTUP_WARMUP` (now `[directory] require_startup_warmup`, default false), `SLACK__SIGNING_SECRET` (formerly `SLACK_SIGNING_SECRET`) or any `ACCESS_*` key; those run on their code defaults.
 - Production `CORS_ALLOWED_ORIGINS` is the terraform variable default, an empty list.
 
 ## sre-bot-config
@@ -31,8 +31,8 @@ Destinations:
 | ACCESS_TOKEN_EXPIRE_MINUTES | ServerSettings (unused field) | delete | 111.7 |
 | APP_TOKEN | none | delete | 111.15 |
 | ATIP_ANNOUNCE_CHANNEL | AtipSettings (dead slice) | delete | 111.14 |
-| AWS_AUDIT_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__AUDIT_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded as development only, wrongly); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
-| AWS_LOGGING_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__LOGGING_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded as development only, wrongly); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
+| AWS_AUDIT_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__AUDIT_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded wrongly as unset in production); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
+| AWS_LOGGING_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__LOGGING_ROLE_ARN (non-public value, travels with the tenant entry); production sets it (pre aws 2026-10-27; first recorded wrongly as unset in production); parameter added by a second terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blob | 111.11.1 |
 | AWS_ORG_ACCOUNT_ROLE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__ORG_ROLE_ARN (non-public value); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |
 | AWS_SRE_ACCOUNT_ROLE_ARN | none | delete | 111.15 |
 | AWS_SSO_INSTANCE_ARN | no longer read (TASK-111.11.1, 2026-10-26) | secret AWS__TENANT__INSTANCE_ARN (non-public value: an internal tenant identifier only Identity Center administrators see); parameter added by a terraform-only PR before 111.11.1, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.11.1 |

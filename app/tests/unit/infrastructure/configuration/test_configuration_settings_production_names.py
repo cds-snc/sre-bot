@@ -46,9 +46,6 @@ from pydantic_settings import BaseSettings
 from infrastructure.audit.settings import AuditSettings
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.coordination.settings import ConditionalWriteSettings
-from infrastructure.directory.settings import DirectorySettings
-from infrastructure.drive.settings import DriveSettings
-from infrastructure.spreadsheets.settings import SpreadsheetSettings
 from integrations.aws.settings import AWSSettings
 from integrations.google_workspace.settings import GoogleResourcesConfig, GoogleWorkspaceSettings
 from integrations.maxmind.settings import MaxMindSettings
@@ -80,10 +77,6 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (RetrySettings, "RETRY_MAX_DELAY_SECONDS", "max_delay_seconds", "3601", 3601),
     (RetrySettings, "RETRY_BATCH_SIZE", "batch_size", "11", 11),
     (RetrySettings, "RETRY_CLAIM_LEASE_SECONDS", "claim_lease_seconds", "301", 301),
-    (DirectorySettings, "DIRECTORY_PROVIDER", "provider", "entra_id", "entra_id"),
-    (DirectorySettings, "DIRECTORY_REQUIRE_STARTUP_WARMUP", "require_startup_warmup", "true", True),
-    (DirectorySettings, "DIRECTORY_CACHE_TTL_SECONDS", "cache_ttl_seconds", "61", 61),
-    (DirectorySettings, "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "startup_warmup_timeout_seconds", "3", 3),
     (
         GoogleResourcesConfig,
         "GOOGLE_RESOURCES",
@@ -118,22 +111,6 @@ def test_configuration_settings_production_name_reaches_field(
     settings = settings_class(_env_file=None)  # type: ignore[call-arg]
 
     assert getattr(settings, attribute) == expected
-
-
-@pytest.mark.parametrize(
-    ("settings_class", "env_name"),
-    [(DriveSettings, "DRIVE_PROVIDER"), (SpreadsheetSettings, "SPREADSHEET_PROVIDER")],
-)
-def test_configuration_settings_single_value_provider_name_is_read(
-    monkeypatch: pytest.MonkeyPatch,
-    settings_class: type[BaseSettings],
-    env_name: str,
-) -> None:
-    """The provider allows only its default, so an unknown value is rejected, proving the name is read."""
-    monkeypatch.setenv(env_name, "sentinel")
-
-    with pytest.raises(ValidationError):
-        settings_class(_env_file=None)  # type: ignore[call-arg]
 
 
 def test_configuration_settings_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:

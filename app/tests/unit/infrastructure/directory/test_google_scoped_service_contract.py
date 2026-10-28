@@ -130,14 +130,8 @@ def test_provider_requests_narrow_scopes_per_operation(
         observed_scopes.append(scopes)
         return service
 
-    settings = MagicMock()
-    settings.managed_group_domain = "example.com"
-    settings.managed_group_prefix = "sg-"
-    settings.enforce_managed_group_email = True
-
     provider = GoogleDirectoryProvider(
         get_service=get_service,
-        directory_settings=settings,
         customer_id="my_customer",
     )
 

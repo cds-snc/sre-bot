@@ -17,7 +17,6 @@ from infrastructure.directory.models import (
     DirectoryUser,
     MembershipCheckResult,
 )
-from infrastructure.directory.settings import DirectorySettings
 from integrations.google_workspace.client import classify_google_error
 
 if TYPE_CHECKING:
@@ -50,7 +49,6 @@ class GoogleDirectoryProvider:
     def __init__(
         self,
         get_service: Callable[[list[str]], AdminDirectoryResource],
-        directory_settings: DirectorySettings,
         customer_id: str,
     ) -> None:
         """Initialise with an injected, per-call scoped service factory.
@@ -58,12 +56,10 @@ class GoogleDirectoryProvider:
         Args:
             get_service: Factory building a scoped Admin Directory Resource
                 for a given OAuth scope list — called once per operation.
-            directory_settings: Directory provider settings.
             customer_id: Real Google Workspace customer id for directory operations
                 (the tenant entry's id; never the my_customer alias).
         """
         self._get_service = get_service
-        self._directory_settings = directory_settings
         self._customer_id = customer_id
         self._logger = logger.bind(provider="google")
 

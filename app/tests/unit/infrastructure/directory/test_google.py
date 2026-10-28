@@ -1,7 +1,6 @@
 """Unit tests for GoogleDirectoryProvider."""
 
 from inspect import signature
-from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -152,29 +151,10 @@ def google_service() -> MagicMock:
 
 
 @pytest.fixture
-def mock_directory_settings():
-    """Directory settings fixture for provider construction."""
-    return MagicMock()
-
-
-@pytest.fixture
-def directory_settings() -> SimpleNamespace:
-    """Directory settings exposing only the fields the service still owns."""
-    return SimpleNamespace(
-        provider="google",
-        require_startup_warmup=False,
-        startup_preload_groups=[],
-        cache_ttl_seconds=60,
-        startup_warmup_timeout_seconds=2,
-    )
-
-
-@pytest.fixture
-def provider(google_service, mock_directory_settings):
+def provider(google_service):
     """GoogleDirectoryProvider backed by a fake Admin SDK Directory service."""
     return GoogleDirectoryProvider(
         get_service=lambda scopes: google_service,
-        directory_settings=mock_directory_settings,
         customer_id="my_customer",
     )
 
@@ -986,27 +966,6 @@ class TestGetGroup:
         # Assert
         assert result.is_success
         assert result.data.aliases == ("sg-team", "team@other.org")
-
-
-class TestProviderIgnoresManagedGroupSettings:
-    def test_operates_with_settings_exposing_only_service_fields(self, google_service, directory_settings):
-        """The provider reads no managed-group configuration from its settings slice."""
-        # Arrange
-        provider = GoogleDirectoryProvider(
-            get_service=lambda scopes: google_service,
-            directory_settings=directory_settings,
-            customer_id="my_customer",
-        )
-        google_service.groups.return_value.get.return_value = _request(
-            {"email": "sg-admin@example.com", "id": "group-1", "name": "Admins"}
-        )
-
-        # Act
-        result = provider.get_group("sg-admin@example.com")
-
-        # Assert
-        assert result.is_success
-        assert result.data.group_email == "sg-admin@example.com"
 
 
 class TestAddGroupMember:

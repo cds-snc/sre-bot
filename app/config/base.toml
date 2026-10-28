@@ -127,6 +127,12 @@ max_output_tokens = 3000
 temperature = -1.0
 timeout_seconds = 180.0
 
+[directory]
+# Which directory answers a lookup is data (the IdP in a group reference, available when its tenant
+# entry is configured), never a setting; Google is the only adapter today. true fails startup when
+# the directory warmup fails.
+require_startup_warmup = false
+
 [notify]
 # The GC Notify request timeout. The API host is the [notify.tenant] entry (api_url), named in the
 # deployment's environment file; with no entry Notify is not configured. The credentials are secrets

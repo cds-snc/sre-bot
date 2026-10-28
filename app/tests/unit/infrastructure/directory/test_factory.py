@@ -15,12 +15,10 @@ class TestBuildGoogleDirectoryProvider:
     def test_returns_google_directory_provider_instance(self):
         # Arrange
         mock_get_service = MagicMock()
-        mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
             get_service=mock_get_service,
-            directory_settings=mock_directory_settings,
             customer_id="my_customer",
         )
 
@@ -30,12 +28,10 @@ class TestBuildGoogleDirectoryProvider:
     def test_returned_object_satisfies_directory_provider_protocol(self):
         # Arrange
         mock_get_service = MagicMock()
-        mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
             get_service=mock_get_service,
-            directory_settings=mock_directory_settings,
             customer_id="my_customer",
         )
 
@@ -45,12 +41,10 @@ class TestBuildGoogleDirectoryProvider:
     def test_provider_uses_injected_service_factory(self):
         # Arrange
         mock_get_service = MagicMock()
-        mock_directory_settings = MagicMock()
 
         # Act
         provider = build_google_directory_provider(
             get_service=mock_get_service,
-            directory_settings=mock_directory_settings,
             customer_id="my_customer",
         )
 
@@ -63,16 +57,14 @@ class TestBuildGoogleDirectoryProvider:
 def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: pytest.MonkeyPatch) -> None:
     directory_factory.get_directory_provider.cache_clear()
 
-    directory_settings = SimpleNamespace(provider="google")
     workspace_settings = SimpleNamespace(
         tenant=SimpleNamespace(customer_id="C03abc123", delegated_user_email="sre-bot@example.com"),
     )
 
     captured: dict[str, object] = {}
 
-    def fake_builder(*, get_service, directory_settings, customer_id):
+    def fake_builder(*, get_service, customer_id):
         captured["get_service"] = get_service
-        captured["directory_settings"] = directory_settings
         captured["customer_id"] = customer_id
         return MagicMock(spec=DirectoryProvider)
 
@@ -82,7 +74,6 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
         observed_service_calls.append((scopes, delegated_user_email))
         return MagicMock()
 
-    monkeypatch.setattr(directory_factory, "get_directory_settings", lambda: directory_settings)
     monkeypatch.setattr(directory_factory, "get_google_workspace_settings", lambda: workspace_settings, raising=False)
     monkeypatch.setattr(directory_factory, "get_admin_directory_service", fake_get_admin_directory_service, raising=False)
     monkeypatch.setattr(directory_factory, "build_google_directory_provider", fake_builder)
@@ -90,7 +81,6 @@ def test_get_directory_provider_uses_scoped_google_service_factory(monkeypatch: 
     provider = directory_factory.get_directory_provider()
 
     assert isinstance(provider, DirectoryProvider)
-    assert captured["directory_settings"] is directory_settings
     assert captured["customer_id"] == "C03abc123"
 
     scoped_get_service = captured["get_service"]
@@ -113,11 +103,10 @@ def test_get_directory_provider_without_a_google_tenant_entry_passes_no_customer
     directory_factory.get_directory_provider.cache_clear()
     captured: dict[str, object] = {}
 
-    def fake_builder(*, get_service, directory_settings, customer_id):
+    def fake_builder(*, get_service, customer_id):
         captured["customer_id"] = customer_id
         return MagicMock(spec=DirectoryProvider)
 
-    monkeypatch.setattr(directory_factory, "get_directory_settings", lambda: SimpleNamespace(provider="google"))
     monkeypatch.setattr(directory_factory, "get_google_workspace_settings", lambda: SimpleNamespace(tenant=None))
     monkeypatch.setattr(directory_factory, "build_google_directory_provider", fake_builder)
 
@@ -125,3 +114,16 @@ def test_get_directory_provider_without_a_google_tenant_entry_passes_no_customer
     directory_factory.get_directory_provider.cache_clear()
 
     assert captured["customer_id"] == ""
+
+
+def test_the_google_provider_takes_no_settings_argument() -> None:
+    """The adapter reads no settings, so neither the builder nor the constructor accepts one."""
+    with pytest.raises(TypeError):
+        build_google_directory_provider(get_service=MagicMock(), directory_settings=MagicMock(), customer_id="c")  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        GoogleDirectoryProvider(get_service=MagicMock(), directory_settings=MagicMock(), customer_id="c")  # type: ignore[call-arg]
+
+
+def test_the_factory_has_no_provider_dispatch() -> None:
+    """The Google provider is built directly: the factory neither reads settings nor names another vendor."""
+    assert not hasattr(directory_factory, "get_directory_settings")

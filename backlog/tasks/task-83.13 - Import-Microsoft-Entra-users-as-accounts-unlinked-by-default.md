@@ -5,8 +5,8 @@ title: >-
   trusted IdP
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 17:46'
+created_date: 2026-09-10 16:18
+updated_date: '2026-10-28T14:15:00Z'
 labels:
   - identity
 dependencies:
@@ -15,7 +15,7 @@ dependencies:
   - TASK-83.12
 references:
   - decisions/people-and-accounts.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1623'
+  - https://github.com/cds-snc/sre-bot/issues/1623
 parent_task_id: TASK-83
 priority: medium
 ordinal: 180000
@@ -38,3 +38,15 @@ It uses the same job shape as TASK-83.5. Each Entra user becomes a person with a
 - [ ] #5 The job runs behind a setting that defaults to off and makes no writes to Entra
 - [ ] #6 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-28T14:15:00Z
+
+---
+
+2026-10-28: the membership side of a trusted Entra (Graph checkMemberGroups adapter in capabilities/directory) is TASK-174; build them together.
+
+---
+<!-- COMMENTS:END -->

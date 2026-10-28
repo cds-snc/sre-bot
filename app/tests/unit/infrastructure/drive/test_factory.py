@@ -1,6 +1,5 @@
 """Factory contract for the DriveProvider singleton and provider construction."""
 
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -13,44 +12,37 @@ from infrastructure.drive.provider import DriveProvider
 
 class TestBuildGoogleDriveProvider:
     def test_returns_google_drive_provider_instance(self):
-        provider = build_google_drive_provider(
-            get_service=MagicMock(),
-            drive_settings=MagicMock(),
-        )
+        provider = build_google_drive_provider(get_service=MagicMock())
 
         assert isinstance(provider, GoogleDriveProvider)
 
     def test_returned_object_satisfies_drive_provider_protocol(self):
-        provider = build_google_drive_provider(
-            get_service=MagicMock(),
-            drive_settings=MagicMock(),
-        )
+        provider = build_google_drive_provider(get_service=MagicMock())
 
         assert isinstance(provider, DriveProvider)
 
     def test_provider_uses_injected_service_factory(self):
         mock_get_service = MagicMock()
-        mock_drive_settings = MagicMock()
 
-        provider = build_google_drive_provider(
-            get_service=mock_get_service,
-            drive_settings=mock_drive_settings,
-        )
+        provider = build_google_drive_provider(get_service=mock_get_service)
 
         assert provider._get_service is mock_get_service
-        assert provider._drive_settings is mock_drive_settings
+
+    def test_builder_and_adapter_take_no_settings_argument(self):
+        """The adapter reads no settings, so neither entry point accepts one."""
+        with pytest.raises(TypeError):
+            build_google_drive_provider(get_service=MagicMock(), drive_settings=MagicMock())  # type: ignore[call-arg]
+        with pytest.raises(TypeError):
+            GoogleDriveProvider(get_service=MagicMock(), drive_settings=MagicMock())  # type: ignore[call-arg]
 
 
 @pytest.mark.unit
-def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
+def test_get_drive_provider_builds_the_google_adapter_with_the_scoped_service_factory(monkeypatch):
     drive_factory.get_drive_provider.cache_clear()
-
-    drive_settings = SimpleNamespace(provider="google")
     captured = {}
 
-    def fake_builder(*, get_service, drive_settings):
+    def fake_builder(*, get_service):
         captured["get_service"] = get_service
-        captured["drive_settings"] = drive_settings
         return MagicMock(spec=DriveProvider)
 
     observed_service_calls = []
@@ -59,15 +51,13 @@ def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
         observed_service_calls.append((scopes, delegated_user_email))
         return MagicMock()
 
-    monkeypatch.setattr(drive_factory, "get_drive_settings", lambda: drive_settings)
     monkeypatch.setattr(drive_factory, "get_drive_service", fake_get_drive_service, raising=False)
     monkeypatch.setattr(drive_factory, "build_google_drive_provider", fake_builder)
 
     provider = drive_factory.get_drive_provider()
+    drive_factory.get_drive_provider.cache_clear()
 
     assert isinstance(provider, DriveProvider)
-    assert captured["drive_settings"] is drive_settings
-
     scoped_get_service = captured["get_service"]
     assert callable(scoped_get_service)
 
@@ -75,3 +65,10 @@ def test_get_drive_provider_uses_scoped_google_service_factory(monkeypatch):
     assert observed_service_calls == [
         (["https://www.googleapis.com/auth/drive"], "caller@example.com"),
     ]
+
+
+@pytest.mark.unit
+def test_the_drive_settings_module_is_gone():
+    """No provider setting exists: the vendor is the Google adapter, never a configured choice."""
+    with pytest.raises(ModuleNotFoundError):
+        __import__("infrastructure.drive.settings")

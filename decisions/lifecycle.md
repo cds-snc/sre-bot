@@ -13,7 +13,7 @@ Composition order matters: configuration before services, services before plugin
 
 Current code (`app/server/lifespan.py`):
 - Loads settings slices and logs their keys, and builds the JWKS clients without fetching keys (a missing `ISSUER_CONFIG` logs a warning and continues).
-- Makes network calls before traffic in two places: the directory warmup, when `DIRECTORY_REQUIRE_STARTUP_WARMUP` opts in, and `access/sync`'s `startup_warmup`, whose adapter assumes an AWS role through STS while `get_aws_client` builds it. The second one makes STS a hard boot dependency of the whole app on behalf of one business feature.
+- Makes network calls before traffic in two places: the directory warmup, when `[directory] require_startup_warmup` opts in, and `access/sync`'s `startup_warmup`, whose adapter assumes an AWS role through STS while `get_aws_client` builds it. The second one makes STS a hard boot dependency of the whole app on behalf of one business feature.
 - Loads plugins from the `pyproject.toml` entry points (`load_plugins`); a plugin that fails to import aborts boot.
 - Collects i18n resources through `register_i18n_resources`, then initializes the translator strictly; failure aborts boot.
 - Calls `register_slack_commands`, `register_routes` and `startup_warmup`; features construct their services lazily or inside `startup_warmup`. `access/request` and `access/sync` subscribe to in-process events there.
@@ -93,3 +93,4 @@ Tolerated until closed:
 - 2026-10-26: the scheduler starting inside the Slack branch is listed as tolerated; phase 6 starts it independent of the transports (TASK-112.4).
 - 2026-10-26: `[scheduler] enabled` starts the scheduler after the transports, independent of the Slack app; the stale-channel job uses the Slack Web API client and runs only with `[slack.tenant]`; that tolerated item is closed (TASK-112.4).
 - 2026-10-27: a feature with invalid settings or a required vendor not configured aborts boot like every other layer; the degraded starts are JWKS issuer gaps and credential checks only (TASK-172).
+- 2026-10-28: the unread directory warmup timeout and preload-group settings are deleted; `[directory] require_startup_warmup` is the one warmup opt-in left, and its removal is TASK-128.
