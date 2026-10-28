@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-28T23:32:00Z'
+updated_date: '2026-10-28T23:36:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -122,4 +122,6 @@ HUMAN STEPS BEFORE MERGE: run bin/deploy-checks.zsh pre and keep the printed rol
 - AC #12 (code done, open on the production value): SentinelSettings is a ConfigurationSlice on [sentinel], read at send time; base.toml log_type = DevSREBot; production.toml has no [sentinel] log_type yet: no recorded output holds the blob's SENTINEL_LOG_TYPE, so pre sentinel prints it and the value is copied in before the PR opens. Ride-along: post_data no longer binds the workspace id (non-public) to its log lines.
 - AC #9 (open): google_ids and google_resources_json.py deleted; the audit reports a blob line split into per-id secrets (GOOGLE_RESOURCES) as none once all are set; test_api_key_detected.py uses the literal; names_only and sentinel task checks added. Baseline: the earlier 'error or critical lines: 3' was followed by three configured_systems_built lines from the next query, not counted ones, so no false match is proven; the baseline now prints its error lines by event and level, to read on the next pre run.
 - Not run: git (human), the deploy checks (human).
+
+2026-10-28 found (human: make dev failed, NotifySettings: NOTIFY__SRE_USER_NAME is set but [notify.tenant] is not): the 22:36Z env-checks plan, applied 22:43Z, copied NOTIFY_SRE_USER_NAME and NOTIFY_SRE_CLIENT_SECRET into NOTIFY__* Codespaces secrets because the coverage audit asked for every old-to-new copy, against the 111.12 decision that development stays without Notify. Dev tooling fix riding here: bin/audit_env_coverage.py no longer plans the copy for a slice-level credential whose vendor has a [<slice>.tenant] in production.toml and none in local.toml, and reports such a name present in Codespaces as a check ('fails local boot, delete it'); two tests in test_bin_audit_env_coverage_classify.py; bin tests 348 passed, ruff clean. Human: delete both Codespaces secrets.
 <!-- SECTION:NOTES:END -->

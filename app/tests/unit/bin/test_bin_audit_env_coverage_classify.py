@@ -180,3 +180,28 @@ def test_a_placeholder_parameter_whose_value_sits_inside_a_blob_line_names_put_p
 
     assert rows["INCIDENT_CORE__FOLDER_ID"].action == "check"
     assert "put-parameter from GOOGLE_RESOURCES inc.f" in rows["INCIDENT_CORE__FOLDER_ID"].reason
+
+
+_NOTIFY = {"NOTIFY_SRE_USER_NAME": ("secret NOTIFY__SRE_USER_NAME", "111.4, 111.12")}
+
+
+def test_a_credential_of_a_vendor_local_leaves_unconfigured_is_not_copied_into_codespaces() -> None:
+    """Notify has a tenant entry in production.toml and none in local.toml: its credential alone fails local boot.
+
+    Reads the checked-in configuration files: the rule follows where each environment configures the vendor.
+    """
+    entries = [("ssm-param", "NOTIFY__SRE_USER_NAME", "set"), (CODESPACES, "NOTIFY_SRE_USER_NAME", "present")]
+
+    rows = {name: verdict for name, _, verdict in coverage_rows(_NOTIFY, {"NOTIFY__SRE_USER_NAME"}, entries)}
+
+    assert rows["NOTIFY__SRE_USER_NAME"].action == "none"
+    assert "set NOTIFY__SRE_USER_NAME" not in rows["NOTIFY__SRE_USER_NAME"].reason
+
+
+def test_a_credential_of_a_vendor_local_leaves_unconfigured_in_codespaces_is_a_check() -> None:
+    entries = [("ssm-param", "NOTIFY__SRE_USER_NAME", "set"), (CODESPACES, "NOTIFY__SRE_USER_NAME", "present")]
+
+    rows = {name: verdict for name, _, verdict in coverage_rows(_NOTIFY, {"NOTIFY__SRE_USER_NAME"}, entries)}
+
+    assert rows["NOTIFY__SRE_USER_NAME"].action == "check"
+    assert "local.toml has no [notify.tenant]" in rows["NOTIFY__SRE_USER_NAME"].reason
