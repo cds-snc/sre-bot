@@ -48,7 +48,7 @@ No migration is left half-done: a surface is either legacy or rebuilt, never bot
 | `modules/` | Legacy Slack bot. Rebuilt surface by surface into features and capabilities, then deleted. | TASK-37, TASK-145 (incident, replacing TASK-38), TASK-39, TASK-40, TASK-41 |
 | `jobs/` | Scheduler registry. Each job moves to its owning feature or capability and registers through the scheduler contract in `contracts/`; the runtime moves to `server/` and runs each job once across replicas on a coordination lease. | TASK-52 |
 | `api/` | Legacy HTTP surface. Feature routes move to their owning packages; system endpoints (health, version, landing) move to `server/`. | TASK-53 |
-| `bin/` | Operator and dev tooling, not app runtime code, so exempt from the layer contracts. Kept; `entry.sh`'s boot-time secret fetch retires once the secrets contract has an implementation. | TASK-54 |
+| `bin/` | Operator and dev tooling, not app runtime code, so exempt from the layer contracts. Kept; `entry.sh` and its boot-time fetch of the SSM blobs are deleted (TASK-111.15.1): the container starts uvicorn directly and the task definition injects each secret. | TASK-54 |
 | `models/` | Shared boundary DTOs. Each moves to its owning feature or capability, or to `contracts/` when it crosses layers; then the directory is deleted. | TASK-55 |
 | `utils/` | Grab-bag helpers. Each moves to its owning layer without adding a forbidden import; then the directory is deleted. | TASK-56 |
 | `locales/` | Legacy `python-i18n` catalogues. Deleted with the last legacy surface, replaced by per-package catalogues ([i18n.md](i18n.md)). | TASK-41 |

@@ -4,7 +4,7 @@ title: Move the Notify, Trello, OpsGenie, MaxMind and Sentinel slices onto the f
 status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-28T13:13:00Z'
+updated_date: '2026-10-28T23:09:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -123,6 +123,8 @@ Actions secrets NOTIFY_TEST_KEY, NOTIFY_SRE_USER_NAME, NOTIFY_SRE_CLIENT_SECRET;
 2026-10-28 implementation (branch task-111.12-vendor-slices, from main 7315e957). Notify, Trello, Opsgenie and MaxMind are ConfigurationSlices: [notify] timeout_seconds 60 and [notify.tenant] api_url (production.toml, https://api.notification.canada.ca, to be confirmed by pre vendors against the blob's NOTIFY_API_URL); [opsgenie] timeout_seconds 30 (urlopen had none) and [opsgenie.tenant] api_url (production.toml and local.toml, https://api.opsgenie.com); Trello's entry TRELLO__TENANT__APP_KEY/TOKEN from the environment with TRELLO__ATIP_BOARD beside it (empty counts as unset; board without entry fails); [maxmind.tenant] database_path (production.toml and local.toml). Credentials SecretStr; half entries and unknown keys fail boot naming the key (host_configuration validates all four). Clients read at use: no module-level settings; Notify revoke without an entry logs revoke_api_key_not_configured and returns error, ENVIRONMENT check and host_info import gone; Opsgenie api_get_request(path) builds the tenant URL, raises OpsGenieAPIError when not configured, healthcheck logs opsgenie_not_configured; create_alert and api_post_request deleted with exports and tests; Trello raises TrelloNotConfiguredError; MaxMindClient(database_path) returns CONFIG_NOT_CONFIGURED without an entry. Retired names (flat NOTIFY_/TRELLO_/OPSGENIE_/MAXMIND_ and TRELLO__APP_KEY/TOKEN) pinned unread; pytest env and ci_code.yml moved off them; audit HINTS added. deploy-checks: google, aws, openai removed (tasks Done), vendors added. configuration.md D1 amendment, current state, tolerated list and Changes; doc-14 rows. Gates: ruff ok; mypy 47 errors = main baseline, none in touched files; pytest tests --ignore=tests/smoke 5999 passed; import contracts 13 kept; settings key ownership OK. AC #7 waits on pre vendors before merge and post vendors after deploy.
 
 2026-10-28 pre vendors PASS (tmp/deploy-checks/pre-vendors-20261028T025350Z.txt): six parameters MATCH, Notify host MATCH (https://api.notification.canada.ca), no MAXMIND_DB_PATH or Opsgenie host line. Rollback image_tag 1270ea357ac6d0ce14c8b74e4895d130eb51b53b-2026-10-27. AC #7 waits on post vendors.
+
+2026-10-28: the Sentinel part this task left to TASK-171 moves to TASK-111.15.1 (human): [sentinel] log_type in the files, SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY as env_only fields, before the blob fetch stops; TASK-171 (row Z2) keeps the rebuild-or-delete ruling.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

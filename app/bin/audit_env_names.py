@@ -115,6 +115,9 @@ HINTS = {
     "TRELLO_ATIP_BOARD": "secret TRELLO__ATIP_BOARD",
     "OPSGENIE_INTEGRATIONS_KEY": "secret OPSGENIE__INTEGRATIONS_KEY",
     "MAXMIND_DB_PATH": "[maxmind.tenant] database_path",
+    "SENTINEL_CUSTOMER_ID": "secret SENTINEL__CUSTOMER_ID",
+    "SENTINEL_SHARED_KEY": "secret SENTINEL__SHARED_KEY",
+    "SENTINEL_LOG_TYPE": "[sentinel] log_type",
     "DIRECTORY_REQUIRE_STARTUP_WARMUP": "[directory] require_startup_warmup",
     "DIRECTORY_PROVIDER": "nothing (deleted: the directory follows the IdP in the data, never a setting)",
     "DIRECTORY_CACHE_TTL_SECONDS": "nothing (deleted: no reader)",
@@ -133,9 +136,9 @@ HINTS = {
     "IDEMPOTENCY_TTL_SECONDS": "[coordination] record_ttl_seconds",
     "IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS": "[coordination] in_progress_ttl_seconds",
     "AUDIT_TABLE_NAME": "[audit] table_name",
-    "INCIDENT_CHANNEL": "[incident] incident_channel",
-    "SLACK_SECURITY_USER_GROUP_ID": "[incident] slack_security_user_group_id",
-    "SLACK_NOTIFY_MGMT_USER_GROUP_ID": "[incident] slack_notify_mgmt_user_group_id",
+    "INCIDENT_CHANNEL": "[incident_response] announcement_channel_id",
+    "SLACK_SECURITY_USER_GROUP_ID": "[incident_response] security_group_id",
+    "SLACK_NOTIFY_MGMT_USER_GROUP_ID": "[incident_response] notify_management_group_id",
     "SRE_OPS_CHANNEL_ID": "[sre_ops] sre_ops_channel_id",
     "AWS_ADMIN_GROUPS": "[cloud_operations] aws_admin_groups",
     "AWS_OPS_GROUP_NAME": "nothing (deleted: never set in production, the ops group assignment never ran)",
@@ -366,12 +369,29 @@ def _actions(source: str, name: str, ctx: Context) -> Verdict:
     return _unevidenced("no workflow under .github/ on the default branch references it", name, "workflow", ctx)
 
 
+def _split_line(name: str, ctx: Context) -> Verdict | None:
+    """A blob line whose value doc-14 split into one secret per path ('NAME <path>' keys), or None."""
+    secrets = [
+        match[1]
+        for key, (destination, _) in ctx.doc14.items()
+        if key.startswith(f"{name} ") and (match := PARAMETER_DESTINATION.match(destination))
+    ]
+    if not secrets:
+        return None
+    unset = sorted(secret for secret in secrets if ctx.parameter_states.get(secret, "missing") != "set")
+    if unset:
+        return Verdict("check", f"split into {len(secrets)} secrets, but /sre-bot/ {', '.join(unset)} not set")
+    return Verdict("none", f"split into {len(secrets)} secrets, all set (doc-14 {name} keys); {BLOB_END}")
+
+
 def _production_blob(name: str, ctx: Context) -> Verdict:
     """A line of the sre-bot-config blobs (migration part)."""
     if name in ctx.doc14:
         destination, _ = ctx.doc14[name]
         if destination.startswith("platform"):
             return Verdict("none", f"platform name the task definition also sets; {BLOB_END}")
+        if name not in ctx.current and (split := _split_line(name, ctx)) is not None:
+            return split
         if name in ctx.current:
             return Verdict("none", f"still read from the blob; doc-14 moves it to {destination}")
         if destination.startswith("delete"):

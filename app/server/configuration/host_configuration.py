@@ -22,7 +22,6 @@ from features.incident.response.settings import get_incident_response_settings
 from features.talent.settings import get_talent_settings
 from infrastructure.audit.settings import get_audit_settings
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
-from infrastructure.configuration.features.incident import get_incident_settings
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
 from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
@@ -35,6 +34,7 @@ from integrations.maxmind.settings import get_maxmind_settings
 from integrations.notify.settings import get_notify_settings
 from integrations.openai.settings import get_openai_settings
 from integrations.opsgenie.settings import get_opsgenie_settings
+from integrations.sentinel.settings import get_sentinel_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
 from integrations.trello.settings import get_trello_settings
 from jobs.settings import SchedulerSettings, get_scheduler_settings
@@ -174,8 +174,8 @@ def _validate_slices(
     get_trello_settings()
     get_opsgenie_settings()
     get_maxmind_settings()
+    get_sentinel_settings()
     get_notify_api_key_leak_settings()
-    get_incident_settings()
     get_atip_settings()
     get_aws_feature_settings()
     # The feature slices the legacy modules read; a rebuilt subdomain states its required ids when it registers.

@@ -27,8 +27,9 @@ NOTIFY__SRE_CLIENT_SECRET and OPSGENIE__INTEGRATIONS_KEY beside a tenant entry; 
 entry is its credentials, TRELLO__TENANT__APP_KEY and TRELLO__TENANT__TOKEN, with the board
 under TRELLO__ATIP_BOARD; MaxMind's entry is its database file; their retired flat names
 (and the unread TRELLO__APP_KEY and TRELLO__TOKEN) are pinned as unread. The Sentinel slice
-still reads the SENTINEL_* names production sets, some of them written 'NAME =value' in the
-.env file. The identity,
+reads [sentinel] log_type with the workspace id and shared key under SENTINEL__CUSTOMER_ID and
+SENTINEL__SHARED_KEY; its flat SENTINEL_* names are pinned as unread. A developer .env line
+written 'NAME =value' still reaches a field. The identity,
 server, dev and Slack transport slices too: production sets ENVIRONMENT,
 BACKEND_URL and SLACK__COMMAND_PREFIX (task definition), GIT_SHA (image),
 NOTIFY_OPS_CHANNEL_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY
@@ -85,9 +86,8 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
         "sentinel-id",
     ),
     (TalentSettings, "TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID", "panelist_guidebook_template_id", "sentinel-id", "sentinel-id"),
-    (SentinelSettings, "SENTINEL_CUSTOMER_ID", "sentinel_customer_id", "sentinel-customer", "sentinel-customer"),
-    (SentinelSettings, "SENTINEL_LOG_TYPE", "sentinel_log_type", "SentinelLogs", "SentinelLogs"),
-    (SentinelSettings, "SENTINEL_SHARED_KEY", "sentinel_shared_key", "sentinel-shared-key", "sentinel-shared-key"),
+    (SentinelSettings, "SENTINEL__CUSTOMER_ID", "customer_id", "sentinel-customer", "sentinel-customer"),
+    (SentinelSettings, "SENTINEL__LOG_TYPE", "log_type", "SentinelLogs", "SentinelLogs"),
     (IdentitySettings, "ENVIRONMENT", "environment", "production", "production"),
     (IdentitySettings, "GIT_SHA", "git_sha", "sentinel-sha", "sentinel-sha"),
 ]
@@ -116,18 +116,18 @@ def test_configuration_settings_production_name_reaches_field(
 
 def test_configuration_settings_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """Names match case-insensitively, so the lower-case spelling of a name is read too."""
-    monkeypatch.setenv("sentinel_log_type", "lower_sentinel")
+    monkeypatch.setenv("sentinel__log_type", "lower_sentinel")
 
     settings = SentinelSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert settings.sentinel_log_type == "lower_sentinel"
+    assert settings.log_type == "lower_sentinel"
 
 
 def test_configuration_settings_upper_case_keyword_accepted() -> None:
     """Constructor keywords in the environment spelling still set the lower-case field."""
-    settings = SentinelSettings(_env_file=None, SENTINEL_LOG_TYPE="UpperSentinel")  # type: ignore[call-arg]
+    settings = SentinelSettings(_env_file=None, LOG_TYPE="UpperSentinel")  # type: ignore[call-arg]
 
-    assert settings.sentinel_log_type == "UpperSentinel"
+    assert settings.log_type == "UpperSentinel"
 
 
 SLACK_NAMES: list[tuple[str, str, str, Any]] = [
@@ -429,13 +429,13 @@ def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: py
 
 def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Lines written 'NAME =value', as some production .env lines are, reach a field."""
-    monkeypatch.delenv("SENTINEL_SHARED_KEY", raising=False)
+    monkeypatch.delenv("SENTINEL__SHARED_KEY", raising=False)
     env_file = tmp_path / ".env"
-    env_file.write_text("SENTINEL_SHARED_KEY =spaced-shared-key\n")
+    env_file.write_text("SENTINEL__SHARED_KEY =spaced-shared-key\n")
 
     sentinel = SentinelSettings(_env_file=env_file)  # type: ignore[call-arg]
 
-    assert sentinel.sentinel_shared_key == "spaced-shared-key"
+    assert sentinel.shared_key.get_secret_value() == "spaced-shared-key"
 
 
 def test_configuration_settings_identity_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -470,6 +470,9 @@ VENDOR_RETIRED_NAMES: list[tuple[type[BaseSettings], str]] = [
     (OpsGenieSettings, "OPSGENIE_KEY"),
     (MaxMindSettings, "MAXMIND_DB_PATH"),
     (MaxMindSettings, "MAXMIND_KEY"),
+    (SentinelSettings, "SENTINEL_CUSTOMER_ID"),
+    (SentinelSettings, "SENTINEL_LOG_TYPE"),
+    (SentinelSettings, "SENTINEL_SHARED_KEY"),
 ]
 
 

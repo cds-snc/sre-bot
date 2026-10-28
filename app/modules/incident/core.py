@@ -10,7 +10,7 @@ from structlog import get_logger
 from contracts.configuration import host_info
 from features.incident.drive.adapters import google_drive as incident_drive
 from features.incident.meet.adapters import google_meet as meet
-from infrastructure.configuration.features.incident import get_incident_settings
+from features.incident.response.settings import get_incident_response_settings
 from integrations.slack.settings import get_slack_settings
 from models.incidents import IncidentPayload
 from modules.incident import (
@@ -424,7 +424,7 @@ def initiate_resources_creation(
     incident_payload: IncidentPayload,
 ):
     """Create an incident and its related resources. If incident Slack channel provided, skips that resource creation"""
-    incident_settings = get_incident_settings()
+    incident_settings = get_incident_response_settings()
 
     # Create channel
     environment = "prod" if host_info().environment == "production" else "dev"
@@ -449,8 +449,8 @@ def initiate_resources_creation(
         f"<@{incident_payload.user_id}> a initié un nouvel incident: {incident_payload.name} pour {incident_payload.product}"
         f" dans <#{incident_payload.channel_id}>"
     )
-    if incident_settings.INCIDENT_CHANNEL:
-        client.chat_postMessage(text=text, channel=incident_settings.INCIDENT_CHANNEL)
+    if incident_settings.announcement_channel_id:
+        client.chat_postMessage(text=text, channel=incident_settings.announcement_channel_id)
 
     # Add incident creator to channel
     client.conversations_invite(channel=incident_payload.channel_id, users=incident_payload.user_id)
@@ -557,7 +557,7 @@ def initiate_resources_creation(
             users_to_invite.append(user["id"])
 
     # Get users from the @security group
-    security_group_id = incident_settings.SLACK_SECURITY_USER_GROUP_ID
+    security_group_id = incident_settings.security_group_id
     if incident_payload.security_incident == "yes" and not security_group_id:
         logger.warning("security_user_group_not_configured", channel_id=incident_payload.channel_id)
     elif incident_payload.security_incident == "yes" and security_group_id:
@@ -572,10 +572,10 @@ def initiate_resources_creation(
                     users_to_invite.append(security_user)
 
     # Get users from the @notify-management group
-    if incident_payload.product == "Notify" and incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID:
+    if incident_payload.product == "Notify" and incident_settings.notify_management_group_id:
         # If this is a Notify product incident, get users from the Notify management user group
         # and add them to the list of users to invite
-        response = client.usergroups_users_list(usergroup=incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID)
+        response = client.usergroups_users_list(usergroup=incident_settings.notify_management_group_id)
         if response.get("ok"):
             for notify_user in response["users"]:
                 if notify_user != incident_payload.user_id:
@@ -584,7 +584,7 @@ def initiate_resources_creation(
             logger.warning(
                 "notify_mgmt_group_fetch_failed",
                 error=response.get("error"),
-                usergroup=incident_settings.SLACK_NOTIFY_MGMT_USER_GROUP_ID,
+                usergroup=incident_settings.notify_management_group_id,
             )
 
     # Invite all collected users to the channel in a single API call

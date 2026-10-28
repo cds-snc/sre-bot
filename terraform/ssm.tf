@@ -57,6 +57,8 @@ locals {
     "TRELLO__TENANT__TOKEN",
     "TRELLO__TOKEN",
   ])
+  # Never read (superseded by TRELLO__TENANT__*) and no longer injected: removed in TASK-111.15.2.
+  sre_bot_unread_secret_names = toset(["TRELLO__APP_KEY", "TRELLO__TOKEN"])
 }
 
 resource "aws_ssm_parameter" "sre_bot_secret" {

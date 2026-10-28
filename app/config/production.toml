@@ -22,10 +22,10 @@ oncall_group_id = "S0BNW0G8CFK"
 [atip]
 announce_channel_id = "C033L7RGCT0"
 
-[incident]
-incident_channel = "CUYR73ESX"
-slack_security_user_group_id = "S057X3XB5FX"
-slack_notify_mgmt_user_group_id = "S0BC6L00PUG"
+[incident_response]
+announcement_channel_id = "CUYR73ESX"
+security_group_id = "S057X3XB5FX"
+notify_management_group_id = "S0BC6L00PUG"
 
 [sre_ops]
 sre_ops_channel_id = "C0388M21LKZ"

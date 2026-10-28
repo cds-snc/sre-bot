@@ -4,7 +4,7 @@ title: 'Contract 2: remove the SSM blob IAM read and the old GCP key parameter'
 status: To Do
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-26T18:52:00Z'
+updated_date: '2026-10-28T23:09:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -37,6 +37,7 @@ Second half of TASK-111.15, after the TASK-111.15.1 deploy is verified. Removes 
 - [ ] #4 TASK-54's AC #3 is checked; TASK-54 is left for the human to set Done
 - [ ] #5 bin/env-checks.zsh and app/bin/audit_env_names.py drop their migration part (SSM blob and /sre-bot parameter reads, doc-14 destinations, the baseline retired names, HINTS); the env-file, Codespaces and GitHub Actions audit stays, and its tests pass
 - [ ] #6 The dead TF_VAR_google_oauth_pickle_string lines are deleted from tf_plan.yml and tf_apply.yml (no terraform variable reads them; a leftover of the pre-service-account OAuth admin user, found 2026-10-26), and the Actions secret GOOGLE_PICKLE_STRING is deleted (human, after merge)
+- [ ] #7 The /sre-bot/TRELLO__APP_KEY and /sre-bot/TRELLO__TOKEN parameters (never read; no longer injected since TASK-111.15.1) are removed from terraform/ssm.tf after 111.15.1's Verify passed: revision 67 and earlier reference their ARNs, so they stay until the IAM read removal ends those revisions as rollback targets
 <!-- AC:END -->
 
 ## Definition of Done
@@ -48,4 +49,6 @@ Second half of TASK-111.15, after the TASK-111.15.1 deploy is verified. Removes 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-26: the env audit's SUPERSEDED map (old Google ID secrets folded into GOOGLE_RESOURCES by #975, FRONTEND_URL) goes with the migration part. GOOGLE_RESOURCES carries an unread key rep.g (folder for Google Groups reports, reader removed by #1460); TASK-158 splits GOOGLE_RESOURCES and drops it.
+
+2026-10-28 (TASK-111.15.1 plan review, OQ3): the Trello parameters' deletion is this task's (AC added); decisions/configuration.md (rename rule) and decisions/deployment.md (skip_destroy, circuit breaker) already order it, no ADR gap. Sentinel: 111.15.1 moves the reads to SENTINEL__CUSTOMER_ID, SENTINEL__SHARED_KEY and [sentinel] log_type, so the blob deletion here loses no Sentinel value; the SENTINEL__* parameters stay until TASK-171's ruling.
 <!-- SECTION:NOTES:END -->

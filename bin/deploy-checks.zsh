@@ -10,16 +10,19 @@
 #   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, runtime errors,
 #                                               # Slack up, HTTP, plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   google_ids pre: the 15 Google document id parameters compared by hash with the GOOGLE_RESOURCES paths they
-#           replace (MATCH, DIFFER or MISSING, never printed); inc.d and rep.g are not carried (TASK-111.10.3)
+#   sentinel    pre: production.toml [sentinel] log_type against the blob's SENTINEL_LOG_TYPE (printed: a public
+#               table name), and the blob's workspace id and shared key lines against /sre-bot/SENTINEL__* by hash
+#               (MATCH or DIFFER, never printed); post: sends since the deploy and no send errors (TASK-111.15.1)
+#   names_only  post: the running revision sets only ENVIRONMENT and FORWARDED_ALLOW_IPS, every secret is a
+#               <SLICE>__<FIELD> name with no retired one, and no container fetched the blobs (TASK-111.15.1)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(google_ids)
-PRE_CHECKS=(google_ids)  # task checks with a pre part
+TASK_CHECKS=(sentinel names_only)
+PRE_CHECKS=(sentinel)  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -34,7 +37,7 @@ REGION=ca-central-1
 CLUSTER=sre-bot-cluster
 SERVICE=sre-bot-service
 LOG_GROUP=/ecs/sre-bot-app
-BLOBS=(sre-bot-config sre-bot-config-infrastructure)  # entry.sh order: both, concatenated into .env
+BLOBS=(sre-bot-config sre-bot-config-infrastructure)  # the order the retired entry.sh concatenated them into .env
 BASE_URL=https://sre-bot.cdssandbox.xyz
 OUT_DIR=$ROOT/tmp/deploy-checks
 OUT=$OUT_DIR/$phase${checks:+-${(j:-:)checks}}-$(date -u +%Y%m%dT%H%M%SZ).txt
@@ -111,37 +114,25 @@ if [[ $phase == pre ]]; then
   since=$(( $(date -u +%s) - 86400 ))
   print "slack_app_initialized: $(li_count $since 'filter event = "slack_app_initialized"')"
   print "error or critical lines: $(li_count $since 'filter level in ["error","critical"]')"
+  li $since 'filter level in ["error","critical"] | stats count() as n by event, level | sort n desc | limit 10'
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | sort @timestamp desc | limit 3'
 
-  if (( ${checks[(Ie)google_ids]} )); then  # TASK-111.10.3
-    section "Google document ids against the GOOGLE_RESOURCES paths they replace (TASK-111.10.3; values never printed)"
-    # The value as the app reads it: both blobs in entry.sh order, through python-dotenv and the JSON parse
-    # (app/bin/google_resources_json.py); a sed over the line misses the dotenv unescaping.
-    resources=$(for b in $BLOBS; do
-        aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text | tr -d '\r'
-      done | uv run --quiet --project $ROOT/app python $ROOT/app/bin/google_resources_json.py) || resources=
-    [[ -n $resources ]] && print "GOOGLE_RESOURCES line: present" || print "GOOGLE_RESOURCES line: missing"
-    # path_hash PATH: sha256 of one GOOGLE_RESOURCES value (a jq path such as inc.f), or 'missing'; the value never
-    # leaves this function.
-    path_hash() { local v; v=$(print -rn -- $resources | jq -er ".$1 // empty" 2>/dev/null) && [[ -n $v ]] && print -rn -- $v | sha256sum | cut -c1-64 || print missing; }
-    google_ok=yes
-    for pair in INCIDENT_CORE__FOLDER_ID:inc.f INCIDENT_CORE__REPORT_TEMPLATE_ID:inc.t \
-        INCIDENT_CORE__LIST_SHEET_ID:inc.l INCIDENT_RESPONSE__HANDBOOK_ID:inc.h \
-        INCIDENT_POSTMORTEM__CALENDAR_ID:cal.sre CLOUD_OPERATIONS_SPENDING__SHEET_ID:aws.s \
-        TALENT__INTERNAL_FOLDER_ID:tal.i TALENT__TEMPLATES_FOLDER_ID:tal.t \
-        TALENT__SCORING_GUIDE_TEMPLATE_ID:tal.s TALENT__CORE_VALUES_INTERVIEW_NOTES_ID:tal.c \
-        TALENT__TECHNICAL_INTERVIEW_NOTES_ID:tal.tech TALENT__INTAKE_FORM_TEMPLATE_ID:tal.int \
-        TALENT__PHONE_SCREEN_TEMPLATE_ID:tal.ph TALENT__RECRUITMENT_FEEDBACK_TEMPLATE_ID:tal.rec \
-        TALENT__PANELIST_GUIDEBOOK_TEMPLATE_ID:tal.pan; do
-      new=$(param_hash /sre-bot/${pair%%:*}); old=$(path_hash ${pair##*:})
-      if [[ $new == missing ]]; then line="MISSING (no such parameter)"
-      elif [[ $old == missing ]]; then line="MISSING (no such GOOGLE_RESOURCES path)"
-      else line=$(same_hash $new $old); fi
-      print "${pair%%:*} vs GOOGLE_RESOURCES ${pair##*:}: $line"
-      [[ $line == MATCH ]] || google_ok=no
+  if (( ${checks[(Ie)sentinel]} )); then  # TASK-111.15.1
+    section "Sentinel slice against the blob lines it replaces (TASK-111.15.1; the id and the shared key never printed)"
+    file_log_type=$(uv run --quiet --project $ROOT/app python -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb")).get("sentinel", {}).get("log_type", ""))' $ROOT/app/config/production.toml)
+    blob_log_type=$(blob_value SENTINEL_LOG_TYPE) || blob_log_type=
+    print "SENTINEL_LOG_TYPE (blob)=$blob_log_type  [sentinel] log_type (production.toml)=${file_log_type:-<unset>}"
+    [[ -n $blob_log_type && $blob_log_type == $file_log_type ]] && log_type_state=MATCH || log_type_state=DIFFER
+    print "log type: $log_type_state"
+    sentinel_ok=$log_type_state
+    for pair in SENTINEL__CUSTOMER_ID:SENTINEL_CUSTOMER_ID SENTINEL__SHARED_KEY:SENTINEL_SHARED_KEY; do
+      new=$(param_hash /sre-bot/${pair%%:*})
+      old=$(blob_value ${pair##*:} | sha256sum | cut -c1-64) || old=missing
+      state=$(same_hash $new $old)
+      print "${pair%%:*} vs blob ${pair##*:}: $state"
+      [[ $state == MATCH ]] || sentinel_ok=DIFFER
     done
-    print "GOOGLE_RESOURCES inc.d and rep.g: not carried (no reader), not compared"
-    [[ $google_ok == yes ]] && result google_ids_pre PASS || result google_ids_pre "FAIL (a DIFFER or MISSING parameter blocks the merge of the reader PR: put-parameter from the named path first)"
+    [[ $sentinel_ok == MATCH ]] && result sentinel_pre PASS || result sentinel_pre "FAIL (a DIFFER blocks the merge: copy the printed log type into production.toml, or put-parameter from the blob line)"
   fi
 fi
 
@@ -202,6 +193,26 @@ if [[ $phase == post ]]; then
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | limit 4'
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
+
+  if (( ${checks[(Ie)names_only]} )); then  # TASK-111.15.1
+    section "Task definition names (TASK-111.15.1: no fetch, platform-provided names and renamed secrets only)"
+    names=$(aws ecs describe-task-definition --region $REGION --task-definition $td --output json \
+      | jq -c '.taskDefinition.containerDefinitions[0] | {secrets: [.secrets[]?.name] | sort, environment: [.environment[]?.name] | sort}')
+    environment_names=$(print -r -- $names | jq -c .environment)
+    retired=$(print -r -- $names | jq -c '[.secrets[] | select((test("^[A-Z0-9]+(_[A-Z0-9]+)*__[A-Z0-9_]+$") | not) or . == "TRELLO__APP_KEY" or . == "TRELLO__TOKEN")]')
+    fetches=$(li_count $since 'filter @message like /Retrieving environment parameters/')
+    print "environment=$environment_names other_secret_names=$retired blob_fetch_lines_since_deploy=$fetches"
+    [[ $environment_names == '["ENVIRONMENT","FORWARDED_ALLOW_IPS"]' && $retired == '[]' && $fetches == 0 ]] \
+      && result names_only PASS || result names_only FAIL
+  fi
+
+  if (( ${checks[(Ie)sentinel]} )); then  # TASK-111.15.1
+    section "Sentinel sends since the deploy (TASK-111.15.1)"
+    sent=$(li_count $since 'filter event = "sentinel_event_sent"')
+    failed=$(li_count $since 'filter event in ["log_to_sentinel_error","sentinel_event_error","send_event_error","audit_event_failed_to_sentinel"]')
+    print "sentinel_event_sent=$sent send errors=$failed"
+    (( sent > 0 && failed == 0 )) && result sentinel_post PASS || result sentinel_post "FAIL (sent=$sent errors=$failed)"
+  fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"
   version=$(curl -s $BASE_URL/version)

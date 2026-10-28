@@ -1,34 +1,46 @@
 from datetime import UTC, datetime
 from unittest.mock import patch
 
+import pytest
+from pydantic import SecretStr
+
 from integrations.sentinel import client as sentinel
+from integrations.sentinel.settings import SentinelSettings
 
 customer_id = "customer_id"
 log_type = "log_type"
 shared_key = "dGVzdCBrZXk="
 
 
-@patch.object(sentinel, "SENTINEL_CUSTOMER_ID", None)
-def test_send_event_customer_id_not_provided():
-    event = {}
-    assert sentinel.send_event(event) is False
+@pytest.fixture
+def configured(monkeypatch):
+    """Sentinel configured through its slice, read by send_event at call time."""
+    settings = SentinelSettings.model_construct(
+        customer_id="SENTINEL_CUSTOMER_ID", shared_key=SecretStr("SENTINEL_SHARED_KEY"), log_type="SENTINEL_LOG_TYPE"
+    )
+    monkeypatch.setattr(sentinel, "get_sentinel_settings", lambda: settings)
+    return settings
 
 
-@patch.object(sentinel, "SENTINEL_SHARED_KEY", None)
-def test_send_event_shared_key_not_provided():
-    event = {}
-    assert sentinel.send_event(event) is False
+def test_send_event_customer_id_not_provided(configured):
+    configured.customer_id = ""
+    assert sentinel.send_event({}) is False
+
+
+def test_send_event_shared_key_not_provided(configured):
+    configured.shared_key = SecretStr("")
+    assert sentinel.send_event({}) is False
 
 
 @patch("integrations.sentinel.client.post_data")
-def test_send_event(post_data_mock):
+def test_send_event(post_data_mock, configured):
     event = {}
     assert sentinel.send_event(event) is True
     post_data_mock.assert_called_once_with("SENTINEL_CUSTOMER_ID", "SENTINEL_SHARED_KEY", "{}", "SENTINEL_LOG_TYPE")
 
 
 @patch("integrations.sentinel.client.post_data")
-def test_send_event_serializes_datetime(post_data_mock):
+def test_send_event_serializes_datetime(post_data_mock, configured):
     event = {"created_at": datetime(2026, 3, 12, 16, 30, tzinfo=UTC)}
 
     assert sentinel.send_event(event) is True
@@ -57,6 +69,17 @@ def test_build_signature():
         )
         == expected
     )
+
+
+@patch("integrations.sentinel.client.logger")
+@patch("integrations.sentinel.client.requests")
+def test_post_data_never_logs_the_workspace_id(mock_requests, logging_mock):
+    """The workspace id is a non-public value: it is in the request host, never in a log binding."""
+    mock_requests.post.return_value.status_code = 200
+
+    sentinel.post_data(customer_id, shared_key, "{}", log_type)
+
+    assert "customer_id" not in logging_mock.bind.call_args.kwargs
 
 
 @patch("integrations.sentinel.client.requests")

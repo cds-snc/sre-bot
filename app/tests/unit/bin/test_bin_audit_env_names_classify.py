@@ -244,6 +244,45 @@ def test_production_blob_lines_are_never_hand_edited(name: str, action: str) -> 
     assert _action("ssm-blob sre-bot-config", name) == action
 
 
+_GOOGLE_IDS = {
+    "GOOGLE_RESOURCES": ("one key per id on its end-state slice, never one JSON", "111.10.3"),
+    "GOOGLE_RESOURCES inc.f": ("secret INCIDENT_CORE__FOLDER_ID (non-public value)", "111.10.3"),
+    "GOOGLE_RESOURCES tal.i": ("secret TALENT__INTERNAL_FOLDER_ID (non-public value)", "111.10.3"),
+    "GOOGLE_RESOURCES inc.d": ("not carried", "111.10.3"),
+}
+
+
+def test_a_blob_line_split_into_secrets_that_are_all_set_is_none() -> None:
+    """GOOGLE_RESOURCES is inert once each id has its own set parameter; the line goes with the blob."""
+    states = {"INCIDENT_CORE__FOLDER_ID": "set", "TALENT__INTERNAL_FOLDER_ID": "set"}
+    ctx = Context(current=CTX.current, doc14=_GOOGLE_IDS, parameter_states=states)
+
+    verdict = classify("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set", ctx)
+
+    assert verdict.action == "none"
+    assert "split into 2 secrets, all set" in verdict.reason
+
+
+def test_a_blob_line_split_into_a_secret_that_is_not_set_is_a_check() -> None:
+    ctx = Context(current=CTX.current, doc14=_GOOGLE_IDS, parameter_states={"INCIDENT_CORE__FOLDER_ID": "set"})
+
+    verdict = classify("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set", ctx)
+
+    assert verdict.action == "check"
+    assert "TALENT__INTERNAL_FOLDER_ID" in verdict.reason
+
+
+@pytest.mark.parametrize(
+    ("name", "secret"), [("SENTINEL_CUSTOMER_ID", "SENTINEL__CUSTOMER_ID"), ("SENTINEL_SHARED_KEY", "SENTINEL__SHARED_KEY")]
+)
+def test_a_flat_sentinel_name_in_codespaces_is_copied_to_its_successor(name: str, secret: str) -> None:
+    """The app reads the prefixed names from TASK-111.15.1; the value is copied before the old name goes."""
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert verdict.new == secret
+
+
 def test_a_migrated_secret_whose_parameter_is_not_set_is_a_check() -> None:
     ctx = Context(current=CTX.current, doc14=CTX.doc14, parameter_states={"SLACK__BOT_TOKEN": "placeholder"})
 
@@ -294,9 +333,10 @@ def test_a_retired_audit_or_coordination_name_is_deleted_with_its_key(name: str,
 @pytest.mark.parametrize(
     ("name", "kept_in"),
     [
-        ("INCIDENT_CHANNEL", "[incident] incident_channel"),
-        ("SLACK_SECURITY_USER_GROUP_ID", "[incident] slack_security_user_group_id"),
-        ("SLACK_NOTIFY_MGMT_USER_GROUP_ID", "[incident] slack_notify_mgmt_user_group_id"),
+        ("INCIDENT_CHANNEL", "[incident_response] announcement_channel_id"),
+        ("SLACK_SECURITY_USER_GROUP_ID", "[incident_response] security_group_id"),
+        ("SLACK_NOTIFY_MGMT_USER_GROUP_ID", "[incident_response] notify_management_group_id"),
+        ("SENTINEL_LOG_TYPE", "[sentinel] log_type"),
         ("SRE_OPS_CHANNEL_ID", "[sre_ops] sre_ops_channel_id"),
         ("AWS_ADMIN_GROUPS", "[cloud_operations] aws_admin_groups"),
         ("ATIP_ANNOUNCE_CHANNEL", "[atip] announce_channel_id"),
