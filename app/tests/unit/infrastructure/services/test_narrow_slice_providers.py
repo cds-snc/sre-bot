@@ -13,22 +13,19 @@ import pytest
 from infrastructure.configuration.infrastructure.retry import RetrySettings
 from infrastructure.resilience.service import ResilienceService
 from integrations.maxmind.client import MaxMindClient
-from integrations.maxmind.settings import MaxMindSettings
 
 pytestmark = pytest.mark.unit
 
 
 class TestMaxMindClientNarrowSlice:
-    """MaxMindClient accepts maxmind_settings instead of full Settings."""
+    """MaxMindClient takes only its database path, never a settings object."""
 
-    def test_accepts_maxmind_settings(self):
-        """MaxMindClient constructs with maxmind_settings parameter."""
-        mock_settings = MagicMock(spec=MaxMindSettings)
+    def test_accepts_the_database_path(self):
+        """MaxMindClient constructs with the [maxmind.tenant] database path."""
         with tempfile.NamedTemporaryFile(suffix=".mmdb", delete=False) as f:
             db_path = f.name
         try:
-            mock_settings.maxmind_db_path = db_path
-            client = MaxMindClient(maxmind_settings=mock_settings)
+            client = MaxMindClient(database_path=db_path)
             assert client._db_path == db_path
         finally:
             os.unlink(db_path)

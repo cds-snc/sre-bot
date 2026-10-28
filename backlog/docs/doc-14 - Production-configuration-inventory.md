@@ -53,12 +53,12 @@ Destinations:
 | INCIDENT_CHANNEL | IncidentFeatureSettings (infrastructure/configuration/features/incident.py) | file, the slice's table | 111.14 |
 | ISSUER_CONFIG | SecuritySettings | file [security] issuer_config (structured table) | 111.8 |
 | MAXMIND_KEY | none (MaxMindSettings reads only the database path) | delete | 111.15 |
-| NOTIFY_API_URL | NotifySettings | file [notify] api_url | 111.12 |
+| NOTIFY_API_URL | no longer read (TASK-111.12, 2026-10-28) | production.toml [notify.tenant] api_url (public; pre vendors compares it with this blob line); the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | NOTIFY_OPS_CHANNEL_ID | NotifyApiKeyLeakSettings (moved from ServerSettings in 111.7) | file [notify_api_key_leak] channel_id | 111.7 |
-| NOTIFY_SRE_CLIENT_SECRET | NotifySettings | secret NOTIFY__SRE_CLIENT_SECRET | 111.4, 111.12 |
-| NOTIFY_SRE_USER_NAME | NotifySettings (credential id) | secret NOTIFY__SRE_USER_NAME | 111.4, 111.12 |
-| NOTIFY_TEST_KEY | none (one test reads it with a default) | delete | 111.15 |
-| OPSGENIE_INTEGRATIONS_KEY | OpsGenieSettings | secret OPSGENIE__INTEGRATIONS_KEY | 111.4, 111.12 |
+| NOTIFY_SRE_CLIENT_SECRET | no longer read (TASK-111.12, 2026-10-28) | secret NOTIFY__SRE_CLIENT_SECRET; the blob line stays inert until 111.15 removes the blobs | 111.4, 111.12 |
+| NOTIFY_SRE_USER_NAME | no longer read (TASK-111.12, 2026-10-28) | secret NOTIFY__SRE_USER_NAME; the blob line stays inert until 111.15 removes the blobs | 111.4, 111.12 |
+| NOTIFY_TEST_KEY | none (read by no test; ci_code.yml stops passing it in TASK-111.12) | delete (Actions secret, after 111.12) | 111.15 |
+| OPSGENIE_INTEGRATIONS_KEY | no longer read (TASK-111.12, 2026-10-28) | secret OPSGENIE__INTEGRATIONS_KEY beside production.toml [opsgenie.tenant] api_url; the blob line stays inert until 111.15 removes the blobs | 111.4, 111.12 |
 | OPSGENIE_KEY | none | delete | 111.15 |
 | SENTINEL_CUSTOMER_ID | SentinelSettings | secret SENTINEL__CUSTOMER_ID (non-public value: the Log Analytics workspace id, a tenant identifier only Azure administrators see, paired with the shared key); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line | 111.12 |
 | SENTINEL_LOG_TYPE | SentinelSettings | file [sentinel] log_type | 111.12 |
@@ -71,9 +71,9 @@ Destinations:
 | SLACK_TOKEN | none | delete | 111.15 |
 | SRE_BOT_EMAIL | no longer read (TASK-111.10.2, 2026-10-26) | secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL (non-public value: the address of a domain-privileged account; parameter added in 111.10.1, read by GoogleWorkspaceSettings from 111.10.2); the blob line stays inert until 111.15 removes the blob | 111.10.1, 111.10.2 |
 | SRE_OPS_CHANNEL_ID | SreOpsSettings (infrastructure/configuration/features/sre_ops.py) | file, the slice's table | 111.14 |
-| TRELLO_APP_KEY | TrelloSettings | secret TRELLO__TENANT__APP_KEY (the credentials are Trello's tenant entry: the SDK fixes the host, so nothing else identifies the tenant, decisions/configuration.md 2026-10-27); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line | 111.12 |
-| TRELLO_ATIP_BOARD | TrelloSettings | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line | 111.12 |
-| TRELLO_TOKEN | TrelloSettings | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line | 111.12 |
+| TRELLO_APP_KEY | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__APP_KEY (the credentials are Trello's tenant entry: the SDK fixes the host, so nothing else identifies the tenant, decisions/configuration.md 2026-10-27); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
+| TRELLO_ATIP_BOARD | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
+| TRELLO_TOKEN | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO__APP_KEY | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__APP_KEY) | secret TRELLO__APP_KEY until the task definition drops it | 111.15.1 |
 | TRELLO__TOKEN | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__TOKEN) | secret TRELLO__TOKEN until the task definition drops it | 111.15.1 |
 

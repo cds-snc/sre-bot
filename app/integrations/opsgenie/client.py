@@ -6,8 +6,6 @@ import structlog
 
 from integrations.opsgenie.settings import get_opsgenie_settings
 
-# Use the integrations API Key as the Opsgenie API Key
-OPSGENIE_KEY = get_opsgenie_settings().opsgenie_integrations_key
 logger = structlog.get_logger()
 
 
@@ -17,10 +15,7 @@ class OpsGenieAPIError(Exception):
 
 def get_on_call_users(schedule):
     log = logger.bind(schedule=schedule)
-    content = api_get_request(
-        f"https://api.opsgenie.com/v2/schedules/{schedule}/on-calls",
-        {"name": "GenieKey", "token": OPSGENIE_KEY},
-    )
+    content = api_get_request(f"/v2/schedules/{schedule}/on-calls")
     try:
         data = json.loads(content)
         return [x["name"] for x in data["data"]["onCallParticipants"]]
@@ -39,14 +34,14 @@ def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str |
     Returns ``None`` when the rotation does not exist on the schedule, has no
     current coverage (gap), or the active recipient is not a user
     (team/escalation). Raises :class:`OpsGenieAPIError` on transport or
-    response-parsing failures.
+    response-parsing failures, and when Opsgenie is not configured.
     """
     # With no `date` param, OpsGenie anchors `finalTimeline` at "now", so the
     # first period of the matching rotation is the active one — unless its
     # startDate is in the future, which indicates a coverage gap.
-    url = f"https://api.opsgenie.com/v2/schedules/{schedule_id}/timeline?identifierType=id&interval=1&intervalUnit=days"
+    path = f"/v2/schedules/{schedule_id}/timeline?identifierType=id&interval=1&intervalUnit=days"
     try:
-        content = api_get_request(url, {"name": "GenieKey", "token": OPSGENIE_KEY})
+        content = api_get_request(path)
         rotations = json.loads(content)["data"]["finalTimeline"]["rotations"]
     except Exception as exc:
         raise OpsGenieAPIError(f"OpsGenie timeline request failed for schedule {schedule_id!r}") from exc
@@ -64,42 +59,14 @@ def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str |
     return recipient.get("name") if recipient.get("type") == "user" else None
 
 
-# Create an Opsgenie alert. This is used to notify the on-call users
-def create_alert(description):
-    log = logger.bind(description=description)
-    content = api_post_request(
-        "https://api.opsgenie.com/v2/alerts",
-        {"name": "GenieKey", "token": OPSGENIE_KEY},
-        {
-            "message": "Notify API Key has been compromised!",
-            "description": f"{description}",
-        },
-    )
-    try:
-        data = json.loads(content)
-        log.info(
-            "create_alert",
-            description=description,
-            result=data["result"],
-        )
-        return data["result"]
-    except Exception as e:
-        log.exception(
-            "create_alert_error",
-            description=description,
-            error=str(e),
-        )
-        return "Could not issue alert to Opsgenie!"
-
-
 def healthcheck():
     """Check if the bot can interact with the Opsgenie API."""
+    if get_opsgenie_settings().tenant is None:
+        logger.warning("opsgenie_not_configured")
+        return False
     healthy = False
     try:
-        content = api_get_request(
-            "https://api.opsgenie.com/v1/services",
-            {"name": "GenieKey", "token": OPSGENIE_KEY},
-        )
+        content = api_get_request("/v1/services")
         result = json.loads(content)
         healthy = "data" in result
         logger.info(
@@ -115,18 +82,13 @@ def healthcheck():
     return healthy
 
 
-def api_get_request(url, auth):
-    req = Request(url)  # noqa: S310 -- scheme is hardcoded to https call sites
-    req.add_header("Authorization", f"{auth['name']} {auth['token']}")
-    conn = urlopen(req)  # noqa: S310 -- scheme is hardcoded to https call sites
-    return conn.read().decode("utf-8")
-
-
-# Post the API request to the Opsgenie API
-def api_post_request(url, auth, data):
-    data = json.dumps(data).encode("utf-8")
-    req = Request(url, data=data)  # noqa: S310 -- scheme is hardcoded to https call sites
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Authorization", f"{auth['name']} {auth['token']}")
-    conn = urlopen(req)  # noqa: S310 -- scheme is hardcoded to https call sites
-    return conn.read().decode("utf-8")
+def api_get_request(path: str) -> str:
+    """GET ``path`` on the tenant's Opsgenie API with the integration key; raises when not configured."""
+    settings = get_opsgenie_settings()
+    if settings.tenant is None:
+        raise OpsGenieAPIError("Opsgenie is not configured")
+    req = Request(settings.tenant.api_url.rstrip("/") + path)  # noqa: S310 -- the tenant validator requires https
+    req.add_header("Authorization", f"GenieKey {settings.integrations_key.get_secret_value()}")
+    conn = urlopen(req, timeout=settings.timeout_seconds)  # noqa: S310 -- the tenant validator requires https
+    body: bytes = conn.read()
+    return body.decode("utf-8")

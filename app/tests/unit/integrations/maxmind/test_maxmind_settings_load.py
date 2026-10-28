@@ -1,59 +1,79 @@
-"""Tests for the MaxMind vendor settings slice in integrations/maxmind/settings.py.
+"""Unit tests for loading the MaxMind vendor slice from the [maxmind] table.
 
-Each test removes the slice's environment variables and ignores the .env file,
-so it observes only the values it sets. Fields are looked up by their lower-cased
-environment variable names, which the slice must keep unchanged.
+Each test installs a base and a local file from tmp_path (``install_maxmind_files``) with every
+MaxMind variable removed and the .env file disabled (the autouse isolation fixture), so it
+observes only the values it writes and sets. MaxMind has no credential and no tenant id: the
+entry is the database file the deployment chooses, [maxmind.tenant] database_path. Boot checks
+its shape only; the file's presence is the healthcheck's. The retired MAXMIND_* names are ignored.
 """
 
-from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
+from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
+from tests.unit.integrations.maxmind.conftest import DATABASE_PATH, RETIRED_NAMES, TENANT, install_maxmind_files
 
 pytestmark = pytest.mark.unit
 
-_DEFAULTS: dict[str, str | None] = {
-    "MAXMIND_DB_PATH": "./geodb/GeoLite2-City.mmdb",
-}
 
-
-@pytest.fixture(autouse=True)
-def _isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Clear the slice's variables and the cached singleton around each test."""
-    for name in _DEFAULTS:
-        monkeypatch.delenv(name, raising=False)
-    get_maxmind_settings.cache_clear()
-    yield
-    get_maxmind_settings.cache_clear()
-
-
-def test_maxmind_settings_getter_returns_one_cached_instance() -> None:
-    """The getter is a process-wide singleton: repeated calls return the same object."""
-    assert get_maxmind_settings() is get_maxmind_settings()
-
-
-@pytest.mark.parametrize("name", list(_DEFAULTS))
-def test_maxmind_settings_reads_each_field_from_its_env_var(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
-    """Each field reads the environment variable of the same name."""
-    monkeypatch.setenv(name, "from-env")
-
-    settings = MaxMindSettings(_env_file=None)
-
-    assert getattr(settings, name.lower()) == "from-env"
-
-
-def test_maxmind_settings_defaults_apply_when_unset() -> None:
-    """With no variables set, every field holds its documented default."""
-    settings = MaxMindSettings(_env_file=None)
-
-    assert {name: getattr(settings, name.lower()) for name in _DEFAULTS} == _DEFAULTS
-
-
-def test_maxmind_settings_model_config_reads_dotenv_case_insensitively() -> None:
-    """The slice loads .env, matches names case-insensitively and ignores unknown keys."""
+def test_maxmind_settings_is_a_slice_on_the_maxmind_table() -> None:
     config = MaxMindSettings.model_config
 
-    assert config.get("env_file") == ".env"
-    assert config.get("case_sensitive") is False
-    assert config.get("extra") == "ignore"
+    assert issubclass(MaxMindSettings, ConfigurationSlice)
+    assert config.get("toml_table_header") == ("maxmind",)
+    assert config.get("env_prefix") == "MAXMIND__"
+    assert config.get("extra") == "forbid"
+
+
+def test_nothing_set_is_maxmind_not_configured(tmp_path: Path) -> None:
+    install_maxmind_files(tmp_path)
+
+    assert MaxMindSettings().tenant is None
+
+
+def test_the_tenant_entry_names_the_database_file(tmp_path: Path) -> None:
+    install_maxmind_files(tmp_path, environment=TENANT)
+
+    settings = MaxMindSettings()
+
+    assert settings.tenant is not None
+    assert settings.tenant.database_path == DATABASE_PATH
+
+
+def test_a_missing_database_file_still_boots(tmp_path: Path) -> None:
+    """No I/O at boot: the file's presence is the healthcheck's."""
+    install_maxmind_files(tmp_path, environment='[maxmind.tenant]\ndatabase_path = "/does/not/exist.mmdb"\n')
+
+    assert MaxMindSettings().tenant is not None
+
+
+@pytest.mark.parametrize(
+    ("files", "key"),
+    [
+        ('[maxmind.tenant]\ndatabase_path = ""\n', "database_path"),
+        ("[maxmind.tenant]\n", "database_path"),
+        (TENANT + 'license_key = "x"\n', "license_key"),
+        ('[maxmind]\ndb_path = "x"\n', "db_path"),
+    ],
+)
+def test_a_malformed_entry_or_unknown_key_fails_naming_it(tmp_path: Path, files: str, key: str) -> None:
+    install_maxmind_files(tmp_path, environment=files)
+
+    with pytest.raises(ConfigurationError, match=key):
+        MaxMindSettings()
+
+
+def test_the_retired_names_are_ignored_in_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    install_maxmind_files(tmp_path)
+    for name in RETIRED_NAMES:
+        monkeypatch.setenv(name, "/retired.mmdb")
+
+    assert MaxMindSettings().tenant is None
+
+
+def test_get_maxmind_settings_is_cached(tmp_path: Path) -> None:
+    install_maxmind_files(tmp_path)
+
+    assert get_maxmind_settings() is get_maxmind_settings()

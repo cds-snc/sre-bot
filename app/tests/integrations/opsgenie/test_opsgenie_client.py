@@ -1,37 +1,48 @@
+"""Tests for the Opsgenie client: on-call lookups, the healthcheck and the request helper.
+
+The client reads the Opsgenie slice at use through ``get_opsgenie_settings``, which each test
+patches with a real ``OpsGenieSettings`` (``model_construct``, so no configuration files are
+needed). Lookups are stubbed at ``api_get_request``; the helper's own tests stub ``Request``
+and ``urlopen``, so no test reaches the network.
+"""
+
 import json
 from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
+from pydantic import SecretStr
+from structlog.testing import capture_logs
 
 from integrations import opsgenie
 from integrations.opsgenie import OpsGenieAPIError
+from integrations.opsgenie.settings import OpsGenieSettings, OpsGenieTenant
+
+API_URL = "https://api.eu.opsgenie.com"
+
+
+def _settings(tenant: OpsGenieTenant | None = OpsGenieTenant(api_url=API_URL)) -> OpsGenieSettings:
+    key = SecretStr("genie-key" if tenant else "")
+    return OpsGenieSettings.model_construct(tenant=tenant, integrations_key=key, timeout_seconds=12.0)
+
+
+@pytest.fixture(autouse=True)
+def _configured_opsgenie():
+    with patch("integrations.opsgenie.client.get_opsgenie_settings", return_value=_settings()):
+        yield
+
+
+@pytest.fixture
+def _unconfigured_opsgenie():
+    with patch("integrations.opsgenie.client.get_opsgenie_settings", return_value=_settings(tenant=None)):
+        yield
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_users(api_get_request_mock):
     api_get_request_mock.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
     assert opsgenie.get_on_call_users("test_schedule") == ["test_user"]
-    api_get_request_mock.assert_called_once_with(
-        "https://api.opsgenie.com/v2/schedules/test_schedule/on-calls",
-        {"name": "GenieKey", "token": "OPSGENIE_KEY"},
-    )
-
-
-@patch("integrations.opsgenie.client.api_post_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
-def test_create_alert(api_post_request_mock):
-    description = "test_description"
-    api_post_request_mock.return_value = (
-        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
-    )
-    assert opsgenie.create_alert(description) == "Request will be processed"
-    api_post_request_mock.assert_called_once_with(
-        "https://api.opsgenie.com/v2/alerts",
-        {"name": "GenieKey", "token": "OPSGENIE_KEY"},
-        {"message": "Notify API Key has been compromised!", "description": description},
-    )
+    api_get_request_mock.assert_called_once_with("/v2/schedules/test_schedule/on-calls")
 
 
 @patch("integrations.opsgenie.client.api_get_request")
@@ -40,59 +51,59 @@ def test_get_on_call_users_with_exception(api_get_request_mock):
     assert opsgenie.get_on_call_users("test_schedule") == []
 
 
-@patch("integrations.opsgenie.client.api_post_request")
-def test_create_alert_with_exception(api_post_request_mock):
-    description = "test_description"
-    api_post_request_mock.return_value = "{]"
-    assert opsgenie.create_alert(description) == "Could not issue alert to Opsgenie!"
+def test_create_alert_is_gone():
+    """Nothing raises Opsgenie alerts any more: the function, its POST helper and their exports are deleted."""
+    assert not hasattr(opsgenie, "create_alert")
+    assert not hasattr(opsgenie, "api_post_request")
+    assert not hasattr(opsgenie.client, "create_alert")
+    assert not hasattr(opsgenie.client, "api_post_request")
 
 
 @patch("integrations.opsgenie.client.Request")
 @patch("integrations.opsgenie.client.urlopen")
-def test_api_get_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    assert (
-        opsgenie.api_get_request("test_url", {"name": "GenieKey", "token": "OPSGENIE_KEY"})
-        == '{"data": {"onCallParticipants": [{"name": "test_user"}]}}'
-    )
+def test_api_get_request_reaches_the_tenant_host_with_the_key_and_timeout(urlopen_mock, request_mock):
+    urlopen_mock.return_value.read.return_value.decode.return_value = '{"data": []}'
 
-    request_mock.assert_called_once_with("test_url")
-    request_mock.return_value.add_header.assert_called_once_with("Authorization", "GenieKey OPSGENIE_KEY")
-    urlopen_mock.assert_called_once_with(request_mock.return_value)
+    assert opsgenie.api_get_request("/v1/services") == '{"data": []}'
+
+    request_mock.assert_called_once_with(f"{API_URL}/v1/services")
+    request_mock.return_value.add_header.assert_called_once_with("Authorization", "GenieKey genie-key")
+    urlopen_mock.assert_called_once_with(request_mock.return_value, timeout=12.0)
 
 
-@patch("integrations.opsgenie.client.Request")
+@pytest.mark.usefixtures("_unconfigured_opsgenie")
 @patch("integrations.opsgenie.client.urlopen")
-def test_api_post_request(urlopen_mock, request_mock):
-    urlopen_mock.return_value.read.return_value.decode.return_value = (
-        '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
-    )
-    assert (
-        opsgenie.api_post_request(
-            "test_url",
-            {"name": "GenieKey", "token": "OPSGENIE_KEY"},
-            {
-                "message": "Notify API Key has been compromised!",
-                "description": "test_description",
-            },
-        )
-        == '{"result": "Request will be processed", "took": 0.302, "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120"}'
-    )
-    request_mock.assert_called_once_with(
-        "test_url",
-        data=b'{"message": "Notify API Key has been compromised!", "description": "test_description"}',
-    )
-    request_mock.return_value.add_header.assert_called_with(
-        "Authorization",
-        "GenieKey OPSGENIE_KEY",
-    )
-    urlopen_mock.assert_called_once_with(request_mock.return_value)
+def test_api_get_request_without_a_tenant_raises_without_a_request(urlopen_mock):
+    with pytest.raises(OpsGenieAPIError, match="not configured"):
+        opsgenie.api_get_request("/v1/services")
+
+    urlopen_mock.assert_not_called()
+
+
+@pytest.mark.usefixtures("_unconfigured_opsgenie")
+@patch("integrations.opsgenie.client.urlopen")
+def test_get_on_call_user_for_rotation_without_a_tenant_raises(urlopen_mock):
+    with pytest.raises(OpsGenieAPIError):
+        opsgenie.get_on_call_user_for_rotation("sched-1", "PSO_rotation")
+
+    urlopen_mock.assert_not_called()
+
+
+@pytest.mark.usefixtures("_unconfigured_opsgenie")
+@patch("integrations.opsgenie.client.urlopen")
+def test_healthcheck_without_a_tenant_is_unhealthy_without_a_request(urlopen_mock):
+    with capture_logs() as entries:
+        assert opsgenie.healthcheck() is False
+
+    assert [entry["event"] for entry in entries] == ["opsgenie_not_configured"]
+    urlopen_mock.assert_not_called()
 
 
 @patch("integrations.opsgenie.client.api_get_request")
 def test_healthcheck_healthy(api_get_request_mock):
     api_get_request_mock.return_value = '{"data": {"name": "test_user"}}'
     assert opsgenie.healthcheck() is True
+    api_get_request_mock.assert_called_once_with("/v1/services")
 
 
 @patch("integrations.opsgenie.client.api_get_request")
@@ -126,7 +137,6 @@ def _window_around_now(
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_returns_email(api_get_request_mock):
     start, end = _window_around_now()
     api_get_request_mock.return_value = _timeline_response(
@@ -154,7 +164,6 @@ def test_get_on_call_user_for_rotation_returns_email(api_get_request_mock):
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_returns_none_when_rotation_absent(
     api_get_request_mock,
 ):
@@ -179,7 +188,6 @@ def test_get_on_call_user_for_rotation_returns_none_when_rotation_absent(
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_returns_none_when_no_user_period(
     api_get_request_mock,
 ):
@@ -189,7 +197,6 @@ def test_get_on_call_user_for_rotation_returns_none_when_no_user_period(
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_skips_non_user_recipients(
     api_get_request_mock,
 ):
@@ -214,7 +221,6 @@ def test_get_on_call_user_for_rotation_skips_non_user_recipients(
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_returns_none_when_first_period_in_future(
     api_get_request_mock,
 ):
@@ -241,7 +247,6 @@ def test_get_on_call_user_for_rotation_returns_none_when_first_period_in_future(
 
 
 @patch("integrations.opsgenie.client.api_get_request")
-@patch("integrations.opsgenie.client.OPSGENIE_KEY", "OPSGENIE_KEY")
 def test_get_on_call_user_for_rotation_raises_on_api_failure(api_get_request_mock):
     api_get_request_mock.return_value = "{not json"
 

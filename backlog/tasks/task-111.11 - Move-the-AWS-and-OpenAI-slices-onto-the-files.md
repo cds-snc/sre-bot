@@ -1,10 +1,10 @@
 ---
 id: TASK-111.11
 title: Move the AWS and OpenAI slices onto the files
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-26T22:22:00Z'
+updated_date: '2026-10-27T20:00:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -30,10 +30,10 @@ AWS role ARNs, SSO instance ids and permission set names, retry and timeout valu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The AWS slice reads its values from the files and declares no AWS_* SDK name as a field
-- [ ] #2 The OpenAI slice reads its non-secret values from the files and its key as OPENAI__API_KEY
-- [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #4 Both subtasks (TASK-111.11.1 AWS, TASK-111.11.2 OpenAI) are Done and every old AWS_* and OPENAI_* name they retire is unread
+- [x] #1 The AWS slice reads its values from the files and declares no AWS_* SDK name as a field
+- [x] #2 The OpenAI slice reads its non-secret values from the files and its key as OPENAI__API_KEY
+- [x] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #4 Both subtasks (TASK-111.11.1 AWS, TASK-111.11.2 OpenAI) are Done and every old AWS_* and OPENAI_* name they retire is unread
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,9 @@ COORDINATOR (2026-10-26). The gate trips on one PR: two vendor slices (AWS 12 fi
 2. TASK-111.11.2 OpenAI slice (deps 111.11.1, 111.4). No terraform expand needed: terraform/ssm.tf:25 already creates and injects /sre-bot/OPENAI__API_KEY (111.4); only its value must be put-parameter'd and MATCH-checked.
 Ordering: 111.11.2 after 111.11.1 is merged and deployed (shared files, one deploy-checks edit at a time). Old OPENAI_* / AWS_* blob lines stay inert until 111.15.1/111.15.2. ACs 1-3 map: #1 -> 111.11.1, #2 -> 111.11.2, #3 -> both; #4 closes the parent.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-27: ACs 1 to 3 checked: 111.11.1 (#1795) and 111.11.2 (#1797) merged and deployed with gates green; AC 4 waits on both subtasks Done after their cleanups.
+<!-- SECTION:NOTES:END -->

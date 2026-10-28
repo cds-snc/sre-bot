@@ -152,6 +152,26 @@ def test_a_retired_openai_name_is_deleted_naming_its_destination(name: str, dest
     assert destination in verdict.reason
 
 
+@pytest.mark.parametrize(
+    ("name", "destination"),
+    [
+        ("NOTIFY_SRE_USER_NAME", "secret NOTIFY__SRE_USER_NAME"),
+        ("NOTIFY_SRE_CLIENT_SECRET", "secret NOTIFY__SRE_CLIENT_SECRET"),
+        ("NOTIFY_API_URL", "[notify.tenant] api_url"),
+        ("TRELLO_APP_KEY", "secret TRELLO__TENANT__APP_KEY"),
+        ("TRELLO_TOKEN", "secret TRELLO__TENANT__TOKEN"),
+        ("TRELLO_ATIP_BOARD", "secret TRELLO__ATIP_BOARD"),
+        ("OPSGENIE_INTEGRATIONS_KEY", "secret OPSGENIE__INTEGRATIONS_KEY"),
+        ("MAXMIND_DB_PATH", "[maxmind.tenant] database_path"),
+    ],
+)
+def test_a_retired_vendor_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
+
+    assert verdict.action == "delete"
+    assert destination in verdict.reason
+
+
 @pytest.mark.parametrize("name", ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL_DYNAMODB", "AWS_ACCESS_KEY_ID"])
 def test_an_aws_sdk_name_is_kept(name: str) -> None:
     """The SDK reads these names itself, so no AWS hint may turn them into a delete."""

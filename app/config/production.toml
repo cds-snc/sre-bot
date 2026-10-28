@@ -24,6 +24,19 @@ oncall_group_id = "S0BNW0G8CFK"
 base_url = "https://ai.cdssandbox.xyz"
 model = "gpt-5.6-luna"
 
+[notify.tenant]
+# The GC Notify API leaked keys are revoked through; its credentials are the task-definition
+# secrets NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET.
+api_url = "https://api.notification.canada.ca"
+
+[opsgenie.tenant]
+# The account's region (US); its key is the task-definition secret OPSGENIE__INTEGRATIONS_KEY.
+api_url = "https://api.opsgenie.com"
+
+[maxmind.tenant]
+# The database the image ships (Dockerfile).
+database_path = "./geodb/GeoLite2-City.mmdb"
+
 [[security.issuers]]
 issuer = "https://backstage.cdssandbox.xyz/api/auth"
 jwks_uri = "https://backstage.cdssandbox.xyz/api/auth/.well-known/jwks.json"

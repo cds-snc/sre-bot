@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-23T17:32:00Z'
+updated_date: '2026-10-27T20:32:00Z'
 labels:
   - migration
   - phase-5
@@ -59,7 +59,7 @@ Targets:
 - [ ] #6 No python-i18n import remains in the rebuilt surfaces, and none of them reads app/infrastructure/configuration/
 - [ ] #7 Each rebuilt feature's settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
 - [ ] #8 The nine talent role folder and template ids move from the interim [google_resources] table into the talent slice's table in the configuration files, and GoogleResourcesConfig stops exposing them
-- [ ] #9 The ATIP Trello board id is a field of the atip slice read from its table in the configuration files, and the Trello vendor slice no longer declares it
+- [ ] #9 The ATIP Trello board id is a field of the atip slice, a non-public value read only from the environment under the atip slice's own <SLICE>__<FIELD> name (never a configuration file; its parameter lands in an expand PR first), and the Trello vendor slice no longer declares it; TRELLO__ATIP_BOARD is removed in the contract that follows
 <!-- AC:END -->
 
 ## Definition of Done
@@ -67,3 +67,15 @@ Targets:
 - [ ] #1 Each module landed as its own reviewable PR series
 - [ ] #2 PR series references decisions/migration.md
 <!-- DOD:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-10-27T20:32:00Z
+
+---
+
+2026-10-27 (human, TASK-111.12 planning): AC #9 reworded. The board id is non-public (decisions/configuration.md 2026-10-27), so it is read from the environment, not from the atip table in the files. Until this task it is tolerated on the Trello vendor slice as TRELLO__ATIP_BOARD (TASK-111.12).
+
+---
+<!-- COMMENTS:END -->
