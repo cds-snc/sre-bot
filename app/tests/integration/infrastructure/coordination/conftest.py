@@ -45,9 +45,7 @@ EXPIRED_IN_PROGRESS_TTL_SECONDS = -1
 
 @pytest.fixture
 def in_memory_conditional_write_store() -> Any:
-    return InMemoryConditionalWriteStore(
-        record_ttl_seconds=RECORD_TTL_SECONDS, in_progress_ttl_seconds=IN_PROGRESS_TTL_SECONDS
-    )
+    return InMemoryConditionalWriteStore(record_ttl_seconds=RECORD_TTL_SECONDS, in_progress_ttl_seconds=IN_PROGRESS_TTL_SECONDS)
 
 
 @pytest.fixture

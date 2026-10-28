@@ -184,7 +184,8 @@ class TestTier2Wrapper:
         """_tier2(...)() executes the wrapped job on the first invocation."""
         # Provide a real in-memory store via the mock
         real_store = LeaseStore(
-            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED
+            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
+            read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
         )
         mock_get_lease_store.return_value = real_store
 
@@ -200,7 +201,8 @@ class TestTier2Wrapper:
     def test_tier2_wrapper_skips_job_when_lease_already_held(self, mock_get_lease_store) -> None:
         """_tier2(...)() skips execution when another runner already holds the lease."""
         real_store = LeaseStore(
-            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED
+            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
+            read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
         )
         mock_get_lease_store.return_value = real_store
 
@@ -220,7 +222,8 @@ class TestTier2Wrapper:
         """_tier2(...)() re-executes the job after the lease expires."""
         # Build a store with zero TTL so the lease expires immediately
         real_store = LeaseStore(
-            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=0), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED
+            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=0),
+            read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
         )
         mock_get_lease_store.return_value = real_store
 
@@ -347,7 +350,8 @@ class TestInitJobRegistration:
         # Arrange
         mock_get_settings.return_value.default_tier2_lease_ttl_seconds = 1800
         mock_get_lease_store.return_value = LeaseStore(
-            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED
+            InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
+            read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
         )
         mock_spending.generate_spending_data = create_autospec(spending.generate_spending_data)
         mock_spending.execute_spending_data_update_job = create_autospec(spending.execute_spending_data_update_job)

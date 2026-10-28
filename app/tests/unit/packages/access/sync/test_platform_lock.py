@@ -16,7 +16,10 @@ pytestmark = pytest.mark.unit
 
 
 def _store() -> LeaseStore:
-    return LeaseStore(InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
+    return LeaseStore(
+        InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
+        read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
+    )
 
 
 def test_acquire_lock_succeeds_once_and_persists_holder_payload() -> None:

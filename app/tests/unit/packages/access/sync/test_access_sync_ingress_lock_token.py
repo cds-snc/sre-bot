@@ -24,7 +24,10 @@ class _Settings:
 
 
 def _lock_store() -> LeaseStore:
-    return LeaseStore(InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300), read_failure_policy=ReadFailurePolicy.FAIL_CLOSED)
+    return LeaseStore(
+        InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
+        read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
+    )
 
 
 def test_enqueue_user_sync_hands_the_lock_owner_token_to_the_job() -> None:

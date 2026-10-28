@@ -41,9 +41,7 @@ def client() -> Any:
 
 @pytest.fixture
 def store(client: Any) -> DynamoDBConditionalWriteStore:
-    return DynamoDBConditionalWriteStore(
-        client, table_name=TABLE_NAME, record_ttl_seconds=3600, in_progress_ttl_seconds=300
-    )
+    return DynamoDBConditionalWriteStore(client, table_name=TABLE_NAME, record_ttl_seconds=3600, in_progress_ttl_seconds=300)
 
 
 def _complete_params() -> dict[str, Any]:
