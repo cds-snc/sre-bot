@@ -43,12 +43,14 @@ from modules import (
     webhook_helper,
 )
 from server.configuration import HostConfiguration, IdentitySettings, ServerSettings
+from server.plugins.boot import call_hook_per_plugin
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
     load_plugins,
     register_background_jobs,
     register_feature_integrations,
+    resolve_plugin_requirements,
 )
 from server.services import SvcsServiceScopeOpener, initialize_core_services
 
@@ -189,7 +191,7 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
     Plugins must already be loaded so every feature's locale path is included.
     """
     i18n_registry = I18nResourceRegistry()
-    pm.hook.register_i18n_resources(registry=i18n_registry)
+    call_hook_per_plugin(pm, "register_i18n_resources", logger, registry=i18n_registry)
     logger.bind(phase="i18n_resource_collection").info(
         "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
     )
@@ -286,6 +288,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     pm = get_plugin_manager()
     # Any plugin that fails to load stops startup here, before the app serves.
     load_plugins(pm, configuration.disabled_plugins, logger.bind(phase="plugin_loading"))
+    # An enabled plugin whose required vendor or capability is not configured stops startup here.
+    resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"))
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-26T13:45:00Z'
+updated_date: '2026-10-29T14:23:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -49,6 +49,12 @@ Operator tooling lives in app/bin/ (decisions/migration.md). Follow the existing
 - [ ] #4 The check is a script under app/bin/ with a make target and a blocking CI step
 - [ ] #5 The generator asks for the plugin's product area (one of decisions/product-scope.md's four) and writes the enablement key into that area's [plugins.<area>] table in base.toml, and adds the entry-point module to the import-linter protected-plugins contract
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-172): the generator's __init__.py template includes a register_requirements hookimpl stub (decisions/plugins.md and feature-packages.md 2026-10-29): a plugin states each vendor or capability it cannot run without there, none it uses optionally.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

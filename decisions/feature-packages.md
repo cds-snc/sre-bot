@@ -26,7 +26,7 @@ Features, capabilities and subdomains all use this one shape. Features live in `
 
 ```text
 app/features/<feature>/
-├── __init__.py        # hookimpls: the package's registration surface
+├── __init__.py        # hookimpls: the package's registration surface, register_requirements first
 ├── README.md          # purpose; for a capability, its classification and feature consumers
 ├── settings.py        # the package's typed settings slice (optional)
 ├── api.py             # capabilities only: public Protocol, domain types, provider function
@@ -41,7 +41,7 @@ app/features/<feature>/
 └── locales/           # EN/FR catalogues (see i18n.md)
 ```
 
-A package generator creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
+A package's `__init__.py` states each vendor or capability it cannot run without in a `register_requirements` hookimpl and states none it uses optionally ([plugins.md](plugins.md)); the generator's template includes the hook. A package generator creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
 
 ### Complex features: an umbrella directory, never a flat prefix
 
@@ -130,3 +130,4 @@ Tolerated until then:
 - 2026-10-09: `incident/scribe` Slack handlers merged into `entrypoints/` (TASK-144.1); Context no longer lists it among the packages with `platforms/`.
 - 2026-10-09: rule 2 becomes the purpose test (audience or outcome, the domain's word, never a mechanism); TASK-135 had merged two packages by mechanism and this rule would have caught it (TASK-145).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-10-29: a package states the vendors and capabilities it requires in a `register_requirements` hookimpl, per plugins.md; the generator template includes it (TASK-172).

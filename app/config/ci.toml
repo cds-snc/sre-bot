@@ -7,3 +7,8 @@ oncall_group_id = ""
 
 [atip]
 announce_channel_id = "C033L7RGCT0"
+
+[plugins.incident_response]
+# A plugin that states a requirement is off: ci configures no vendor tenant. incident.scribe
+# requires [openai.tenant] (decisions/plugins.md); a guard test fails if one is left on.
+"incident.scribe" = false

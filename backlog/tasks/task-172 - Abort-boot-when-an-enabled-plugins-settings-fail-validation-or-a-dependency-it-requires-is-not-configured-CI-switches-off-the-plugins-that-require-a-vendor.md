@@ -4,10 +4,10 @@ title: >-
   Abort boot when an enabled plugin's settings fail validation or a dependency
   it requires is not configured; CI switches off the plugins that require a
   vendor
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-27T18:10:00Z'
-updated_date: '2026-10-29T00:46:00Z'
+updated_date: '2026-10-29T14:30:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -39,11 +39,11 @@ SCOPE (ruled 2026-10-29):
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An enabled plugin whose settings slice fails validation aborts boot before yield naming the key, in every layer (lifespan test)
-- [ ] #2 An enabled plugin whose required vendor is not configured aborts boot with one CRITICAL plugin_boot_failed event naming the plugin and the configuration key, and no secret value (lifespan test)
-- [ ] #3 incident.scribe enabled with no [openai.tenant] aborts boot naming openai.tenant; incident.comms enabled with no [openai.tenant] boots and reports text generation unavailable (tests)
-- [ ] #4 ci.toml switches off incident.scribe, the only plugin that states a requirement now; the CI boot and the full suite pass with scribe off, and a guard test fails if a plugin that states a requirement is enabled in ci.toml
-- [ ] #5 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
+- [x] #1 An enabled plugin whose settings slice fails validation aborts boot before yield naming the key, in every layer (lifespan test)
+- [x] #2 An enabled plugin whose required vendor is not configured aborts boot with one CRITICAL plugin_boot_failed event naming the plugin and the configuration key, and no secret value (lifespan test)
+- [x] #3 incident.scribe enabled with no [openai.tenant] aborts boot naming openai.tenant; incident.comms enabled with no [openai.tenant] boots and reports text generation unavailable (tests)
+- [x] #4 ci.toml switches off incident.scribe, the only plugin that states a requirement now; the CI boot and the full suite pass with scribe off, and a guard test fails if a plugin that states a requirement is enabled in ci.toml
+- [x] #5 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -123,4 +123,8 @@ Q6 TASK-126 title/file name still says "on_boot_failure abort|continue" while it
 - 2026-10-29: plan approved (human), with the 2026-10-29 rulings above.
 
 2026-10-29: the Slack, Google and Opsgenie requirements follow-up is TASK-175 (created, human 2026-10-29).
+
+2026-10-29 implemented in the working tree from main cd090014, In Progress. contracts/plugins/requirements.py RequiredDependencyError(setting); register_requirements hookspec (first in FeatureLifecycleSpecs); server/plugins/boot.py: call_hook_per_plugin (subset_hook_caller per plugin, positional-only so startup_warmup's logger kwarg passes through), load_entry_points (an import failure is attributed to the first entry point neither registered nor blocked, pluggy's load order; unknown only when none), log_plugin_boot_failed (one CRITICAL plugin_boot_failed: plugin, phase = hook name or plugin_loading, error_type, setting; setting from RequiredDependencyError or the ValidationError's title and locations, never the error text). The field is 'setting', not 'key': CodeQL's clear-text-logging rule flags log identifiers named key. manager.py: requirements via resolve_plugin_requirements; event handlers, routes, startup_warmup and the Slack per-plugin loop go through the runner; lifespan.py: requirements right after load_plugins, i18n collection per plugin. Scribe: register_requirements calls features/incident/scribe/adapters/requirements.py require_openai_tenant (adapter, since contract (e) forbids integrations imports outside adapters/). ci.toml [plugins.incident_response] incident.scribe = false; pytest-env pins all four keys. Guard test reads base.toml + ci.toml directly so the pin cannot hide a missing switch-off. plugins.md Tolerated item 'no plugin states what it requires' closed, Changes line; feature-packages.md layout comment and paragraph; TASK-114 note (generator template). Tests changed: plugin loading and configuration phase expected disabled sets (+ incident.scribe), enablement boot (ci disables scribe), event-handlers hook test on a real pm. Production: production.toml has [openai.tenant] and OPENAI__API_KEY is a task-definition secret, so scribe's requirement holds; no terraform, no new deploy check (generic post).
+
+Gates 2026-10-29: ruff check . All checks passed (format clean); mypy 41 errors in 14 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 5878 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK. ACs 1-5 checked: #1 test_lifespan_plugin_boot_failure (settings slice case), #2 same file (requirement case, event fields exactly plugin/phase/error_type/setting), #3 test_incident_scribe_requirements_resolve and test_lifespan_incident_plugins_openai_requirement, #4 ci.toml + guard test + full suite.
 <!-- SECTION:NOTES:END -->

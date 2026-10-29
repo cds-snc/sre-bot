@@ -84,7 +84,6 @@ Tickets: TASK-18 (contracts, including hookspecs), TASK-110 (entry-point loading
 
 Tolerated until closed:
 - a raising `startup_warmup` hookimpl aborts boot even when the cause is a feature's credentials (TASK-126);
-- no plugin states what it requires yet, so a plugin enabled without its vendor boots and fails at use (TASK-172 states incident.scribe's OpenAI requirement);
 - Slack, Google and Opsgenie requirements (incident.scribe, oncall_sync, rant, user_rotations) are not stated, pending a rule on how CI satisfies them (a fake tenant or the plugin switched off) and the configured-systems read (TASK-145.5.9); TASK-175, after TASK-172;
 - the `register_event_handlers` hookspec, and `access/request` and `access/sync` subscribing to the in-process dispatcher in `startup_warmup`;
 - plugins under `packages/` rather than `features/`.
@@ -103,3 +102,4 @@ Tolerated until closed:
 - 2026-10-26: the CI check for environment-variable and `ENVIRONMENT` plugin switches joins the Checks (TASK-112.4); the access switches `ACCESS_*_ENABLED` go in TASK-112.3.
 - 2026-10-27: one boot failure policy for every layer: an enabled plugin whose settings fail validation, or whose required vendor or capability is not configured, aborts boot (Backstage's default); a plugin states a requirement by resolving it at registration; a dependency is optional only where the plugin's ADR designs that state; no skip, no per-plugin override (TASK-172).
 - 2026-10-29: requirements are stated through the `register_requirements` hookspec, fired per plugin before registration; an import failure is attributed to its entry-point name; the Boot test line no longer describes the old skip of a feature with an invalid slice (TASK-172 planning).
+- 2026-10-29: TASK-172 implemented: `register_requirements` fires per plugin after loading, incident.scribe requires `[openai.tenant]`, ci.toml switches scribe off (a guard test fails when a plugin that states a requirement is on in CI), and `plugin_boot_failed` names the setting at fault in a `setting` field (a field named `key` trips CodeQL's clear-text-logging rule); the "no plugin states what it requires" tolerated item is closed.
