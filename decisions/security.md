@@ -47,3 +47,4 @@ Ticket: Phase-0 security hotfixes — known gaps at adoption time: prod CORS wil
 - 2026-09-25: feature permissions come from authorization.md, not JWT scopes; token scopes grant API access only.
 - 2026-10-20: CORS drops credentials mode (bearer tokens need none), methods default to `GET` and `POST`, and the settings live in the `SecuritySettings` slice (TASK-24.2).
 - 2026-10-23: issuers move to `[[security.issuers]]` in the configuration files and each entry is boot-validated (https or loopback `jwks_uri`, asymmetric algorithms, audience, one per issuer); production refuses to boot with the dev bypass flag on or its token set; fail-degraded covers JWKS reachability only (TASK-111.8).
+- 2026-10-29: the dev bypass enabled outside production and an empty issuer list log one `security_setting_weakened` WARNING naming the setting ([configuration.md](configuration.md), TASK-156 planning).

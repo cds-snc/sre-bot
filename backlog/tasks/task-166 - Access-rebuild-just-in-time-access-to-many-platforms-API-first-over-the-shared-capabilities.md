@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-10-28T19:42:00Z'
+updated_date: '2026-10-29T15:45:00Z'
 labels:
   - access
 milestone: m-7
@@ -43,3 +43,9 @@ This coordinator is broken out into subtasks as the ADRs are amended (people and
 - [ ] #4 A developer can run the access plugins locally: the AWS profile and cross-account permissions they need are documented, and the plugins are switched on through PLUGINS__PLATFORM_ACCESS in app/.env
 - [ ] #5 The entitlement catalogue is managed content (decisions/organisation-content.md, managed-content.md): one validated, authorised, versioned and audited write path, read through a port the access feature owns; ACCESS_CONFIG_SOURCE and its four loaders are deleted
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-156 planning, human): the access settings move onto the configuration files as ConfigurationSlice subclasses so they appear in plugin_configuration_summary, and any credential among them is SecretStr and env_only (configuration.md, Startup reports configuration). Today they are plain BaseSettings outside the summary.
+<!-- SECTION:NOTES:END -->

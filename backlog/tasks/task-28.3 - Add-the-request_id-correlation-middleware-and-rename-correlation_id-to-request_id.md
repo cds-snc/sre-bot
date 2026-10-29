@@ -5,8 +5,8 @@ title: >-
   request_id
 status: To Do
 assignee: []
-created_date: '2026-09-15 19:39'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-15 19:39
+updated_date: '2026-10-29T15:45:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -17,7 +17,7 @@ references:
   - decisions/observability.md
   - app/infrastructure/logging/context.py
   - app/server/server.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1610'
+  - https://github.com/cds-snc/sre-bot/issues/1610
 parent_task_id: TASK-28
 priority: high
 ordinal: 210000
@@ -48,3 +48,9 @@ Out of scope: security headers and RFC 9457 problem details (TASK-28), and the l
 - [ ] #4 rg finds no correlation_id binding left in app/, or each remaining use is listed in notes with an owner
 - [ ] #5 The uvicorn access-line correlation question is verified empirically, with the decision recorded in notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-156 planning): service identity (service.name, service.version, service.instance.id, deployment.environment.name) is added by a chain processor, not contextvars, so clear_contextvars() never removes it; request_id stays the only contextvars-bound correlation key (observability.md). The middleware does not bind identity fields.
+<!-- SECTION:NOTES:END -->
