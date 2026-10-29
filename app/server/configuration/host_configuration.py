@@ -29,7 +29,7 @@ from infrastructure.logging.settings import LoggingSettings, get_logging_setting
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.aws.settings import get_aws_settings
-from integrations.google_workspace.settings import get_google_workspace_settings
+from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.maxmind.settings import get_maxmind_settings
 from integrations.notify.settings import get_notify_settings
 from integrations.openai.settings import get_openai_settings
@@ -125,6 +125,23 @@ def validate_slack_transport(transport: SlackTransportSettings, slack: SlackSett
         )
 
 
+# The legacy incident handlers in modules/ use Google Workspace (documents, Drive, calendar) and are
+# not plugins, so they cannot state the requirement through register_requirements (decisions/plugins.md).
+# The host states it while they are registered; TASK-145.13 deletes app/modules/incident and this rule.
+# No ENVIRONMENT comparison: every environment that switches the transport on needs the tenant.
+LEGACY_INCIDENT_GOOGLE_KEY = "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID"
+
+
+def validate_legacy_incident_google_tenant(transport: SlackTransportSettings, google: GoogleWorkspaceSettings) -> None:
+    """Fail boot when the transport is switched on without a Google Workspace tenant (decisions/configuration.md).
+
+    A half tenant entry already fails inside the Google slice, so a tenant present here is complete.
+    The message names the key, never a value.
+    """
+    if transport.enabled and google.tenant is None:
+        raise ConfigurationError(f"{LEGACY_INCIDENT_GOOGLE_KEY} is required when [slack_transport] enabled is true")
+
+
 def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     """Run the configuration phase once: select, check and install the files, validate every host slice.
 
@@ -168,7 +185,7 @@ def _validate_slices(
     validate_slack_transport(slack_transport, get_slack_settings())
     scheduler = get_scheduler_settings()
     get_aws_settings()
-    get_google_workspace_settings()
+    validate_legacy_incident_google_tenant(slack_transport, get_google_workspace_settings())
     get_openai_settings()
     get_notify_settings()
     get_trello_settings()
