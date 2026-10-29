@@ -1,9 +1,7 @@
 """Unit tests for the access-owned permission-set slice, the [access_permission_sets] table.
 
 Each test installs a base and a local file from tmp_path with the .env file disabled.
-The two values are the permission-set ARNs the 'write' and 'read' aliases resolve to;
-they were AWS_SSO_SYSTEM_ADMIN_PERMISSIONS and AWS_SSO_VIEW_ONLY_PERMISSIONS, and those
-names are no longer read.
+The two values are the permission-set ARNs the 'write' and 'read' aliases resolve to.
 """
 
 from collections.abc import Iterator
@@ -24,7 +22,10 @@ VIEW = "arn:aws:sso:::permissionSet/ssoins-1234567890abcdef/ps-viewer"
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setitem(AccessPermissionSetsSettings.model_config, "env_file", None)
-    for name in ("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", "AWS_SSO_VIEW_ONLY_PERMISSIONS"):
+    for name in (
+        "ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS",
+        "ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS",
+    ):
         monkeypatch.delenv(name, raising=False)
     get_access_permission_sets_settings.cache_clear()
     yield
@@ -69,17 +70,6 @@ def test_permission_sets_read_the_environment_file(tmp_path: Path) -> None:
     settings = get_access_permission_sets_settings()
 
     assert (settings.system_admin_permissions, settings.view_only_permissions) == (ADMIN, VIEW)
-
-
-def test_permission_sets_ignore_the_retired_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The old AWS_SSO_*_PERMISSIONS names in the environment change nothing."""
-    _install(tmp_path, "[access_permission_sets]\n")
-    monkeypatch.setenv("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", ADMIN)
-    monkeypatch.setenv("AWS_SSO_VIEW_ONLY_PERMISSIONS", VIEW)
-
-    settings = AccessPermissionSetsSettings()
-
-    assert (settings.system_admin_permissions, settings.view_only_permissions) == ("", "")
 
 
 def test_permission_sets_unknown_key_fails_naming_the_key(tmp_path: Path) -> None:

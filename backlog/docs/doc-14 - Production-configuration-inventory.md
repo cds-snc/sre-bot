@@ -11,7 +11,7 @@ Every key production sets on 2026-10-20, by name only (no values), with its owni
 
 This is the rename map: TASK-111.4 creates one SSM SecureString parameter per row whose destination is a secret, under the new name shown, and the slice subtasks read the new names. Each slice subtask lower-cases its fields to match the TOML keys and secret names below.
 
-From TASK-111.15.1 the container no longer fetches the two SSM parameters: it starts uvicorn directly, and the task definition sets only `ENVIRONMENT` and `FORWARDED_ALLOW_IPS` with the `/sre-bot/*` secrets. Every blob line below is inert from then on; the IAM read stays until TASK-111.15.2 so an earlier revision can still roll back.
+From TASK-111.15.1 the container no longer fetches the two SSM parameters: it starts uvicorn directly, and the task definition sets only `ENVIRONMENT` and `FORWARDED_ALLOW_IPS` with the `/sre-bot/*` secrets. Every blob line below is inert from then on. TASK-111.15.2 removes the IAM read on both blobs (merged state; an earlier revision can no longer roll back) and destroys the old `gcp_sre_service_account_key`, `/sre-bot/TRELLO__APP_KEY` and `/sre-bot/TRELLO__TOKEN` parameters; the two blobs remain until the human deletes them in the console, and this doc is archived after that. No tool reads this doc any more: the env audits read the env-only settings fields and `terraform/ssm.tf`.
 
 Destinations:
 - `file [table] key`: a value in `app/config/production.toml` (or `base.toml` when it equals the default everywhere).
@@ -76,8 +76,8 @@ Destinations:
 | TRELLO_APP_KEY | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__APP_KEY (the credentials are Trello's tenant entry: the SDK fixes the host, so nothing else identifies the tenant, decisions/configuration.md 2026-10-27); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO_ATIP_BOARD | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__ATIP_BOARD (non-public value: a board set to Public opens to anyone with its link, as a Drive item does); parameter added by the terraform-only PR before 111.11.1 (2026-10-27), value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
 | TRELLO_TOKEN | no longer read (TASK-111.12, 2026-10-28) | secret TRELLO__TENANT__TOKEN (Trello's tenant entry, as TRELLO__TENANT__APP_KEY); parameter added by the terraform-only PR before 111.12, value set with put-parameter from this blob line; the blob line stays inert until 111.15 removes the blobs | 111.12 |
-| TRELLO__APP_KEY | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__APP_KEY) | secret TRELLO__APP_KEY until the task definition drops it (111.15.1); parameter removed in 111.15.2 after Verify | 111.15.1, 111.15.2 |
-| TRELLO__TOKEN | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__TOKEN) | secret TRELLO__TOKEN until the task definition drops it (111.15.1); parameter removed in 111.15.2 after Verify | 111.15.1, 111.15.2 |
+| TRELLO__APP_KEY | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__APP_KEY) | secret TRELLO__APP_KEY until the task definition drops it (111.15.1); parameter destroyed by 111.15.2's tf_apply | 111.15.1, 111.15.2 |
+| TRELLO__TOKEN | none (parameter created by 111.4, never read; superseded by TRELLO__TENANT__TOKEN) | secret TRELLO__TOKEN until the task definition drops it (111.15.1); parameter destroyed by 111.15.2's tf_apply | 111.15.1, 111.15.2 |
 
 ## GOOGLE_RESOURCES ids
 
@@ -123,7 +123,7 @@ One row per id in the sre-bot-config `GOOGLE_RESOURCES` JSON, keyed `GOOGLE_RESO
 | CORS_ALLOWED_ORIGINS | removed with its terraform variable (TASK-111.15.1) | SecuritySettings | file [security] cors_allowed_origins | 111.8, removed in 111.15.1 |
 | FORWARDED_ALLOW_IPS | environment (VPC public subnet CIDRs) | none (uvicorn) | platform | - |
 | SLACK__COMMAND_PREFIX | removed (TASK-111.15.1) | SlackTransportSettings | file [slack_transport] command_prefix (the transport's table; TASK-112 adds its enablement key beside it) | 111.7, removed in 111.15.1 |
-| GCP_SRE_SERVICE_ACCOUNT_KEY_FILE | secrets: (SSM parameter, value from a terraform variable) | no longer read (TASK-111.10.2, 2026-10-26); no longer injected (TASK-111.15.1); the parameter and its terraform variable go in 111.15.2 | secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (new parameter whose value is set outside terraform) | 111.4, 111.10.2 |
+| GCP_SRE_SERVICE_ACCOUNT_KEY_FILE | secrets: (SSM parameter, value from a terraform variable) | no longer read (TASK-111.10.2, 2026-10-26); no longer injected (TASK-111.15.1); the parameter, its terraform variable and the workflows' TF_VAR line removed by 111.15.2 (the Actions secret is deleted by the human after its apply) | secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY (new parameter whose value is set outside terraform) | 111.4, 111.10.2 |
 
 ## Secrets TASK-111.4 creates
 

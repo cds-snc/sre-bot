@@ -1,18 +1,16 @@
 """Unit tests for the env-name audit's actions.
 
-``classify`` is called with a small hand-built ``Context`` (read, retired, doc-14 rows, parameters and
-workflow references), so each action is pinned without reading the env files, GitHub or SSM. The
-production-blob cases read the checked-in production configuration, which holds the migrated
-``[slack_transport]`` table.
+``classify`` is called with a small hand-built ``Context`` (read names, a retired map and workflow and
+setup references), so each action is pinned without reading the env files or GitHub. The real
+``RETIRED`` map and the real setup files are read only where the test is about them.
 """
 
 import pytest
 
 from bin.audit_env_names import (
+    RETIRED,
     Context,
     classify,
-    parameter_rows,
-    replacement,
     setup_references,
     unprovided_workflow_references,
 )
@@ -20,19 +18,22 @@ from bin.audit_env_names import (
 pytestmark = pytest.mark.unit
 
 CTX = Context(
-    current={"SLACK__BOT_TOKEN", "LOGGING__LOG_LEVEL", "ACCESS_CONFIG_SOURCE"},
-    retired={"SLACK_BOT_TOKEN", "LOG_LEVEL", "SESSION_SECRET_KEY", "SLACK_ENABLED"},
-    doc14={
-        "SLACK_BOT_TOKEN": ("secret SLACK__BOT_TOKEN, read by SlackSettings", "111.4, 111.9"),
-        "SLACK_ENABLED": ("production.toml [slack_transport] enabled = true", "112.1"),
-        "APP_TOKEN": ("delete", "111.15"),
-        "ACCESS_CONFIG_SOURCE": ("file [access] source", "TASK-166"),
-        "ENVIRONMENT": ("platform (task definition already sets it)", "111.15"),
-        "GHOST": ("file [nowhere] key", "111.99"),
+    current={"SLACK__BOT_TOKEN", "LOGGING__LOG_LEVEL"},
+    retired={
+        "SLACK_BOT_TOKEN": "secret SLACK__BOT_TOKEN",
+        "SLACK_ENABLED": "[slack_transport] enabled",
+        "SESSION_SECRET_KEY": "nothing (no reader)",
     },
-    parameter_states={"SLACK__BOT_TOKEN": "set"},
     workflow_refs={"GEO_DB_BUCKET": ["refresh_geodb.yml"], "LOG_ANALYTICS_WORKSPACE_ID": ["ci_code.yml"]},
     setup_refs={"GEO_DB_BUCKET": [".devcontainer/maxmind-create.sh"]},
+)
+SOURCES = (
+    "file app/.env",
+    "codespaces repo cds-snc/sre-bot",
+    "codespaces user (reaches cds-snc/sre-bot)",
+    "actions secret repo cds-snc/sre-bot",
+    "actions variable repo cds-snc/sre-bot",
+    "dependabot secret repo cds-snc/sre-bot",
 )
 
 
@@ -46,11 +47,12 @@ def _action(source: str, name: str, state: str = "set", ctx: Context = CTX) -> s
         ("SLACK__BOT_TOKEN", "set", "none"),
         ("AWS_PROFILE", "set", "none"),
         ("LOGGING__LOG_LEVEL", "commented", "none"),
-        ("SLACK_BOT_TOKEN", "set", "rename"),
+        ("SLACK_BOT_TOKEN", "set", "delete"),
         ("SESSION_SECRET_KEY", "set", "delete"),
         ("SLACK_ENABLED", "set", "delete"),
-        ("LOG_LEVEL", "commented", "delete"),
+        ("SESSION_SECRET_KEY", "commented", "delete"),
         ("REACT_APP_API_URL", "present", "check"),
+        ("UNREAD_LINE", "commented", "check"),
         ("GEO_DB_BUCKET", "present", "none"),
     ],
 )
@@ -58,152 +60,28 @@ def test_developer_names_get_one_action(name: str, state: str, action: str) -> N
     assert _action("file app/.env", name, state) == action
 
 
-def test_a_parameter_destination_set_ahead_of_its_reader_is_kept() -> None:
-    ctx = Context(
-        current=CTX.current,
-        doc14={"SRE_BOT_EMAIL": ("secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "111.10.2")},
-    )
+def test_a_retired_name_whose_value_moved_to_a_secret_names_the_secret_to_copy_to() -> None:
+    verdict = classify("codespaces repo cds-snc/sre-bot", "SLACK_BOT_TOKEN", "present", CTX)
 
-    verdict = classify("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL", "present", ctx)
+    assert verdict.action == "delete"
+    assert verdict.new == "SLACK__BOT_TOKEN"
 
-    assert verdict.action == "none"
-    assert "SRE_BOT_EMAIL" in verdict.reason
-    assert _action("codespaces repo cds-snc/sre-bot", "GOOGLE_WORKSPACE__TENANT__UNKNOWN", "present", ctx) == "check"
+
+def test_a_retired_switch_points_to_its_configuration_key() -> None:
+    verdict = classify("file app/.env", "SLACK_ENABLED", "set", CTX)
+
+    assert verdict.reason == "retired; set [slack_transport] enabled instead"
+    assert verdict.new is None
 
 
 def test_the_real_setup_scripts_read_the_geodb_bucket() -> None:
     assert ".devcontainer/maxmind-create.sh" in setup_references()["GEO_DB_BUCKET"]
 
 
-def test_a_rename_names_the_successor() -> None:
-    assert "set SLACK__BOT_TOKEN to the same value" in classify("file app/.env", "SLACK_BOT_TOKEN", "set", CTX).reason
-
-
-def test_a_superseded_google_id_names_the_secret_that_holds_it_now() -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", "CORE_VALUES_INTERVIEW_NOTES_TEMPLATE", "present", CTX)
-
-    assert verdict.action == "delete"
-    assert "GOOGLE_RESOURCES tal.c" in verdict.reason
-    assert "TALENT__CORE_VALUES_INTERVIEW_NOTES_ID" in verdict.reason
-
-
-@pytest.mark.parametrize("name", ["SRE_DRIVE_ID", "FOLDER_REPORTS_GOOGLE_GROUPS"])
-def test_a_superseded_google_id_with_no_reader_says_it_was_not_carried(name: str) -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert "not carried" in verdict.reason
-
-
-def test_the_google_resources_json_is_deleted_without_copying_it_into_a_per_id_secret() -> None:
-    """Each id has its own secret now; the JSON value must never be copied into one of them."""
-    verdict = classify("codespaces repo cds-snc/sre-bot", "GOOGLE_RESOURCES", "present", CTX)
-
-    assert verdict.action == "delete"
-    assert verdict.new is None
-    assert "INCIDENT_CORE__FOLDER_ID" in verdict.reason
-
-
-def test_a_retired_switch_points_to_its_configuration_key() -> None:
-    assert "[slack_transport] enabled" in classify("file app/.env", "SLACK_ENABLED", "set", CTX).reason
-
-
-@pytest.mark.parametrize(
-    ("name", "destination"),
-    [
-        ("SRE_BOT_EMAIL", "secret GOOGLE_WORKSPACE__TENANT__DELEGATED_USER_EMAIL"),
-        ("GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "secret GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"),
-        ("GOOGLE_WORKSPACE_CUSTOMER_ID", "secret GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID"),
-        ("GOOGLE_API_NUM_RETRIES", "[google_workspace] api_num_retries"),
-        ("GOOGLE_API_TIMEOUT_SECONDS", "[google_workspace] api_timeout_seconds"),
-    ],
-)
-def test_a_retired_google_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert destination in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "destination"),
-    [
-        ("AWS_AUDIT_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__AUDIT_ROLE_ARN"),
-        ("AWS_ORG_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__ORG_ROLE_ARN"),
-        ("AWS_LOGGING_ACCOUNT_ROLE_ARN", "secret AWS__TENANT__LOGGING_ROLE_ARN"),
-        ("AWS_SSO_INSTANCE_ID", "secret AWS__TENANT__INSTANCE_ID"),
-        ("AWS_SSO_INSTANCE_ARN", "secret AWS__TENANT__INSTANCE_ARN"),
-        ("AWS_SSO_SYSTEM_ADMIN_PERMISSIONS", "secret ACCESS_PERMISSION_SETS__SYSTEM_ADMIN_PERMISSIONS"),
-        ("AWS_SSO_VIEW_ONLY_PERMISSIONS", "secret ACCESS_PERMISSION_SETS__VIEW_ONLY_PERMISSIONS"),
-        ("AWS_RETRY_MAX_ATTEMPTS", "[aws] retry_max_attempts"),
-        ("AWS_RETRY_MODE", "[aws] retry_mode"),
-        ("AWS_CONNECT_TIMEOUT_SECONDS", "[aws] connect_timeout_seconds"),
-        ("AWS_READ_TIMEOUT_SECONDS", "[aws] read_timeout_seconds"),
-        ("AWS_TRANSIENT_RETRY_AFTER_SECONDS", "[aws] transient_retry_after_seconds"),
-        ("AWS_NOT_FOUND_CODES", "[aws] not_found_codes"),
-        ("AWS_UNAUTHORIZED_CODES", "[aws] unauthorized_codes"),
-        ("AWS_TRANSIENT_CODES", "[aws] transient_codes"),
-    ],
-)
-def test_a_retired_aws_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert destination in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "destination"),
-    [
-        ("OPENAI_API_KEY", "secret OPENAI__API_KEY"),
-        ("OPENAI_BASE_URL", "[openai.tenant] base_url"),
-        ("OPENAI_MODEL", "[openai.tenant] model"),
-        ("OPENAI_MAX_OUTPUT_TOKENS", "[openai] max_output_tokens"),
-        ("OPENAI_TEMPERATURE", "[openai] temperature"),
-        ("OPENAI_TIMEOUT_SECONDS", "[openai] timeout_seconds"),
-    ],
-)
-def test_a_retired_openai_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert destination in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "destination"),
-    [
-        ("NOTIFY_SRE_USER_NAME", "secret NOTIFY__SRE_USER_NAME"),
-        ("NOTIFY_SRE_CLIENT_SECRET", "secret NOTIFY__SRE_CLIENT_SECRET"),
-        ("NOTIFY_API_URL", "[notify.tenant] api_url"),
-        ("TRELLO_APP_KEY", "secret TRELLO__TENANT__APP_KEY"),
-        ("TRELLO_TOKEN", "secret TRELLO__TENANT__TOKEN"),
-        ("TRELLO_ATIP_BOARD", "secret TRELLO__ATIP_BOARD"),
-        ("OPSGENIE_INTEGRATIONS_KEY", "secret OPSGENIE__INTEGRATIONS_KEY"),
-        ("MAXMIND_DB_PATH", "[maxmind.tenant] database_path"),
-    ],
-)
-def test_a_retired_vendor_name_is_deleted_naming_its_destination(name: str, destination: str) -> None:
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert destination in verdict.reason
-
-
 @pytest.mark.parametrize("name", ["AWS_REGION", "AWS_DEFAULT_REGION", "AWS_ENDPOINT_URL_DYNAMODB", "AWS_ACCESS_KEY_ID"])
 def test_an_aws_sdk_name_is_kept(name: str) -> None:
-    """The SDK reads these names itself, so no AWS hint may turn them into a delete."""
+    """The SDK reads these names itself."""
     assert classify("codespaces repo cds-snc/sre-bot", name, "present", CTX).action == "none"
-
-
-def test_the_retired_flat_lease_ttl_is_deleted_for_its_scheduler_key_not_renamed() -> None:
-    """Without the hint the guess would be a SCHEDULER__ rename; the value is a configuration key."""
-    ctx = Context(current={"SCHEDULER__DEFAULT_TIER2_LEASE_TTL_SECONDS"}, retired={"DEFAULT_TIER2_LEASE_TTL_SECONDS"})
-
-    verdict = classify("file app/.env", "DEFAULT_TIER2_LEASE_TTL_SECONDS", "set", ctx)
-
-    assert verdict.action == "delete"
-    assert "[scheduler] default_tier2_lease_ttl_seconds" in verdict.reason
 
 
 @pytest.mark.parametrize(
@@ -227,180 +105,21 @@ def test_a_workflow_reference_with_no_listed_secret_is_a_check() -> None:
     assert [(name, verdict.action) for name, _, verdict in rows] == [("LOG_ANALYTICS_WORKSPACE_ID", "check")]
 
 
-@pytest.mark.parametrize(
-    ("name", "action"),
-    [
-        ("ENVIRONMENT", "none"),
-        ("ACCESS_CONFIG_SOURCE", "none"),
-        ("APP_TOKEN", "none"),
-        ("SLACK_ENABLED", "none"),
-        ("SLACK_BOT_TOKEN", "none"),
-        ("GHOST", "check"),
-        ("LOGGING__LOG_LEVEL", "check"),
-        ("UNLISTED_OLD_NAME", "none"),
-    ],
-)
-def test_production_blob_lines_are_never_hand_edited(name: str, action: str) -> None:
-    assert _action("ssm-blob sre-bot-config", name) == action
+@pytest.mark.parametrize("name", ["GCP_SRE_SERVICE_ACCOUNT_KEY_FILE", "GOOGLE_PICKLE_STRING"])
+def test_the_retired_terraform_inputs_are_deleted_from_actions(name: str) -> None:
+    """Their workflow lines and terraform variable are gone; the retired map is the evidence."""
+    ctx = Context(current=set(), retired=RETIRED)
+
+    assert _action("actions secret repo cds-snc/sre-bot", name, "present", ctx) == "delete"
+    assert _action("dependabot secret repo cds-snc/sre-bot", name, "present", ctx) == "delete"
 
 
-_GOOGLE_IDS = {
-    "GOOGLE_RESOURCES": ("one key per id on its end-state slice, never one JSON", "111.10.3"),
-    "GOOGLE_RESOURCES inc.f": ("secret INCIDENT_CORE__FOLDER_ID (non-public value)", "111.10.3"),
-    "GOOGLE_RESOURCES tal.i": ("secret TALENT__INTERNAL_FOLDER_ID (non-public value)", "111.10.3"),
-    "GOOGLE_RESOURCES inc.d": ("not carried", "111.10.3"),
-}
+@pytest.mark.parametrize("source", SOURCES)
+def test_maxmind_key_is_never_deleted(source: str) -> None:
+    """The devcontainer passes MAXMIND_KEY to the GeoIP updater as LICENSE_KEY; it is never retired, even
+    when no reference is found, so no audit row may plan its deletion."""
+    ctx = Context(current=set(), retired=RETIRED)
 
-
-def test_a_blob_line_split_into_secrets_that_are_all_set_is_none() -> None:
-    """GOOGLE_RESOURCES is inert once each id has its own set parameter; the line goes with the blob."""
-    states = {"INCIDENT_CORE__FOLDER_ID": "set", "TALENT__INTERNAL_FOLDER_ID": "set"}
-    ctx = Context(current=CTX.current, doc14=_GOOGLE_IDS, parameter_states=states)
-
-    verdict = classify("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set", ctx)
-
-    assert verdict.action == "none"
-    assert "split into 2 secrets, all set" in verdict.reason
-
-
-def test_a_blob_line_split_into_a_secret_that_is_not_set_is_a_check() -> None:
-    ctx = Context(current=CTX.current, doc14=_GOOGLE_IDS, parameter_states={"INCIDENT_CORE__FOLDER_ID": "set"})
-
-    verdict = classify("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set", ctx)
-
-    assert verdict.action == "check"
-    assert "TALENT__INTERNAL_FOLDER_ID" in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "secret"), [("SENTINEL_CUSTOMER_ID", "SENTINEL__CUSTOMER_ID"), ("SENTINEL_SHARED_KEY", "SENTINEL__SHARED_KEY")]
-)
-def test_a_flat_sentinel_name_in_codespaces_is_copied_to_its_successor(name: str, secret: str) -> None:
-    """The app reads the prefixed names from TASK-111.15.1; the value is copied before the old name goes."""
-    verdict = classify("codespaces repo cds-snc/sre-bot", name, "present", CTX)
-
-    assert verdict.action == "delete"
-    assert verdict.new == secret
-
-
-def test_a_migrated_secret_whose_parameter_is_not_set_is_a_check() -> None:
-    ctx = Context(current=CTX.current, doc14=CTX.doc14, parameter_states={"SLACK__BOT_TOKEN": "placeholder"})
-
-    assert _action("ssm-blob sre-bot-config", "SLACK_BOT_TOKEN", ctx=ctx) == "check"
-    assert [verdict.action for _, _, verdict in parameter_rows(ctx)] == ["check"]
-
-
-def test_replacement_prefers_the_shortest_table_prefixed_name() -> None:
-    assert replacement("LOG_LEVEL", {"LOGGING__LOG_LEVEL", "OTHER__LOGGING__LOG_LEVEL"}) == "LOGGING__LOG_LEVEL"
-
-
-@pytest.mark.parametrize(
-    ("name", "kept_in"),
-    [
-        ("DIRECTORY_REQUIRE_STARTUP_WARMUP", "[directory] require_startup_warmup"),
-        ("DIRECTORY_PROVIDER", "nothing"),
-        ("DIRECTORY_CACHE_TTL_SECONDS", "nothing"),
-        ("DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS", "nothing"),
-        ("DRIVE_PROVIDER", "nothing"),
-        ("SPREADSHEET_PROVIDER", "nothing"),
-    ],
-)
-def test_a_retired_directory_hosting_name_is_deleted_with_its_destination(name: str, kept_in: str) -> None:
-    """A retired name in a developer file is deleted, and the reason names its key or says it is deleted."""
-    verdict = classify("file app/.env", name, "set", CTX)
-
-    assert verdict.action == "delete"
-    assert kept_in in verdict.reason
-    assert "set nothing" not in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "kept_in"),
-    [
-        ("IDEMPOTENCY_TTL_SECONDS", "[coordination] record_ttl_seconds"),
-        ("IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS", "[coordination] in_progress_ttl_seconds"),
-        ("AUDIT_TABLE_NAME", "[audit] table_name"),
-    ],
-)
-def test_a_retired_audit_or_coordination_name_is_deleted_with_its_key(name: str, kept_in: str) -> None:
-    """The flat names moved onto the files, so the reason names the key that now holds the value."""
-    verdict = classify("file app/.env", name, "set", CTX)
-
-    assert verdict.action == "delete"
-    assert kept_in in verdict.reason
-
-
-@pytest.mark.parametrize(
-    ("name", "kept_in"),
-    [
-        ("INCIDENT_CHANNEL", "[incident_response] announcement_channel_id"),
-        ("SLACK_SECURITY_USER_GROUP_ID", "[incident_response] security_group_id"),
-        ("SLACK_NOTIFY_MGMT_USER_GROUP_ID", "[incident_response] notify_management_group_id"),
-        ("SENTINEL_LOG_TYPE", "[sentinel] log_type"),
-        ("SRE_OPS_CHANNEL_ID", "[sre_ops] sre_ops_channel_id"),
-        ("AWS_ADMIN_GROUPS", "[cloud_operations] aws_admin_groups"),
-        ("ATIP_ANNOUNCE_CHANNEL", "[atip] announce_channel_id"),
-    ],
-)
-def test_a_retired_feature_name_is_deleted_with_its_key(name: str, kept_in: str) -> None:
-    """The feature values moved onto the files, so the reason names the key that now holds the value."""
-    verdict = classify("file app/.env", name, "set", CTX)
-
-    assert verdict.action == "delete"
-    assert kept_in in verdict.reason
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "AWS_OPS_GROUP_NAME",
-        "GROUP_DOMAIN",
-        "GROUP_PROVIDERS",
-        "RECONCILIATION_ENABLED",
-        "RECONCILIATION_BACKEND",
-        "RECONCILIATION_MAX_ATTEMPTS",
-        "RECONCILIATION_BASE_DELAY_SECONDS",
-        "RECONCILIATION_MAX_DELAY_SECONDS",
-        "CIRCUIT_BREAKER_ENABLED",
-        "CIRCUIT_BREAKER_FAILURE_THRESHOLD",
-        "CIRCUIT_BREAKER_TIMEOUT_SECONDS",
-        "CIRCUIT_BREAKER_HALF_OPEN_MAX_CALLS",
-        "REQUIRE_JUSTIFICATION",
-        "MIN_JUSTIFICATION_LENGTH",
-    ],
-)
-def test_a_retired_feature_name_without_a_reader_is_deleted_with_no_destination(name: str) -> None:
-    """The groups and ops group settings have no successor, so the reason names the deletion."""
-    verdict = classify("file app/.env", name, "set", CTX)
-
-    assert verdict.action == "delete"
-    assert verdict.reason.startswith("retired; nothing (deleted")
-
-
-def test_a_commented_retired_name_reports_the_new_key() -> None:
-    verdict = classify("file app/.env.example", "DIRECTORY_REQUIRE_STARTUP_WARMUP", "commented", CTX)
-
-    assert verdict.action == "delete"
-    assert "[directory] require_startup_warmup" in verdict.reason
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "RETRY_ENABLED",
-        "RETRY_BACKEND",
-        "RETRY_DYNAMODB_TABLE_NAME",
-        "RETRY_DYNAMODB_TTL_DAYS",
-        "RETRY_MAX_ATTEMPTS",
-        "RETRY_BASE_DELAY_SECONDS",
-        "RETRY_MAX_DELAY_SECONDS",
-        "RETRY_BATCH_SIZE",
-        "RETRY_CLAIM_LEASE_SECONDS",
-    ],
-)
-def test_a_retired_retry_name_is_deleted_with_no_destination(name: str) -> None:
-    """The retry store has no successor setting, so the reason names the deletion, not an unknown name."""
-    verdict = classify("file app/.env", name, "set", CTX)
-
-    assert verdict.action == "delete"
-    assert verdict.reason.startswith("retired; nothing (deleted")
+    assert "MAXMIND_KEY" not in RETIRED
+    assert _action(source, "MAXMIND_KEY", "present", ctx) != "delete"
+    assert _action(source, "MAXMIND_KEY", "commented", ctx) != "delete"

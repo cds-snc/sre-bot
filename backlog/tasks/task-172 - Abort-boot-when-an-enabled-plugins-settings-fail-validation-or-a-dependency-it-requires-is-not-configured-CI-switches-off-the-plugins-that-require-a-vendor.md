@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T18:10:00Z'
-updated_date: '2026-10-28T23:09:00Z'
+updated_date: '2026-10-29T00:46:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -27,21 +27,22 @@ ordinal: 453000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 decisions/plugins.md and lifecycle.md (2026-10-27): an enabled plugin states that it must work in this environment, so every boot failure aborts, in every layer: an import error or a raising hookimpl, a settings slice that fails validation, a vendor slice that fails validation, and a vendor or capability the plugin requires that is not configured. A plugin is switched off with its enablement key, never skipped. Runtime drift (credential checks, TASK-126) never aborts.
 
-TODAY: an invalid feature slice already aborts boot (lifecycle.md Migration listed it as a tolerance of the old skip target; that item is gone). No plugin states a requirement: a plugin enabled without its vendor boots and fails at use. base.toml enables incident.comms, incident.scribe, oncall_sync, user_rotations, geolocate and rant; ci.toml configures no vendor tenant, so once requirements are stated the CI boot fails unless ci.toml switches those plugins off.
+TODAY: an invalid feature slice already aborts boot (lifecycle.md Migration listed it as a tolerance of the old skip target; that item is gone). No plugin states a requirement: a plugin enabled without its vendor boots and fails at use. base.toml enables incident.comms, incident.scribe, oncall_sync, user_rotations, geolocate and rant; ci.toml configures no vendor tenant.
 
-SCOPE:
+SCOPE (ruled 2026-10-29):
 - contracts/: one typed error for a required dependency that is not configured, carrying the configuration key; the host logs one CRITICAL plugin_boot_failed event (plugin, phase, error type, key; no secrets) and aborts before yield.
-- Each enabled plugin resolves what it requires while it registers (configured-systems read, workplace-systems.md rule 3) and raises the error when it is absent. Re-grep each plugin's vendor reads to list them. incident.scribe requires the OpenAI tenant ([openai.tenant], TASK-111.11.2); incident.comms uses text generation optionally (its designed fallback, incident-management.md) and requires none for it.
-- ci.toml switches off every plugin that requires a vendor; the tests that need one switch it on with fakes (the pytest-env pattern for access.*). A developer switches a plugin off from app/.env.
-- feature-packages.md guidance and the TASK-114 generator point new plugins at the rule.
+- A new optional, no-argument register_requirements hookspec (decisions/plugins.md hookspec list), fired per plugin before registration: the plugin resolves what it requires and raises the error when it is absent. An import failure is attributed to the entry-point name; the plugin is unknown only when none can be derived.
+- This task states one requirement: incident.scribe requires the OpenAI tenant ([openai.tenant], TASK-111.11.2). incident.comms uses text generation optionally (its designed fallback, incident-management.md) and requires none. Slack, Google and Opsgenie requirements (scribe, oncall_sync, rant, user_rotations) are a follow-up through the configured-systems read, with an ADR rule on how CI satisfies them.
+- ci.toml switches off incident.scribe only, the one plugin that states a requirement; a guard test fails if a plugin that states a requirement is enabled in ci.toml; pytest-env pins the whole [plugins.incident_response] table (all four keys), as for access.*. A developer switches a plugin off from app/.env.
+- feature-packages.md guidance and the TASK-114 generator point new plugins at register_requirements.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 An enabled plugin whose settings slice fails validation aborts boot before yield naming the key, in every layer (lifespan test)
 - [ ] #2 An enabled plugin whose required vendor is not configured aborts boot with one CRITICAL plugin_boot_failed event naming the plugin and the configuration key, and no secret value (lifespan test)
-- [ ] #3 incident.scribe enabled with no [openai.tenant] aborts boot naming the key; incident.comms enabled with no [openai.tenant] boots and reports text generation unavailable (tests)
-- [ ] #4 ci.toml switches off every plugin that requires a vendor; the CI boot and the full suite pass with no vendor tenant configured
+- [ ] #3 incident.scribe enabled with no [openai.tenant] aborts boot naming openai.tenant; incident.comms enabled with no [openai.tenant] boots and reports text generation unavailable (tests)
+- [ ] #4 ci.toml switches off incident.scribe, the only plugin that states a requirement now; the CI boot and the full suite pass with scribe off, and a guard test fails if a plugin that states a requirement is enabled in ci.toml
 - [ ] #5 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
@@ -113,3 +114,13 @@ Q4 Import-failure attribution: pluggy gives no plugin name on ImportError. Recom
 Q5 pytest-env pin for scribe: pin the whole [plugins.incident_response] table (mirrors the access pin) vs rely on ci.toml. Recommend the pin per standing decision; if env table overrides replace rather than merge, list all four keys (as planned).
 Q6 TASK-126 title/file name still says "on_boot_failure abort|continue" while its body is credential checks; recommend renaming the file title via CLI later to avoid contradicting the no-override ruling (not this PR).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-10-29 (delivery session; human asked for each open question to be assessed against the ADRs and doc-11): Q1 new register_requirements hookspec: plugins.md rules the requirement but names no hook (gap); Backstage (explicit plugin dependency declaration, startup fails on an unresolved one: https://backstage.io/docs/backend-system/architecture/backends) and Django system checks (registered at app load, an error blocks startup: https://docs.djangoproject.com/en/6.0/topics/checks/) support a dedicated explicit hook; plugins.md gains it in the hookspec list, a Changes line and Sources. Q2 only scribe's OpenAI requirement now: no ADR rules how CI satisfies Slack/Google/Opsgenie requirements (switching six plugins off in CI loses their tests), so that rule and those requirements are a follow-up after TASK-145.5.9's read (proposed, not created); plugins.md Tolerated lists it. Q3 tightened: entry-point name (enablement already keys every installed entry point), unknown only as a last resort (plugins.md requires the event to name the plugin). Q4 pin all four keys of [plugins.incident_response]; the guard test and a test that comms, oncall_sync and user_rotations stay enabled with the pin stay in the plan. Q5 TASK-126 retitled separately (comment there), not in this PR. Also fixes plugins.md's stale Boot test line (a feature with an invalid slice aborts, not absent). ACs #3 and #4 and the description reworded. Applied, pending plan approval.
+
+- 2026-10-29: plan approved (human), with the 2026-10-29 rulings above.
+
+2026-10-29: the Slack, Google and Opsgenie requirements follow-up is TASK-175 (created, human 2026-10-29).
+<!-- SECTION:NOTES:END -->

@@ -2,8 +2,6 @@
 
 Settings are built under the installed configuration files; the checked-in
 local and production files are installed explicitly where their values are asserted.
-The retired flat names are set in the environment and in a temporary .env to show
-they no longer reach the slice.
 """
 
 import tomllib
@@ -20,18 +18,15 @@ pytestmark = pytest.mark.unit
 CONFIG_DIRECTORY = Path(__file__).resolve().parents[4] / "config"
 
 _NAMES = (
-    "SLACK__COMMAND_PREFIX",
     "SLACK_TRANSPORT__COMMAND_PREFIX",
     "SLACK_TRANSPORT__ENABLED",
     "SLACK_TRANSPORT__SOCKET_MODE",
-    "SLACK_ENABLED",
-    "SLACK_SOCKET_MODE",
 )
 
 
 @pytest.fixture(autouse=True)
 def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Remove every spelling so each test controls the environment and the provider cache."""
+    """Remove the slice's variables so each test controls the environment and the provider cache."""
     for name in _NAMES:
         monkeypatch.delenv(name, raising=False)
     get_slack_transport_settings.cache_clear()
@@ -87,30 +82,6 @@ def test_prefixed_environment_variables_override_the_file(monkeypatch: pytest.Mo
     assert settings.command_prefix == "env-"
     assert settings.enabled is True
     assert settings.socket_mode is False
-
-
-def test_retired_names_in_the_environment_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
-    """SLACK__COMMAND_PREFIX, SLACK_ENABLED and SLACK_SOCKET_MODE no longer reach the slice."""
-    monkeypatch.setenv("SLACK__COMMAND_PREFIX", "old-")
-    monkeypatch.setenv("SLACK_ENABLED", "true")
-    monkeypatch.setenv("SLACK_SOCKET_MODE", "false")
-
-    settings = SlackTransportSettings()
-
-    assert settings.command_prefix == ""
-    assert settings.enabled is False
-    assert settings.socket_mode is True
-
-
-def test_retired_names_in_a_dotenv_file_are_ignored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A stale .env carrying the retired switches leaves the slice on its file values."""
-    (tmp_path / ".env").write_text("SLACK_ENABLED=true\nSLACK_SOCKET_MODE=false\n")
-    monkeypatch.chdir(tmp_path)
-
-    settings = SlackTransportSettings()
-
-    assert settings.enabled is False
-    assert settings.socket_mode is True
 
 
 def test_slice_declares_its_three_fields_without_alias() -> None:

@@ -3,10 +3,10 @@ id: TASK-111.15.1
 title: >-
   Contract 1: entry.sh stops fetching SSM; task definition drops the old names
   and secret
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-22T13:57:00Z'
-updated_date: '2026-10-28T23:49:00Z'
+updated_date: '2026-10-29T00:15:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -51,7 +51,7 @@ Sentinel (decided 2026-10-28): the app reads SENTINEL_* only from the blob's .en
 - [x] #3 IAM grants are unchanged in this PR
 - [x] #4 The CI workflow and pytest env set no unread variable
 - [x] #5 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
-- [ ] #6 After merge and a dispatch deploy, describe-task-definition of the running revision shows only platform-provided names and the renamed secrets (output in the notes)
+- [x] #6 After merge and a dispatch deploy, describe-task-definition of the running revision shows only platform-provided names and the renamed secrets (output in the notes)
 - [x] #7 IncidentFeatureSettings is gone: IncidentResponseSettings (features/incident/response/settings.py) owns [incident_response] with announcement_channel_id, security_group_id and notify_management_group_id, extra=forbid; base.toml and production.toml keys moved with values unchanged, and modules/incident reads them
 - [x] #8 Every line of sre-bot-config and sre-bot-config-infrastructure the current image reads has its end-state owner in production.toml/base.toml or an injected /sre-bot/* secret, the Sentinel lines included; the evidence is in the notes
 - [x] #9 Dev tooling: the google_ids check, app/bin/google_resources_json.py and its test are deleted; the audit reports the GOOGLE_RESOURCES blob line as none; the deploy-checks baseline no longer counts info lines as errors; test_api_key_detected.py uses a literal; a named post check (names_only) verifies AC #6; a task check sentinel (pre: log type MATCH printed, customer id and key MATCH by hash; post: sends since the deploy, no send errors) verifies AC #12
@@ -62,7 +62,7 @@ Sentinel (decided 2026-10-28): the app reads SENTINEL_* only from the blob's .en
 
 ## Definition of Done
 <!-- DOD:BEGIN -->
-- [ ] #1 Human: tf_apply succeeded, the dispatch deploy was verified, and the roll-back runbook Verify checklist passed
+- [x] #1 Human: tf_apply succeeded, the dispatch deploy was verified, and the roll-back runbook Verify checklist passed
 <!-- DOD:END -->
 
 ## Implementation Plan
@@ -128,4 +128,8 @@ HUMAN STEPS BEFORE MERGE: run bin/deploy-checks.zsh pre and keep the printed rol
 2026-10-28 23:40Z pre sentinel (tmp/deploy-checks/pre-sentinel-20261028T234017Z.txt, on :67): blob SENTINEL_LOG_TYPE = SREBot, copied into production.toml [sentinel] log_type (test_production_writes_to_the_table_the_blob_named); SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY MATCH by hash; the log type was DIFFER only because the file had no value yet: rerun pre sentinel expects PASS. Baseline breakdown: the 3 error lines are Socket Mode 'Failed to check the state of sock' ConnectionResetError (level error), so the count was never inflated by info lines; AC #9 checked with the breakdown in place. AC #8: every blob line the current image reads now has its owner (env-checks 23:40:41Z: sre-bot-config none=46, sre-bot-config-infrastructure none=6, GOOGLE_RESOURCES none as split). env-checks 20261028T234041Z: clean except the planned Sentinel Codespaces moves (SENTINEL_CUSTOMER_ID and SENTINEL_LOG_TYPE deleted, SENTINEL_SHARED_KEY copied to SENTINEL__SHARED_KEY then deleted; SENTINEL__CUSTOMER_ID already present) and the 3 org-secret checks; the 7 Actions secrets are gone and no NOTIFY__* Codespaces row remains. Gates after the change: pytest 6067 passed (later +1 Sentinel test), ruff clean, key ownership OK.
 
 2026-10-28 23:45Z env-checks replan (tmp/env-checks/20261028T234533Z.txt) clean: the Sentinel Codespaces moves applied, coverage none=39, only the 3 org-secret checks. 23:47Z pre sentinel (tmp/deploy-checks/pre-sentinel-20261028T234736Z.txt) PASS: log type SREBot MATCH, id and key MATCH. PR #1807 open, awaiting review. Open: AC #6 and the DoD (merge, tf_apply, dispatch deploy, post names_only sentinel, runbook Verify).
+
+2026-10-28 merged (#1807, df749d05, 23:59:10Z). tf_apply success on df749d05; build_and_deploy run 40791030439 deployed (human: only the new tasks run; the run still shows in progress while the verify step waits out the alarm window). Pending: post names_only sentinel (decides whether a dispatch redeploy is needed), runbook Verify, AC #6.
+
+2026-10-29 00:09Z post names_only sentinel (tmp/deploy-checks/post-names_only-sentinel-20261029T000917Z.txt) on sre-bot-task:69, image df749d05f98afb45cf52e1773385130626470daa-2026-10-28: rollout, boot_errors, runtime_errors, slack_up, version PASS; names_only PASS (environment [ENVIRONMENT, FORWARDED_ALLOW_IPS], no other secret name, 0 blob fetch lines), so the merge deploy already ran the new revision and no dispatch redeploy was needed; sentinel_post PASS (4 sends, 0 errors); health 200. AC #6 checked. DoD #1 is the human's (tf_apply success, deploy verified, runbook Verify).
 <!-- SECTION:NOTES:END -->

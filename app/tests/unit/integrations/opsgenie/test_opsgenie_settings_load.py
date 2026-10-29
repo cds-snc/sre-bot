@@ -4,8 +4,7 @@ Each test installs a base and a local file from tmp_path (``install_opsgenie_fil
 every Opsgenie variable removed and the .env file disabled (the autouse isolation fixture),
 so it observes only the values it writes and sets. The timeout comes from [opsgenie], the
 regional API host from the optional [opsgenie.tenant] entry, and the key only from
-OPSGENIE__INTEGRATIONS_KEY. The retired flat names are ignored in the environment and in a
-.env file.
+OPSGENIE__INTEGRATIONS_KEY.
 """
 
 from pathlib import Path
@@ -14,7 +13,7 @@ import pytest
 
 from contracts.configuration import ConfigurationSlice
 from integrations.opsgenie.settings import OpsGenieSettings, get_opsgenie_settings
-from tests.unit.integrations.opsgenie.conftest import API_URL, RETIRED_NAMES, TENANT, install_opsgenie_files
+from tests.unit.integrations.opsgenie.conftest import API_URL, TENANT, install_opsgenie_files
 
 pytestmark = pytest.mark.unit
 
@@ -72,23 +71,6 @@ def test_the_key_never_appears_in_repr_str_or_dump(tmp_path: Path, monkeypatch: 
 
     for rendered in (repr(settings), str(settings), repr(settings.model_dump())):
         assert "genie-render-0001" not in rendered
-
-
-def test_the_retired_names_are_ignored_in_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_opsgenie_files(tmp_path)
-    for name in RETIRED_NAMES:
-        monkeypatch.setenv(name, "retired")
-
-    assert OpsGenieSettings().integrations_key.get_secret_value() == ""
-
-
-def test_the_retired_names_are_ignored_in_a_dotenv_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_opsgenie_files(tmp_path)
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("\n".join(f"{name}=retired" for name in RETIRED_NAMES) + "\n", encoding="utf-8")
-    monkeypatch.setitem(OpsGenieSettings.model_config, "env_file", str(dotenv))
-
-    assert OpsGenieSettings().integrations_key.get_secret_value() == ""
 
 
 def test_get_opsgenie_settings_is_cached(tmp_path: Path) -> None:

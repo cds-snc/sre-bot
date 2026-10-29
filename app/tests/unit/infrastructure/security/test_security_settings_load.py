@@ -1,9 +1,8 @@
 """Tests for the security settings slice on the [security] table.
 
-Each test removes the slice's environment variables, both the SECURITY__ names
-and the retired unprefixed ones, and builds the slice without the .env file
-under the installed ci configuration files, so it observes only the files and
-the values it sets. Validator tests assert the error names the offending key.
+Each test removes the slice's SECURITY__ environment variables and builds the
+slice without the .env file under the installed ci configuration files, so it
+observes only the files and the values it sets. Validator tests assert the error names the offending key.
 """
 
 import json
@@ -27,15 +26,6 @@ _FIELDS = (
     "dev_bypass_token",
 )
 
-_RETIRED_NAMES = (
-    "ISSUER_CONFIG",
-    "CORS_ALLOWED_ORIGINS",
-    "CORS_ALLOWED_METHODS",
-    "CORS_ALLOWED_HEADERS",
-    "DEV_BYPASS_ENABLED",
-    "DEV_BYPASS_TOKEN",
-)
-
 _ISSUER = {
     "issuer": "https://issuer.example.com",
     "jwks_uri": "https://issuer.example.com/.well-known/jwks.json",
@@ -46,9 +36,7 @@ _ISSUER = {
 
 @pytest.fixture(autouse=True)
 def _isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Clear every spelling of the slice's variables and the cached singleton around each test."""
-    for name in _RETIRED_NAMES:
-        monkeypatch.delenv(name, raising=False)
+    """Clear the slice's variables and the cached singleton around each test."""
     for field in _FIELDS:
         monkeypatch.delenv(f"SECURITY__{field.upper()}", raising=False)
     get_security_settings.cache_clear()
@@ -128,31 +116,6 @@ def test_security_settings_reads_the_bypass_token_from_the_dotenv_file(tmp_path,
 
     assert settings.dev_bypass_token is not None
     assert settings.dev_bypass_token.get_secret_value() == "dotenv-token"
-
-
-@pytest.mark.parametrize(
-    ("name", "value"),
-    [
-        ("ISSUER_CONFIG", json.dumps({"https://issuer.example.com": {"jwks_uri": "https://x/jwks", "audience": "a"}})),
-        ("CORS_ALLOWED_ORIGINS", '["https://frontend.example"]'),
-        ("CORS_ALLOWED_METHODS", '["PUT"]'),
-        ("CORS_ALLOWED_HEADERS", '["X-Old"]'),
-        ("DEV_BYPASS_ENABLED", "true"),
-        ("DEV_BYPASS_TOKEN", "old-token"),
-    ],
-)
-def test_security_settings_ignores_the_retired_unprefixed_names(name: str, value: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The names the previous image reads no longer reach any field, so the file values stand."""
-    monkeypatch.setenv(name, value)
-
-    settings = SecuritySettings(_env_file=None)
-
-    assert settings.issuers == []
-    assert settings.cors_allowed_origins == []
-    assert settings.cors_allowed_methods == ["GET", "POST"]
-    assert settings.cors_allowed_headers == ["Authorization", "Content-Type", "X-Request-ID", "traceparent"]
-    assert settings.dev_bypass_enabled is False
-    assert settings.dev_bypass_token is None
 
 
 @pytest.mark.parametrize(

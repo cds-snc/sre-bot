@@ -13,12 +13,6 @@ variable "fargate_memory" {
   default = 2048
 }
 
-variable "gcp_sre_service_account_key" {
-  description = "(Required) The GCP SRE service account key"
-  type        = string
-  sensitive   = true
-}
-
 variable "error_threshold" {
   description = "CloudWatch alarm threshold for the SRE Bot ERROR logs"
   type        = string

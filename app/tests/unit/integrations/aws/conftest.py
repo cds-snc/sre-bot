@@ -16,23 +16,6 @@ from contracts.configuration import install_configuration_files
 from integrations.aws.settings import AWSSettings, get_aws_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = (
-    "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS",
-    "AWS_SSO_VIEW_ONLY_PERMISSIONS",
-    "AWS_AUDIT_ACCOUNT_ROLE_ARN",
-    "AWS_ORG_ACCOUNT_ROLE_ARN",
-    "AWS_LOGGING_ACCOUNT_ROLE_ARN",
-    "AWS_SSO_INSTANCE_ID",
-    "AWS_SSO_INSTANCE_ARN",
-    "AWS_RETRY_MAX_ATTEMPTS",
-    "AWS_RETRY_MODE",
-    "AWS_CONNECT_TIMEOUT_SECONDS",
-    "AWS_READ_TIMEOUT_SECONDS",
-    "AWS_TRANSIENT_RETRY_AFTER_SECONDS",
-    "AWS_NOT_FOUND_CODES",
-    "AWS_UNAUTHORIZED_CODES",
-    "AWS_TRANSIENT_CODES",
-)
 INSTANCE_ID = "d-1234567890"
 INSTANCE_ARN = "arn:aws:sso:::instance/ssoins-1234567890abcdef"
 

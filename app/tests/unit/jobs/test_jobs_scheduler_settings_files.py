@@ -60,14 +60,6 @@ def test_an_unknown_scheduler_key_fails_naming_it(tmp_path: Path) -> None:
         SchedulerSettings()
 
 
-def test_the_retired_flat_lease_ttl_name_is_not_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The flat name a production .env line could still carry stays inert."""
-    _install(tmp_path, _BASE)
-    monkeypatch.setenv("DEFAULT_TIER2_LEASE_TTL_SECONDS", "3600")
-
-    assert SchedulerSettings().default_tier2_lease_ttl_seconds == 1800
-
-
 @pytest.mark.parametrize(("environment", "enabled"), [("production", True), ("local", False), ("ci", False)])
 def test_configuration_files_run_scheduled_jobs_in_production_only(environment: str, enabled: bool) -> None:
     install_configuration_files(load_configuration_files(environment))

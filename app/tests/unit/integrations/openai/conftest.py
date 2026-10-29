@@ -16,14 +16,6 @@ from contracts.configuration import install_configuration_files
 from integrations.openai.settings import OpenAISettings, OpenAITenant, get_openai_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = (
-    "OPENAI_API_KEY",
-    "OPENAI_MODEL",
-    "OPENAI_MAX_OUTPUT_TOKENS",
-    "OPENAI_TEMPERATURE",
-    "OPENAI_TIMEOUT_SECONDS",
-    "OPENAI_BASE_URL",
-)
 BASE_URL = "https://models.example.test"
 MODEL = "test-model"
 

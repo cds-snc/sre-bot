@@ -4,8 +4,7 @@ Each test installs a base and a local file from tmp_path (``install_notify_files
 every Notify variable removed and the .env file disabled (the autouse isolation fixture),
 so it observes only the values it writes and sets. The timeout comes from [notify], the API
 host from the optional [notify.tenant] entry, and the credentials only from
-NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET. The retired flat names are ignored in
-the environment and in a .env file.
+NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET.
 """
 
 from pathlib import Path
@@ -14,7 +13,7 @@ import pytest
 
 from contracts.configuration import ConfigurationSlice
 from integrations.notify.settings import NotifySettings, get_notify_settings
-from tests.unit.integrations.notify.conftest import API_URL, RETIRED_NAMES, TENANT, install_notify_files
+from tests.unit.integrations.notify.conftest import API_URL, TENANT, install_notify_files
 
 pytestmark = pytest.mark.unit
 
@@ -79,29 +78,6 @@ def test_the_credentials_never_appear_in_repr_str_or_dump(tmp_path: Path, monkey
     for rendered in (repr(settings), str(settings), repr(settings.model_dump())):
         assert "notify-user-render" not in rendered
         assert "notify-secret-render" not in rendered
-
-
-def test_the_retired_names_are_ignored_in_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_notify_files(tmp_path)
-    for name in RETIRED_NAMES:
-        monkeypatch.setenv(name, "https://retired.example.test" if name == "NOTIFY_API_URL" else "retired")
-
-    settings = NotifySettings()
-
-    assert settings.tenant is None
-    assert settings.sre_user_name.get_secret_value() == ""
-
-
-def test_the_retired_names_are_ignored_in_a_dotenv_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_notify_files(tmp_path)
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("\n".join(f"{name}=retired" for name in RETIRED_NAMES) + "\n", encoding="utf-8")
-    monkeypatch.setitem(NotifySettings.model_config, "env_file", str(dotenv))
-
-    settings = NotifySettings()
-
-    assert settings.tenant is None
-    assert settings.sre_client_secret.get_secret_value() == ""
 
 
 def test_get_notify_settings_is_cached(tmp_path: Path) -> None:

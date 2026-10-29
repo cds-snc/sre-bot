@@ -5,19 +5,18 @@
 is present; this one starts from the names that must be supplied and checks every place that should
 hold them:
 
-    terraform  ``terraform/ssm.tf`` creates ``/sre-bot/<NAME>`` (none for a development-only value)
+    terraform  ``terraform/ssm.tf`` creates ``/sre-bot/<NAME>`` only for a name an env-only field reads
     ssm        the parameter is set, not missing or on the terraform placeholder
-    source     the production blob line doc-14 moves to it exists, while the parameter still needs it
-    codespaces a Codespace that still has the old name also has the new one, unless development leaves the
-               vendor unconfigured (a [<slice>.tenant] entry in production.toml and none in local.toml): then the
-               slice-level credential alone fails local boot, so a Codespace must not hold it
+    codespaces a name whose metadata sends developers to a Codespaces secret has one, unless development
+               leaves the vendor unconfigured (a [<slice>.tenant] entry in production.toml and none in
+               local.toml): then the slice-level credential alone fails local boot, so a Codespace must not
+               hold it
 
-``app/.env.example`` is not judged: ``bin/generate_env_example.py`` writes it from the settings classes
-and a test fails when it drifts.
-
-The names are the parameter destinations of doc-14 and the names ``terraform/ssm.tf`` creates. A row
-is ``check`` when any place disagrees, ``none`` otherwise. Without SSM rows (no AWS credentials) the
-ssm and source columns are not judged.
+The names are the env-only settings fields (``contracts.configuration.env_only``, collected as
+``bin/generate_env_example.py`` collects them) and the names ``terraform/ssm.tf`` creates; an env-only
+name terraform does not create is development only. ``app/.env.example`` is not judged: it is generated
+and a test fails when it drifts. A row is ``check`` when any place disagrees, ``none`` otherwise.
+Without SSM rows (no AWS credentials) or Codespaces rows (no gh auth) that column is not judged.
 
 Usage (from app/): ``uv run python -m bin.audit_env_coverage [--all] [PREFIX...] < names.tsv``; with
 prefixes (the wrapper's name filters, which also limit what it collects) only matching names are judged.
@@ -25,23 +24,19 @@ prefixes (the wrapper's name filters, which also limit what it collects) only ma
 
 import re
 import sys
+import tomllib
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from pathlib import Path
+from typing import Any
 
-from bin.audit_env_names import (
-    PARAMETER_DESTINATION,
-    REPO_ROOT,
-    Destinations,
-    Verdict,
-    config_table,
-    doc14_destinations,
-)
+from bin.audit_env_names import APP_ROOT, REPO_ROOT, Verdict
+from bin.generate_env_example import collect
 
 SSM_TF = REPO_ROOT / "terraform/ssm.tf"
+CONFIG_DIR = APP_ROOT / "config"
 SECRET_NAMES = re.compile(r"sre_bot_secret_names\s*=\s*toset\(\[(.*?)\]\)", re.S)
 QUOTED = re.compile(r'"([A-Z0-9_]+)"')
-DEVELOPMENT_ONLY = "development only"
 
 type Entry = tuple[str, str, str]
 
@@ -52,6 +47,21 @@ def terraform_parameters(path: Path = SSM_TF) -> set[str]:
     return set(QUOTED.findall(match[1])) if match else set()
 
 
+def config_table(environment: str, table: str) -> dict[str, Any]:
+    """The merged ``[table]`` of base.toml and ``<environment>.toml``."""
+    merged: dict[str, Any] = {}
+    for name in ("base.toml", f"{environment}.toml"):
+        path = CONFIG_DIR / name
+        if not path.exists():
+            continue
+        data: Any = tomllib.loads(path.read_text())
+        for part in table.split("."):
+            data = data.get(part, {}) if isinstance(data, dict) else {}
+        if isinstance(data, dict):
+            merged.update(data)
+    return merged
+
+
 def unconfigured_in_development(name: str) -> str | None:
     """The tenant table a slice-level credential needs when production configures it and local does not, else None."""
     if "__" not in name or "__TENANT__" in name:
@@ -60,56 +70,40 @@ def unconfigured_in_development(name: str) -> str | None:
     return tenant if config_table("production", tenant) and not config_table("local", tenant) else None
 
 
-def _gaps(name: str, old: str | None, dev_only: bool, terraform: set[str], entries: list[Entry]) -> list[str]:
-    in_doc14 = old is not None
-    # A doc-14 key may name a path inside a blob line ("GOOGLE_RESOURCES inc.f"); the line is its first word.
-    line = old.split()[0] if old else None
+def _gaps(name: str, developer_source: str | None, terraform: set[str], entries: list[Entry]) -> list[str]:
     parameters = {n: s for source, n, s in entries if source == "ssm-param"}
-    blob = {n for source, n, s in entries if source.startswith("ssm-blob") and s == "set"}
     codespaces = {n for source, n, _ in entries if source.startswith("codespaces")}
     gaps: list[str] = []
 
-    if dev_only and line in blob:
-        gaps.append(f"doc-14 says development only, but production sets {old}: it needs a parameter (fix doc-14)")
-    elif dev_only and name in terraform:
-        gaps.append("development only, but terraform/ssm.tf creates it (its placeholder would reach production)")
-    elif in_doc14 and not dev_only and name not in terraform:
-        gaps.append(f"doc-14 moves {old} here, but terraform/ssm.tf does not create it")
-    if name in terraform and not in_doc14:
-        gaps.append("terraform/ssm.tf creates it, but no doc-14 row moves a value to it")
-
+    if name in terraform and developer_source is None:
+        gaps.append("terraform/ssm.tf creates it, but no env-only settings field reads it")
     if name in terraform and parameters:
-        state = parameters.get(name, "missing")
-        if state == "missing":
-            source = "" if old is None or line in blob else f", and there is no {old} line in the production blobs to copy"
-            gaps.append(f"terraform/ssm.tf creates it, but SSM has no parameter yet (tf_apply pending){source}")
-        elif state != "set" and line in blob:
-            gaps.append(f"parameter is {state}: put-parameter from {old}")
-        elif state != "set":
-            gaps.append(f"parameter is {state}, and there is no {old} line in the production blobs to copy")
+        param_state = parameters.get(name, "missing")
+        if param_state == "missing":
+            gaps.append("terraform/ssm.tf creates it, but SSM has no parameter yet (tf_apply pending)")
+        elif param_state != "set":
+            gaps.append(f"parameter is {param_state}: set it with put-parameter")
 
     if tenant := unconfigured_in_development(name):
         if name in codespaces:
             gaps.append(f"Codespaces has {name}, but local.toml has no [{tenant}]: it fails local boot, delete it")
-    elif old and old in codespaces and name not in codespaces:
-        gaps.append(f"Codespaces has {old} but not {name}: set {name} to the same value")
+    elif developer_source == "codespaces" and codespaces and name not in codespaces:
+        gaps.append("its metadata names a Codespaces secret, but no Codespaces secret provides it")
     return gaps
 
 
-def coverage_rows(doc14: Destinations, terraform: set[str], entries: Iterable[Entry]) -> list[tuple[str, str, Verdict]]:
-    """One row per name that must be supplied: (name, summary of where it is, verdict)."""
+def coverage_rows(env_only: Mapping[str, str], terraform: set[str], entries: Iterable[Entry]) -> list[tuple[str, str, Verdict]]:
+    """One row per name that must be supplied: (name, summary of where it is, verdict).
+
+    ``env_only`` maps each env-only name to the developer source its metadata names.
+    """
     collected = list(entries)
-    moves: dict[str, tuple[str, bool]] = {}
-    for source_name, (destination, _) in doc14.items():
-        if match := PARAMETER_DESTINATION.match(destination):
-            moves[match[1]] = (source_name, DEVELOPMENT_ONLY in destination)
     parameters = {n: s for source, n, s in collected if source == "ssm-param"}
     rows = []
-    for name in sorted(moves.keys() | terraform):
-        old, dev_only = moves.get(name, (None, False))
-        gaps = _gaps(name, old, dev_only, terraform, collected)
+    for name in sorted(env_only.keys() | terraform):
+        gaps = _gaps(name, env_only.get(name), terraform, collected)
         where = [
-            "terraform" if name in terraform else ("no terraform (development only)" if dev_only else "no terraform"),
+            "terraform" if name in terraform else "no terraform (development only)",
             f"ssm {parameters.get(name, 'missing')}" if parameters and name in terraform else "",
         ]
         verdict = Verdict("check", "; ".join(gaps)) if gaps else Verdict("none", "supplied everywhere it is needed")
@@ -124,9 +118,8 @@ def main(argv: list[str]) -> None:
     for line in sys.stdin:
         if len(fields := line.rstrip("\n").split("\t")) == 3:
             entries.append((fields[0], fields[1], fields[2]))
-    rows = [
-        row for row in coverage_rows(doc14_destinations(), terraform_parameters(), entries) if row[0].startswith(prefixes or "")
-    ]
+    env_only = {entry.name: entry.source for entry in collect()[0]}
+    rows = [row for row in coverage_rows(env_only, terraform_parameters(), entries) if row[0].startswith(prefixes or "")]
     counts = Counter(verdict.action for _, _, verdict in rows)
     print("\n== coverage: names supplied through the environment == " + " ".join(f"{a}={n}" for a, n in sorted(counts.items())))
     for name, where, verdict in sorted(rows, key=lambda row: (row[2].action == "none", row[0])):

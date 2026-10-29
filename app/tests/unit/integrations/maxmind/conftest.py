@@ -17,7 +17,6 @@ from integrations.maxmind.client import get_maxmind_client
 from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = ("MAXMIND_DB_PATH", "MAXMIND_KEY")
 DATABASE_PATH = "./geodb/test-City.mmdb"
 TENANT = f'[maxmind.tenant]\ndatabase_path = "{DATABASE_PATH}"\n'
 

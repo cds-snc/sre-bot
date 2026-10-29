@@ -62,7 +62,7 @@ def test_named_secret_references_are_not_dynamic(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize("name", ["UNUSED_SECRET", "SLACK_ENABLED"])
 def test_a_blind_scan_turns_every_repo_secret_into_none(name: str) -> None:
-    ctx = Context(current=set(), retired={"SLACK_ENABLED"}, workflow_scan_blind=True)
+    ctx = Context(current=set(), retired={"SLACK_ENABLED": "[slack_transport] enabled"}, workflow_scan_blind=True)
 
     verdict = classify(SECRET_SOURCE, name, "present", ctx)
 
@@ -91,10 +91,9 @@ def _pure_audit(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("PLAN_FILE", raising=False)
     monkeypatch.delenv("REPO_SLUG", raising=False)
     monkeypatch.setattr(audit_env_names, "env_names", lambda root: {"READ__NAME"})
-    monkeypatch.setattr(audit_env_names, "baseline_names", lambda sha, tree: {"RETIRED_NAME"})
+    monkeypatch.setattr(audit_env_names, "RETIRED", {"RETIRED_NAME": "nothing (no reader)"})
     monkeypatch.setattr(audit_env_names, "workflow_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "setup_references", lambda: {})
-    monkeypatch.setattr(audit_env_names, "doc14_destinations", lambda: {})
     monkeypatch.setattr(audit_env_names, "pass_through_workflow_files", lambda: [])
     rows = [
         f"{SECRET_SOURCE}\tUNUSED_SECRET\tpresent",
@@ -107,7 +106,7 @@ def _pure_audit(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.usefixtures("_pure_audit")
 def test_the_lookup_pass_lists_only_the_unevidenced_checks(capsys: pytest.CaptureFixture[str]) -> None:
-    audit_env_names.main(["--lookups", "abc123"])
+    audit_env_names.main(["--lookups"])
 
     assert capsys.readouterr().out == "repo\tUNREAD_NAME\nworkflow\tUNUSED_SECRET\n"
 
@@ -120,7 +119,7 @@ def test_the_report_pass_shows_the_looked_up_reference(
     refs.write_text("UNUSED_SECRET\t26ecfff1 2024-06-20 Adding workflow\n")
     monkeypatch.setenv("LAST_REFS_FILE", str(refs))
 
-    audit_env_names.main(["abc123"])
+    audit_env_names.main([])
 
     out = capsys.readouterr().out
     assert "check  UNUSED_SECRET [present]: no workflow under .github/ on the default branch references it" in out

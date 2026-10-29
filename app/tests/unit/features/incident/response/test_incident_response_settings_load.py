@@ -4,8 +4,8 @@ Settings are built from the checked-in configuration files the test run installs
 real loader for one environment) and from the environment with monkeypatch; nothing is
 stubbed. The Slack ids are deployment configuration: declared empty in base.toml, set in
 production.toml only. The handbook id is non-public: declared empty in base.toml, held by no
-environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. The
-legacy [incident] table and its INCIDENT__* names reach no field; an unknown key fails naming it.
+environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. An
+unknown key fails naming it.
 """
 
 import tomllib
@@ -23,14 +23,6 @@ pytestmark = pytest.mark.unit
 
 _FIELDS = ("handbook_id",)
 _SLACK_IDS = ("announcement_channel_id", "security_group_id", "notify_management_group_id")
-_RETIRED_NAMES = (
-    "INCIDENT__INCIDENT_CHANNEL",
-    "INCIDENT__SLACK_SECURITY_USER_GROUP_ID",
-    "INCIDENT__SLACK_NOTIFY_MGMT_USER_GROUP_ID",
-    "INCIDENT_CHANNEL",
-    "SLACK_SECURITY_USER_GROUP_ID",
-    "SLACK_NOTIFY_MGMT_USER_GROUP_ID",
-)
 
 
 @dataclass(frozen=True)
@@ -42,7 +34,7 @@ class _Files:
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setitem(IncidentResponseSettings.model_config, "env_file", None)
-    for name in (*_RETIRED_NAMES, *(f"INCIDENT_RESPONSE__{field.upper()}" for field in _SLACK_IDS)):
+    for name in (f"INCIDENT_RESPONSE__{field.upper()}" for field in _SLACK_IDS):
         monkeypatch.delenv(name, raising=False)
     get_incident_response_settings.cache_clear()
     yield
@@ -65,7 +57,7 @@ def test_no_environment_file_holds_a_non_public_id(environment: str) -> None:
 
 
 def test_production_resolves_the_slack_ids_production_ran_on() -> None:
-    """The values are the blob lines' (deploy check 'features', TASK-111.14), moved unchanged."""
+    """production.toml holds the production workspace's announcement channel and user group ids."""
     install_configuration_files(load_configuration_files("production"))
 
     settings = IncidentResponseSettings()
@@ -92,15 +84,6 @@ def test_a_prefixed_environment_variable_beats_the_files(monkeypatch: pytest.Mon
     monkeypatch.setenv("INCIDENT_RESPONSE__ANNOUNCEMENT_CHANNEL_ID", "C0OVERRIDE")
 
     assert IncidentResponseSettings().announcement_channel_id == "C0OVERRIDE"
-
-
-@pytest.mark.parametrize("name", _RETIRED_NAMES)
-def test_the_legacy_names_reach_no_field(monkeypatch: pytest.MonkeyPatch, name: str) -> None:
-    monkeypatch.setenv(name, "C0LEGACY")
-
-    settings = IncidentResponseSettings()
-
-    assert "C0LEGACY" not in [getattr(settings, field) for field in _SLACK_IDS]
 
 
 def test_the_legacy_table_fails_the_slice_naming_it(tmp_path: Path) -> None:

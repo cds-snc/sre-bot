@@ -4,7 +4,7 @@ Rows are classified as in the audit itself, then turned into commands. An env-fi
 removed or renamed with one sed per file; a GitHub secret or variable is deleted through gh,
 under the user's own login; a retired Codespaces secret whose value moves to a new name is
 copied from the running Codespace before the old one is deleted, because GitHub never returns a
-secret's value. Production SSM rows and organization-level names produce no command.
+secret's value. SSM rows and organization-level names produce no command.
 """
 
 import io
@@ -18,7 +18,14 @@ from bin.audit_env_names import GH, Context, Verdict, classify, fix_commands
 pytestmark = pytest.mark.unit
 
 REPO = "cds-snc/sre-bot"
-CTX = Context(current={"NOTIFY__SRE_CLIENT_SECRET", "SLACK__BOT_TOKEN"})
+CTX = Context(
+    current={"NOTIFY__SRE_CLIENT_SECRET", "SLACK__BOT_TOKEN"},
+    retired={
+        "NOTIFY_SRE_CLIENT_SECRET": "secret NOTIFY__SRE_CLIENT_SECRET",
+        "INCIDENT_CHANNEL": "[incident_core] channel",
+        "GROUP_DOMAIN": "nothing (no reader)",
+    },
+)
 
 
 def _rows(source: str, *names: str, state: str = "present") -> list[tuple[str, str, Verdict]]:
@@ -32,13 +39,6 @@ def test_env_file_lines_are_removed_with_one_sed_per_file() -> None:
         "# file app/.env",
         "sed -i -E '/^[[:space:]]*#?[[:space:]]*(export[[:space:]]+)?(GROUP_DOMAIN|INCIDENT_CHANNEL)=/d' app/.env",
     ]
-
-
-def test_the_generated_env_example_is_never_edited_by_a_plan() -> None:
-    """make env-example writes app/.env.example from the settings classes; a plan would only fight it."""
-    rows = _rows("file app/.env.example", "INCIDENT_CHANNEL", state="commented")
-
-    assert fix_commands({"file app/.env.example": rows}, REPO) == []
 
 
 def test_a_secret_moving_to_a_new_name_is_copied_before_the_old_one_is_deleted() -> None:
@@ -95,7 +95,7 @@ def test_each_github_source_gets_its_delete_command(source: str, command: str) -
 
 @pytest.mark.parametrize(
     "source",
-    ["ssm-blob sre-bot-config", "ssm /sre-bot/<NAME> secret parameters", "codespaces org cds-snc (may not reach this repo)"],
+    ["ssm-param", "codespaces org cds-snc (may not reach this repo)"],
 )
 def test_production_and_organization_rows_get_no_command(source: str) -> None:
     rows = [("OLD_NAME", "present", Verdict("delete", "x")), ("OTHER", "missing", Verdict("check", "y"))]
@@ -108,15 +108,6 @@ def test_rows_needing_no_action_or_a_check_get_no_command() -> None:
     rows = [("KEPT", "present", Verdict("none", "used")), ("ODD", "present", Verdict("check", "investigate"))]
 
     assert fix_commands({source: rows}, REPO) == []
-
-
-def test_an_env_file_line_with_a_new_name_is_renamed_in_place() -> None:
-    rows = [("OLD_NAME", "set", Verdict("rename", "set NEW__NAME to the same value, then delete OLD_NAME", new="NEW__NAME"))]
-
-    assert fix_commands({"file app/.env": rows}, REPO) == [
-        "# file app/.env",
-        "sed -i -E 's/^([[:space:]]*#?[[:space:]]*(export[[:space:]]+)?)OLD_NAME=/\\1NEW__NAME=/' app/.env",
-    ]
 
 
 def test_an_env_file_line_whose_value_moves_to_a_secret_name_is_renamed_not_deleted() -> None:
@@ -136,13 +127,12 @@ def test_the_plan_file_holds_exactly_the_printed_commands(
     monkeypatch.setenv("REPO_SLUG", REPO)
     monkeypatch.setenv("PLAN_FILE", str(plan))
     monkeypatch.setattr(audit_env_names, "env_names", lambda root: set())
-    monkeypatch.setattr(audit_env_names, "baseline_names", lambda sha, tree: {"OLD_NAME"})
+    monkeypatch.setattr(audit_env_names, "RETIRED", {"OLD_NAME": "nothing (no reader)"})
     monkeypatch.setattr(audit_env_names, "workflow_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "setup_references", lambda: {})
-    monkeypatch.setattr(audit_env_names, "doc14_destinations", lambda: {})
     monkeypatch.setattr("sys.stdin", io.StringIO(f"actions secret repo {REPO}\tOLD_NAME\tpresent\n"))
 
-    audit_env_names.main(["abc123"])
+    audit_env_names.main([])
 
     assert plan.read_text() == f"# actions secret repo {REPO}\n{GH} secret delete OLD_NAME --repo {REPO}\n"
     assert "nothing has run" in capsys.readouterr().out
@@ -156,10 +146,9 @@ def test_an_unevidenced_name_never_enters_the_plan(
     monkeypatch.setenv("REPO_SLUG", REPO)
     monkeypatch.setenv("PLAN_FILE", str(plan))
     monkeypatch.setattr(audit_env_names, "env_names", lambda root: set())
-    monkeypatch.setattr(audit_env_names, "baseline_names", lambda sha, tree: set())
+    monkeypatch.setattr(audit_env_names, "RETIRED", {})
     monkeypatch.setattr(audit_env_names, "workflow_references", lambda: {})
     monkeypatch.setattr(audit_env_names, "setup_references", lambda: {})
-    monkeypatch.setattr(audit_env_names, "doc14_destinations", lambda: {})
     monkeypatch.setattr(audit_env_names, "pass_through_workflow_files", lambda: [])
     rows = [
         f"actions secret repo {REPO}\tUNUSED_SECRET\tpresent",
@@ -169,7 +158,7 @@ def test_an_unevidenced_name_never_enters_the_plan(
     ]
     monkeypatch.setattr("sys.stdin", io.StringIO("".join(f"{row}\n" for row in rows)))
 
-    audit_env_names.main(["abc123"])
+    audit_env_names.main([])
 
     assert plan.read_text() == ""
     actions = [line.split()[0] for line in capsys.readouterr().out.splitlines() if "[present]" in line or "[commented]" in line]

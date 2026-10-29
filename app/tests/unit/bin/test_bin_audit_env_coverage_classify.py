@@ -1,8 +1,9 @@
 """Unit tests for the env-name coverage audit.
 
-``coverage_rows`` is called with hand-built doc-14 rows, terraform names and collected TSV entries, so
-each gap is pinned without reading doc-14, ``terraform/ssm.tf``, GitHub or SSM. ``terraform_parameters``
-reads a small ``ssm.tf`` written to a temporary directory.
+``coverage_rows`` is called with hand-built env-only names (name to the developer source their metadata
+names), terraform names and collected TSV entries, so each gap is pinned without importing the settings
+classes or reading ``terraform/ssm.tf``, GitHub or SSM. ``terraform_parameters`` reads a small ``ssm.tf``
+written to a temporary directory; the development-unconfigured rule reads the checked-in configuration.
 """
 
 from pathlib import Path
@@ -13,189 +14,97 @@ from bin.audit_env_coverage import coverage_rows, terraform_parameters
 
 pytestmark = pytest.mark.unit
 
-DOC14 = {
-    "SLACK_BOT_TOKEN": ("secret SLACK__BOT_TOKEN, read by SlackSettings", "111.4, 111.9"),
-    "TRELLO_ATIP_BOARD": ("secret TRELLO__ATIP_BOARD (non-public value)", "111.12"),
-    "AWS_AUDIT_ACCOUNT_ROLE_ARN": (
-        "secret AWS__TENANT__AUDIT_ROLE_ARN (non-public value; development only: production sets no audit role)",
-        "111.11.1",
-    ),
-    "NOTIFY_API_URL": ("file [notify] api_url", "111.12"),
-}
-EXAMPLE = "file app/.env.example"
+ENV_ONLY = {"SLACK__BOT_TOKEN": "codespaces", "TRELLO__ATIP_BOARD": "codespaces", "GEO__LOCAL_ONLY": "local"}
 CODESPACES = "codespaces repo cds-snc/sre-bot"
 
 
 def _rows(terraform: set[str], entries: list[tuple[str, str, str]]) -> dict[str, tuple[str, str]]:
-    return {name: (verdict.action, verdict.reason) for name, _, verdict in coverage_rows(DOC14, terraform, entries)}
+    return {name: (verdict.action, verdict.reason) for name, _, verdict in coverage_rows(ENV_ONLY, terraform, entries)}
 
 
-def _complete(name: str, old: str) -> list[tuple[str, str, str]]:
-    return [
-        ("ssm-param", name, "set"),
-        ("ssm-blob sre-bot-config", old, "set"),
-        (CODESPACES, name, "present"),
-        (EXAMPLE, name, "commented"),
-    ]
+def test_a_parameter_terraform_creates_sets_and_codespaces_provides_needs_nothing() -> None:
+    entries = [("ssm-param", "SLACK__BOT_TOKEN", "set"), (CODESPACES, "SLACK__BOT_TOKEN", "present")]
+
+    assert _rows({"SLACK__BOT_TOKEN"}, entries)["SLACK__BOT_TOKEN"][0] == "none"
 
 
-def test_a_parameter_terraform_creates_sets_and_every_place_provides_needs_nothing() -> None:
-    """A doc-14 secret that terraform creates, SSM holds, Codespaces provides and .env.example names is none."""
-    rows = _rows({"SLACK__BOT_TOKEN"}, _complete("SLACK__BOT_TOKEN", "SLACK_BOT_TOKEN"))
+def test_a_terraform_parameter_no_env_only_field_reads_is_a_check() -> None:
+    """A name in ssm.tf that no settings field declares env-only has no reader: its parameter is unused."""
+    action, reason = _rows({"GHOST__KEY"}, [("ssm-param", "GHOST__KEY", "set")])["GHOST__KEY"]
 
-    assert rows["SLACK__BOT_TOKEN"][0] == "none"
-
-
-def test_a_doc14_secret_terraform_does_not_create_is_a_check() -> None:
-    """doc-14 moving a production value to a parameter that ssm.tf lacks is caught before the apply."""
-    rows = _rows(set(), [("ssm-blob sre-bot-config", "TRELLO_ATIP_BOARD", "set")])
-
-    action, reason = rows["TRELLO__ATIP_BOARD"]
     assert action == "check"
-    assert "terraform/ssm.tf does not create it" in reason
+    assert "no env-only settings field reads it" in reason
 
 
-def test_a_terraform_parameter_no_doc14_row_names_is_a_check() -> None:
-    """A name in ssm.tf that no doc-14 row moves anything to has no recorded source."""
-    rows = _rows({"GHOST__KEY"}, [("ssm-param", "GHOST__KEY", "set")])
+def test_an_env_only_name_without_a_parameter_is_development_only() -> None:
+    """A name terraform does not create is supplied only to developers; nothing judges production for it."""
+    rows = {name: (where, verdict.action) for name, where, verdict in coverage_rows(ENV_ONLY, set(), [])}
 
-    action, reason = rows["GHOST__KEY"]
-    assert action == "check"
-    assert "no doc-14 row" in reason
+    assert rows["GEO__LOCAL_ONLY"] == ("no terraform (development only)", "none")
 
 
-def test_a_development_only_name_terraform_creates_is_a_check() -> None:
-    """A development-only value must have no parameter: its placeholder would reach production."""
-    rows = _rows({"AWS__TENANT__AUDIT_ROLE_ARN"}, [])
-
-    action, reason = rows["AWS__TENANT__AUDIT_ROLE_ARN"]
-    assert action == "check"
-    assert "development only" in reason
-
-
-def test_a_development_only_name_without_a_parameter_needs_no_terraform() -> None:
-    """A development-only value with no parameter, provided in Codespaces and the example, is none."""
-    entries = [(CODESPACES, "AWS__TENANT__AUDIT_ROLE_ARN", "present"), (EXAMPLE, "AWS__TENANT__AUDIT_ROLE_ARN", "set")]
-
-    assert _rows(set(), entries)["AWS__TENANT__AUDIT_ROLE_ARN"][0] == "none"
-
-
-@pytest.mark.parametrize(
-    ("blob_state", "expected"),
-    [("set", "put-parameter from TRELLO_ATIP_BOARD"), (None, "no TRELLO_ATIP_BOARD line")],
-)
-def test_a_placeholder_parameter_names_its_source_line_or_its_absence(blob_state: str | None, expected: str) -> None:
-    """A parameter still on the placeholder says where its value comes from, or that nothing supplies it."""
-    entries = [("ssm-param", "TRELLO__ATIP_BOARD", "placeholder")]
-    if blob_state:
-        entries.append(("ssm-blob sre-bot-config", "TRELLO_ATIP_BOARD", blob_state))
+@pytest.mark.parametrize("state", ["placeholder", "empty"])
+def test_a_parameter_not_set_is_a_check(state: str) -> None:
+    entries = [("ssm-param", "TRELLO__ATIP_BOARD", state)]
 
     action, reason = _rows({"TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"]
     assert action == "check"
-    assert expected in reason
+    assert f"parameter is {state}: set it with put-parameter" in reason
 
 
 def test_a_parameter_terraform_has_not_created_yet_waits_for_the_apply() -> None:
-    """A name in ssm.tf with no parameter in SSM is pending tf_apply."""
-    entries = [("ssm-param", "SLACK__BOT_TOKEN", "set"), ("ssm-blob sre-bot-config", "TRELLO_ATIP_BOARD", "set")]
+    entries = [("ssm-param", "SLACK__BOT_TOKEN", "set")]
 
     action, reason = _rows({"SLACK__BOT_TOKEN", "TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"]
     assert action == "check"
-    assert "tf_apply" in reason
+    assert "tf_apply pending" in reason
 
 
 def test_ssm_states_are_not_judged_when_the_ssm_section_was_skipped() -> None:
-    """Without any SSM rows (no AWS credentials) the parameter and source columns are unknown, not missing."""
-    entries = [(CODESPACES, "TRELLO__ATIP_BOARD", "present"), (EXAMPLE, "TRELLO__ATIP_BOARD", "set")]
+    """Without any SSM rows (no AWS credentials) the parameter state is unknown, not missing."""
+    entries = [(CODESPACES, "TRELLO__ATIP_BOARD", "present")]
 
     assert _rows({"TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"][0] == "none"
 
 
-def test_codespaces_holding_only_the_old_name_is_a_check() -> None:
-    """A Codespace still provides the old name but not the new one: development loses the value."""
-    entries = [*_complete("TRELLO__ATIP_BOARD", "TRELLO_ATIP_BOARD")[:2], (CODESPACES, "TRELLO_ATIP_BOARD", "present")]
-    entries.append((EXAMPLE, "TRELLO__ATIP_BOARD", "commented"))
+def test_a_codespaces_sourced_name_missing_from_codespaces_is_a_check() -> None:
+    """The metadata says a developer gets the value from a Codespaces secret, and none provides it."""
+    entries = [(CODESPACES, "SLACK__BOT_TOKEN", "present")]
 
-    action, reason = _rows({"TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"]
+    action, reason = _rows(set(), entries)["TRELLO__ATIP_BOARD"]
     assert action == "check"
-    assert "Codespaces has TRELLO_ATIP_BOARD" in reason
+    assert "no Codespaces secret provides it" in reason
 
 
-def test_the_generated_env_example_is_never_judged() -> None:
-    """bin/generate_env_example.py writes app/.env.example and a test catches drift, so no row asks for a line."""
-    entries = [e for e in _complete("SLACK__BOT_TOKEN", "SLACK_BOT_TOKEN") if e[0] != EXAMPLE]
-    entries.append((EXAMPLE, "OTHER", "set"))
-
-    action, reason = _rows({"SLACK__BOT_TOKEN"}, entries)["SLACK__BOT_TOKEN"]
-    assert action == "none"
-    assert "app/.env.example" not in reason
+def test_codespaces_are_not_judged_when_none_were_listed() -> None:
+    """Without any Codespaces rows (no gh auth) a missing secret is unknown, not absent."""
+    assert _rows(set(), [])["TRELLO__ATIP_BOARD"][0] == "none"
 
 
 def test_terraform_parameters_reads_the_secret_names_set(tmp_path: Path) -> None:
     """The names come from the sre_bot_secret_names set, not from other quoted strings in the file."""
     tf = tmp_path / "ssm.tf"
     tf.write_text(
-        'resource "aws_ssm_parameter" "x" {\n  name = "gcp_sre_service_account_key"\n}\n'
+        'resource "aws_ssm_parameter" "x" {\n  name = "OTHER_NAME"\n}\n'
         'locals {\n  sre_bot_secret_names = toset([\n    "SLACK__BOT_TOKEN",\n    "TRELLO__ATIP_BOARD",\n  ])\n}\n'
     )
 
     assert terraform_parameters(tf) == {"SLACK__BOT_TOKEN", "TRELLO__ATIP_BOARD"}
 
 
-def test_a_parameter_not_created_yet_also_says_whether_its_source_line_exists() -> None:
-    """Before the apply, a pending parameter whose blob line is absent is flagged, so it is dropped from ssm.tf."""
-    entries = [("ssm-param", "SLACK__BOT_TOKEN", "set"), ("ssm-blob sre-bot-config", "SLACK_BOT_TOKEN", "set")]
-
-    _, reason = _rows({"SLACK__BOT_TOKEN", "TRELLO__ATIP_BOARD"}, entries)["TRELLO__ATIP_BOARD"]
-    assert "tf_apply pending" in reason
-    assert "no TRELLO_ATIP_BOARD line" in reason
+_NOTIFY = {"NOTIFY__SRE_USER_NAME": "codespaces"}
 
 
-def test_a_development_only_name_production_sets_is_a_check() -> None:
-    """doc-14 calling a value development only while a production blob line sets it would drop it in production."""
-    entries = [
-        ("ssm-param", "SLACK__BOT_TOKEN", "set"),
-        ("ssm-blob sre-bot-config", "AWS_AUDIT_ACCOUNT_ROLE_ARN", "set"),
-        (CODESPACES, "AWS__TENANT__AUDIT_ROLE_ARN", "present"),
-    ]
-
-    action, reason = _rows({"SLACK__BOT_TOKEN"}, entries)["AWS__TENANT__AUDIT_ROLE_ARN"]
-    assert action == "check"
-    assert "production sets AWS_AUDIT_ACCOUNT_ROLE_ARN" in reason
-
-
-def test_a_placeholder_parameter_whose_value_sits_inside_a_blob_line_names_put_parameter() -> None:
-    """A doc-14 key naming a path inside a blob line ("GOOGLE_RESOURCES inc.f") is copied from that line.
-
-    The blob holds the line ``GOOGLE_RESOURCES``, never the key itself, so the check must resolve the line from
-    the key's first word; otherwise the placeholder parameter would report that there is nothing to copy.
-    """
-    doc14 = {"GOOGLE_RESOURCES inc.f": ("secret INCIDENT_CORE__FOLDER_ID (non-public value)", "111.10.3")}
-    entries = [
-        ("ssm-param", "INCIDENT_CORE__FOLDER_ID", "placeholder"),
-        ("ssm-blob sre-bot-config", "GOOGLE_RESOURCES", "set"),
-    ]
-
-    rows = {name: verdict for name, _, verdict in coverage_rows(doc14, {"INCIDENT_CORE__FOLDER_ID"}, entries)}
-
-    assert rows["INCIDENT_CORE__FOLDER_ID"].action == "check"
-    assert "put-parameter from GOOGLE_RESOURCES inc.f" in rows["INCIDENT_CORE__FOLDER_ID"].reason
-
-
-_NOTIFY = {"NOTIFY_SRE_USER_NAME": ("secret NOTIFY__SRE_USER_NAME", "111.4, 111.12")}
-
-
-def test_a_credential_of_a_vendor_local_leaves_unconfigured_is_not_copied_into_codespaces() -> None:
+def test_a_credential_of_a_vendor_local_leaves_unconfigured_is_not_wanted_in_codespaces() -> None:
     """Notify has a tenant entry in production.toml and none in local.toml: its credential alone fails local boot.
 
     Reads the checked-in configuration files: the rule follows where each environment configures the vendor.
     """
-    entries = [("ssm-param", "NOTIFY__SRE_USER_NAME", "set"), (CODESPACES, "NOTIFY_SRE_USER_NAME", "present")]
+    entries = [("ssm-param", "NOTIFY__SRE_USER_NAME", "set"), (CODESPACES, "OTHER", "present")]
 
     rows = {name: verdict for name, _, verdict in coverage_rows(_NOTIFY, {"NOTIFY__SRE_USER_NAME"}, entries)}
 
     assert rows["NOTIFY__SRE_USER_NAME"].action == "none"
-    assert "set NOTIFY__SRE_USER_NAME" not in rows["NOTIFY__SRE_USER_NAME"].reason
 
 
 def test_a_credential_of_a_vendor_local_leaves_unconfigured_in_codespaces_is_a_check() -> None:
