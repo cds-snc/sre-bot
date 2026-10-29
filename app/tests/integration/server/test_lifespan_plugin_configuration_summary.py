@@ -7,7 +7,7 @@ provider and translation are stubbed; feature registration runs for real. The fa
 plugins build the access permission-sets slice, which no host slice getter builds, or a
 subclass of it, in their startup_warmup. The event must list only slices first built
 during a plugin's boot, grouped under the plugin that built them, with a hash per
-section, and a canary non-public value must appear only as its last four characters.
+entry, and a canary non-public value must appear only as its last four characters.
 """
 
 import dataclasses
@@ -108,12 +108,17 @@ async def _boot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, disabled: froze
         _stub_startup(stack)
         async with build_lifespan(configuration)(FastAPI()):
             pass
-    return [event for event in events if event["event"] == "plugin_configuration_summary"]
+    return [event for event in events if event["event"] in {"plugin_configuration_summary", "configuration_slice"}]
+
+
+def _summary(events: list[dict[str, Any]]) -> dict[str, Any]:
+    (summary,) = [event for event in events if event["event"] == "plugin_configuration_summary"]
+    return summary
 
 
 async def test_sections_list_only_slices_built_during_each_plugin_boot(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Each plugin's section holds the slices it built first; a slice the host phase built is in none."""
-    (event,) = await _boot(monkeypatch, tmp_path)
+    """Each plugin's entry names the slices it built first; a slice the host phase built is in none."""
+    event = _summary(await _boot(monkeypatch, tmp_path))
 
     sections = {section["plugin"]: section for section in event["plugins"]}
     assert list(sections) == ["alpha", "beta"]
@@ -126,16 +131,23 @@ async def test_sections_list_only_slices_built_during_each_plugin_boot(monkeypat
 async def test_a_non_public_value_appears_only_as_its_last_four_characters(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """The canary permission-set ARN is withheld: its tail under partial, never the full value."""
-    (event,) = await _boot(monkeypatch, tmp_path)
+    """The canary permission-set ARN is withheld: its tail under partial in the plugin's slice event, never in full."""
+    events = await _boot(monkeypatch, tmp_path)
 
-    section = event["plugins"][0]["slices"]["access_permission_sets"]
-    assert section["partial"]["system_admin_permissions"] == NON_PUBLIC[-4:]
-    assert NON_PUBLIC not in repr(event)
+    slice_events = [event for event in events if event["event"] == "configuration_slice"]
+    assert {(event["plugin"], event["slice"]) for event in slice_events} == {
+        ("alpha", "access_permission_sets"),
+        ("beta", "access_permission_sets"),
+    }
+    assert all(event["phase"] == "plugin_boot" for event in slice_events)
+    assert slice_events[0]["partial"]["system_admin_permissions"] == NON_PUBLIC[-4:]
+    assert NON_PUBLIC not in repr(events)
 
 
 async def test_a_disabled_plugin_has_no_section(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A disabled plugin's boot never runs, so its slice is never built and never listed."""
-    (event,) = await _boot(monkeypatch, tmp_path, disabled=frozenset({"alpha", "beta"}))
+    events = await _boot(monkeypatch, tmp_path, disabled=frozenset({"alpha", "beta"}))
+    event = _summary(events)
+    assert [event for event in events if event["event"] == "configuration_slice"] == []
 
     assert event["plugins"] == []

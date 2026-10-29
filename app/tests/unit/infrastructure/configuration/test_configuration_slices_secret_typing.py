@@ -22,8 +22,10 @@ import pytest
 from pydantic import BaseModel, SecretBytes, SecretStr
 from pydantic.fields import FieldInfo
 
-from contracts.configuration import ConfigurationSlice, install_configuration_files, is_env_only
+from contracts.configuration import ConfigurationSlice, install_configuration_files, is_env_only, uninstall_configuration_files
 from infrastructure.logging.formatters import mask_sensitive_data
+from server.configuration.loader import CONFIG_DIR
+from server.configuration.summary import summarize
 from tests.factories.google_service_account import service_account_info
 
 pytestmark = pytest.mark.unit
@@ -167,9 +169,16 @@ def test_no_repr_and_no_json_dump_shows_a_canary(tmp_path: Path, monkeypatch: py
     assert built >= 8
 
 
-# Names the summary logs as dict keys that the pipeline's key-name redaction masks:
-# "auth" in unauthorized_*, "token" in max_output_tokens, "api_key" in the table name.
-EXPECTED_MASKED_NAMES = {"aws.unauthorized_codes", "notify_api_key_leak", "openai.max_output_tokens", "slack.unauthorized_errors"}
+# Shown field names a slice event logs as dict keys that the pipeline's key-name
+# redaction masks: "auth" in unauthorized_*, "token" in max_output_tokens. A table name
+# is the slice event's value, so it is never masked.
+EXPECTED_MASKED_NAMES = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors"}
+# The Fargate runtime splits a line over 16 KB, and Logs Insights extracts at most 200 fields of a JSON event.
+LINE_LIMIT_BYTES = 16 * 1024
+FIELD_LIMIT = 200
+# Room for the event name, level, timestamp, logger, callsite and service identity fields.
+ENVELOPE_FIELDS = 20
+ENVELOPE_BYTES = 1024
 
 
 def _shown_names(slice_class: type[ConfigurationSlice]) -> Iterator[str]:
@@ -183,20 +192,44 @@ def _shown_names(slice_class: type[ConfigurationSlice]) -> Iterator[str]:
                     yield f"{field_name}.{nested_name}"
 
 
-def test_the_summary_names_key_name_redaction_masks_are_pinned() -> None:
-    """A table or shown field name matching a redaction pattern is masked in the summary, so the set is pinned.
+def _flattened_fields(value: Any) -> int:
+    """Count leaves the way Logs Insights flattens JSON: nested keys and list positions each become a field."""
+    if isinstance(value, dict):
+        return sum(_flattened_fields(member) for member in value.values()) or 1
+    if isinstance(value, list):
+        return sum(_flattened_fields(member) for member in value) or 1
+    return 1
 
-    The summary keys sections by table and shown values by field name; the redaction
-    processor is applied to a one-key event per name, so a new collision fails here and
-    is decided in review rather than found missing in a production log.
+
+def test_the_summary_names_key_name_redaction_masks_are_pinned() -> None:
+    """A shown field name matching a redaction pattern is masked in its slice event, so the set is pinned.
+
+    A slice event keys shown values by field name; the redaction processor is applied
+    to a one-key event per name, so a new collision fails here and is decided in
+    review rather than found missing in a production log.
     """
     redact = mask_sensitive_data()
     masked: set[str] = set()
     for slice_class in _slices():
         table = slice_class.model_config["toml_table_header"][0]
-        if redact(None, "info", {table: "x"})[table] != "x":
-            masked.add(table)
-            continue
         masked |= {f"{table}.{name}" for name in _shown_names(slice_class) if redact(None, "info", {name: "x"})[name] != "x"}
 
     assert masked == EXPECTED_MASKED_NAMES
+
+
+def test_every_slice_event_fits_the_runtime_buffer_and_the_query_field_limit() -> None:
+    """Each slice is one log event, so each stays under 16 KB and 200 fields with room for the envelope.
+
+    Every slice is built from the real base and ci files, as a ci boot builds it; a
+    slice that grows past either bound fails here, in CI, rather than arriving split
+    or partly unqueryable in production.
+    """
+    install_configuration_files(_Files(environment="ci", paths=(CONFIG_DIR / "base.toml", CONFIG_DIR / "ci.toml")))
+    try:
+        for slice_class in _slices():
+            (event,) = summarize([slice_class()]).slice_events()
+
+            assert len(json.dumps(event).encode("utf-8")) < LINE_LIMIT_BYTES - ENVELOPE_BYTES, slice_class.__name__
+            assert _flattened_fields(event) < FIELD_LIMIT - ENVELOPE_FIELDS, slice_class.__name__
+    finally:
+        uninstall_configuration_files()

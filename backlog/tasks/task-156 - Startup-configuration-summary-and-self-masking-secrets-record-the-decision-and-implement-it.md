@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-10-20 12:31
-updated_date: '2026-10-29T16:44:00Z'
+updated_date: '2026-10-29T16:54:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -141,4 +141,6 @@ OQ10 One PR with a size exception.
 2026-10-29 (human review of the first local boot): the summary is regrouped per slice: one section per table holding values (a list of plain values stays one value; nested models and lists of models get dotted names), set, unset and partial (non-public tails), matching Spring Boot configprops and Backstage config:print. The service_identity event and the duplicate environment field are dropped, since every record carries the identity. Shown names are dict keys, so the key-name redaction masks four names: aws.unauthorized_codes, openai.max_output_tokens, slack.unauthorized_errors and the whole notify_api_key_leak section. This fails safe, the hash still covers them, and a unit test over every slice pins the set. ADR text updated in configuration.md and observability.md. Gates, each run once at the end: ruff clean; mypy 41 errors in the same 14 untouched legacy files; pytest 5931 passed; import contracts 13 kept; key ownership OK. Production diff: 16 files, +192 -152, plus the new summary.py (143 lines).
 
 2026-10-29: the three @contextmanager functions annotated -> Iterator[...] now return Generator[...]. Current typeshed deprecates the Iterator form, and the editor flagged it. The three are server/plugins/boot.py attribute_built_slices (new in this task), features/incident/comms/entrypoints/slack.py _incident_scope and tests/factories/services.py _scope. An AST scan found no other @contextmanager or @asynccontextmanager with an Iterator or AsyncIterator return. Checks: ruff and mypy clean on the three files; 490 targeted tests passed.
+
+2026-10-29 (human approved): each slice is now its own configuration_slice event, carrying slice, config_hash, values, set, unset and partial, plus plugin for plugin slices. The phase ends with a configuration_summary or plugin_configuration_summary header naming the slices, with the files and the combined hash. Reason: the Fargate runtime splits lines over 16 KB into unparseable pieces, and Logs Insights extracts at most 200 fields of a JSON event; the single event already flattened to about 170. A test builds every slice from base and ci and holds each slice event under 16 KB and 200 fields, with envelope room (largest today: aws, 1.3 KB, 44 fields). Table names are values now, so notify_api_key_leak is no longer masked; the pinned masked set is aws.unauthorized_codes, openai.max_output_tokens and slack.unauthorized_errors. The deploy summary check is unchanged, since it reads the header. ADR text updated in configuration.md and plugins.md. Final gates, each run once: ruff clean; mypy 41 errors in the same 14 untouched files; pytest 5932 passed; import contracts 13 kept; key ownership OK.
 <!-- SECTION:NOTES:END -->

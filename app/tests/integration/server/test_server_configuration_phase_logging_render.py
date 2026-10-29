@@ -41,8 +41,11 @@ SECRET = "xoxb-secret-value-0002"
 CANARY_CREDENTIAL = "xoxb-canary-credential-7788"
 CANARY_NON_PUBLIC = "canary-board-id-0123456789"
 REDACTED = "***REDACTED***"
-# Names a key-name redaction pattern matches: "auth" in unauthorized_*, "token" in max_output_tokens, "api_key" in a table name.
-EXPECTED_MASKED = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors", "notify_api_key_leak"}
+# Names a key-name redaction pattern matches: "auth" in unauthorized_*, "token" in max_output_tokens.
+EXPECTED_MASKED = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors"}
+# The Fargate runtime splits a line over 16 KB, and Logs Insights extracts at most 200 fields of a JSON event.
+LINE_LIMIT_BYTES = 16 * 1024
+FIELD_LIMIT = 200
 
 _GETTERS: tuple[Callable[[], Any], ...] = (
     get_identity_settings,
@@ -189,13 +192,29 @@ def _summary(events: list[dict[str, Any]]) -> dict[str, Any]:
     return summary
 
 
+def _slice_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {event["slice"]: event for event in events if event["event"] == "configuration_slice"}
+
+
+def _flattened_fields(value: Any) -> int:
+    """Count leaves the way Logs Insights flattens JSON: nested keys and list positions each become a field."""
+    if isinstance(value, dict):
+        return sum(_flattened_fields(member) for member in value.values()) or 1
+    if isinstance(value, list):
+        return sum(_flattened_fields(member) for member in value) or 1
+    return 1
+
+
 def test_the_summary_is_one_json_event_with_names_only_for_files(
     _production_phase: Path, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """configuration_summary parses as JSON at info with file names, a hash and one section per slice table."""
+    """configuration_summary closes the phase at info with file names, a hash and the slices, each logged on its own."""
     load_host_configuration()
 
-    summary = _summary(_events(_lines(capfd)))
+    events = _events(_lines(capfd))
+    summary = _summary(events)
+    assert [event["event"] for event in events][-1] == "configuration_summary"
+    assert set(_slice_events(events)) == set(summary["slices"])
     assert summary["level"] == "info"
     assert summary["phase"] == "configuration"
     assert "environment" not in summary
@@ -214,12 +233,10 @@ def test_key_name_redaction_masks_only_the_known_names_and_never_a_withheld_stat
     """
     load_host_configuration()
 
-    sections = _summary(_events(_lines(capfd)))["slices"]
-    masked = {table for table, section in sections.items() if section == REDACTED}
-    masked |= {
+    sections = _slice_events(_events(_lines(capfd)))
+    masked = {
         f"{table}.{name}"
         for table, section in sections.items()
-        if section != REDACTED
         for name, value in section.get("values", {}).items()
         if value == REDACTED
     }
@@ -239,7 +256,7 @@ def test_a_canary_credential_appears_nowhere_and_a_non_public_value_only_as_its_
     load_host_configuration()
 
     lines = _lines(capfd)
-    sections = _summary(_events(lines))["slices"]
+    sections = _slice_events(_events(lines))
     output = "\n".join(lines)
     assert CANARY_CREDENTIAL not in output
     assert CANARY_NON_PUBLIC not in output
@@ -247,12 +264,15 @@ def test_a_canary_credential_appears_nowhere_and_a_non_public_value_only_as_its_
     assert sections["incident_core"]["partial"]["folder_id"] == CANARY_NON_PUBLIC[-4:]
 
 
-def test_the_summary_event_stays_far_below_the_log_event_size_limit(capfd: pytest.CaptureFixture[str]) -> None:
-    """CloudWatch rejects an event over 256 KB; the summary line is bounded to a small fraction of that."""
+def test_every_summary_line_fits_the_runtime_buffer_and_the_query_field_limit(capfd: pytest.CaptureFixture[str]) -> None:
+    """A line over 16 KB arrives split and unparseable, and fields past 200 are not queryable, so each event stays under both."""
     load_host_configuration()
 
-    (line,) = [line for line in _lines(capfd) if '"configuration_summary"' in line]
-    assert len(line.encode("utf-8")) < 64 * 1024
+    lines = [line for line in _lines(capfd) if '"configuration_s' in line]
+    assert len(lines) > 1
+    for line in lines:
+        assert len(line.encode("utf-8")) < LINE_LIMIT_BYTES
+        assert _flattened_fields(json.loads(line)) < FIELD_LIMIT
 
 
 def test_the_service_identity_rides_every_record_without_an_event_of_its_own(capfd: pytest.CaptureFixture[str]) -> None:

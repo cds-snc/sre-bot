@@ -65,15 +65,18 @@ def _get_logger_from_app() -> BoundLogger:
 
 
 def _log_plugin_configuration_summary(logger: BoundLogger) -> None:
-    """Log the slices each plugin's boot first built: a section per plugin, each with its own hash.
+    """Log one configuration_slice event per slice each plugin's boot first built, then the summary naming them.
 
-    A disabled plugin never builds its slices, so it has no section.
+    A disabled plugin never builds its slices, so it has no entry.
     """
-    sections: list[dict[str, object]] = []
+    plugins: list[dict[str, object]] = []
     for plugin, built in plugin_built_slices().items():
         summary = summarize(built)
-        sections.append({"plugin": plugin, "config_hash": summary.config_hash, "slices": summary.sections()})
-    logger.info("plugin_configuration_summary", phase="plugin_boot", plugins=sections)
+        events = summary.slice_events()
+        for event in events:
+            logger.info("configuration_slice", phase="plugin_boot", plugin=plugin, **event)
+        plugins.append({"plugin": plugin, "config_hash": summary.config_hash, "slices": [event["slice"] for event in events]})
+    logger.info("plugin_configuration_summary", phase="plugin_boot", plugins=plugins)
 
 
 def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:

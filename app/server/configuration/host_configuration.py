@@ -187,14 +187,18 @@ def _log_invalid(error: ConfigurationError) -> None:
 
 
 def _log_configuration_summary(files: TomlConfigurationFiles) -> None:
-    """Log every slice the phase built as one event: the shown values, the state of the withheld, a hash of the shown."""
+    """Log one configuration_slice event per slice the phase built, then the configuration_summary that closes the phase."""
     summary = summarize(built_slices())
-    structlog.get_logger(__name__).info(
+    log = structlog.get_logger(__name__)
+    events = summary.slice_events()
+    for event in events:
+        log.info("configuration_slice", phase="configuration", **event)
+    log.info(
         "configuration_summary",
         phase="configuration",
         files=[path.name for path in files.paths],
         config_hash=summary.config_hash,
-        slices=summary.sections(),
+        slices=[event["slice"] for event in events],
     )
 
 

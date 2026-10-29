@@ -1,8 +1,10 @@
 """The configuration summary: what startup reports about the slices that validated.
 
 Generated from the built slices, never from a hand-kept list (decisions/configuration.md,
-Startup reports configuration, never a secret). Each slice gets a section keyed by its
-table, as Spring Boot's configprops groups properties by prefix: shown fields under
+Startup reports configuration, never a secret). Each slice is logged as its own event, so
+no event outgrows the Fargate runtime's 16 KB line buffer or Logs Insights' 200 extracted
+fields, and each section groups the slice's fields as Spring Boot's configprops groups
+properties by prefix: shown fields under
 "values" (dotted names for nested models and list entries that hold models; a list of
 plain values stays one value), withheld fields named under "set" or "unset", and
 non-public fields with a tail under "partial". A withheld field's name is a list member,
@@ -63,6 +65,13 @@ class ConfigurationSummary:
             else:
                 section.setdefault(entry.state, []).append(entry.name)
         return sections
+
+    def slice_events(self) -> list[dict[str, Any]]:
+        """Return one event body per slice table: the table, the hash of its shown values, then its section."""
+        return [
+            {"slice": table, "config_hash": _hash([entry for entry in self.entries if entry.table == table]), **section}
+            for table, section in self.sections().items()
+        ]
 
 
 def summarize(slices: Iterable[ConfigurationSlice]) -> ConfigurationSummary:
