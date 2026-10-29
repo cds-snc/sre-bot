@@ -3,8 +3,7 @@
 Each test installs a base and a local file from tmp_path with every SENTINEL_* and SENTINEL__*
 variable removed and the .env file disabled (the autouse isolation fixture), so it observes only
 the values it writes and sets. The log type is a file key; the workspace id and the shared key
-are read only from SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY. The flat names the blob .env
-supplied before TASK-111.15.1 reach no field.
+are read only from SENTINEL__CUSTOMER_ID and SENTINEL__SHARED_KEY.
 """
 
 import os
@@ -18,8 +17,6 @@ from integrations.sentinel.settings import SentinelSettings, get_sentinel_settin
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
 
 pytestmark = pytest.mark.unit
-
-_RETIRED_NAMES = ("SENTINEL_CUSTOMER_ID", "SENTINEL_LOG_TYPE", "SENTINEL_SHARED_KEY")
 
 
 @pytest.fixture(autouse=True)
@@ -98,17 +95,6 @@ def test_the_credentials_never_appear_in_repr_or_str(tmp_path: Path, monkeypatch
         assert "key-render" not in rendered
 
 
-@pytest.mark.parametrize("name", _RETIRED_NAMES)
-def test_the_flat_names_reach_no_field(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> None:
-    """The names the blob .env supplied are ignored once the fetch stops."""
-    _install(tmp_path)
-    monkeypatch.setenv(name, "flat-value")
-
-    settings = SentinelSettings()
-
-    assert "flat-value" not in (settings.customer_id, settings.shared_key.get_secret_value(), settings.log_type)
-
-
 def test_an_unknown_key_in_the_table_fails_the_slice(tmp_path: Path) -> None:
     _install(tmp_path, base="[sentinel]\nunknown = 1\n")
 
@@ -116,8 +102,8 @@ def test_an_unknown_key_in_the_table_fails_the_slice(tmp_path: Path) -> None:
         SentinelSettings()
 
 
-def test_production_writes_to_the_table_the_blob_named() -> None:
-    """production.toml holds the blob's SENTINEL_LOG_TYPE (deploy check 'sentinel' compares the two)."""
+def test_production_sets_the_log_type() -> None:
+    """production.toml sets the Sentinel log type the production workspace expects."""
     install_configuration_files(load_configuration_files("production"))
 
     assert SentinelSettings().log_type == "SREBot"

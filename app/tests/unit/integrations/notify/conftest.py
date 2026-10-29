@@ -16,7 +16,6 @@ from contracts.configuration import install_configuration_files
 from integrations.notify.settings import NotifySettings, get_notify_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = ("NOTIFY_SRE_USER_NAME", "NOTIFY_SRE_CLIENT_SECRET", "NOTIFY_API_URL")
 API_URL = "https://notify.example.test"
 TENANT = f'[notify.tenant]\napi_url = "{API_URL}"\n'
 

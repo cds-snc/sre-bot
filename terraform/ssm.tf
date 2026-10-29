@@ -1,17 +1,5 @@
-resource "aws_ssm_parameter" "gcp_sre_service_account_key" {
-  name     = "gcp_sre_service_account_key"
-  provider = aws.core_services
-  type     = "SecureString"
-  value    = var.gcp_sre_service_account_key
-
-  tags = {
-    CostCentre = var.billing_code
-    Terraform  = true
-  }
-}
-
 # Secrets and non-public values (decisions/configuration.md) the app reads under
-# their <SLICE>__<FIELD> names (doc-14 rename map).
+# their <SLICE>__<FIELD> names.
 # Values are set outside terraform with put-parameter --overwrite; value_wo is
 # write-only, so terraform never reads a value into state. Never bump
 # value_wo_version: that writes the placeholder over the real value.
@@ -51,14 +39,10 @@ locals {
     "TALENT__SCORING_GUIDE_TEMPLATE_ID",
     "TALENT__TECHNICAL_INTERVIEW_NOTES_ID",
     "TALENT__TEMPLATES_FOLDER_ID",
-    "TRELLO__APP_KEY",
     "TRELLO__ATIP_BOARD",
     "TRELLO__TENANT__APP_KEY",
     "TRELLO__TENANT__TOKEN",
-    "TRELLO__TOKEN",
   ])
-  # Never read (superseded by TRELLO__TENANT__*) and no longer injected: removed in TASK-111.15.2.
-  sre_bot_unread_secret_names = toset(["TRELLO__APP_KEY", "TRELLO__TOKEN"])
 }
 
 resource "aws_ssm_parameter" "sre_bot_secret" {

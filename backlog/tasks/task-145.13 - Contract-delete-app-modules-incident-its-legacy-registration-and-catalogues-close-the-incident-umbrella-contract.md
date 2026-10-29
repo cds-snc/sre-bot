@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:31:00Z'
+updated_date: '2026-10-29T00:22:00Z'
 labels:
   - incident
   - features
@@ -46,6 +46,7 @@ THIS SLICE
 - [ ] #4 decisions/incident-management.md Migration lists no closed tolerance and carries a dated Changes line
 - [ ] #5 Once a production run of the TASK-145.5.7 upgrade job reports nothing pending, features/incident/core/adapters/legacy_items.py (the read bridge), the upgrade job and their tests are deleted, and decisions/incident-management.md Migration tolerances are updated to match
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #7 The TASK-173 host rule (a Slack transport switched on with GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset fails boot, server/configuration/host_configuration.py) and its tests are deleted with the legacy handlers it exists for, and decisions/configuration.md Tolerated no longer lists it (dated Changes line)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -85,4 +86,6 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 2026-10-15: also owns removing the legacy upgrade bridge and job (legacy_items.py, TASK-145.5.7) once a production run reports nothing pending.
 
 2026-10-15 (human default): legacy attributes are left on stored items; there is no strip pass, since nothing reads them once the bridge (TASK-145.5.8) and the TASK-145.5.7 job are deleted.
+
+- 2026-10-29 (TASK-173 assessment): the legacy Google requirement outlives declare's rebuild (eight modules under app/modules/incident import Google), so this task, not TASK-145.7, deletes TASK-173's rule; AC added.
 <!-- SECTION:NOTES:END -->

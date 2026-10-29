@@ -16,8 +16,6 @@ from contracts.configuration import install_configuration_files
 from integrations.trello.settings import TrelloSettings, get_trello_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = ("TRELLO_APP_KEY", "TRELLO_TOKEN", "TRELLO_ATIP_BOARD", "TRELLO__APP_KEY", "TRELLO__TOKEN")
-
 
 @pytest.fixture(autouse=True)
 def _trello_env_isolation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:

@@ -2,9 +2,9 @@
 
 Each test installs a base and a local file from tmp_path with every AUDIT variable removed and the
 .env file disabled (the autouse isolation fixture), so it observes only the values it writes and
-sets. table_name is the slice's only key; the retired AUDIT_TABLE_NAME is never read, and an
-unknown key fails the load naming it. The provider-built service runs over the in-memory record
-store, so its write is observed in the configured table.
+sets. table_name is the slice's only key, and an unknown key fails the load naming it. The
+provider-built service runs over the in-memory record store, so its write is observed in the
+configured table.
 """
 
 import os
@@ -92,13 +92,6 @@ def test_an_unknown_key_in_a_file_fails_the_load_naming_it(tmp_path: Path, key: 
 
     with pytest.raises(ConfigurationError, match=key):
         AuditSettings()
-
-
-def test_the_retired_flat_name_is_not_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _install(tmp_path)
-    monkeypatch.setenv("AUDIT_TABLE_NAME", "retired")
-
-    assert AuditSettings().table_name == "sre_bot_audit_trail"
 
 
 def test_the_provider_is_cached() -> None:

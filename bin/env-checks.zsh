@@ -1,10 +1,9 @@
 #!/usr/bin/env zsh
-# Environment-name audit: one action per name (none, delete, rename, check) for every name set in the env
+# Environment-name audit: one action per name (none, delete, check) for every name set in the env
 # files, the Codespaces secrets, the GitHub Actions and Dependabot secrets and variables, and the production
 # SSM parameters. Read-only. Never prints a value: names and a state only (set, empty, commented,
 # placeholder, present). A secret parameter is compared with the terraform placeholder in-process.
-# Developer helper, not part of the app. The production SSM part serves the configuration migration and is
-# deleted with the blobs in TASK-111.15.2; the env-file, Codespaces and Actions part stays.
+# Developer helper, not part of the app.
 #
 # Usage (from any directory; gh auth and AWS read credentials make their sections run, else they are skipped):
 #   zsh bin/env-checks.zsh                 # full audit; rows needing no action are hidden
@@ -14,16 +13,16 @@
 #   env -u GITHUB_TOKEN -u GH_TOKEN gh auth login --web; the script then retries with it automatically.
 # User Codespaces secrets need the codespace scope once: gh auth refresh -h github.com -s codespace
 # Plan and apply, as terraform does: the audit only plans. It writes tmp/env-checks/<UTC>.txt (gitignored,
-# never commit it, also echoed) and tmp/env-checks/<UTC>.plan.sh, the commands for the delete and rename rows
+# never commit it, also echoed) and tmp/env-checks/<UTC>.plan.sh, the commands for the delete rows
 # (env files, Codespaces, Actions, Dependabot; never SSM or organization names). Nothing is changed until:
 #   zsh bin/env-checks.zsh apply tmp/env-checks/<UTC>.plan.sh   # or: make env-checks-apply PLAN=<file>
 # which prints that exact plan, asks for 'yes', runs it line by line, logs to <UTC>.plan.applied.txt and
 # renames the plan so it cannot run twice. Plan again afterwards to confirm the rows are gone.
-# A delete needs evidence of retirement (a retired app name, a HINTS or SUPERSEDED entry); a name nothing reads
+# A delete needs evidence of retirement (a RETIRED entry in audit_env_names.py); a name nothing reads
 # or no default-branch workflow references is a check showing its last reference in git history, looked up here
 # for those names only (the audit's --lookups pass lists them) and handed to the audit as LAST_REFS_FILE.
 # Classifier: app/bin/audit_env_names.py (each present name); app/bin/audit_env_coverage.py (where each name
-# supplied through the environment is missing: terraform/ssm.tf, SSM, the blob source line, Codespaces).
+# supplied through the environment is missing: terraform/ssm.tf, SSM, Codespaces).
 # app/.env.example is not scanned: make env-example generates it from the settings classes.
 
 setopt no_unset pipe_fail
@@ -55,11 +54,9 @@ fi
 
 ROOT=$(git -C ${0:A:h} rev-parse --show-toplevel)
 APP=$ROOT/app
-BASELINE=74508713^   # parent of TASK-111.1: the tree before the configuration migration
 REPO_SLUG=cds-snc/sre-bot
 ORG=cds-snc
 REGION=ca-central-1
-BLOBS=(sre-bot-config sre-bot-config-infrastructure)
 PLACEHOLDER=set-outside-terraform   # terraform/ssm.tf value_wo
 OUT_DIR=$ROOT/tmp/env-checks
 mkdir -p $OUT_DIR
@@ -68,8 +65,7 @@ OUT=$OUT_DIR/$STAMP.txt
 PLAN=$OUT_DIR/$STAMP.plan.sh
 NAMES=$(mktemp)
 REFS=$(mktemp)
-BASE_DIR=$(mktemp -d)
-trap 'rm -rf $NAMES $REFS $BASE_DIR' EXIT
+trap 'rm -f $NAMES $REFS' EXIT
 show=()
 filters=()
 for a in "$@"; do [[ $a == --all ]] && show=(--all) || filters+=($a); done
@@ -153,12 +149,8 @@ scan_lines() {
     note "skipped GitHub: gh not authenticated"
   fi
 
-  # Migration part: deleted with the blobs in TASK-111.15.2.
+  # The /sre-bot/<NAME> parameters: set, empty or still on the terraform placeholder.
   if aws sts get-caller-identity >/dev/null 2>&1; then
-    for b in $BLOBS; do
-      aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text \
-        | tr -d '\r' | sed -E 's/^([A-Z][A-Z0-9_]*)[[:space:]]*=[[:space:]]*/\1=/' | scan_lines "ssm-blob $b"
-    done
     for p in $(aws ssm get-parameters-by-path --region $REGION --path /sre-bot --query 'Parameters[].Name' --output text); do
       v=$(aws ssm get-parameter --region $REGION --name $p --with-decryption --query Parameter.Value --output text)
       [[ $v == $PLACEHOLDER ]] && s=placeholder || { [[ -z $v ]] && s=empty || s=set; }
@@ -169,14 +161,11 @@ scan_lines() {
     note "skipped SSM: no AWS credentials"
   fi
 
-  sha=$(git -C $ROOT rev-parse $BASELINE)
-  if [[ $(cut -d' ' -f1 $OUT_DIR/.baseline-names.txt 2>/dev/null) == $sha ]]; then tree=(); else
-    git -C $ROOT archive $sha app | tar -x -C $BASE_DIR && tree=($BASE_DIR/app); fi
   cd $APP
-  for row in ${(f)"$(uv run --quiet python -m bin.audit_env_names --lookups $sha $tree < $NAMES)"}; do
+  for row in ${(f)"$(uv run --quiet python -m bin.audit_env_names --lookups < $NAMES)"}; do
     [[ -n $row ]] && print -r -- "${row#*$'\t'}	$(last_ref ${row%%$'\t'*} ${row#*$'\t'})" >> $REFS
   done
-  LAST_REFS_FILE=$REFS REPO_SLUG=$REPO_SLUG PLAN_FILE=$PLAN uv run --quiet python -m bin.audit_env_names $show $sha $tree < $NAMES
+  LAST_REFS_FILE=$REFS REPO_SLUG=$REPO_SLUG PLAN_FILE=$PLAN uv run --quiet python -m bin.audit_env_names $show < $NAMES
   uv run --quiet python -m bin.audit_env_coverage $show $filters < $NAMES
 } 2>&1 | tee $OUT
 

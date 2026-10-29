@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-27 16:07
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-10-29T00:46:00Z'
 labels:
   - architecture
   - layers
@@ -32,6 +32,12 @@ app/bin/ is operator and dev tooling (entry.sh container entrypoint, db.sh, seed
 <!-- AC:BEGIN -->
 - [ ] #1 decisions/migration.md's directory table classifies app/bin/ as operator and dev tooling, exempt from the layer contracts
 - [ ] #2 decisions/migration.md's bin/ row states that entry.sh fetches no configuration and secrets come through task-definition secrets: (decisions/configuration.md), not a secrets contract implementation
-- [ ] #3 app/bin/entry.sh fetches no SSM parameter and only starts the app, verified against the running task definition (TASK-111.15.1)
+- [x] #3 app/bin/entry.sh fetches no SSM parameter and only starts the app, verified against the running task definition (TASK-111.15.1)
 - [ ] #4 No secret- or configuration-fetching logic exists in app/bin/
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-111.15.2): AC #3 checked. app/bin/entry.sh no longer exists (deleted by TASK-111.15.1); the image starts uvicorn directly, pinned by tests/unit/bin/test_bin_container_start_contract.py, and 111.15.1's names_only post check passed on the running revision (no blob fetch line). TASK-111.15.2 also removes the IAM read on the blobs. AC #4 is checked by the human with the Done flip, after the blobs are deleted.
+<!-- SECTION:NOTES:END -->

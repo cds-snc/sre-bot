@@ -17,7 +17,7 @@ from integrations.google_workspace.settings import (
     get_google_workspace_settings,
 )
 from tests.factories.google_service_account import service_account_key
-from tests.unit.integrations.google_workspace.conftest import RETIRED_NAMES, install_google_files
+from tests.unit.integrations.google_workspace.conftest import install_google_files
 
 pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("google_slice_env")]
 
@@ -93,19 +93,6 @@ def test_google_settings_delegated_user_is_optional(tmp_path: Path, monkeypatch:
 
     assert tenant is not None
     assert tenant.delegated_user_email is None
-
-
-def test_google_settings_ignores_the_retired_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The old flat names in the environment and in .env no longer configure Google or its tuning."""
-    install_google_files(tmp_path, "[google_workspace]\napi_num_retries = 3\napi_timeout_seconds = 10.0\n")
-    for name in RETIRED_NAMES:
-        monkeypatch.setenv(name, "7")
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("".join(f"{name}=7\n" for name in RETIRED_NAMES), encoding="utf-8")
-
-    settings = GoogleWorkspaceSettings(_env_file=dotenv)  # type: ignore[call-arg]
-
-    assert (settings.api_num_retries, settings.api_timeout_seconds, settings.tenant) == (3, 10.0, None)
 
 
 @pytest.mark.parametrize("timeout", ["0", "-1"])

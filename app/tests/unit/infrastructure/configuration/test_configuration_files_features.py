@@ -60,7 +60,7 @@ def test_base_declares_each_feature_table_empty() -> None:
 
 
 def test_production_resolves_the_values_production_ran_on() -> None:
-    """The id is the blob line's value (deploy check 'features'); the admin group was the code default."""
+    """production.toml holds the production SRE ops channel and the AWS admin group."""
     install_configuration_files(load_configuration_files("production"))
 
     assert SreOpsSettings().SRE_OPS_CHANNEL_ID == "C0388M21LKZ"

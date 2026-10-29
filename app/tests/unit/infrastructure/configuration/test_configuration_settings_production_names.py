@@ -3,40 +3,13 @@
 Every row sets one environment variable to a sentinel that differs from the
 field default and builds the slice from the process environment only, so a
 field rename that silently stops reading its name falls back to the default and
-fails here instead of in production. The names are the deploy interface; the
-security slice reads the configuration files and is pinned by its own
-production-values test. The Slack slice
-reads the [slack] table too: its secrets are pinned under their SLACK__<FIELD>
-names (production sets SLACK__BOT_TOKEN, SLACK__USER_TOKEN and SLACK__APP_TOKEN
-as task-definition secrets) beside a tenant entry, and the retired SLACK_<FIELD>
-names are pinned as unread. The Google Workspace slice follows the same rule: its
-key and delegated user are pinned under GOOGLE_WORKSPACE__TENANT__<FIELD> (production
-sets both as task-definition secrets) beside a tenant entry, and the retired flat names
-are pinned as unread. GOOGLE_RESOURCES is no longer read: each Google document id is pinned
-under its owner's <SLICE>__<FIELD> name (production sets all fifteen as task-definition
-secrets), and the retired blob name is pinned as unread. The AWS slice reads the [aws] table and its tenant entry from AWS__TENANT__<FIELD>
-(production sets INSTANCE_ID, INSTANCE_ARN and ORG_ROLE_ARN as task-definition secrets),
-and the access slice the [access_permission_sets] table with its two values from
-ACCESS_PERMISSION_SETS__<FIELD>: non-public values, so no file names them; the fifteen
-retired AWS_* names are pinned as unread; the region and the dynamodb-local endpoint are the SDK's
-(AWS_DEFAULT_REGION, AWS_ENDPOINT_URL_DYNAMODB), declared by no field. The OpenAI slice
-reads the [openai] table with its key under OPENAI__API_KEY (a task-definition secret) beside a
-tenant entry; the six retired OPENAI_* names are pinned as unread. The Notify and
-Opsgenie slices read their tables with their credentials under NOTIFY__SRE_USER_NAME,
-NOTIFY__SRE_CLIENT_SECRET and OPSGENIE__INTEGRATIONS_KEY beside a tenant entry; Trello's
-entry is its credentials, TRELLO__TENANT__APP_KEY and TRELLO__TENANT__TOKEN, with the board
-under TRELLO__ATIP_BOARD; MaxMind's entry is its database file; their retired flat names
-(and the unread TRELLO__APP_KEY and TRELLO__TOKEN) are pinned as unread. The Sentinel slice
-reads [sentinel] log_type with the workspace id and shared key under SENTINEL__CUSTOMER_ID and
-SENTINEL__SHARED_KEY; its flat SENTINEL_* names are pinned as unread. A developer .env line
-written 'NAME =value' still reaches a field. The identity,
-server, dev and Slack transport slices too: production sets ENVIRONMENT,
-BACKEND_URL and SLACK__COMMAND_PREFIX (task definition), GIT_SHA (image),
-NOTIFY_OPS_CHANNEL_ID, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, SESSION_SECRET_KEY
-and ACCESS_TOKEN_EXPIRE_MINUTES (the SSM-delivered sre-bot-config file), and
-NOTIFY_ONCALL_GROUP_ID and SRE_TEST_CHANNEL_ID (sre-bot-config-infrastructure);
-WEBHOOK_MAX_BODY_BYTES, ACCESS_TOKEN_MAX_AGE_MINUTES and SLACK_DEV_MSG_CHANNEL
-stay part of the interface.
+fails here instead of in production. The names are the deploy interface: each
+slice reads <SLICE>__<FIELD> beside its table, and a tenant entry from
+<SLICE>__TENANT__<FIELD>. The security slice reads the configuration files and
+is pinned by its own production-values test. The AWS region and the
+dynamodb-local endpoint are the SDK's (AWS_DEFAULT_REGION,
+AWS_ENDPOINT_URL_DYNAMODB), declared by no field. Names match case-insensitively,
+and a dotenv line written 'NAME =value' still reaches a field.
 """
 
 from pathlib import Path
@@ -144,20 +117,6 @@ SLACK_NAMES: list[tuple[str, str, str, Any]] = [
 ]
 """A secret needs the tenant entry and the tenant entry needs the bot token, so every row sets both beside its name."""
 
-SLACK_RETIRED_NAMES = [
-    "SLACK_TEAM_ID",
-    "SLACK_BOT_TOKEN",
-    "SLACK_USER_TOKEN",
-    "SLACK_APP_TOKEN",
-    "SLACK_SIGNING_SECRET",
-    "SLACK_REQUEST_TIMEOUT_SECONDS",
-    "SLACK_RETRY_MAX_ATTEMPTS",
-    "SLACK_TRANSIENT_RETRY_AFTER_SECONDS",
-    "SLACK_UNAUTHORIZED_ERRORS",
-    "SLACK_NOT_FOUND_ERRORS",
-    "SLACK_TRANSIENT_ERRORS",
-]
-
 
 @pytest.mark.parametrize(("env_name", "attribute", "raw", "expected"), SLACK_NAMES, ids=[row[0] for row in SLACK_NAMES])
 def test_configuration_settings_slack_name_reaches_field(
@@ -184,29 +143,9 @@ def test_configuration_settings_slack_tenant_name_builds_the_tenant_entry(monkey
     assert settings.tenant.team_id == "TSENTINEL1"
 
 
-@pytest.mark.parametrize("env_name", SLACK_RETIRED_NAMES)
-def test_configuration_settings_slack_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
-    """The old SLACK_<FIELD> names and SLACK_TEAM_ID are read by no field: the slice builds exactly as without them."""
-    baseline = SlackSettings(_env_file=None).model_dump()  # type: ignore[call-arg]
-    monkeypatch.setenv(env_name, "7" if env_name.endswith(("SECONDS", "ATTEMPTS")) else "TSENTINEL1")
-
-    settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert settings.model_dump() == baseline
-
-
 GOOGLE_NAMES: list[tuple[str, str, str, Any]] = [
     ("GOOGLE_WORKSPACE__API_NUM_RETRIES", "api_num_retries", "7", 7),
     ("GOOGLE_WORKSPACE__API_TIMEOUT_SECONDS", "api_timeout_seconds", "12.5", 12.5),
-]
-
-GOOGLE_RETIRED_NAMES = [
-    "GOOGLE_DELEGATED_ADMIN_EMAIL",
-    "SRE_BOT_EMAIL",
-    "GOOGLE_WORKSPACE_CUSTOMER_ID",
-    "GCP_SRE_SERVICE_ACCOUNT_KEY_FILE",
-    "GOOGLE_API_NUM_RETRIES",
-    "GOOGLE_API_TIMEOUT_SECONDS",
 ]
 
 
@@ -238,31 +177,6 @@ def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monke
     )
 
 
-@pytest.mark.parametrize("env_name", GOOGLE_RETIRED_NAMES)
-def test_configuration_settings_google_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
-    """The old flat Google names are read by no field: the slice builds exactly as without them."""
-    baseline = GoogleWorkspaceSettings(_env_file=None).model_dump()  # type: ignore[call-arg]
-    monkeypatch.setenv(env_name, "7")
-
-    settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
-
-    assert settings.model_dump() == baseline
-
-
-@pytest.mark.parametrize(
-    "settings_class",
-    [IncidentCoreSettings, IncidentResponseSettings, IncidentPostmortemSettings, CloudOperationsSpendingSettings, TalentSettings],
-)
-def test_configuration_settings_google_resources_blob_is_unread(
-    monkeypatch: pytest.MonkeyPatch, settings_class: type[BaseSettings]
-) -> None:
-    """The retired GOOGLE_RESOURCES line stays in the blob for the rollback image; no slice reads it."""
-    baseline = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
-    monkeypatch.setenv("GOOGLE_RESOURCES", '{"inc": {"f": "sentinel"}, "tal": {"i": "sentinel"}}')
-
-    assert settings_class(_env_file=None).model_dump() == baseline  # type: ignore[call-arg]
-
-
 def test_configuration_settings_slack_and_google_lower_case_names_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
     """The lower-case spelling of a Slack name and of a Google name is read too."""
     monkeypatch.setenv("slack__tenant__team_id", "TSENTINEL1")
@@ -275,15 +189,6 @@ def test_configuration_settings_slack_and_google_lower_case_names_accepted(monke
     assert slack.bot_token == "xoxb-lower"
     assert google.api_num_retries == 9
 
-
-OPENAI_RETIRED_NAMES = [
-    "OPENAI_API_KEY",
-    "OPENAI_MODEL",
-    "OPENAI_MAX_OUTPUT_TOKENS",
-    "OPENAI_TEMPERATURE",
-    "OPENAI_TIMEOUT_SECONDS",
-    "OPENAI_BASE_URL",
-]
 
 OPENAI_NAMES: list[tuple[str, str, Any]] = [
     ("OPENAI__MAX_OUTPUT_TOKENS", "max_output_tokens", 1234),
@@ -317,35 +222,6 @@ def test_configuration_settings_openai_table_name_reaches_field(
     assert getattr(settings, attribute) == expected
 
 
-@pytest.mark.parametrize("env_name", OPENAI_RETIRED_NAMES)
-def test_configuration_settings_openai_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
-    """The six old OPENAI_* names are read by no field: the slice builds exactly as without them."""
-    baseline = OpenAISettings(_env_file=None).model_dump()  # type: ignore[call-arg]
-    monkeypatch.setenv(env_name, "https://ai.retired.example" if env_name == "OPENAI_BASE_URL" else "7")
-
-    settings = OpenAISettings(_env_file=None).model_dump()  # type: ignore[call-arg]
-
-    assert settings == baseline
-
-
-AWS_RETIRED_NAMES = [
-    "AWS_SSO_SYSTEM_ADMIN_PERMISSIONS",
-    "AWS_SSO_VIEW_ONLY_PERMISSIONS",
-    "AWS_AUDIT_ACCOUNT_ROLE_ARN",
-    "AWS_ORG_ACCOUNT_ROLE_ARN",
-    "AWS_LOGGING_ACCOUNT_ROLE_ARN",
-    "AWS_SSO_INSTANCE_ID",
-    "AWS_SSO_INSTANCE_ARN",
-    "AWS_RETRY_MAX_ATTEMPTS",
-    "AWS_RETRY_MODE",
-    "AWS_CONNECT_TIMEOUT_SECONDS",
-    "AWS_READ_TIMEOUT_SECONDS",
-    "AWS_TRANSIENT_RETRY_AFTER_SECONDS",
-    "AWS_NOT_FOUND_CODES",
-    "AWS_UNAUTHORIZED_CODES",
-    "AWS_TRANSIENT_CODES",
-]
-
 AWS_NAMES: list[tuple[str, str, Any]] = [
     ("AWS__RETRY_MAX_ATTEMPTS", "retry_max_attempts", 5),
     ("AWS__RETRY_MODE", "retry_mode", "adaptive"),
@@ -365,19 +241,6 @@ def test_configuration_settings_aws_table_name_reaches_field(
     settings = AWSSettings(_env_file=None)  # type: ignore[call-arg]
 
     assert getattr(settings, attribute) == expected
-
-
-@pytest.mark.parametrize("env_name", AWS_RETIRED_NAMES)
-def test_configuration_settings_aws_retired_name_is_unread(monkeypatch: pytest.MonkeyPatch, env_name: str) -> None:
-    """The fifteen old AWS_* names are read by no field: the slices build exactly as without them."""
-    baseline = (AWSSettings(_env_file=None).model_dump(), AccessPermissionSetsSettings(_env_file=None).model_dump())  # type: ignore[call-arg]
-    monkeypatch.setenv(
-        env_name, "7" if env_name.endswith(("SECONDS", "ATTEMPTS")) else "arn:aws:sso:::instance/ssoins-1234567890abcdef"
-    )
-
-    settings = (AWSSettings(_env_file=None).model_dump(), AccessPermissionSetsSettings(_env_file=None).model_dump())  # type: ignore[call-arg]
-
-    assert settings == baseline
 
 
 def test_configuration_settings_aws_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -428,7 +291,7 @@ def test_configuration_settings_vendor_lower_case_names_accepted(monkeypatch: py
 
 
 def test_configuration_settings_spaced_env_file_lines_reach_fields(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Lines written 'NAME =value', as some production .env lines are, reach a field."""
+    """Dotenv lines written 'NAME =value', with a space before the equals sign, reach a field."""
     monkeypatch.delenv("SENTINEL__SHARED_KEY", raising=False)
     env_file = tmp_path / ".env"
     env_file.write_text("SENTINEL__SHARED_KEY =spaced-shared-key\n")
@@ -455,25 +318,6 @@ def test_configuration_settings_identity_missing_environment_names_field(monkeyp
         IdentitySettings()
 
     assert exc_info.value.errors()[0]["loc"] == ("environment",)
-
-
-VENDOR_RETIRED_NAMES: list[tuple[type[BaseSettings], str]] = [
-    (NotifySettings, "NOTIFY_SRE_USER_NAME"),
-    (NotifySettings, "NOTIFY_SRE_CLIENT_SECRET"),
-    (NotifySettings, "NOTIFY_API_URL"),
-    (TrelloSettings, "TRELLO_APP_KEY"),
-    (TrelloSettings, "TRELLO_TOKEN"),
-    (TrelloSettings, "TRELLO_ATIP_BOARD"),
-    (TrelloSettings, "TRELLO__APP_KEY"),
-    (TrelloSettings, "TRELLO__TOKEN"),
-    (OpsGenieSettings, "OPSGENIE_INTEGRATIONS_KEY"),
-    (OpsGenieSettings, "OPSGENIE_KEY"),
-    (MaxMindSettings, "MAXMIND_DB_PATH"),
-    (MaxMindSettings, "MAXMIND_KEY"),
-    (SentinelSettings, "SENTINEL_CUSTOMER_ID"),
-    (SentinelSettings, "SENTINEL_LOG_TYPE"),
-    (SentinelSettings, "SENTINEL_SHARED_KEY"),
-]
 
 
 def test_configuration_settings_notify_names_configure_notify(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -527,16 +371,3 @@ def test_configuration_settings_maxmind_name_configures_maxmind(monkeypatch: pyt
 
     assert tenant is not None
     assert tenant.database_path == "/sentinel/GeoLite2.mmdb"
-
-
-@pytest.mark.parametrize(("settings_class", "env_name"), VENDOR_RETIRED_NAMES, ids=[row[1] for row in VENDOR_RETIRED_NAMES])
-def test_configuration_settings_vendor_retired_name_is_unread(
-    monkeypatch: pytest.MonkeyPatch, settings_class: type[BaseSettings], env_name: str
-) -> None:
-    """The old flat names are read by no field: the slice builds exactly as without them."""
-    baseline = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
-    monkeypatch.setenv(env_name, "https://retired.example" if env_name.endswith("URL") else "retired")
-
-    settings = settings_class(_env_file=None).model_dump()  # type: ignore[call-arg]
-
-    assert settings == baseline

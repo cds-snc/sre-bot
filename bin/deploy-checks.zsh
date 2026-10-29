@@ -2,7 +2,7 @@
 # Production deploy checks: a baseline before a merge and verification after its deploy. Read-only:
 # describe, get and Logs Insights queries only; no write, registration, update-service or workflow dispatch.
 # Never prints a secret: values stay in local variables and are compared in-process; log samples are masked.
-# Developer helper for the configuration migration and plugin work, not part of the app.
+# Developer helper for deploy verification, not part of the app.
 #
 # Usage (from any directory; needs AWS read credentials and gh auth):
 #   zsh bin/deploy-checks.zsh pre [CHECK ...]   # before a merge: rollback image tag, task definition, 24h baseline,
@@ -10,19 +10,18 @@
 #   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, runtime errors,
 #                                               # Slack up, HTTP, plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   sentinel    pre: production.toml [sentinel] log_type against the blob's SENTINEL_LOG_TYPE (printed: a public
-#               table name), and the blob's workspace id and shared key lines against /sre-bot/SENTINEL__* by hash
-#               (MATCH or DIFFER, never printed); post: sends since the deploy and no send errors (TASK-111.15.1)
-#   names_only  post: the running revision sets only ENVIRONMENT and FORWARDED_ALLOW_IPS, every secret is a
-#               <SLICE>__<FIELD> name with no retired one, and no container fetched the blobs (TASK-111.15.1)
+#   contract    post: the SSM read policy names no blob or old GCP key parameter, the destroyed gcp_sre_service_account_key,
+#               /sre-bot/TRELLO__APP_KEY and /sre-bot/TRELLO__TOKEN are not found, and the running revision started its
+#               tasks without a secrets failure; the blobs' presence is informational until the human deletes them
+#               (TASK-111.15.2)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(sentinel names_only)
-PRE_CHECKS=(sentinel)  # task checks with a pre part
+TASK_CHECKS=(contract)
+PRE_CHECKS=()  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
 shift
@@ -37,7 +36,6 @@ REGION=ca-central-1
 CLUSTER=sre-bot-cluster
 SERVICE=sre-bot-service
 LOG_GROUP=/ecs/sre-bot-app
-BLOBS=(sre-bot-config sre-bot-config-infrastructure)  # the order the retired entry.sh concatenated them into .env
 BASE_URL=https://sre-bot.cdssandbox.xyz
 OUT_DIR=$ROOT/tmp/deploy-checks
 OUT=$OUT_DIR/$phase${checks:+-${(j:-:)checks}}-$(date -u +%Y%m%dT%H%M%SZ).txt
@@ -64,26 +62,6 @@ li() {
 }
 li_count() { local v; v=$(li $1 "$2 | stats count() as n" ${3:-} | jq -r '.n // empty' | head -1); print -r -- ${v:-0}; }
 
-# blob_where NAME: which blob(s) hold a NAME line (names only).
-blob_where() { local b w=(); for b in $BLOBS; do aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text | tr -d '\r' | grep -qE "^[[:space:]]*$1[[:space:]]*=" && w+=$b; done; print -r -- "${w:-none}"; }
-# blob_value NAME: the value of a NAME line in the first blob holding it, quotes and spaces trimmed. Callers keep it
-# in a local variable and never print it unless it is meant for the files.
-blob_value() {
-  local b line
-  for b in $BLOBS; do
-    line=$(aws ssm get-parameter --region $REGION --name $b --with-decryption --query Parameter.Value --output text \
-      | tr -d '\r' | grep -E "^[[:space:]]*$1[[:space:]]*=" | tail -1)
-    [[ -n $line ]] && { print -rn -- ${line#*=} | sed -E "s/^[[:space:]]+|[[:space:]]+\$//g; s/^[\"'](.*)[\"']\$/\1/"; return 0; }
-  done
-  return 1
-}
-# param_hash NAME: sha256 of a SecureString parameter's value, or 'missing'.
-param_hash() {
-  local v
-  v=$(aws ssm get-parameter --region $REGION --name $1 --with-decryption --query Parameter.Value --output text 2>/dev/null) || { print missing; return; }
-  print -rn -- $v | sha256sum | cut -c1-64
-}
-same_hash() { [[ $1 != missing && $1 == $2 ]] && print MATCH || print DIFFER; }
 primary_deployment() {
   aws ecs describe-services --region $REGION --cluster $CLUSTER --services $SERVICE --output json \
     | jq -c '.services[0].deployments[] | select(.status=="PRIMARY") | {taskDefinition, rolloutState, runningCount, desiredCount, createdAt}'
@@ -117,23 +95,6 @@ if [[ $phase == pre ]]; then
   li $since 'filter level in ["error","critical"] | stats count() as n by event, level | sort n desc | limit 10'
   li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | sort @timestamp desc | limit 3'
 
-  if (( ${checks[(Ie)sentinel]} )); then  # TASK-111.15.1
-    section "Sentinel slice against the blob lines it replaces (TASK-111.15.1; the id and the shared key never printed)"
-    file_log_type=$(uv run --quiet --project $ROOT/app python -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb")).get("sentinel", {}).get("log_type", ""))' $ROOT/app/config/production.toml)
-    blob_log_type=$(blob_value SENTINEL_LOG_TYPE) || blob_log_type=
-    print "SENTINEL_LOG_TYPE (blob)=$blob_log_type  [sentinel] log_type (production.toml)=${file_log_type:-<unset>}"
-    [[ -n $blob_log_type && $blob_log_type == $file_log_type ]] && log_type_state=MATCH || log_type_state=DIFFER
-    print "log type: $log_type_state"
-    sentinel_ok=$log_type_state
-    for pair in SENTINEL__CUSTOMER_ID:SENTINEL_CUSTOMER_ID SENTINEL__SHARED_KEY:SENTINEL_SHARED_KEY; do
-      new=$(param_hash /sre-bot/${pair%%:*})
-      old=$(blob_value ${pair##*:} | sha256sum | cut -c1-64) || old=missing
-      state=$(same_hash $new $old)
-      print "${pair%%:*} vs blob ${pair##*:}: $state"
-      [[ $state == MATCH ]] || sentinel_ok=DIFFER
-    done
-    [[ $sentinel_ok == MATCH ]] && result sentinel_pre PASS || result sentinel_pre "FAIL (a DIFFER blocks the merge: copy the printed log type into production.toml, or put-parameter from the blob line)"
-  fi
 fi
 
 if [[ $phase == post ]]; then
@@ -194,24 +155,42 @@ if [[ $phase == post ]]; then
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
 
-  if (( ${checks[(Ie)names_only]} )); then  # TASK-111.15.1
-    section "Task definition names (TASK-111.15.1: no fetch, platform-provided names and renamed secrets only)"
-    names=$(aws ecs describe-task-definition --region $REGION --task-definition $td --output json \
-      | jq -c '.taskDefinition.containerDefinitions[0] | {secrets: [.secrets[]?.name] | sort, environment: [.environment[]?.name] | sort}')
-    environment_names=$(print -r -- $names | jq -c .environment)
-    retired=$(print -r -- $names | jq -c '[.secrets[] | select((test("^[A-Z0-9]+(_[A-Z0-9]+)*__[A-Z0-9_]+$") | not) or . == "TRELLO__APP_KEY" or . == "TRELLO__TOKEN")]')
-    fetches=$(li_count $since 'filter @message like /Retrieving environment parameters/')
-    print "environment=$environment_names other_secret_names=$retired blob_fetch_lines_since_deploy=$fetches"
-    [[ $environment_names == '["ENVIRONMENT","FORWARDED_ALLOW_IPS"]' && $retired == '[]' && $fetches == 0 ]] \
-      && result names_only PASS || result names_only FAIL
-  fi
+  if (( ${checks[(Ie)contract]} )); then  # TASK-111.15.2
+    section "Contract (TASK-111.15.2: blob and old GCP key read removed, retired parameters destroyed; names and verdicts only)"
+    policy_arn=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='sre-botSecretsManagerKeyRetrieval'].Arn | [0]" --output text)
+    policy_version=$(aws iam get-policy --policy-arn $policy_arn --query Policy.DefaultVersionId --output text)
+    read_names=$(aws iam get-policy-version --policy-arn $policy_arn --version-id $policy_version --output json \
+      | jq -c '[.PolicyVersion.Document.Statement[] | select([.Action] | flatten | index("ssm:GetParameter")) | [.Resource] | flatten[]
+               | sub("^arn:aws:ssm:[^:]+:[0-9]+:parameter"; "")]')
+    outside=$(print -r -- $read_names | jq -c 'map(select(startswith("/sre-bot/") | not))')
+    print "policy $policy_version: $(print -r -- $read_names | jq length) readable parameters; outside /sre-bot/: $outside"
+    [[ $outside == '[]' ]] && result contract_iam PASS || result contract_iam FAIL
 
-  if (( ${checks[(Ie)sentinel]} )); then  # TASK-111.15.1
-    section "Sentinel sends since the deploy (TASK-111.15.1)"
-    sent=$(li_count $since 'filter event = "sentinel_event_sent"')
-    failed=$(li_count $since 'filter event in ["log_to_sentinel_error","sentinel_event_error","send_event_error","audit_event_failed_to_sentinel"]')
-    print "sentinel_event_sent=$sent send errors=$failed"
-    (( sent > 0 && failed == 0 )) && result sentinel_post PASS || result sentinel_post "FAIL (sent=$sent errors=$failed)"
+    destroyed_ok=PASS
+    for name in gcp_sre_service_account_key /sre-bot/TRELLO__APP_KEY /sre-bot/TRELLO__TOKEN; do
+      if aws ssm get-parameter --region $REGION --name $name --query Parameter.Name --output text >/dev/null 2>&1; then
+        print "$name: present"; destroyed_ok=FAIL
+      else
+        print "$name: not found"
+      fi
+    done
+    result contract_parameters $destroyed_ok
+
+    for name in sre-bot-config sre-bot-config-infrastructure; do
+      aws ssm get-parameter --region $REGION --name $name --query Parameter.Name --output text >/dev/null 2>&1 \
+        && print "$name: present (unread; deleted by the human in the console)" || print "$name: not found"
+    done
+
+    desired=$(print -r -- $dep | jq -r .desiredCount)
+    stopped=$(aws ecs list-tasks --region $REGION --cluster $CLUSTER --service-name $SERVICE --desired-status STOPPED --query taskArns --output json)
+    secrets_failures=0
+    if [[ $stopped != '[]' ]]; then
+      secrets_failures=$(aws ecs describe-tasks --region $REGION --cluster $CLUSTER --tasks ${(f)"$(print -r -- $stopped | jq -r '.[]')"} --output json \
+        | jq '[.tasks[] | select((.stoppedReason // "") | test("ResourceInitializationError|AccessDenied|ssm"; "i"))] | length')
+    fi
+    print "revision=${td##*:} running=$tasks desired=$desired stopped tasks with a secrets failure (last hour)=$secrets_failures"
+    [[ $(print -r -- $dep | jq -r .rolloutState) == COMPLETED && $tasks == $desired && $secrets_failures == 0 ]] \
+      && result contract_revision PASS || result contract_revision FAIL
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

@@ -1,10 +1,10 @@
 ---
 id: TASK-158
 title: Delete GoogleResourcesConfig and the interim google_resources table
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:28
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-10-29T00:26:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -42,4 +42,6 @@ After TASK-145.6, 145.7, 145.10, 145.12, 39 and 88 move their ids into their own
 
 <!-- SECTION:NOTES:BEGIN -->
 - 2026-10-28 (human, TASK-111.10.3 planning): superseded. A value moves once to its end-state owner (decisions/configuration.md), so TASK-111.10.3 moves every id and deletes GoogleResourcesConfig, get_google_resources_config, the [google_resources] table and the tolerated GOOGLE_RESOURCES item; nothing is left for this task. Proposed: close as superseded by TASK-111.10.3 (human closes).
+
+- 2026-10-29 recheck (delivery session, row 9.15.2): rg finds no GoogleResourcesConfig, get_google_resources_config or [google_resources] under app/, app/config or terraform; decisions/configuration.md records the move (2026-10-28 Changes line) and no longer tolerates GOOGLE_RESOURCES. ACs #1-#3 and #5 hold through TASK-111.10.3 (#1805, #1806). The remaining GOOGLE_RESOURCES mentions are migration tooling (app/bin/audit_env_names.py, audit_env_coverage.py, their tests, the production-names unread pin) that TASK-111.15.2 AC #8 deletes. Proposed: close as superseded (human).
 <!-- SECTION:NOTES:END -->

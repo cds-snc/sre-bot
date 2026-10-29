@@ -4,7 +4,7 @@ Each test installs a base and a local file from tmp_path (``install_maxmind_file
 MaxMind variable removed and the .env file disabled (the autouse isolation fixture), so it
 observes only the values it writes and sets. MaxMind has no credential and no tenant id: the
 entry is the database file the deployment chooses, [maxmind.tenant] database_path. Boot checks
-its shape only; the file's presence is the healthcheck's. The retired MAXMIND_* names are ignored.
+its shape only; the file's presence is the healthcheck's.
 """
 
 from pathlib import Path
@@ -13,7 +13,7 @@ import pytest
 
 from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.maxmind.settings import MaxMindSettings, get_maxmind_settings
-from tests.unit.integrations.maxmind.conftest import DATABASE_PATH, RETIRED_NAMES, TENANT, install_maxmind_files
+from tests.unit.integrations.maxmind.conftest import DATABASE_PATH, TENANT, install_maxmind_files
 
 pytestmark = pytest.mark.unit
 
@@ -63,14 +63,6 @@ def test_a_malformed_entry_or_unknown_key_fails_naming_it(tmp_path: Path, files:
 
     with pytest.raises(ConfigurationError, match=key):
         MaxMindSettings()
-
-
-def test_the_retired_names_are_ignored_in_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    install_maxmind_files(tmp_path)
-    for name in RETIRED_NAMES:
-        monkeypatch.setenv(name, "/retired.mmdb")
-
-    assert MaxMindSettings().tenant is None
 
 
 def test_get_maxmind_settings_is_cached(tmp_path: Path) -> None:

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T18:11:00Z'
-updated_date: '2026-10-28T23:08:00Z'
+updated_date: '2026-10-29T00:31:00Z'
 labels:
   - configuration
   - plugins
@@ -23,15 +23,15 @@ ordinal: 454000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/configuration.md (Tolerated, 2026-10-27): the legacy incident code in modules/ needs Google Workspace (documents, Drive, calendar) and is not a plugin, so it cannot state a requirement itself (decisions/plugins.md). Until the incident rebuild's declare path states its own requirement (Stack M, TASK-145.7 AC #9), the host does it: in the configuration phase, a Slack transport switched on with no Google Workspace tenant entry fails boot naming GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID, as a transport switched on without its own vendor's tenant entry already does (decisions/lifecycle.md phase 1). No ENVIRONMENT comparison. Deleted with the legacy incident handlers.
+decisions/configuration.md (Tolerated, 2026-10-27): the legacy incident code in modules/ needs Google Workspace (documents, Drive, calendar) and is not a plugin, so it cannot state a requirement itself (decisions/plugins.md). Until the legacy incident handlers are deleted (app/modules/incident, TASK-145.13; eight of its modules use Google, so the need outlives declare's rebuild in TASK-145.7), the host states it: in the configuration phase, a Slack transport switched on with GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset fails boot naming that key, as a transport switched on without its own vendor's tenant entry already does (decisions/lifecycle.md phase 1). No ENVIRONMENT comparison. TASK-172's register_requirements cannot carry it: the legacy handlers are not plugins.
 
-TODAY: CI and a Codespace without a Google tenant boot and fail at use; production configures the tenant (TASK-111.10.2).
+TODAY: CI and a Codespace without a Google tenant boot and fail at use; production configures the tenant through the environment-only SSM parameters GOOGLE_WORKSPACE__TENANT__* (terraform/ssm.tf, TASK-111.10.2), not production.toml. local.toml enables the transport, so a Codespace needs the GOOGLE_WORKSPACE__TENANT__* secrets.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With [slack_transport] enabled and no Google Workspace tenant entry, boot fails in the configuration phase naming GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID; with the transport off, or with a tenant, boot succeeds (tests)
-- [ ] #2 The rule sits beside the existing transport-requires-vendor check, carries a comment naming the legacy incident handlers it exists for, and is listed in decisions/configuration.md Tolerated
+- [ ] #1 With [slack_transport] enabled and GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset, boot fails in the configuration phase naming GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and 'required when [slack_transport] enabled is true'; with the transport off, or with a tenant, boot succeeds (tests)
+- [ ] #2 The rule is a new function beside the existing transport-requires-vendor check, carries a comment naming the legacy incident handlers it exists for; the existing decisions/configuration.md Tolerated item names TASK-145.13 as its deletion point and a dated Changes line records the rule
 - [ ] #3 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
@@ -96,3 +96,11 @@ Q2 Require only the customer id (the task AC) or the whole entry? Recommend cust
 Q3 Message wording: key only, with a short reason? Recommend key plus "required when [slack_transport] enabled is true" in the same style as the siblings; the legacy-handler reason lives in the code comment (AC2), not in the operator message.
 Q4 Add the check to env-checks/deploy-checks? Recommend no change; existing pre check covers Google parameters (verify), human runs it.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-10-29 (delivery session; open questions assessed against the ADRs and doc-11): Q1 new function, Q2 customer id only, Q3 key plus the reason, Q4 no new deploy or env check: each covered by lifecycle.md phase 1 and configuration.md (Tolerated; 2026-10-27 vendor slices never make their tenant required), no gap. Correction: the deletion point is TASK-145.13 (deletes app/modules/incident), not TASK-145.7: on_call, incident_alert, notify_stale_incident_channels, core, incident, schedule_retro, incident_conversation and incident_helper import Google, and 145.7 AC #1 removes only the declare and alert-button registrations. Plan step 3 and the Q1 rationale's 'clean deletion in 145.7' read 145.13. TASK-145.13 gains the deletion AC. Not subsumed by TASK-172 (the handlers are not plugins). Applied, pending plan approval.
+
+- 2026-10-29: plan approved (human), with the 2026-10-29 rulings above.
+<!-- SECTION:NOTES:END -->

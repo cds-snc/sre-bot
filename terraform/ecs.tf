@@ -28,10 +28,8 @@ resource "aws_ecs_task_definition" "sre-bot" {
     awslogs-stream-prefix = "ecs-sre-bot"
     image                 = "${aws_ecr_repository.sre-bot.repository_url}:latest"
     forwarded_allow_ips   = join(",", module.vpc.public_subnet_cidr_blocks)
-    # Every parameter but the never-read TRELLO__APP_KEY and TRELLO__TOKEN, which stay until
-    # TASK-111.15.2 because earlier revisions, still rollback targets, reference them.
     secrets = jsonencode([
-      for name in sort(setsubtract(local.sre_bot_secret_names, local.sre_bot_unread_secret_names)) :
+      for name in sort(local.sre_bot_secret_names) :
       { name = name, valueFrom = aws_ssm_parameter.sre_bot_secret[name].arn }
     ])
   })

@@ -4,8 +4,7 @@ Each test installs a base and a local file from tmp_path (``install_openai_files
 every OpenAI variable removed and the .env file disabled (the autouse isolation fixture),
 so it observes only the values it writes and sets. The tuning comes from [openai], the
 model endpoint from the optional [openai.tenant] entry, and the key only from
-OPENAI__API_KEY. The six retired OPENAI_* names are ignored in the environment and in a
-.env file.
+OPENAI__API_KEY.
 """
 
 from pathlib import Path
@@ -14,7 +13,7 @@ import pytest
 
 from contracts.configuration import ConfigurationSlice
 from integrations.openai.settings import OpenAISettings, get_openai_settings
-from tests.unit.integrations.openai.conftest import BASE_URL, MODEL, RETIRED_NAMES, install_openai_files
+from tests.unit.integrations.openai.conftest import BASE_URL, MODEL, install_openai_files
 
 pytestmark = pytest.mark.unit
 
@@ -80,33 +79,6 @@ def test_the_key_never_appears_in_repr_str_or_dump(tmp_path: Path, monkeypatch: 
     assert "sk-render-0001" not in repr(settings)
     assert "sk-render-0001" not in str(settings)
     assert "sk-render-0001" not in repr(settings.model_dump())
-
-
-def test_the_retired_names_are_ignored_in_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """None of the six OPENAI_* names configures the slice from the environment."""
-    install_openai_files(tmp_path)
-    for name in RETIRED_NAMES:
-        monkeypatch.setenv(name, "https://retired.example.test" if name == "OPENAI_BASE_URL" else "7")
-
-    settings = OpenAISettings()
-
-    assert settings.tenant is None
-    assert settings.api_key.get_secret_value() == ""
-    assert (settings.max_output_tokens, settings.temperature, settings.timeout_seconds) == (3000, -1.0, 180.0)
-
-
-def test_the_retired_names_are_ignored_in_a_dotenv_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A developer's old OPENAI_* lines in .env neither configure the slice nor fail it."""
-    install_openai_files(tmp_path)
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("\n".join(f"{name}=7" for name in RETIRED_NAMES) + "\n", encoding="utf-8")
-    monkeypatch.setitem(OpenAISettings.model_config, "env_file", str(dotenv))
-
-    settings = OpenAISettings()
-
-    assert settings.tenant is None
-    assert settings.api_key.get_secret_value() == ""
-    assert settings.max_output_tokens == 3000
 
 
 def test_get_openai_settings_is_cached(tmp_path: Path) -> None:

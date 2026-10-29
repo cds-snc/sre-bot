@@ -24,10 +24,6 @@ def _clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
         "SERVER__PUBLIC_BASE_URL",
         "SERVER__SRE_TEST_CHANNEL_ID",
         "SERVER__WEBHOOK_MAX_BODY_BYTES",
-        "BACKEND_URL",
-        "NOTIFY_OPS_CHANNEL_ID",
-        "SRE_TEST_CHANNEL_ID",
-        "WEBHOOK_MAX_BODY_BYTES",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -56,19 +52,6 @@ def test_prefixed_environment_variable_beats_the_file(monkeypatch: pytest.Monkey
     monkeypatch.setenv("SERVER__PUBLIC_BASE_URL", "https://override.example")
 
     assert ServerSettings().public_base_url == "https://override.example"
-
-
-def test_former_flat_names_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The retired bare names no longer reach the slice."""
-    monkeypatch.setenv("BACKEND_URL", "https://old.example")
-    monkeypatch.setenv("SRE_TEST_CHANNEL_ID", "COLD")
-    monkeypatch.setenv("WEBHOOK_MAX_BODY_BYTES", "1")
-
-    settings = ServerSettings()
-
-    assert settings.public_base_url == "http://127.0.0.1:8000"
-    assert settings.sre_test_channel_id == ""
-    assert settings.webhook_max_body_bytes == 262_144
 
 
 def test_unknown_key_in_the_table_fails_naming_it(tmp_path: Path) -> None:

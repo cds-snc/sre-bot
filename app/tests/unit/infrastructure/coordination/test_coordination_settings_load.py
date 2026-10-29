@@ -1,10 +1,9 @@
 """Unit tests for loading the coordination slice from the [coordination] table.
 
-Each test installs a base and a local file from tmp_path with every COORDINATION and IDEMPOTENCY
-variable removed and the .env file disabled (the autouse isolation fixture), so it observes only
+Each test installs a base and a local file from tmp_path with every COORDINATION variable
+removed and the .env file disabled (the autouse isolation fixture), so it observes only
 the values it writes and sets. The slice holds the table name and the two TTLs under keys that do
-not repeat the table; the retired IDEMPOTENCY_* names are never read, and an unknown key in the
-table fails the load naming it.
+not repeat the table, and an unknown key in the table fails the load naming it.
 """
 
 import os
@@ -19,16 +18,15 @@ from server.configuration.loader import CONFIG_DIR, TomlConfigurationFiles
 
 pytestmark = pytest.mark.unit
 
-RETIRED_NAMES = ("IDEMPOTENCY_TTL_SECONDS", "IDEMPOTENCY_IN_PROGRESS_TTL_SECONDS", "IDEMPOTENCY_TABLE")
 DEFAULTS = {"table_name": "sre_bot_idempotency", "record_ttl_seconds": 3600, "in_progress_ttl_seconds": 300}
 
 
 @pytest.fixture(autouse=True)
 def _coordination_env_isolation(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Remove COORDINATION and IDEMPOTENCY variables, disable the .env file and clear the cached provider."""
+    """Remove COORDINATION variables, disable the .env file and clear the cached provider."""
     monkeypatch.setitem(ConditionalWriteSettings.model_config, "env_file", None)
     for key in tuple(os.environ):
-        if key.upper().startswith(("COORDINATION_", "IDEMPOTENCY_")):
+        if key.upper().startswith("COORDINATION_"):
             monkeypatch.delenv(key, raising=False)
     get_conditional_write_settings.cache_clear()
     yield
@@ -106,15 +104,6 @@ def test_an_unknown_key_in_a_file_fails_the_load_naming_it(tmp_path: Path, key: 
 
     with pytest.raises(ConfigurationError, match=key):
         ConditionalWriteSettings()
-
-
-@pytest.mark.parametrize("name", RETIRED_NAMES)
-def test_the_retired_flat_names_are_not_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> None:
-    """The old unprefixed names neither set a key nor fail the load."""
-    _install(tmp_path)
-    monkeypatch.setenv(name, "7")
-
-    assert _values(ConditionalWriteSettings()) == DEFAULTS
 
 
 def test_the_provider_is_cached() -> None:

@@ -1,11 +1,10 @@
 """Tests for the Slack vendor slice on the [slack] table and its provider.
 
 Each test writes a base file and an environment file into tmp_path and installs
-them, so it observes only the values it writes and sets. Every Slack variable,
-the SLACK__ names and the retired unprefixed ones, is removed first and the .env
-file is disabled unless a test passes its own. Failures are read from the
-ConfigurationError message, which must name the key and never carry a token:
-the rendered traceback is searched for each token value.
+them, so it observes only the values it writes and sets. Every SLACK__ variable
+is removed first and the .env file is disabled unless a test passes its own.
+Failures are read from the ConfigurationError message, which must name the key
+and never carry a token: the rendered traceback is searched for each token value.
 """
 
 import re
@@ -33,27 +32,13 @@ _SECRETS = {
     "SLACK__SIGNING_SECRET": SIGNING_SECRET,
 }
 
-_RETIRED_NAMES = (
-    "SLACK_TEAM_ID",
-    "SLACK_BOT_TOKEN",
-    "SLACK_USER_TOKEN",
-    "SLACK_APP_TOKEN",
-    "SLACK_SIGNING_SECRET",
-    "SLACK_REQUEST_TIMEOUT_SECONDS",
-    "SLACK_RETRY_MAX_ATTEMPTS",
-    "SLACK_TRANSIENT_RETRY_AFTER_SECONDS",
-    "SLACK_UNAUTHORIZED_ERRORS",
-    "SLACK_NOT_FOUND_ERRORS",
-    "SLACK_TRANSIENT_ERRORS",
-)
-
 _TENANT = '[slack.tenant]\nteam_id = "T0TENANT"\n'
 
 
 @pytest.fixture(autouse=True)
 def _isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """Clear every spelling of the slice's variables, the .env file and the cached singleton."""
-    for name in (*_RETIRED_NAMES, *_SECRETS, "SLACK__TENANT__TEAM_ID", "SLACK__COMMAND_PREFIX"):
+    """Clear the slice's variables, the .env file and the cached singleton."""
+    for name in (*_SECRETS, "SLACK__TENANT__TEAM_ID", "SLACK__COMMAND_PREFIX"):
         monkeypatch.delenv(name, raising=False)
     for field in SlackSettings.model_fields:
         monkeypatch.delenv(f"SLACK__{field.upper()}", raising=False)
@@ -171,21 +156,6 @@ def test_slack_settings_empty_secrets_count_as_unset(tmp_path: Path, monkeypatch
 
     assert settings.app_token is None
     assert settings.signing_secret is None
-
-
-def test_slack_settings_ignores_the_retired_names(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The old SLACK_<FIELD> names and SLACK_TEAM_ID, in the environment or .env, are read by no field."""
-    for name in _RETIRED_NAMES:
-        monkeypatch.setenv(name, "1" if "SECONDS" in name or "ATTEMPTS" in name else "T0RETIRED")
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("SLACK_TEAM_ID=T0RETIRED\nSLACK_BOT_TOKEN=xoxb-retired\n", encoding="utf-8")
-    _install(tmp_path)
-
-    settings = SlackSettings(_env_file=dotenv)  # type: ignore[call-arg]
-
-    assert settings.tenant is None
-    assert settings.bot_token == ""
-    assert settings.request_timeout_seconds == 10
 
 
 def test_slack_settings_tenant_without_the_bot_token_fails_naming_the_key(

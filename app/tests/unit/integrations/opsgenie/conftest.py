@@ -16,7 +16,6 @@ from contracts.configuration import install_configuration_files
 from integrations.opsgenie.settings import OpsGenieSettings, get_opsgenie_settings
 from server.configuration.loader import TomlConfigurationFiles
 
-RETIRED_NAMES = ("OPSGENIE_INTEGRATIONS_KEY", "OPSGENIE_KEY")
 API_URL = "https://api.opsgenie.example.test"
 TENANT = f'[opsgenie.tenant]\napi_url = "{API_URL}"\n'
 

@@ -5,8 +5,7 @@ every AWS variable removed and the .env file disabled (the autouse isolation fix
 so it observes only the values it writes and sets. The client tuning comes from [aws];
 the managed organisation from the optional tenant entry, read only from AWS__TENANT__<FIELD>
 in the environment (no file names it); the region and the
-dynamodb-local endpoint belong to the SDK and are not fields. The fifteen retired
-AWS_* names are ignored in the environment and in a .env file.
+dynamodb-local endpoint belong to the SDK and are not fields.
 """
 
 from pathlib import Path
@@ -16,7 +15,7 @@ import pytest
 from contracts.configuration import ConfigurationSlice
 from integrations.aws.settings import AWSSettings, AwsTenant, get_aws_settings
 from tests.factories.aws import set_aws_tenant
-from tests.unit.integrations.aws.conftest import INSTANCE_ARN, INSTANCE_ID, RETIRED_NAMES, install_aws_files
+from tests.unit.integrations.aws.conftest import INSTANCE_ARN, INSTANCE_ID, install_aws_files
 
 pytestmark = pytest.mark.unit
 
@@ -132,33 +131,6 @@ def test_aws_settings_tenant_reads_from_a_dotenv_file(tmp_path: Path) -> None:
     settings = AWSSettings(_env_file=dotenv)  # type: ignore[call-arg]
 
     assert settings.identity_store_id == INSTANCE_ID
-
-
-@pytest.mark.parametrize("name", RETIRED_NAMES)
-def test_aws_settings_ignores_a_retired_name_in_the_environment(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str
-) -> None:
-    """A retired AWS_* name changes nothing and does not trip the unknown-key check."""
-    install_aws_files(tmp_path)
-    monkeypatch.setenv(name, "5" if "ATTEMPTS" in name or "SECONDS" in name else "ignored")
-
-    settings = AWSSettings()
-
-    assert settings.tenant is None
-    assert settings.retry_max_attempts == 3
-    assert settings.retry_mode == "standard"
-
-
-def test_aws_settings_ignores_the_retired_names_in_a_dotenv_file(tmp_path: Path) -> None:
-    """A developer's .env still holding the retired lines boots with the files' values."""
-    install_aws_files(tmp_path)
-    dotenv = tmp_path / ".env"
-    dotenv.write_text("".join(f"{name}=ignored\n" for name in RETIRED_NAMES), encoding="utf-8")
-
-    settings = AWSSettings(_env_file=dotenv)  # type: ignore[call-arg]
-
-    assert settings.tenant is None
-    assert settings.retry_mode == "standard"
 
 
 def test_get_aws_settings_is_cached_until_cleared(tmp_path: Path) -> None:

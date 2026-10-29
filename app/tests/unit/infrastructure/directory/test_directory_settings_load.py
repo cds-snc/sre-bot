@@ -2,8 +2,8 @@
 
 Each test installs a base and a local file from tmp_path with every DIRECTORY variable removed
 and the .env file disabled (the autouse isolation fixture), so it observes only the values it
-writes and sets. require_startup_warmup is the slice's only key; the retired flat names and the
-deleted fields are never read, and a deleted key in a file fails the load naming it.
+writes and sets. require_startup_warmup is the slice's only key, and a deleted key in a file
+fails the load naming it.
 """
 
 import os
@@ -18,12 +18,6 @@ from server.configuration.loader import CONFIG_DIR, TomlConfigurationFiles
 
 pytestmark = pytest.mark.unit
 
-RETIRED_NAMES = (
-    "DIRECTORY_PROVIDER",
-    "DIRECTORY_REQUIRE_STARTUP_WARMUP",
-    "DIRECTORY_CACHE_TTL_SECONDS",
-    "DIRECTORY_STARTUP_WARMUP_TIMEOUT_SECONDS",
-)
 DELETED_KEYS = ("provider", "cache_ttl_seconds", "startup_warmup_timeout_seconds", "startup_preload_groups")
 
 
@@ -105,15 +99,6 @@ def test_an_unknown_key_in_a_file_fails_the_load_naming_it(tmp_path: Path) -> No
 
     with pytest.raises(ConfigurationError, match="require_startup_warmop"):
         DirectorySettings()
-
-
-@pytest.mark.parametrize("name", RETIRED_NAMES)
-def test_the_retired_flat_names_are_not_read(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, name: str) -> None:
-    """The old unprefixed names neither set the key nor fail the load."""
-    _install(tmp_path)
-    monkeypatch.setenv(name, "true" if name.endswith("WARMUP") else "retired")
-
-    assert DirectorySettings().require_startup_warmup is False
 
 
 def test_the_provider_is_cached() -> None:
