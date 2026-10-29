@@ -129,9 +129,10 @@ env = [
     # plugin enable it explicitly. access.sync switched on from app/.env would make
     # lifespan build the AWS Identity Center adapter (and assume its role) at startup.
     'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
-    # Likewise incident.scribe, which requires [openai.tenant]: switched on from app/.env it would
-    # abort every lifespan test boot. The whole table is pinned, as the ci files set it.
-    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.scribe": false, "oncall_sync": true, "user_rotations": true}}',
+    # Likewise the plugins that declare a requirement (scribe, oncall_sync, user_rotations, rant): switched on
+    # from app/.env they would abort every lifespan test boot. Each table is pinned whole, as the ci files set it.
+    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.scribe": false, "oncall_sync": false, "user_rotations": false}}',
+    'PLUGINS__WORKPLACE_UTILITIES={{"geolocate": true, "rant": false}}',
     # Likewise the scheduler: SCHEDULER__ENABLED=true in app/.env would start the real
     # jobs thread in every lifespan test. Tests that need it enable it explicitly.
     "SCHEDULER__ENABLED=false",

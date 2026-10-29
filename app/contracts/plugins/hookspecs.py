@@ -7,7 +7,7 @@ Covers the full lifecycle of a feature package:
   - Startup settings validation / cache warmup
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 from fastapi import FastAPI
@@ -15,6 +15,7 @@ from structlog.stdlib import BoundLogger
 
 from contracts.i18n.resources import I18nResourceRegistrar
 from contracts.plugins.namespace import hookspec
+from contracts.plugins.requirements import Requirement
 from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.slack.registrar import SlackCommandRegistrar
 
@@ -47,16 +48,17 @@ class FeatureLifecycleSpecs:
     """
 
     @hookspec
-    def register_requirements(self) -> None:
-        """Resolve each vendor or capability the plugin requires.
+    def register_requirements(self) -> Sequence[Requirement]:
+        """Declare each vendor or capability the plugin requires.
 
-        Called once per plugin, at startup, before any registration hook. A
-        dependency the plugin uses optionally is not stated here.
+        Called once per plugin, at startup, before any registration hook. The host
+        resolves the declarations and aborts boot, naming every unmet setting, when
+        one is not configured. A dependency the plugin uses optionally is not declared.
 
-        Raises:
-            RequiredDependencyError: A required dependency is not configured;
-                the error names the configuration setting, and boot aborts.
+        Returns:
+            The settings the plugin requires, such as ``Requirement("slack.tenant")``.
         """
+        raise NotImplementedError
 
     @hookspec
     def register_slack_commands(self, registrar: SlackCommandRegistrar) -> None:

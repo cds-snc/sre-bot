@@ -25,8 +25,9 @@ Implement `$ARGUMENTS`.
    is provably wrong, and say so explicitly.
 4. Keep every change inside the approved architecture boundaries.
 5. Refactor once green.
-6. Run the quality gates every 3-5 edits and before completion. Report the actual
-   command output as evidence.
+6. While implementing, run ruff and the targeted test files only. At the end run
+   the full mypy (then fix), then the full pytest alone, once each, never in
+   parallel; rerun only on a real error. Report the actual command output as evidence.
 7. Check off each acceptance criterion as its test verifies it
    (`backlog task edit <id> --check-ac <index>`) — one by one, never batched at
    the end. Record `--notes`: what changed, test evidence, DoD items left for

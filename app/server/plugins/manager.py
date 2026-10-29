@@ -17,6 +17,7 @@ from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.scheduler.registry import BackgroundJobRegistry
 from server.plugins.boot import attribute_built_slices, call_hook_per_plugin, load_entry_points, log_plugin_boot_failed
+from server.plugins.requirements import resolve_requirements
 from server.plugins.slack_registrar import PluginSlackRegistrar
 
 if TYPE_CHECKING:
@@ -24,6 +25,7 @@ if TYPE_CHECKING:
     from structlog.stdlib import BoundLogger
 
     from contracts.slack.registrar import SlackCommandRegistrar
+    from contracts.workplace import ConfiguredSystems
     from infrastructure.events.service import EventDispatcher
 
 logger = structlog.get_logger()
@@ -89,14 +91,14 @@ def load_plugins(pm: FeaturePluginManager, disabled: Collection[str], logger: Bo
     logger.info("feature_plugins_loaded", plugins=plugins, disabled=sorted(disabled))
 
 
-def resolve_plugin_requirements(pm: FeaturePluginManager, logger: BoundLogger) -> None:
-    """Fire ``register_requirements`` per plugin, before any registration hook.
+def resolve_plugin_requirements(pm: FeaturePluginManager, logger: BoundLogger, systems: ConfiguredSystems) -> None:
+    """Fire ``register_requirements`` per plugin and resolve the declarations, before any registration hook.
 
     Raises:
-        RequiredDependencyError: An enabled plugin requires a dependency that is
-            not configured; it is logged as ``plugin_boot_failed`` first.
+        PluginRequirementsUnmetError: An enabled plugin requires a setting that is
+            not configured; each such setting is logged as ``plugin_boot_failed`` first.
     """
-    call_hook_per_plugin(pm, "register_requirements", logger)
+    resolve_requirements(pm, logger, systems)
     logger.info("plugin_requirements_resolved")
 
 

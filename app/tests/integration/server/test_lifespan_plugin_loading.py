@@ -9,9 +9,9 @@ the real metadata, as the app factory runs it before the lifespan: startup must
 raise before the lifespan yields, because a feature that cannot load must stop
 the process instead of being skipped. The success case reads the real installed
 metadata and checks the registered plugin names against the plugins the ci
-files enable; the access plugins, off in base.toml, and incident.scribe, off in
-ci.toml because it requires an OpenAI tenant the ci files do not configure, must
-not be registered.
+files enable; the access plugins, off in base.toml, and the plugins that declare
+requirements, off in ci.toml because the ci files configure no vendor tenant or
+token, must not be registered.
 """
 
 import importlib.metadata
@@ -31,13 +31,18 @@ from server.plugins.manager import get_plugin_manager
 from tests.factories.lifespan import lifespan
 from tests.fixtures.plugin_dists import write_plugin_dist
 
-DISABLED_PLUGINS = {"access.catalog", "access.request", "access.sync", "incident.scribe"}
-ENABLED_PLUGINS = {
-    "geolocate",
-    "incident.comms",
+DISABLED_PLUGINS = {
+    "access.catalog",
+    "access.request",
+    "access.sync",
+    "incident.scribe",
     "oncall_sync",
     "rant",
     "user_rotations",
+}
+ENABLED_PLUGINS = {
+    "geolocate",
+    "incident.comms",
 }
 RAISING_MODULE = "fake_plugin_raising_i18n"
 RAISING_SOURCE = """

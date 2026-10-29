@@ -101,8 +101,11 @@ transitory state. See `testing-standards` skill.
 
 ## Verification (Non-Negotiable)
 
-Run after every 3-5 meaningful edits **and** before reporting completion. Always
-from `app/`, scoped to project code — never against `.venv` or paths outside the repo.
+During implementation run ruff and the targeted test files only. Once every
+other change is finished, run the full mypy and fix what it finds, then the full
+pytest on its own: once each, one after the other, never in parallel with each
+other or other heavy work; rerun one only on a real error. Always from `app/`,
+scoped to project code — never against `.venv` or paths outside the repo.
 
 ```bash
 cd app && uv run ruff check .                                  # ~0.1s
@@ -128,7 +131,8 @@ plans and acceptance criteria.
   before implementation. Produce it with `/plan-task <id>`.
 - **Single-PR size gate**: a change exceeding ~400 production LOC, ~10 files, two
   subsystems, or mixing mechanical refactor with behavior change MUST be
-  decomposed into incremental subtasks before implementation.
+  decomposed into incremental subtasks before implementation. A PR that only
+  deletes is not bound by the size gate.
 - One task per session, one branch, one PR. Check off acceptance criteria one by
   one as each is verified. Agents stop at `In Progress` with notes; **only humans
   move a task to Done.**

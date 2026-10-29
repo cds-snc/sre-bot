@@ -18,7 +18,6 @@ from structlog.testing import capture_logs
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
-from contracts.plugins.requirements import RequiredDependencyError
 from server.plugins.boot import call_hook_per_plugin, log_plugin_boot_failed
 
 pytestmark = pytest.mark.unit
@@ -68,11 +67,11 @@ def test_runner_calls_every_plugin_once_with_the_hook_arguments() -> None:
     assert sorted(calls) == ["first", "second"]
 
 
-def test_runner_attributes_a_required_dependency_to_the_raising_plugin() -> None:
-    error = RequiredDependencyError("openai.tenant")
+def test_runner_attributes_a_raising_hookimpl_to_its_plugin() -> None:
+    error = RuntimeError("boom")
     pm = _manager(quiet=_plugin(), needy=_raising(error))
 
-    with capture_logs() as events, pytest.raises(RequiredDependencyError) as raised:
+    with capture_logs() as events, pytest.raises(RuntimeError) as raised:
         call_hook_per_plugin(pm, "register_requirements", structlog.get_logger())
 
     assert raised.value is error
@@ -82,10 +81,22 @@ def test_runner_attributes_a_required_dependency_to_the_raising_plugin() -> None
             "log_level": "critical",
             "plugin": "needy",
             "phase": "register_requirements",
-            "error_type": "RequiredDependencyError",
-            "setting": "openai.tenant",
+            "error_type": "RuntimeError",
+            "setting": None,
         }
     ]
+
+
+def test_runner_returns_each_plugins_results_by_name() -> None:
+    @hookimpl
+    def register_requirements() -> tuple[str, ...]:
+        return ("slack.tenant",)
+
+    pm = _manager(quiet=_plugin(), loud=_plugin(register_requirements=register_requirements))
+
+    results = call_hook_per_plugin(pm, "register_requirements", structlog.get_logger())
+
+    assert results == {"quiet": [], "loud": [("slack.tenant",)]}
 
 
 def test_runner_stops_at_the_first_plugin_that_raises() -> None:

@@ -15,6 +15,7 @@ vendor adapters live under ``adapters/``. Swapping OpsGenie or Slack is a
 from datetime import timedelta
 
 from contracts.plugins.namespace import hookimpl
+from contracts.plugins.requirements import Requirement
 from packages.oncall_sync.settings import get_oncall_schedules
 from packages.user_rotations.settings import get_rotations
 
@@ -27,6 +28,12 @@ def _run_oncall_sync() -> None:
     from packages.oncall_sync.providers import get_oncall_sync_service  # noqa: PLC0415
 
     get_oncall_sync_service().sync_all()
+
+
+@hookimpl
+def register_requirements() -> tuple[Requirement, ...]:
+    """Require the Slack tenant and user token and the Opsgenie tenant: the sync reads one and writes user groups in the other."""
+    return (Requirement("slack.tenant"), Requirement("slack.user_token"), Requirement("opsgenie.tenant"))
 
 
 @hookimpl
