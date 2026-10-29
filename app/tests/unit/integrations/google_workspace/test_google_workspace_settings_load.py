@@ -63,7 +63,11 @@ def test_google_settings_reads_the_tenant_from_the_environment(tmp_path: Path, m
     tenant = GoogleWorkspaceSettings().tenant
 
     assert tenant is not None
-    assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (CUSTOMER, KEY, DELEGATED_USER)
+    assert (tenant.customer_id, tenant.service_account_key.get_secret_value(), tenant.delegated_user_email) == (
+        CUSTOMER,
+        KEY,
+        DELEGATED_USER,
+    )
 
 
 def test_google_settings_reads_the_tenant_secrets_from_a_dotenv_file(tmp_path: Path) -> None:
@@ -80,7 +84,11 @@ def test_google_settings_reads_the_tenant_secrets_from_a_dotenv_file(tmp_path: P
     tenant = GoogleWorkspaceSettings(_env_file=dotenv).tenant  # type: ignore[call-arg]
 
     assert tenant is not None
-    assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (CUSTOMER, KEY, DELEGATED_USER)
+    assert (tenant.customer_id, tenant.service_account_key.get_secret_value(), tenant.delegated_user_email) == (
+        CUSTOMER,
+        KEY,
+        DELEGATED_USER,
+    )
 
 
 def test_google_settings_delegated_user_is_optional(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

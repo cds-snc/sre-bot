@@ -21,7 +21,7 @@ Feature-domain configuration (channel IDs, user-group IDs) lives with the consum
 
 from functools import lru_cache
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from contracts.configuration import ConfigurationSlice, env_only
@@ -68,10 +68,10 @@ class SlackSettings(ConfigurationSlice):
 
     tenant: SlackTenant | None = Field(default=None, description="The Slack workspace this instance works with.")
 
-    bot_token: str = env_only("Bot token (xoxb-) the app acts with.", "codespaces", default="")
-    user_token: str = env_only("User token (xoxp-) for the calls a bot token cannot make.", "codespaces", default="")
-    app_token: str | None = env_only("App-level token (xapp-) Socket Mode connects with.", "codespaces", default=None)
-    signing_secret: str | None = env_only("Signing secret HTTP Events mode verifies requests with.", "codespaces", default=None)
+    bot_token: SecretStr = env_only("Bot token (xoxb-) the app acts with.", "codespaces", default=SecretStr(""))
+    user_token: SecretStr = env_only("User token (xoxp-) for the calls a bot token cannot make.", "local", default=SecretStr(""))
+    app_token: SecretStr | None = env_only("App-level token (xapp-) Socket Mode connects with.", "codespaces", default=None)
+    signing_secret: SecretStr | None = env_only("Signing secret HTTP Events mode verifies requests with.", "local", default=None)
 
     request_timeout_seconds: int = 10
     retry_max_attempts: int = 2

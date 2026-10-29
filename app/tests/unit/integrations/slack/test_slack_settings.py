@@ -112,7 +112,7 @@ def test_slack_settings_reads_the_tenant_from_the_tenant_entry(tmp_path: Path, m
 
     assert settings.tenant == SlackTenant(team_id="T0TENANT")
     assert settings.tenant.tenant_id == "T0TENANT"
-    assert settings.bot_token == BOT_TOKEN
+    assert settings.bot_token.get_secret_value() == BOT_TOKEN
 
 
 def test_slack_settings_reads_every_secret_from_its_slack_name(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -123,7 +123,12 @@ def test_slack_settings_reads_every_secret_from_its_slack_name(tmp_path: Path, m
 
     settings = SlackSettings()
 
-    assert (settings.bot_token, settings.user_token, settings.app_token, settings.signing_secret) == (
+    assert (
+        settings.bot_token.get_secret_value(),
+        settings.user_token.get_secret_value(),
+        settings.app_token.get_secret_value() if settings.app_token else None,
+        settings.signing_secret.get_secret_value() if settings.signing_secret else None,
+    ) == (
         BOT_TOKEN,
         USER_TOKEN,
         APP_TOKEN,
@@ -140,8 +145,8 @@ def test_slack_settings_without_tenant_or_secrets_is_unconfigured(tmp_path: Path
     settings = SlackSettings()
 
     assert settings.tenant is None
-    assert settings.bot_token == ""
-    assert settings.user_token == ""
+    assert settings.bot_token.get_secret_value() == ""
+    assert settings.user_token.get_secret_value() == ""
     assert settings.app_token is None
     assert settings.signing_secret is None
 
@@ -244,7 +249,8 @@ def test_slack_settings_local_shape_builds(monkeypatch: pytest.MonkeyPatch) -> N
     settings = SlackSettings()
 
     assert settings.tenant is not None
-    assert settings.app_token == APP_TOKEN
+    assert settings.app_token is not None
+    assert settings.app_token.get_secret_value() == APP_TOKEN
 
 
 def test_slack_settings_transport_switches_are_not_fields() -> None:

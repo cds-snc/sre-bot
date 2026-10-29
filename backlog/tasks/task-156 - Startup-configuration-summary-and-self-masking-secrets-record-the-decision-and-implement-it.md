@@ -3,10 +3,10 @@ id: TASK-156
 title: >-
   Startup configuration summary and self-masking secrets: record the decision
   and implement it
-status: To Do
+status: In Progress
 assignee: []
 created_date: 2026-10-20 12:31
-updated_date: '2026-10-29T15:54:00Z'
+updated_date: '2026-10-29T16:38:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -49,11 +49,11 @@ The configuration phase runs in the app factory (create_app, server/server.py), 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 decisions/configuration.md records the generated configuration summaries (host in the configuration phase, plugins after plugin boot; field names, secret presence only, non-public values at most their last four characters, files loaded, a hash of the shown values), secret typing, the WARNING rule for security-weakening settings and the no-config-endpoint rule; observability.md records the service identity carried on every record (OpenTelemetry names) and the log destinations; lifecycle.md, plugins.md and security.md link to it
-- [ ] #2 The app factory's configuration phase emits the summary for every slice it validates, generated from that set rather than a hand-kept list, plugin boot emits plugin_configuration_summary for the enabled plugins' slices, and _list_configs_from_sections is removed
-- [ ] #3 Every secret field in a settings slice is SecretStr or SecretBytes, and a test asserts no slice repr or model_dump_json shows a secret value
-- [ ] #4 Outside production, the dev bypass enabled at boot logs a WARNING naming the setting, and an empty issuer configuration logs a WARNING in every environment (in production the bypass already fails boot, TASK-111.8)
-- [ ] #5 ruff, lint-imports, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
+- [x] #1 decisions/configuration.md records the generated configuration summaries (host in the configuration phase, plugins after plugin boot; field names, secret presence only, non-public values at most their last four characters, files loaded, a hash of the shown values), secret typing, the WARNING rule for security-weakening settings and the no-config-endpoint rule; observability.md records the service identity carried on every record (OpenTelemetry names) and the log destinations; lifecycle.md, plugins.md and security.md link to it
+- [x] #2 The app factory's configuration phase emits the summary for every slice it validates, generated from that set rather than a hand-kept list, plugin boot emits plugin_configuration_summary for the enabled plugins' slices, and _list_configs_from_sections is removed
+- [x] #3 Every secret field in a settings slice is SecretStr or SecretBytes, and a test asserts no slice repr or model_dump_json shows a secret value
+- [x] #4 Outside production, the dev bypass enabled at boot logs a WARNING naming the setting, and an empty issuer configuration logs a WARNING in every environment (in production the bypass already fails boot, TASK-111.8)
+- [x] #5 ruff, lint-imports, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -135,4 +135,8 @@ OQ10 One PR with a size exception.
 2026-10-29 planning: OQ1-OQ10 decided by the human after an ADR, doc-11 and online-guidance assessment (see the plan's Decisions). The ADR amendments are written on main's working tree (configuration.md, observability.md, lifecycle.md, plugins.md, security.md) and ride on this task's branch. The description's identity 'bound as context' is superseded: identity is carried on every record by a chain processor (observability.md). Branch after #1809 and #1810 merge, or from main with a small rebase.
 
 2026-10-29: small fix riding here (TASK-156 touches both ADRs): observability.md line 16 and plugins.md Boot failure policy still say plugin_boot_failed names 'the configuration key'; since TASK-172 the field is `setting`. Reword both to 'the setting at fault (`setting` field)'.
+
+2026-10-29 implementation: summary builder (server/configuration/summary.py), slice recorder + is_env_only (contracts/configuration.py), per-plugin attribution (server/plugins/boot.py attribute_built_slices around each plugin hook call), identity processor in both chains, security_setting_weakened, SecretStr for Slack and Google credentials, deploy-checks 'summary' check. Deviations: plugin_configuration_summary lists only plugins that built a slice (configuration.md reworded); service_identity event documented in observability.md; mypy still reports 41 errors in 14 files none touched here (i18n, legacy modules, slack/channels.py). Human: review app/.env.example diff, re-run make env-checks, run 'zsh bin/deploy-checks.zsh post summary' after deploy.
+
+2026-10-29 (human review of the first local boot): the summary is regrouped per slice: one section per table holding values (a list of plain values stays one value; nested models and lists of models get dotted names), set, unset and partial (non-public tails), matching Spring Boot configprops and Backstage config:print. The service_identity event and the duplicate environment field are dropped, since every record carries the identity. Shown names are dict keys, so the key-name redaction masks four names: aws.unauthorized_codes, openai.max_output_tokens, slack.unauthorized_errors and the whole notify_api_key_leak section. This fails safe, the hash still covers them, and a unit test over every slice pins the set. ADR text updated in configuration.md and observability.md. Gates, each run once at the end: ruff clean; mypy 41 errors in the same 14 untouched legacy files; pytest 5931 passed; import contracts 13 kept; key ownership OK. Production diff: 16 files, +192 -152, plus the new summary.py (143 lines).
 <!-- SECTION:NOTES:END -->

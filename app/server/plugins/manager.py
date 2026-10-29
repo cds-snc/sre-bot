@@ -16,7 +16,7 @@ import structlog
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.scheduler.registry import BackgroundJobRegistry
-from server.plugins.boot import call_hook_per_plugin, load_entry_points, log_plugin_boot_failed
+from server.plugins.boot import attribute_built_slices, call_hook_per_plugin, load_entry_points, log_plugin_boot_failed
 from server.plugins.slack_registrar import PluginSlackRegistrar
 
 if TYPE_CHECKING:
@@ -145,7 +145,8 @@ def _register_slack_per_plugin(pm: FeaturePluginManager, registrar: SlackCommand
         others = [other for _, other in plugins if other is not plugin]
         hook = pm.subset_hook_caller("register_slack_commands", remove_plugins=others)
         try:
-            hook(registrar=PluginSlackRegistrar(registrar, name))
+            with attribute_built_slices(name):
+                hook(registrar=PluginSlackRegistrar(registrar, name))
         except Exception as error:
             log_plugin_boot_failed(logger, plugin=name, phase="register_slack_commands", error=error)
             raise

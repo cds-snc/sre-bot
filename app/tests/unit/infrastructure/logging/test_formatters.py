@@ -1,7 +1,6 @@
 """Unit tests for infrastructure.logging.formatters module.
 
 Tests cover:
-- add_app_info processor
 - mask_sensitive_data processor
 - truncate_large_values processor
 - add_environment_info processor
@@ -13,68 +12,11 @@ import pytest
 
 from infrastructure.logging.formatters import (
     SENSITIVE_PATTERNS,
-    add_app_info,
     add_environment_info,
     downgrade_transient_socket_mode_errors,
     mask_sensitive_data,
     truncate_large_values,
 )
-
-
-@pytest.mark.unit
-class TestAddAppInfo:
-    """Test suite for add_app_info processor factory."""
-
-    def test_add_app_info_adds_name_and_version(self):
-        """Processor adds app_name and app_version to event dict."""
-        processor = add_app_info("sre-bot", "1.2.3")
-        event_dict = {"event": "test_event", "key": "value"}
-
-        result = processor(None, "info", event_dict)
-
-        assert result["app_name"] == "sre-bot"
-        assert result["app_version"] == "1.2.3"
-        assert result["event"] == "test_event"
-        assert result["key"] == "value"
-
-    def test_add_app_info_with_unknown_version(self):
-        """Default version is 'unknown' if not provided."""
-        processor = add_app_info("test-app")
-        event_dict = {"event": "test"}
-
-        result = processor(None, "info", event_dict)
-
-        assert result["app_name"] == "test-app"
-        assert result["app_version"] == "unknown"
-
-    def test_add_app_info_preserves_existing_fields(self):
-        """Existing fields in event dict are preserved."""
-        processor = add_app_info("my-app", "2.0.0")
-        event_dict = {
-            "event": "user_action",
-            "user_id": "123",
-            "timestamp": "2024-01-01",
-        }
-
-        result = processor(None, "debug", event_dict)
-
-        assert result["user_id"] == "123"
-        assert result["timestamp"] == "2024-01-01"
-        assert result["app_name"] == "my-app"
-
-    def test_add_app_info_overwrites_existing_app_info(self):
-        """If app_name/app_version exist, they are overwritten."""
-        processor = add_app_info("new-app", "3.0")
-        event_dict = {
-            "event": "test",
-            "app_name": "old-app",
-            "app_version": "1.0",
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["app_name"] == "new-app"
-        assert result["app_version"] == "3.0"
 
 
 @pytest.mark.unit

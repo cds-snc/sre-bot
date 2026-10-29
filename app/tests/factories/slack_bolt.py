@@ -17,6 +17,7 @@ from urllib.parse import urlencode
 
 import pluggy
 import pytest
+from pydantic import SecretStr
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_bolt.authorization import AuthorizeResult
 from slack_sdk import WebClient
@@ -165,7 +166,7 @@ def harness_fixture(
         monkeypatch.setattr("server.plugins.manager.get_plugin_manager", lambda: plugin_manager)
 
         app = App(authorize=authorize_single_workspace, request_verification_enabled=False, listener_executor=InlineExecutor())
-        settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+        settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
         provider = SlackPlatformProvider(settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter())
         if service_scopes is not None:
             provider.set_scope_opener(service_scopes())

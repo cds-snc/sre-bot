@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -26,7 +27,7 @@ def test_legacy_slack_commands_and_legacy_handlers_register_sre_command_once(moc
     """
     # Arrange
     command_prefix = get_slack_transport_settings().command_prefix
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     provider = SlackPlatformProvider(
         settings=settings,
         formatter=SlackBlockKitFormatter(),

@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import SecretStr
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.slack_response import SlackResponse
 
@@ -38,7 +39,7 @@ def _slack_error(code: str, *, headers: dict[str, str] | None = None, status_cod
 
 
 def _provider(client: Any | None) -> SlackPlatformProvider:
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     provider = SlackPlatformProvider(settings=settings)
     provider._client = client
     return provider

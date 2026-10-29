@@ -319,9 +319,10 @@ class SlackPlatformProvider:
 
             # Prepare Socket Mode handler if enabled (start happens separately)
             if self._socket_mode:
+                socket_credential = self._settings.app_token
                 self._handler = SocketModeHandler(
                     self._app,
-                    self._settings.app_token,
+                    socket_credential.get_secret_value() if socket_credential else None,
                     logger=logging.getLogger("slack_sdk.socket_mode"),
                 )
                 log.info("socket_mode_handler_prepared")

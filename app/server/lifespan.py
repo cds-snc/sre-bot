@@ -15,7 +15,6 @@ from contracts.configuration import HostInfo
 from contracts.i18n.resources import I18nResourceSpec
 from contracts.services import ServiceScopeOpener
 from contracts.slack.registrar import SlackCommandRegistrar
-from infrastructure.configuration.features.sre_ops import SreOpsSettings
 from infrastructure.directory import (
     DirectorySettings,
     get_directory_provider,
@@ -25,7 +24,6 @@ from infrastructure.i18n import (
     TranslationService,
     get_translation_service,
 )
-from infrastructure.logging.settings import LoggingSettings
 from infrastructure.security import get_jwks_manager
 from infrastructure.security.settings import SecuritySettings
 from integrations.slack.provider import get_slack_provider
@@ -42,8 +40,9 @@ from modules import (
     sre,
     webhook_helper,
 )
-from server.configuration import HostConfiguration, IdentitySettings, ServerSettings
-from server.plugins.boot import call_hook_per_plugin
+from server.configuration import HostConfiguration
+from server.configuration.summary import summarize
+from server.plugins.boot import call_hook_per_plugin, plugin_built_slices, reset_plugin_built_slices
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
@@ -65,33 +64,16 @@ def _get_logger_from_app() -> BoundLogger:
     return structlog.stdlib.get_logger()
 
 
-def _list_configs_from_sections(
-    host: HostInfo,
-    identity: IdentitySettings,
-    logging_settings: LoggingSettings,
-    server_settings: ServerSettings,
-    security_settings: SecuritySettings,
-    directory_settings: DirectorySettings,
-    sre_ops_settings: SreOpsSettings,
-    logger: BoundLogger,
-) -> None:
-    config_settings: dict[str, tuple[object, ...]] = {
-        "settings": (
-            {"LOG_LEVEL": logging_settings.log_level},
-            {"GIT_SHA": host.git_sha},
-        )
-    }
+def _log_plugin_configuration_summary(logger: BoundLogger) -> None:
+    """Log the slices each plugin's boot first built: a section per plugin, each with its own hash.
 
-    config_settings["identity"] = tuple(identity.model_dump().keys())
-    config_settings["server"] = tuple(server_settings.model_dump().keys())
-    config_settings["security"] = tuple(security_settings.model_dump().keys())
-    config_settings["directory"] = tuple(directory_settings.model_dump().keys())
-    config_settings["sre_ops"] = tuple(sre_ops_settings.model_dump().keys())
-
-    logger.info("configuration_initialized", base_settings=config_settings["settings"])
-    for key, value in config_settings.items():
-        if key != "settings":
-            logger.info("configuration_loaded", config_setting=key, keys=value)
+    A disabled plugin never builds its slices, so it has no section.
+    """
+    sections: list[dict[str, object]] = []
+    for plugin, built in plugin_built_slices().items():
+        summary = summarize(built)
+        sections.append({"plugin": plugin, "config_hash": summary.config_hash, "slices": summary.sections()})
+    logger.info("plugin_configuration_summary", phase="plugin_boot", plugins=sections)
 
 
 def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
@@ -141,17 +123,13 @@ def _initialize_security_services(
     """Pre-initialize JWT/JWKS security infrastructure at startup.
 
     If [security] lists no issuers the application starts in a degraded state:
-    authenticated endpoints will return 500 at runtime.  A startup warning is
-    logged so the misconfiguration is visible without blocking the process.
+    authenticated endpoints will return 500 at runtime. The configuration phase
+    already logged the security_setting_weakened warning, so the warmup is skipped.
     """
     log = logger.bind(phase="security")
     log.info("security_services_initialization_started")
     issuer_config = settings.issuer_config
     if not issuer_config:
-        log.warning(
-            "security_services_no_issuer_config",
-            detail="[security] issuers is empty; authenticated endpoints will fail at runtime",
-        )
         return
 
     jwks_manager = get_jwks_manager()
@@ -255,22 +233,6 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     registry.register_value(HostInfo, host)
 
     logger.info("application_startup")
-    logger.info(
-        "configuration_files_loaded",
-        phase="configuration",
-        environment=configuration.files.environment,
-        files=[path.name for path in configuration.files.paths],
-    )
-    _list_configs_from_sections(
-        host,
-        configuration.identity,
-        configuration.logging,
-        server_settings,
-        security_settings,
-        directory_settings,
-        sre_ops_settings,
-        logger,
-    )
     # Phase 2: build every core service once; a failing factory stops startup here.
     await initialize_core_services(registry, logger)
     service_scopes = SvcsServiceScopeOpener(registry)
@@ -286,6 +248,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     )
 
     pm = get_plugin_manager()
+    reset_plugin_built_slices()
     # Any plugin that fails to load stops startup here, before the app serves.
     load_plugins(pm, configuration.disabled_plugins, logger.bind(phase="plugin_loading"))
     # An enabled plugin whose required vendor or capability is not configured stops startup here.
@@ -306,6 +269,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
         slack_provider=app.state.slack_provider,
     )
     log.info("feature_integrations_registered")
+    _log_plugin_configuration_summary(logger)
     # Legacy sre and dev subcommands must be in the provider's registry before
     # initialize_app binds the root slash commands.
     _register_legacy_slack_commands(app.state.slack_provider, logger)

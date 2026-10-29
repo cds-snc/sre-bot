@@ -76,6 +76,15 @@ def test_a_codespaces_sourced_name_missing_from_codespaces_is_a_check() -> None:
     assert "no Codespaces secret provides it" in reason
 
 
+def test_a_local_sourced_name_is_not_expected_in_codespaces() -> None:
+    """A name whose metadata says the developer sets it in app/.env (Slack's signing secret, a user token) needs no Codespaces secret."""
+    entries = [(CODESPACES, "SLACK__BOT_TOKEN", "present")]
+
+    action, _ = _rows(set(), entries)["GEO__LOCAL_ONLY"]
+
+    assert action == "none"
+
+
 def test_codespaces_are_not_judged_when_none_were_listed() -> None:
     """Without any Codespaces rows (no gh auth) a missing secret is unknown, not absent."""
     assert _rows(set(), [])["TRELLO__ATIP_BOARD"][0] == "none"

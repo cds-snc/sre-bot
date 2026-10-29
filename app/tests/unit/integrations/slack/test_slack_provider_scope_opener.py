@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import SecretStr
 
 from integrations.slack.provider import SlackPlatformProvider
 
@@ -16,7 +17,7 @@ pytestmark = pytest.mark.unit
 
 
 def _provider() -> SlackPlatformProvider:
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     return SlackPlatformProvider(settings=settings)
 
 

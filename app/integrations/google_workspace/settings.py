@@ -17,7 +17,7 @@ from functools import lru_cache
 from typing import Any, cast
 
 from google.oauth2 import service_account
-from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, SecretStr, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from contracts.configuration import ConfigurationSlice, env_only
@@ -65,7 +65,7 @@ class GoogleWorkspaceTenant(BaseModel):
     customer_id: str = env_only(
         "Real Google Workspace customer id, never the my_customer alias; a non-public value.", "codespaces"
     )
-    service_account_key: str = env_only("Service-account key JSON for this tenant.", "codespaces")
+    service_account_key: SecretStr = env_only("Service-account key JSON for this tenant.", "codespaces")
     delegated_user_email: str | None = env_only(
         "Workspace user the service account impersonates when a caller names none; a non-public value.",
         "codespaces",
@@ -85,7 +85,7 @@ class GoogleWorkspaceTenant(BaseModel):
     def _key_builds_credentials(self) -> GoogleWorkspaceTenant:
         # Raised as a field error so the configuration error names the key's variable.
         try:
-            self._credentials = build_service_account_credentials(self.service_account_key)
+            self._credentials = build_service_account_credentials(self.service_account_key.get_secret_value())
         except ValueError as error:
             raise ValueError(f"{_TENANT_VARIABLE.format('SERVICE_ACCOUNT_KEY')} {error}") from None
         return self

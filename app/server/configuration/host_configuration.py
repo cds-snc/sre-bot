@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from contracts.configuration import (
     ConfigurationError,
     HostInfo,
+    built_slices,
     describe_validation_error,
     install_configuration_files,
     install_host_info,
@@ -25,7 +26,7 @@ from infrastructure.configuration.features.aws_ops import get_aws_feature_settin
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
 from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
-from infrastructure.logging.settings import LoggingSettings, get_logging_settings
+from infrastructure.logging.settings import get_logging_settings
 from infrastructure.logging.setup import configure_logging
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.aws.settings import get_aws_settings
@@ -40,9 +41,10 @@ from integrations.trello.settings import get_trello_settings
 from jobs.settings import SchedulerSettings, get_scheduler_settings
 from modules.atip.settings import get_atip_settings
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
-from server.configuration.identity import IdentitySettings, get_identity_settings
+from server.configuration.identity import IdentitySettings, build_service_identity, get_identity_settings
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
 from server.configuration.server_settings import ServerSettings, get_server_settings
+from server.configuration.summary import summarize
 from server.plugins.manager import installed_plugin_names
 from server.plugins.settings import check_plugin_enablement, get_plugins_settings
 from server.slack.settings import SlackTransportSettings, get_slack_transport_settings
@@ -61,14 +63,11 @@ class SlackKey(StrEnum):
 class HostConfiguration:
     """Everything the lifespan reads from the configuration phase."""
 
-    files: TomlConfigurationFiles
-    identity: IdentitySettings
     host_info: HostInfo
     server: ServerSettings
     security: SecuritySettings
     directory: DirectorySettings
     sre_ops: SreOpsSettings
-    logging: LoggingSettings
     slack_transport: SlackTransportSettings
     scheduler: SchedulerSettings
     disabled_plugins: frozenset[str]
@@ -95,6 +94,20 @@ def refuse_dev_bypass_in_production(host: HostInfo, security: SecuritySettings) 
         raise ConfigurationError("[security] dev_bypass_enabled is true in production; the dev bypass is local only")
     if security.dev_bypass_token is not None:
         raise ConfigurationError("SECURITY__DEV_BYPASS_TOKEN is set in production; the dev bypass is local only")
+
+
+def warn_on_weakened_security(host: HostInfo, security: SecuritySettings) -> None:
+    """Log a WARNING for each security-weakening setting at boot, naming the setting and never a value.
+
+    The dev bypass flag is warned about outside production only, since production refuses
+    to boot with it (refuse_dev_bypass_in_production). An empty issuer list leaves every
+    authenticated endpoint failing at runtime, so it warns in every environment.
+    """
+    log = structlog.get_logger(__name__)
+    if host.environment != "production" and security.dev_bypass_enabled:
+        log.warning("security_setting_weakened", phase="configuration", setting="security.dev_bypass_enabled")
+    if not security.issuers:
+        log.warning("security_setting_weakened", phase="configuration", setting="security.issuers")
 
 
 def validate_slack_transport(transport: SlackTransportSettings, slack: SlackSettings) -> None:
@@ -154,9 +167,9 @@ def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     files = load_configuration_files(identity.environment, directory)
     install_configuration_files(files)
     logging_settings = get_logging_settings()
-    configure_logging(identity.environment, logging_settings)
+    configure_logging(identity.environment, logging_settings, static_fields=build_service_identity(identity).log_fields())
     try:
-        return _validate_slices(identity, files, logging_settings)
+        configuration = _validate_slices(identity)
     except ValidationError as error:
         # A slice not yet on the files raises pydantic's error, whose message renders every input value.
         failure = ConfigurationError(describe_validation_error(error))
@@ -165,15 +178,27 @@ def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     except ConfigurationError as error:
         _log_invalid(error)
         raise
+    _log_configuration_summary(files)
+    return configuration
 
 
 def _log_invalid(error: ConfigurationError) -> None:
     structlog.get_logger(__name__).critical("configuration_invalid", phase="configuration", error=str(error))
 
 
-def _validate_slices(
-    identity: IdentitySettings, files: TomlConfigurationFiles, logging_settings: LoggingSettings
-) -> HostConfiguration:
+def _log_configuration_summary(files: TomlConfigurationFiles) -> None:
+    """Log every slice the phase built as one event: the shown values, the state of the withheld, a hash of the shown."""
+    summary = summarize(built_slices())
+    structlog.get_logger(__name__).info(
+        "configuration_summary",
+        phase="configuration",
+        files=[path.name for path in files.paths],
+        config_hash=summary.config_hash,
+        slices=summary.sections(),
+    )
+
+
+def _validate_slices(identity: IdentitySettings) -> HostConfiguration:
     server = get_server_settings()
     security = get_security_settings()
     directory_settings = get_directory_settings()
@@ -205,17 +230,15 @@ def _validate_slices(
     check_plugin_enablement(plugins, installed_plugin_names())
     host = build_host_info(identity, server)
     refuse_dev_bypass_in_production(host, security)
+    warn_on_weakened_security(host, security)
     install_host_info(host)
     install_slack_transport_info(SlackTransportInfo(command_prefix=slack_transport.command_prefix))
     return HostConfiguration(
-        files=files,
-        identity=identity,
         host_info=host,
         server=server,
         security=security,
         directory=directory_settings,
         sre_ops=sre_ops,
-        logging=logging_settings,
         slack_transport=slack_transport,
         scheduler=scheduler,
         disabled_plugins=plugins.disabled(),

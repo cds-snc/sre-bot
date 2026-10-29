@@ -10,6 +10,7 @@ import os
 from collections.abc import Iterator
 
 import pytest
+from pydantic import SecretStr
 
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.settings import SlackSettings, get_slack_settings
@@ -51,9 +52,9 @@ class MockSlackSettings:
         bot_token="xoxb-test",
         signing_secret="test-secret",
     ):
-        self.app_token = app_token
-        self.bot_token = bot_token
-        self.signing_secret = signing_secret
+        self.app_token = SecretStr(app_token) if app_token else None
+        self.bot_token = SecretStr(bot_token)
+        self.signing_secret = SecretStr(signing_secret) if signing_secret else None
 
 
 # ─────────────────────────────────────────────────────────────────────────────

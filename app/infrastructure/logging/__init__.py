@@ -17,7 +17,6 @@ Public API:
     - clear_request_context(): Clear all request context
 
 Formatters:
-    - add_app_info(): Processor to add app name/version
     - mask_sensitive_data(): Processor to redact sensitive fields
     - truncate_large_values(): Processor to limit string lengths
     - add_environment_info(): Processor to add environment name
@@ -56,7 +55,6 @@ from infrastructure.logging.context import (
 # Log formatters/processors
 from infrastructure.logging.formatters import (
     SENSITIVE_PATTERNS,
-    add_app_info,
     add_environment_info,
     mask_sensitive_data,
     truncate_large_values,
@@ -75,7 +73,6 @@ __all__ = [
     "set_correlation_id",
     "clear_request_context",
     # Formatters
-    "add_app_info",
     "mask_sensitive_data",
     "truncate_large_values",
     "add_environment_info",
