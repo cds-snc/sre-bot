@@ -14,13 +14,9 @@ from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 
-import structlog
-
 from contracts.workplace import WorkplaceSystem
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.slack.settings import SlackSettings, get_slack_settings
-
-logger = structlog.get_logger(__name__)
 
 
 class StaticConfiguredSystems:
@@ -62,6 +58,4 @@ TENANT_SOURCES: tuple[TenantSource, ...] = (
 
 def read_configured_systems(sources: Iterable[TenantSource] = TENANT_SOURCES) -> StaticConfiguredSystems:
     """Build the configured systems from the tenant sources, in source order."""
-    tenants = {source.system: tenant for source in sources if (tenant := source.read()) is not None}
-    logger.info("configured_systems_built", systems=[system.value for system in tenants])
-    return StaticConfiguredSystems(tenants)
+    return StaticConfiguredSystems({source.system: tenant for source in sources if (tenant := source.read()) is not None})

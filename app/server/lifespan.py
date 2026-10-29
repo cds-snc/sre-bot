@@ -42,6 +42,7 @@ from modules import (
 )
 from server.configuration import HostConfiguration
 from server.configuration.summary import summarize
+from server.configured_systems import read_configured_systems
 from server.plugins.boot import call_hook_per_plugin, plugin_built_slices, reset_plugin_built_slices
 from server.plugins.manager import (
     FeaturePluginManager,
@@ -255,7 +256,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     # Any plugin that fails to load stops startup here, before the app serves.
     load_plugins(pm, configuration.disabled_plugins, logger.bind(phase="plugin_loading"))
     # An enabled plugin whose required vendor or capability is not configured stops startup here.
-    resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"))
+    resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"), read_configured_systems())
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters

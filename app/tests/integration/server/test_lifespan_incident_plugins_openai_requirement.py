@@ -3,9 +3,9 @@
 The real lifespan loads the installed plugins on a freshly built plugin manager;
 core services, security, the directory, the Slack provider, translation and feature
 registration are stubbed, since requirements are resolved before any of them. The
-ci files configure no [openai.tenant]. With incident.scribe enabled (the
-configuration's disabled set replaced by the access plugins only) startup must stop
-before the lifespan yields, naming openai.tenant: scribe has no fallback. With the ci
+ci files configure no tenant. With incident.scribe enabled (the
+configuration's disabled set replaced by the access plugins and the other plugins that declare requirements) startup must stop
+before the lifespan yields, naming each tenant scribe declares: it has no fallback. With the ci
 files as they are (scribe off, comms on) startup must reach the yield and comms must
 report text generation unavailable, its designed fallback.
 """
@@ -19,16 +19,17 @@ import pytest
 from fastapi import FastAPI
 from structlog.testing import capture_logs
 
-from contracts.plugins.requirements import RequiredDependencyError
 from features.incident.comms.providers import get_status_update_text_generator, text_generation_available
 from integrations.openai import get_openai_settings
 from server.configuration import load_host_configuration
 from server.lifespan import build_lifespan
 from server.plugins.manager import get_plugin_manager
+from server.plugins.requirements import PluginRequirementsUnmetError
 
 pytestmark = pytest.mark.integration
 
 ACCESS_PLUGINS = frozenset({"access.catalog", "access.request", "access.sync"})
+OTHER_REQUIRING_PLUGINS = frozenset({"oncall_sync", "user_rotations", "rant"})
 
 
 @pytest.fixture(autouse=True)
@@ -54,19 +55,22 @@ def _stub_startup(stack: ExitStack) -> None:
     stack.enter_context(patch("server.lifespan._register_legacy_slack_commands"))
 
 
-async def test_lifespan_aborts_naming_openai_tenant_when_scribe_is_enabled_without_it() -> None:
-    configuration = dataclasses.replace(load_host_configuration(), disabled_plugins=ACCESS_PLUGINS)
+async def test_lifespan_aborts_naming_every_tenant_scribe_lacks_when_it_is_enabled() -> None:
+    configuration = dataclasses.replace(load_host_configuration(), disabled_plugins=ACCESS_PLUGINS | OTHER_REQUIRING_PLUGINS)
     reached_yield = False
 
-    with ExitStack() as stack, capture_logs() as events, pytest.raises(RequiredDependencyError) as raised:
+    with ExitStack() as stack, capture_logs() as events, pytest.raises(PluginRequirementsUnmetError):
         _stub_startup(stack)
         async with build_lifespan(configuration)(FastAPI()):
             reached_yield = True
 
     assert reached_yield is False
-    assert raised.value.setting == "openai.tenant"
     failures = [event for event in events if event["event"] == "plugin_boot_failed"]
-    assert [(event["plugin"], event["setting"]) for event in failures] == [("incident.scribe", "openai.tenant")]
+    assert [(event["plugin"], event["setting"]) for event in failures] == [
+        ("incident.scribe", "openai.tenant"),
+        ("incident.scribe", "slack.tenant"),
+        ("incident.scribe", "google_workspace.tenant"),
+    ]
 
 
 async def test_lifespan_boots_with_comms_reporting_text_generation_unavailable_when_scribe_is_off() -> None:
