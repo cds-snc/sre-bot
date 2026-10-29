@@ -3,10 +3,10 @@ id: TASK-173
 title: >-
   While the legacy incident handlers are registered, a Slack transport switched
   on without a Google Workspace tenant fails boot
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-27T18:11:00Z'
-updated_date: '2026-10-29T00:31:00Z'
+updated_date: '2026-10-29T14:34:00Z'
 labels:
   - configuration
   - plugins
@@ -30,9 +30,9 @@ TODAY: CI and a Codespace without a Google tenant boot and fail at use; producti
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With [slack_transport] enabled and GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset, boot fails in the configuration phase naming GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and 'required when [slack_transport] enabled is true'; with the transport off, or with a tenant, boot succeeds (tests)
-- [ ] #2 The rule is a new function beside the existing transport-requires-vendor check, carries a comment naming the legacy incident handlers it exists for; the existing decisions/configuration.md Tolerated item names TASK-145.13 as its deletion point and a dated Changes line records the rule
-- [ ] #3 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
+- [x] #1 With [slack_transport] enabled and GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset, boot fails in the configuration phase naming GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and 'required when [slack_transport] enabled is true'; with the transport off, or with a tenant, boot succeeds (tests)
+- [x] #2 The rule is a new function beside the existing transport-requires-vendor check, carries a comment naming the legacy incident handlers it exists for; the existing decisions/configuration.md Tolerated item names TASK-145.13 as its deletion point and a dated Changes line records the rule
+- [x] #3 ruff, mypy (no new errors in touched files), pytest tests --ignore=tests/smoke, make check-import-contracts and make check-settings-key-ownership pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,4 +103,6 @@ Q4 Add the check to env-checks/deploy-checks? Recommend no change; existing pre 
 - 2026-10-29 (delivery session; open questions assessed against the ADRs and doc-11): Q1 new function, Q2 customer id only, Q3 key plus the reason, Q4 no new deploy or env check: each covered by lifecycle.md phase 1 and configuration.md (Tolerated; 2026-10-27 vendor slices never make their tenant required), no gap. Correction: the deletion point is TASK-145.13 (deletes app/modules/incident), not TASK-145.7: on_call, incident_alert, notify_stale_incident_channels, core, incident, schedule_retro, incident_conversation and incident_helper import Google, and 145.7 AC #1 removes only the declare and alert-button registrations. Plan step 3 and the Q1 rationale's 'clean deletion in 145.7' read 145.13. TASK-145.13 gains the deletion AC. Not subsumed by TASK-172 (the handlers are not plugins). Applied, pending plan approval.
 
 - 2026-10-29: plan approved (human), with the 2026-10-29 rulings above.
+
+2026-10-29 implemented in the working tree from main cd090014 (same tree as TASK-172, disjoint files), In Progress. host_configuration.py: validate_legacy_incident_google_tenant(transport, google) beside validate_slack_transport, called in _validate_slices on the Google slice (after the Slack rules; a half Google entry fails in the slice first), message 'GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID is required when [slack_transport] enabled is true', comment names the legacy incident handlers and TASK-145.13. Tests: unit test_server_configuration_legacy_incident_google_rule (off, on with tenant, on without: exact message); integration test_lifespan_vendor_slice_validation (+3: no Google tenant fails naming the key with no token value, half entry fails on SERVICE_ACCOUNT_KEY first, both tenants boot); logging_render production test given a Google tenant. configuration.md Tolerated item reworded (since TASK-173, function named), Changes line; blob line points at TASK-176. Gates on the combined 172+173 tree: ruff All checks passed, format clean; mypy 41 errors in 14 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 5884 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK. ACs 1-3 checked. Production: the three GOOGLE_WORKSPACE__TENANT__* SSM parameters are in the task definition (terraform/ssm.tf) and hold the values 111.10.2 verified; a blank one would fail boot and the circuit breaker rolls back. Codespaces need the GOOGLE_WORKSPACE__TENANT__* secrets (local.toml enables the transport) or SLACK_TRANSPORT__ENABLED=false in app/.env.
 <!-- SECTION:NOTES:END -->

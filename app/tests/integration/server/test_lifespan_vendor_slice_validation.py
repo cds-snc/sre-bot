@@ -157,6 +157,48 @@ async def test_slack_secret_without_the_tenant_fails_boot_naming_the_key(monkeyp
     assert "xoxb-secret-boot-0001" not in rendered
 
 
+async def test_slack_transport_on_without_a_google_tenant_fails_boot_naming_the_customer_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SLACK_TRANSPORT__ENABLED", "true")
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TENANT")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-secret-boot-0002")
+    monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-secret-boot-0002")
+
+    rendered = await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID is required when")
+
+    assert "xoxb-secret-boot-0002" not in rendered
+
+
+async def test_slack_transport_on_with_a_half_google_tenant_fails_on_the_google_slice_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("SLACK_TRANSPORT__ENABLED", "true")
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TENANT")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-secret-boot-0003")
+    monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-secret-boot-0003")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
+
+    await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY is required when")
+
+
+async def test_slack_transport_on_with_both_tenants_boots(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SLACK_TRANSPORT__ENABLED", "true")
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0TENANT")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-secret-boot-0004")
+    monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-secret-boot-0004")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
+    reached_yield = False
+
+    with ExitStack() as stack:
+        _stub_later_phases(stack)
+        async with lifespan(FastAPI()):
+            reached_yield = True
+
+    assert reached_yield is True
+
+
 async def test_google_key_with_the_my_customer_alias_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "my_customer")

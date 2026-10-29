@@ -32,6 +32,7 @@ from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_a
 from server.configuration import CONFIG_DIR as REAL_CONFIG_DIR
 from server.configuration import get_identity_settings, get_server_settings, load_host_configuration
 from server.slack.settings import get_slack_transport_settings
+from tests.factories.google_service_account import service_account_key
 
 pytestmark = pytest.mark.integration
 
@@ -105,6 +106,9 @@ def test_configuration_phase_event_renders_as_json_in_production(
     _transport_on(_production_phase, '[slack.tenant]\nteam_id = "T0001"\n')
     monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-bot")
     monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-app")
+    # The legacy incident handlers need Google Workspace while the transport is on.
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY", service_account_key())
 
     load_host_configuration()
 
