@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-10-20 12:31
-updated_date: '2026-10-29T16:54:00Z'
+updated_date: '2026-10-29T17:08:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -143,4 +143,6 @@ OQ10 One PR with a size exception.
 2026-10-29: the three @contextmanager functions annotated -> Iterator[...] now return Generator[...]. Current typeshed deprecates the Iterator form, and the editor flagged it. The three are server/plugins/boot.py attribute_built_slices (new in this task), features/incident/comms/entrypoints/slack.py _incident_scope and tests/factories/services.py _scope. An AST scan found no other @contextmanager or @asynccontextmanager with an Iterator or AsyncIterator return. Checks: ruff and mypy clean on the three files; 490 targeted tests passed.
 
 2026-10-29 (human approved): each slice is now its own configuration_slice event, carrying slice, config_hash, values, set, unset and partial, plus plugin for plugin slices. The phase ends with a configuration_summary or plugin_configuration_summary header naming the slices, with the files and the combined hash. Reason: the Fargate runtime splits lines over 16 KB into unparseable pieces, and Logs Insights extracts at most 200 fields of a JSON event; the single event already flattened to about 170. A test builds every slice from base and ci and holds each slice event under 16 KB and 200 fields, with envelope room (largest today: aws, 1.3 KB, 44 fields). Table names are values now, so notify_api_key_leak is no longer masked; the pinned masked set is aws.unauthorized_codes, openai.max_output_tokens and slack.unauthorized_errors. The deploy summary check is unchanged, since it reads the header. ADR text updated in configuration.md and plugins.md. Final gates, each run once: ruff clean; mypy 41 errors in the same 14 untouched files; pytest 5932 passed; import contracts 13 kept; key ownership OK.
+
+2026-10-29 (human): no manual deploy or env check is required for this task. Since the SSM blob migration closed, those checks run only for a task that changes terraform, the task definition, IAM or SSM parameters, or adds, renames or removes an environment name or secret, and for the contract step that deletes what a running revision used. Every AC is checked; the human sets Done.
 <!-- SECTION:NOTES:END -->
