@@ -1,6 +1,6 @@
 """Protocol-conformant fake for the per-invocation service scope contract."""
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
 from typing import Any, cast
 
@@ -31,7 +31,7 @@ class FakeServiceScopeOpener:
         return self._scope()
 
     @contextmanager
-    def _scope(self) -> Iterator[ServiceResolver]:
+    def _scope(self) -> Generator[ServiceResolver]:
         self.opened += 1
         try:
             yield FakeServiceResolver(self.services)

@@ -54,7 +54,7 @@ Only the modal is updated.
 
 import asyncio
 import json
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, TypedDict
@@ -167,7 +167,7 @@ def _with_scopes(handler: _ScopedListener, scopes: ServiceScopeOpener) -> Callab
 
 
 @contextmanager
-def _incident_scope(scopes: ServiceScopeOpener, channel_id: str) -> Iterator[tuple[IncidentStore, ConversationReference]]:
+def _incident_scope(scopes: ServiceScopeOpener, channel_id: str) -> Generator[tuple[IncidentStore, ConversationReference]]:
     """Open one service scope; yield the incident store built in it and the channel's conversation reference.
 
     The caller makes its service call inside the block, so the resolved

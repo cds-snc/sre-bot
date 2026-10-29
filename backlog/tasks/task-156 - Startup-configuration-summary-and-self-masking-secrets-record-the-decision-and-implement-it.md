@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-10-20 12:31
-updated_date: '2026-10-29T16:38:00Z'
+updated_date: '2026-10-29T16:44:00Z'
 labels:
   - plugin-architecture
   - configuration
@@ -139,4 +139,6 @@ OQ10 One PR with a size exception.
 2026-10-29 implementation: summary builder (server/configuration/summary.py), slice recorder + is_env_only (contracts/configuration.py), per-plugin attribution (server/plugins/boot.py attribute_built_slices around each plugin hook call), identity processor in both chains, security_setting_weakened, SecretStr for Slack and Google credentials, deploy-checks 'summary' check. Deviations: plugin_configuration_summary lists only plugins that built a slice (configuration.md reworded); service_identity event documented in observability.md; mypy still reports 41 errors in 14 files none touched here (i18n, legacy modules, slack/channels.py). Human: review app/.env.example diff, re-run make env-checks, run 'zsh bin/deploy-checks.zsh post summary' after deploy.
 
 2026-10-29 (human review of the first local boot): the summary is regrouped per slice: one section per table holding values (a list of plain values stays one value; nested models and lists of models get dotted names), set, unset and partial (non-public tails), matching Spring Boot configprops and Backstage config:print. The service_identity event and the duplicate environment field are dropped, since every record carries the identity. Shown names are dict keys, so the key-name redaction masks four names: aws.unauthorized_codes, openai.max_output_tokens, slack.unauthorized_errors and the whole notify_api_key_leak section. This fails safe, the hash still covers them, and a unit test over every slice pins the set. ADR text updated in configuration.md and observability.md. Gates, each run once at the end: ruff clean; mypy 41 errors in the same 14 untouched legacy files; pytest 5931 passed; import contracts 13 kept; key ownership OK. Production diff: 16 files, +192 -152, plus the new summary.py (143 lines).
+
+2026-10-29: the three @contextmanager functions annotated -> Iterator[...] now return Generator[...]. Current typeshed deprecates the Iterator form, and the editor flagged it. The three are server/plugins/boot.py attribute_built_slices (new in this task), features/incident/comms/entrypoints/slack.py _incident_scope and tests/factories/services.py _scope. An AST scan found no other @contextmanager or @asynccontextmanager with an Iterator or AsyncIterator return. Checks: ruff and mypy clean on the three files; 490 targeted tests passed.
 <!-- SECTION:NOTES:END -->

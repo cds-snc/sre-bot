@@ -7,7 +7,7 @@ text: a validation message renders the input value, which may be a secret.
 """
 
 import importlib.metadata
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
@@ -39,7 +39,7 @@ def plugin_built_slices() -> dict[str, tuple[ConfigurationSlice, ...]]:
 
 
 @contextmanager
-def attribute_built_slices(plugin: str) -> Iterator[None]:
+def attribute_built_slices(plugin: str) -> Generator[None]:
     """Attribute to ``plugin`` every slice built inside the block that no earlier boot step built."""
     before = {type(built) for built in built_slices()}
     yield
