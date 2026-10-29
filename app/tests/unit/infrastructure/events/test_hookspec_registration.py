@@ -37,14 +37,17 @@ def test_hookimpl_receives_dispatcher() -> None:
 
 
 def test_hookspec_called_during_feature_integration(monkeypatch) -> None:
-    mocked_hook = MagicMock()
-    fake_pm = MagicMock()
-    fake_pm.hook.register_event_handlers = mocked_hook
+    pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
+    pm.add_hookspecs(FeatureLifecycleSpecs)
+    observed: list[object] = []
 
-    monkeypatch.setattr(
-        "server.plugins.manager.get_plugin_manager",
-        lambda: fake_pm,
-    )
+    class Plugin:
+        @hookimpl
+        def register_event_handlers(self, dispatcher: EventDispatcher) -> None:
+            observed.append(dispatcher)
+
+    pm.register(Plugin(), name="events_plugin")
+    monkeypatch.setattr("server.plugins.manager.get_plugin_manager", lambda: pm)
 
     dispatcher = EventDispatcher()
     register_feature_integrations(
@@ -53,4 +56,4 @@ def test_hookspec_called_during_feature_integration(monkeypatch) -> None:
         event_dispatcher=dispatcher,
     )
 
-    mocked_hook.assert_called_once_with(dispatcher=dispatcher)
+    assert observed == [dispatcher]

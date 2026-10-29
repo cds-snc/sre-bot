@@ -62,7 +62,8 @@ def test_base_keeps_the_access_plugins_off_and_every_other_plugin_on() -> None:
     keys = {name: enabled for area in base["plugins"].values() for name, enabled in area.items()}
 
     assert {name for name, enabled in keys.items() if not enabled} == ACCESS_PLUGINS
-    assert get_plugins_settings().disabled() == ACCESS_PLUGINS
+    # ci.toml also switches off incident.scribe, which requires an OpenAI tenant ci does not configure.
+    assert get_plugins_settings().disabled() == ACCESS_PLUGINS | {"incident.scribe"}
 
 
 def test_disabled_access_plugins_register_no_route_and_no_openapi_path() -> None:

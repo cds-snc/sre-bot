@@ -1,10 +1,10 @@
 ---
 id: TASK-111.15
 title: 'Contract: stop fetching the SSM parameters and remove the old deployment names'
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-20 23:25
-updated_date: '2026-10-23T17:30:00Z'
+updated_date: '2026-10-29T14:11:00Z'
 labels:
   - configuration
 milestone: m-7
@@ -35,5 +35,5 @@ Coordinator for the contract step of the configuration move: the old deployment 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TASK-111.15.1 and TASK-111.15.2 are done
+- [x] #1 TASK-111.15.1 and TASK-111.15.2 are done
 <!-- AC:END -->

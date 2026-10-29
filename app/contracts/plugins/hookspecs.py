@@ -1,6 +1,7 @@
 """Hook specifications for feature plugin lifecycle.
 
 Covers the full lifecycle of a feature package:
+  - Requirements: the vendors and capabilities the plugin cannot run without
   - Slack command, block action and view submission registration
   - HTTP route registration
   - Startup settings validation / cache warmup
@@ -33,6 +34,7 @@ class FeatureLifecycleSpecs:
     """Collection of hookspecs covering the full lifecycle of a feature plugin.
 
     This includes:
+        - Requirements, resolved before any registration
         - Startup validation and warmup
         - Slack command, block action and view submission registration (through the registrar Protocol)
         - HTTP route registration
@@ -43,6 +45,18 @@ class FeatureLifecycleSpecs:
     Each hookspec is optional and called at the appropriate point in the
     application lifecycle. Implement the ones relevant to your feature.
     """
+
+    @hookspec
+    def register_requirements(self) -> None:
+        """Resolve each vendor or capability the plugin requires.
+
+        Called once per plugin, at startup, before any registration hook. A
+        dependency the plugin uses optionally is not stated here.
+
+        Raises:
+            RequiredDependencyError: A required dependency is not configured;
+                the error names the configuration setting, and boot aborts.
+        """
 
     @hookspec
     def register_slack_commands(self, registrar: SlackCommandRegistrar) -> None:

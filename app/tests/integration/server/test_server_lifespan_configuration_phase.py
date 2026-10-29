@@ -148,5 +148,5 @@ async def test_the_lifespan_loads_plugins_with_the_disabled_names_from_the_files
         async with build_lifespan(configuration)(FastAPI()):
             pass
 
-    assert configuration.disabled_plugins == frozenset({"access.catalog", "access.request", "access.sync"})
+    assert configuration.disabled_plugins == frozenset({"access.catalog", "access.request", "access.sync", "incident.scribe"})
     assert load_plugins.call_args.args[1] == configuration.disabled_plugins

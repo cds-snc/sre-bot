@@ -15,6 +15,7 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookspec
 from contracts.slack.registrar import SlackCommandRegistrar
 
 EXPECTED_HOOKS = [
+    "register_requirements",
     "register_slack_commands",
     "register_routes",
     "register_i18n_resources",
@@ -25,6 +26,7 @@ EXPECTED_HOOKS = [
 
 
 EXPECTED_PARAMS = {
+    "register_requirements": ["self"],
     "register_slack_commands": ["self", "registrar"],
     "register_routes": ["self", "app"],
     "register_i18n_resources": ["self", "registry"],

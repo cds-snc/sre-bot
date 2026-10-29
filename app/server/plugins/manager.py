@@ -16,6 +16,7 @@ import structlog
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.scheduler.registry import BackgroundJobRegistry
+from server.plugins.boot import call_hook_per_plugin, load_entry_points, log_plugin_boot_failed
 from server.plugins.slack_registrar import PluginSlackRegistrar
 
 if TYPE_CHECKING:
@@ -65,7 +66,7 @@ def load_plugins(pm: FeaturePluginManager, disabled: Collection[str], logger: Bo
 
     Each disabled name is blocked before loading, so pluggy skips its entry point
     before importing it: a disabled plugin registers nothing and its module never
-    runs. Errors are not caught: a plugin that fails to import stops startup.
+    runs. A plugin that fails to import is logged as ``plugin_boot_failed`` and stops startup.
     Loading is idempotent, since pluggy skips entry points already registered.
 
     Args:
@@ -83,9 +84,20 @@ def load_plugins(pm: FeaturePluginManager, disabled: Collection[str], logger: Bo
         )
     for blocked in disabled:
         pm.set_blocked(blocked)
-    pm.load_setuptools_entrypoints(PLUGIN_NAMESPACE)
+    load_entry_points(pm, logger)
     plugins = sorted(name for plugin, _ in pm.list_plugin_distinfo() if (name := pm.get_name(plugin)) is not None)
     logger.info("feature_plugins_loaded", plugins=plugins, disabled=sorted(disabled))
+
+
+def resolve_plugin_requirements(pm: FeaturePluginManager, logger: BoundLogger) -> None:
+    """Fire ``register_requirements`` per plugin, before any registration hook.
+
+    Raises:
+        RequiredDependencyError: An enabled plugin requires a dependency that is
+            not configured; it is logged as ``plugin_boot_failed`` first.
+    """
+    call_hook_per_plugin(pm, "register_requirements", logger)
+    logger.info("plugin_requirements_resolved")
 
 
 def register_feature_integrations(
@@ -108,30 +120,35 @@ def register_feature_integrations(
     pm = get_plugin_manager()
 
     if slack_provider:
-        _register_slack_per_plugin(pm, slack_provider)
+        _register_slack_per_plugin(pm, slack_provider, logger)
         logger.info("slack_commands_registered")
 
     if event_dispatcher:
-        pm.hook.register_event_handlers(dispatcher=event_dispatcher)
+        call_hook_per_plugin(pm, "register_event_handlers", logger, dispatcher=event_dispatcher)
         logger.info("event_handlers_registered")
 
-    pm.hook.register_routes(app=app)
+    call_hook_per_plugin(pm, "register_routes", logger, app=app)
     logger.info("feature_routes_registered")
 
-    pm.hook.startup_warmup(logger=logger)
+    call_hook_per_plugin(pm, "startup_warmup", logger, logger=logger)
     logger.info("feature_startup_warmup_completed")
 
 
-def _register_slack_per_plugin(pm: FeaturePluginManager, registrar: SlackCommandRegistrar) -> None:
+def _register_slack_per_plugin(pm: FeaturePluginManager, registrar: SlackCommandRegistrar, logger: BoundLogger) -> None:
     """Call each plugin's ``register_slack_commands`` with a registrar scoped to its entry-point name.
 
     A blocked (disabled) plugin is listed without a plugin object and is skipped.
+    A failure is logged as ``plugin_boot_failed`` and stops startup.
     """
     plugins = [(name, plugin) for name, plugin in pm.list_name_plugin() if plugin is not None]
     for name, plugin in plugins:
         others = [other for _, other in plugins if other is not plugin]
         hook = pm.subset_hook_caller("register_slack_commands", remove_plugins=others)
-        hook(registrar=PluginSlackRegistrar(registrar, name))
+        try:
+            hook(registrar=PluginSlackRegistrar(registrar, name))
+        except Exception as error:
+            log_plugin_boot_failed(logger, plugin=name, phase="register_slack_commands", error=error)
+            raise
 
 
 def register_background_jobs(registry: BackgroundJobRegistry) -> None:
