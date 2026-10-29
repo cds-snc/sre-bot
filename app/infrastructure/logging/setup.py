@@ -103,8 +103,23 @@ def _is_test_environment() -> bool:
     return "pytest" in sys.modules
 
 
+def _add_static_fields(fields: Mapping[str, str]) -> Callable[[Any, str, MutableMapping[str, Any]], Mapping[str, Any]]:
+    """Return a processor that puts the same fields on every record.
+
+    The fields are not context: clear_contextvars cannot remove them, and the chain
+    reaches standard-library records too (decisions/observability.md, Service identity).
+    """
+
+    def processor(logger: Any, method_name: str, event_dict: MutableMapping[str, Any]) -> Mapping[str, Any]:
+        event_dict.update(fields)
+        return event_dict
+
+    return processor
+
+
 def _build_base_processors(
     logging_settings: LoggingSettings,
+    static_fields: Mapping[str, str] | None = None,
 ) -> list[
     Callable[
         [Any, str, MutableMapping[str, Any]],
@@ -114,6 +129,8 @@ def _build_base_processors(
     return [
         # 1. Context propagation (must be first)
         structlog.contextvars.merge_contextvars,
+        # Service identity: the same fields on every record, ahead of the redaction processor
+        _add_static_fields(static_fields or {}),
         # 2. Add metadata
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
@@ -140,6 +157,7 @@ def configure_logging(
     environment: Literal["local", "ci", "production"],
     logging_settings: LoggingSettings,
     log_level: str | None = None,
+    static_fields: Mapping[str, str] | None = None,
 ) -> BoundLogger:
     """Configure structured logging with OpenTelemetry semantic conventions.
 
@@ -156,6 +174,8 @@ def configure_logging(
         logging_settings: The [logging] slice.
         log_level: Optional override for log level (DEBUG, INFO, WARNING, etc).
             Defaults to logging_settings.log_level if not provided.
+        static_fields: Fields added to every record, the service identity; they survive
+            clear_contextvars and reach standard-library records.
 
     Returns:
         Configured logger instance
@@ -196,7 +216,7 @@ def configure_logging(
 
     # Build processor pipeline per structlog best practices
     # Order matters: context vars first, then enrichment, then formatting
-    processors = _build_base_processors(logging_settings=logging_settings)
+    processors = _build_base_processors(logging_settings, static_fields)
 
     # 6. Final rendering (environment-specific)
     renderers: list[Any] = [structlog.stdlib.ProcessorFormatter.remove_processors_meta]

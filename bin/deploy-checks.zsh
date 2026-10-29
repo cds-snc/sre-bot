@@ -10,17 +10,16 @@
 #   zsh bin/deploy-checks.zsh post [CHECK ...]  # after the deploy: run, rollout, boot errors, runtime errors,
 #                                               # Slack up, HTTP, plus each named task check
 # Task checks (each belongs to a task; delete it once that task is Done):
-#   contract    post: the SSM read policy names no blob or old GCP key parameter, the destroyed gcp_sre_service_account_key,
-#               /sre-bot/TRELLO__APP_KEY and /sre-bot/TRELLO__TOKEN are not found, and the running revision started its
-#               tasks without a secrets failure; the blobs' presence is informational until the human deletes them
-#               (TASK-111.15.2)
+#   summary     post: every running task logged configuration_summary since the rollout, service.instance.id is distinct
+#               per task, config_hash is identical across tasks (drift is a FAIL), the security_setting_weakened count
+#               (informational), and no token-shaped value (xox*-, xapp-, -----BEGIN) in any boot line (TASK-156)
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(contract)
+TASK_CHECKS=(summary)
 PRE_CHECKS=()  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
@@ -155,42 +154,19 @@ if [[ $phase == post ]]; then
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
 
-  if (( ${checks[(Ie)contract]} )); then  # TASK-111.15.2
-    section "Contract (TASK-111.15.2: blob and old GCP key read removed, retired parameters destroyed; names and verdicts only)"
-    policy_arn=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='sre-botSecretsManagerKeyRetrieval'].Arn | [0]" --output text)
-    policy_version=$(aws iam get-policy --policy-arn $policy_arn --query Policy.DefaultVersionId --output text)
-    read_names=$(aws iam get-policy-version --policy-arn $policy_arn --version-id $policy_version --output json \
-      | jq -c '[.PolicyVersion.Document.Statement[] | select([.Action] | flatten | index("ssm:GetParameter")) | [.Resource] | flatten[]
-               | sub("^arn:aws:ssm:[^:]+:[0-9]+:parameter"; "")]')
-    outside=$(print -r -- $read_names | jq -c 'map(select(startswith("/sre-bot/") | not))')
-    print "policy $policy_version: $(print -r -- $read_names | jq length) readable parameters; outside /sre-bot/: $outside"
-    [[ $outside == '[]' ]] && result contract_iam PASS || result contract_iam FAIL
-
-    destroyed_ok=PASS
-    for name in gcp_sre_service_account_key /sre-bot/TRELLO__APP_KEY /sre-bot/TRELLO__TOKEN; do
-      if aws ssm get-parameter --region $REGION --name $name --query Parameter.Name --output text >/dev/null 2>&1; then
-        print "$name: present"; destroyed_ok=FAIL
-      else
-        print "$name: not found"
-      fi
-    done
-    result contract_parameters $destroyed_ok
-
-    for name in sre-bot-config sre-bot-config-infrastructure; do
-      aws ssm get-parameter --region $REGION --name $name --query Parameter.Name --output text >/dev/null 2>&1 \
-        && print "$name: present (unread; deleted by the human in the console)" || print "$name: not found"
-    done
-
-    desired=$(print -r -- $dep | jq -r .desiredCount)
-    stopped=$(aws ecs list-tasks --region $REGION --cluster $CLUSTER --service-name $SERVICE --desired-status STOPPED --query taskArns --output json)
-    secrets_failures=0
-    if [[ $stopped != '[]' ]]; then
-      secrets_failures=$(aws ecs describe-tasks --region $REGION --cluster $CLUSTER --tasks ${(f)"$(print -r -- $stopped | jq -r '.[]')"} --output json \
-        | jq '[.tasks[] | select((.stoppedReason // "") | test("ResourceInitializationError|AccessDenied|ssm"; "i"))] | length')
-    fi
-    print "revision=${td##*:} running=$tasks desired=$desired stopped tasks with a secrets failure (last hour)=$secrets_failures"
-    [[ $(print -r -- $dep | jq -r .rolloutState) == COMPLETED && $tasks == $desired && $secrets_failures == 0 ]] \
-      && result contract_revision PASS || result contract_revision FAIL
+  if (( ${checks[(Ie)summary]} )); then  # TASK-156
+    section "Summary (TASK-156: configuration_summary per task, identity, hash agreement; names, counts and verdicts only)"
+    rows=$(li $since 'filter event = "configuration_summary" | stats count() as n, latest(config_hash) as h, latest(`service.instance.id`) as i by @logStream')
+    streams=$(print -r -- $rows | jq -s 'length')
+    print "tasks running=$tasks; log streams with configuration_summary since the rollout=$streams"
+    (( streams >= tasks && streams > 0 )) && result summary_present PASS || result summary_present "FAIL ($streams of $tasks tasks)"
+    ids=$(print -r -- $rows | jq -s '[.[].i] | unique | length')
+    [[ $ids == $streams ]] && result summary_instance_ids PASS || result summary_instance_ids "FAIL ($ids distinct ids for $streams tasks)"
+    hashes=$(print -r -- $rows | jq -s '[.[].h] | unique | length')
+    [[ $hashes == 1 ]] && result summary_config_hash PASS || result summary_config_hash "FAIL ($hashes distinct config_hash values: configuration drift between tasks)"
+    print "security_setting_weakened lines since the rollout (informational): $(li_count $since 'filter event = "security_setting_weakened"')"
+    leaked=$(li_count $since 'filter @message like /(xox[abpersu]-|xapp-)[A-Za-z0-9-]+|-----BEGIN/' $boot_end)
+    [[ $leaked == 0 ]] && result summary_no_token_in_boot PASS || result summary_no_token_in_boot "FAIL ($leaked boot lines carry a token-shaped value; rerun the query by hand)"
   fi
 
   section "HTTP (allowed paths only; /api/v1/* answers 403 at the WAF until TASK-163)"

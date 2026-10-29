@@ -62,7 +62,7 @@ class SlackBootstrap:
         """
         request_verification_enabled = not socket_mode
         app = AsyncApp(
-            token=self.settings.bot_token,
+            token=self.settings.bot_token.get_secret_value(),
             client=self.web,
             request_verification_enabled=request_verification_enabled,
         )
@@ -86,7 +86,7 @@ class LegacySlackBootstrap:
         """
         request_verification_enabled = not socket_mode
         app = App(
-            token=self.settings.bot_token,
+            token=self.settings.bot_token.get_secret_value(),
             client=self.web,
             request_verification_enabled=request_verification_enabled,
         )

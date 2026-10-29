@@ -13,6 +13,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pydantic import SecretStr
 
 from contracts.slack.models import CommandPayload, CommandResponse
 from features.incident.comms.entrypoints.slack import register
@@ -29,7 +30,7 @@ def scopes() -> FakeServiceScopeOpener:
 
 @pytest.fixture
 def provider(scopes: FakeServiceScopeOpener) -> SlackPlatformProvider:
-    settings: Any = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings: Any = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     slack_provider = SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
     slack_provider.set_scope_opener(scopes)
     register(slack_provider)

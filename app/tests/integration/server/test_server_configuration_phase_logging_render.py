@@ -22,6 +22,7 @@ import pytest
 import structlog
 
 from contracts.configuration import ConfigurationError, uninstall_configuration_files, uninstall_host_info
+from features.incident.common.settings import get_incident_core_settings
 from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from infrastructure.directory import get_directory_settings
 from infrastructure.logging.settings import get_logging_settings
@@ -37,6 +38,14 @@ from tests.factories.google_service_account import service_account_key
 pytestmark = pytest.mark.integration
 
 SECRET = "xoxb-secret-value-0002"
+CANARY_CREDENTIAL = "xoxb-canary-credential-7788"
+CANARY_NON_PUBLIC = "canary-board-id-0123456789"
+REDACTED = "***REDACTED***"
+# Names a key-name redaction pattern matches: "auth" in unauthorized_*, "token" in max_output_tokens.
+EXPECTED_MASKED = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors"}
+# The Fargate runtime splits a line over 16 KB, and Logs Insights extracts at most 200 fields of a JSON event.
+LINE_LIMIT_BYTES = 16 * 1024
+FIELD_LIMIT = 200
 
 _GETTERS: tuple[Callable[[], Any], ...] = (
     get_identity_settings,
@@ -48,6 +57,7 @@ _GETTERS: tuple[Callable[[], Any], ...] = (
     get_slack_settings,
     get_slack_transport_settings,
     get_google_workspace_settings,
+    get_incident_core_settings,
     get_notify_api_key_leak_settings,
 )
 
@@ -175,3 +185,117 @@ def test_transport_on_without_the_tenant_entry_fails_without_the_token(
     assert [event["event"] for event in _events(lines)].count("configuration_invalid") == 1
     assert SECRET not in "\n".join(lines)
     assert SECRET not in "".join(traceback.format_exception(raised.value))
+
+
+def _summary(events: list[dict[str, Any]]) -> dict[str, Any]:
+    (summary,) = [event for event in events if event["event"] == "configuration_summary"]
+    return summary
+
+
+def _slice_events(events: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {event["slice"]: event for event in events if event["event"] == "configuration_slice"}
+
+
+def _flattened_fields(value: Any) -> int:
+    """Count leaves the way Logs Insights flattens JSON: nested keys and list positions each become a field."""
+    if isinstance(value, dict):
+        return sum(_flattened_fields(member) for member in value.values()) or 1
+    if isinstance(value, list):
+        return sum(_flattened_fields(member) for member in value) or 1
+    return 1
+
+
+def test_the_summary_is_one_json_event_with_names_only_for_files(
+    _production_phase: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """configuration_summary closes the phase at info with file names, a hash and the slices, each logged on its own."""
+    load_host_configuration()
+
+    events = _events(_lines(capfd))
+    summary = _summary(events)
+    assert [event["event"] for event in events][-1] == "configuration_summary"
+    assert set(_slice_events(events)) == set(summary["slices"])
+    assert summary["level"] == "info"
+    assert summary["phase"] == "configuration"
+    assert "environment" not in summary
+    assert summary["files"] == ["base.toml", "production.toml"]
+    assert len(summary["config_hash"]) == 64
+    assert set(summary["slices"]) >= {"logging", "server", "security", "slack", "google_workspace"}
+
+
+def test_key_name_redaction_masks_only_the_known_names_and_never_a_withheld_state(
+    capfd: pytest.CaptureFixture[str],
+) -> None:
+    """Section and shown-field names are dict keys, so a name matching a redaction pattern is masked.
+
+    Every masked name is one the unit test over all slices pins; withheld names are list
+    members, so set and unset survive the pipeline.
+    """
+    load_host_configuration()
+
+    sections = _slice_events(_events(_lines(capfd)))
+    masked = {
+        f"{table}.{name}"
+        for table, section in sections.items()
+        for name, value in section.get("values", {}).items()
+        if value == REDACTED
+    }
+    assert "slack.unauthorized_errors" in masked
+    assert masked <= EXPECTED_MASKED
+    assert "bot_token" in sections["slack"]["unset"]
+
+
+def test_a_canary_credential_appears_nowhere_and_a_non_public_value_only_as_its_tail(
+    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """A set Slack bot credential logs as state only; a set non-public board id logs as state and its last four characters."""
+    monkeypatch.setenv("SLACK__TENANT__TEAM_ID", "T0001")
+    monkeypatch.setenv("SLACK__BOT_TOKEN", CANARY_CREDENTIAL)
+    monkeypatch.setenv("INCIDENT_CORE__FOLDER_ID", CANARY_NON_PUBLIC)
+
+    load_host_configuration()
+
+    lines = _lines(capfd)
+    sections = _slice_events(_events(lines))
+    output = "\n".join(lines)
+    assert CANARY_CREDENTIAL not in output
+    assert CANARY_NON_PUBLIC not in output
+    assert "bot_token" in sections["slack"]["set"]
+    assert sections["incident_core"]["partial"]["folder_id"] == CANARY_NON_PUBLIC[-4:]
+
+
+def test_every_summary_line_fits_the_runtime_buffer_and_the_query_field_limit(capfd: pytest.CaptureFixture[str]) -> None:
+    """A line over 16 KB arrives split and unparseable, and fields past 200 are not queryable, so each event stays under both."""
+    load_host_configuration()
+
+    lines = [line for line in _lines(capfd) if '"configuration_s' in line]
+    assert len(lines) > 1
+    for line in lines:
+        assert len(line.encode("utf-8")) < LINE_LIMIT_BYTES
+        assert _flattened_fields(json.loads(line)) < FIELD_LIMIT
+
+
+def test_the_service_identity_rides_every_record_without_an_event_of_its_own(capfd: pytest.CaptureFixture[str]) -> None:
+    """Every record carries the four resource attributes, so no separate identity event is logged."""
+    load_host_configuration()
+
+    events = _events(_lines(capfd))
+    assert "service_identity" not in {event["event"] for event in events}
+    for event in events:
+        assert event["deployment.environment.name"] == "production"
+        assert {"service.name", "service.version", "service.instance.id"} <= set(event)
+    assert len({event["service.instance.id"] for event in events}) == 1
+
+
+def test_an_invalid_slice_logs_only_configuration_invalid_and_no_summary(
+    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """A boot that fails validation reports the failure and never a summary of a half-validated set."""
+    monkeypatch.setenv("SERVER__WEBHOOK_MAX_BODY_BYTES", SECRET)
+
+    with pytest.raises(ConfigurationError):
+        load_host_configuration()
+
+    names = [event["event"] for event in _events(_lines(capfd))]
+    assert "configuration_invalid" in names
+    assert "configuration_summary" not in names

@@ -14,6 +14,7 @@ from unittest.mock import MagicMock
 
 import pluggy
 import pytest
+from pydantic import SecretStr
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
@@ -71,7 +72,7 @@ def run_registration(registrar: SlackCommandRegistrar) -> None:
 
 
 def real_provider() -> SlackPlatformProvider:
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     return SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
 
 

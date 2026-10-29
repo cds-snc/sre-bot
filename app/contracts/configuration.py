@@ -55,18 +55,22 @@ class HostInfo:
 # readers decisions/dependency-injection.md still tolerates.
 _files: ConfigurationFiles | None = None
 _host: HostInfo | None = None
+# The slices built since the files were installed, one per class, so the host can report them.
+_built: dict[type, ConfigurationSlice] = {}
 
 
 def install_configuration_files(files: ConfigurationFiles) -> None:
     """Install the checked files every slice reads; a later install replaces them."""
     global _files
     _files = files
+    _built.clear()
 
 
 def uninstall_configuration_files() -> None:
     """Remove the installed files, so building a slice fails until the next install."""
     global _files
     _files = None
+    _built.clear()
 
 
 def installed_configuration_files() -> ConfigurationFiles:
@@ -74,6 +78,16 @@ def installed_configuration_files() -> ConfigurationFiles:
     if _files is None:
         raise ConfigurationError("configuration files not loaded: the app factory's configuration phase installs them")
     return _files
+
+
+def slice_table(built: ConfigurationSlice) -> str:
+    """Return the configuration-file table a built slice reads."""
+    return type(built)._table
+
+
+def built_slices() -> tuple[ConfigurationSlice, ...]:
+    """Return the slices built since the files were installed, sorted by table."""
+    return tuple(sorted(_built.values(), key=lambda built: (slice_table(built), type(built).__name__)))
 
 
 def install_host_info(info: HostInfo) -> None:
@@ -101,6 +115,12 @@ def host_info() -> HostInfo:
 type EnvSource = Literal["codespaces", "devcontainer", "local"]
 """Where a developer's value for an environment-only name comes from: a Codespaces secret,
 the devcontainer's compose file, or the developer's own app/.env."""
+
+
+def is_env_only(field: FieldInfo) -> bool:
+    """Whether a field was declared with env_only: no configuration file holds its value."""
+    extra = field.json_schema_extra
+    return isinstance(extra, dict) and extra.get("env_only") is True
 
 
 def env_only(description: str, source: EnvSource, **field: Any) -> Any:
@@ -168,6 +188,7 @@ class ConfigurationSlice(BaseSettings):
         except ValidationError as error:
             # Raised from None: pydantic renders every input value, secrets included, into its message.
             raise ConfigurationError(describe_validation_error(error, type(self))) from None
+        _built[type(self)] = self
 
     @classmethod
     def settings_customise_sources(

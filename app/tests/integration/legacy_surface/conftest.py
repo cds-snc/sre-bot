@@ -29,6 +29,7 @@ import i18n  # type: ignore
 import pluggy
 import pytest
 import structlog
+from pydantic import SecretStr
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_sdk import WebClient
 from slack_sdk.webhook import WebhookClient
@@ -160,7 +161,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
     client = FakeSlackClient()
     app = build_bolt_app(monkeypatch)
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     provider = SlackPlatformProvider(
         settings=cast(SlackSettings, settings), formatter=SlackBlockKitFormatter(), command_prefix=command_prefix
     )

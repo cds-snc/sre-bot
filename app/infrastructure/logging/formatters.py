@@ -4,7 +4,7 @@ This module provides formatters that can be used as structlog processors
 to customize log output format.
 
 Usage:
-    from infrastructure.logging.formatters import add_app_info, mask_sensitive_data
+    from infrastructure.logging.formatters import mask_sensitive_data
 
 Dependencies:
     - structlog processors
@@ -50,30 +50,6 @@ def downgrade_transient_socket_mode_errors(logger: WrappedLogger, method_name: s
             event_dict["socket_mode_transient"] = True
             break
     return event_dict
-
-
-def add_app_info(app_name: str, app_version: str = "unknown"):
-    """Create a processor that adds application info to log entries.
-
-    Args:
-        app_name: Name of the application.
-        app_version: Version string for the application.
-
-    Returns:
-        A structlog processor function.
-
-    Example:
-        configure_logging(
-            extra_processors=[add_app_info("sre-bot", "1.2.3")]
-        )
-    """
-
-    def processor(logger: Any, method_name: str, event_dict: dict[str, Any]) -> dict[str, Any]:
-        event_dict["app_name"] = app_name
-        event_dict["app_version"] = app_version
-        return event_dict
-
-    return processor
 
 
 # Sensitive field patterns that should be masked in logs

@@ -39,7 +39,7 @@ def get_slack_web_client(*, actor: SlackActor = "bot") -> WebClient:
     settings = get_slack_settings()
     retries = settings.retry_max_attempts
     return WebClient(
-        token=settings.user_token if actor == "user" else settings.bot_token,
+        token=(settings.user_token if actor == "user" else settings.bot_token).get_secret_value(),
         timeout=settings.request_timeout_seconds,
         retry_handlers=[
             ConnectionErrorRetryHandler(max_retry_count=retries),
@@ -54,7 +54,7 @@ def get_async_slack_web_client() -> AsyncWebClient:
     settings = get_slack_settings()
     retries = settings.retry_max_attempts
     return AsyncWebClient(
-        token=settings.bot_token,
+        token=settings.bot_token.get_secret_value(),
         timeout=settings.request_timeout_seconds,
         retry_handlers=[
             AsyncConnectionErrorRetryHandler(max_retry_count=retries),

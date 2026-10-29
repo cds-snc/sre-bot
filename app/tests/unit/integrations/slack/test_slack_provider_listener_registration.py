@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from pydantic import SecretStr
 
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -54,7 +55,7 @@ def bolt_app(monkeypatch: pytest.MonkeyPatch) -> RecordingBoltApp:
 
 @pytest.fixture
 def provider() -> SlackPlatformProvider:
-    settings = SimpleNamespace(app_token="xapp-test", bot_token="xoxb-test")
+    settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     return SlackPlatformProvider(settings=settings, formatter=SlackBlockKitFormatter())
 
 

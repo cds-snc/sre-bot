@@ -5,13 +5,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from infrastructure.logging.settings import LoggingSettings
 from server import lifespan as lifespan_module
 from server.lifespan import (
     _get_logger_from_app,
     _initialize_directory_provider,
     _is_test_environment,
-    _list_configs_from_sections,
     _register_legacy_handlers,
     _stop_scheduled_tasks,
 )
@@ -56,47 +54,6 @@ def test_lifespan_get_logger_returns_logger():
     logger = _get_logger_from_app()
 
     assert logger is not None
-
-
-@pytest.mark.integration
-def test_lifespan_list_configs_logs_settings(mock_settings):
-    """Test that _list_configs logs configuration settings."""
-    # Arrange
-    mock_logger = MagicMock()
-    mock_server_settings = MagicMock()
-    mock_server_settings.model_dump.return_value = {"PORT": 8080}
-    mock_directory_settings = MagicMock()
-    mock_directory_settings.model_dump.return_value = {"require_startup_warmup": True}
-    mock_sre_ops_settings = MagicMock()
-    mock_sre_ops_settings.model_dump.return_value = {"SRE_OPS_CHANNEL_ID": ""}
-    mock_security_settings = MagicMock()
-    mock_security_settings.model_dump.return_value = {"issuer_config": {}, "dev_bypass_token": "secret"}
-
-    # Act
-    mock_identity = MagicMock()
-    mock_identity.model_dump.return_value = {"environment": "ci", "git_sha": "abc"}
-    _list_configs_from_sections(
-        mock_settings,
-        mock_identity,
-        LoggingSettings(log_level="WARNING"),
-        mock_server_settings,
-        mock_security_settings,
-        mock_directory_settings,
-        mock_sre_ops_settings,
-        mock_logger,
-    )
-
-    # Assert
-    mock_logger.info.assert_called()
-    first_call = mock_logger.info.call_args_list[0]
-    assert first_call.args[0] == "configuration_initialized"
-
-    base_settings = first_call.kwargs["base_settings"]
-    assert all("PREFIX" not in entry for entry in base_settings)
-    assert {"LOG_LEVEL": "WARNING"} in base_settings
-    security_call = next(c for c in mock_logger.info.call_args_list if c.kwargs.get("config_setting") == "security")
-    assert security_call.kwargs["keys"] == ("issuer_config", "dev_bypass_token")
-    assert "secret" not in str(mock_logger.info.call_args_list)
 
 
 @pytest.mark.integration

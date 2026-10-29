@@ -5,8 +5,8 @@ title: >-
   free-text regex
 status: To Do
 assignee: []
-created_date: '2026-09-15 19:39'
-updated_date: '2026-10-15 17:48'
+created_date: 2026-09-15 19:39
+updated_date: '2026-10-29T15:45:00Z'
 labels:
   - infrastructure
   - observability
@@ -18,7 +18,7 @@ references:
   - terraform/local.tf
   - terraform/alarms.tf
   - decisions/observability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1645'
+  - https://github.com/cds-snc/sre-bot/issues/1645
 priority: high
 ordinal: 211000
 ---
@@ -47,3 +47,9 @@ Scope (terraform only, after TASK-28.2 makes every line JSON):
 - [ ] #3 Saved Logs Insights query definitions exist for errors by event over time and for per-webhook invocation triage
 - [ ] #4 The new metric filters run alongside the old ones before the alarms switch, with the terraform plan output and the comparison recorded in notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-156 planning): candidate structured-field alarm in production on { $.event = "security_setting_weakened" } (WARNING, emitted at boot when a setting weakens security; configuration.md). Optional, not decided.
+<!-- SECTION:NOTES:END -->

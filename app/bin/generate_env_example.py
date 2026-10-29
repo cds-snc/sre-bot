@@ -34,6 +34,7 @@ from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings
 
 from bin.check_settings_key_ownership import APP_ROOT, collect_env_claims
+from contracts.configuration import is_env_only
 
 OUTPUT = APP_ROOT / ".env.example"
 SOURCES = {
@@ -69,7 +70,7 @@ class GenerationError(Exception):
 
 def _env_only(field: FieldInfo) -> dict[str, Any] | None:
     extra = field.json_schema_extra
-    return extra if isinstance(extra, dict) and extra.get("env_only") is True else None
+    return extra if is_env_only(field) and isinstance(extra, dict) else None
 
 
 def _nested_model(annotation: Any) -> type[BaseModel] | None:

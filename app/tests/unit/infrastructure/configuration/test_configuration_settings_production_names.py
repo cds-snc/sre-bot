@@ -84,7 +84,8 @@ def test_configuration_settings_production_name_reaches_field(
 
     settings = settings_class(_env_file=None)  # type: ignore[call-arg]
 
-    assert getattr(settings, attribute) == expected
+    value = getattr(settings, attribute)
+    assert (value.get_secret_value() if isinstance(value, SecretStr) else value) == expected
 
 
 def test_configuration_settings_lower_case_environment_name_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -129,7 +130,8 @@ def test_configuration_settings_slack_name_reaches_field(
 
     settings = SlackSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert getattr(settings, attribute) == expected
+    value = getattr(settings, attribute)
+    assert (value.get_secret_value() if isinstance(value, SecretStr) else value) == expected
 
 
 def test_configuration_settings_slack_tenant_name_builds_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,7 +160,8 @@ def test_configuration_settings_google_name_reaches_field(
 
     settings = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert getattr(settings, attribute) == expected
+    value = getattr(settings, attribute)
+    assert (value.get_secret_value() if isinstance(value, SecretStr) else value) == expected
 
 
 def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -170,7 +173,7 @@ def test_configuration_settings_google_tenant_names_build_the_tenant_entry(monke
     tenant = GoogleWorkspaceSettings(_env_file=None).tenant  # type: ignore[call-arg]
 
     assert tenant is not None
-    assert (tenant.customer_id, tenant.service_account_key, tenant.delegated_user_email) == (
+    assert (tenant.customer_id, tenant.service_account_key.get_secret_value(), tenant.delegated_user_email) == (
         "C0sentinel",
         service_account_key(),
         "bot@sentinel.example",
@@ -186,7 +189,7 @@ def test_configuration_settings_slack_and_google_lower_case_names_accepted(monke
     slack = SlackSettings(_env_file=None)  # type: ignore[call-arg]
     google = GoogleWorkspaceSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert slack.bot_token == "xoxb-lower"
+    assert slack.bot_token.get_secret_value() == "xoxb-lower"
     assert google.api_num_retries == 9
 
 
@@ -219,7 +222,8 @@ def test_configuration_settings_openai_table_name_reaches_field(
 
     settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert getattr(settings, attribute) == expected
+    value = getattr(settings, attribute)
+    assert (value.get_secret_value() if isinstance(value, SecretStr) else value) == expected
 
 
 AWS_NAMES: list[tuple[str, str, Any]] = [
@@ -240,7 +244,8 @@ def test_configuration_settings_aws_table_name_reaches_field(
 
     settings = AWSSettings(_env_file=None)  # type: ignore[call-arg]
 
-    assert getattr(settings, attribute) == expected
+    value = getattr(settings, attribute)
+    assert (value.get_secret_value() if isinstance(value, SecretStr) else value) == expected
 
 
 def test_configuration_settings_aws_tenant_names_build_the_tenant_entry(monkeypatch: pytest.MonkeyPatch) -> None:
