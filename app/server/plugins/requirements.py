@@ -85,9 +85,7 @@ def declared_requirements(pm: pluggy.PluginManager, logger: BoundLogger) -> dict
     return {plugin: tuple(req for declared in returned for req in declared) for plugin, returned in results.items()}
 
 
-def unmet_requirements(
-    declared: Mapping[str, Sequence[Requirement]], systems: ConfiguredSystems
-) -> list[RequirementFailure]:
+def unmet_requirements(declared: Mapping[str, Sequence[Requirement]], systems: ConfiguredSystems) -> list[RequirementFailure]:
     """Return a failure for every unmet requirement of every plugin, in plugin and declaration order.
 
     The slices a resolution builds are attributed to the plugin that declared it.

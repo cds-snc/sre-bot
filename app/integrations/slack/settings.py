@@ -69,7 +69,9 @@ class SlackSettings(ConfigurationSlice):
     tenant: SlackTenant | None = Field(default=None, description="The Slack workspace this instance works with.")
 
     bot_token: SecretStr = env_only("Bot token (xoxb-) the app acts with.", "codespaces", default=SecretStr(""))
-    user_token: SecretStr = env_only("User token (xoxp-) for the calls a bot token cannot make.", "codespaces", default=SecretStr(""))
+    user_token: SecretStr = env_only(
+        "User token (xoxp-) for the calls a bot token cannot make.", "codespaces", default=SecretStr("")
+    )
     app_token: SecretStr | None = env_only("App-level token (xapp-) Socket Mode connects with.", "codespaces", default=None)
     signing_secret: SecretStr | None = env_only("Signing secret HTTP Events mode verifies requests with.", "local", default=None)
 
