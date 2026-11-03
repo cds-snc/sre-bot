@@ -3,10 +3,10 @@ id: TASK-175
 title: >-
   Plugins declare their Slack, Google, Opsgenie and user-token requirements; CI
   checks the production and local configuration against them
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-29T00:46:00Z'
-updated_date: '2026-10-29T19:09:00Z'
+updated_date: '2026-10-29T23:53:00Z'
 labels:
   - plugins
 dependencies:
@@ -29,7 +29,7 @@ Follow-up to TASK-172 (human, 2026-10-29: create; decisions applied 2026-10-29).
 - [x] #3 The host resolves declarations against the configured-systems read and the cached slices, collects every unmet requirement across enabled plugins, logs one CRITICAL plugin_boot_failed per failure with plugin and setting, then aborts boot; tests cover each plugin's success and failure
 - [x] #4 A pytest test loads production.toml and local.toml, collects the declared requirements of every enabled plugin and fails when one does not resolve or a required env-only secret is not supplied (terraform/ssm.tf for production, a Codespace secret for local); ci.toml switches the requiring plugins off with a guard test; local.toml (oncall_sync off) still boots in development
 - [x] #5 Ride-along (human, 2026-10-29): CLAUDE.md Verification, the python-quality-gates and tdd-implementation skills and .github/agents/implementation.agent.md state the gate cadence (ruff and targeted tests during implementation; full mypy then fixes, then full pytest alone, once each at the end; rerun only on a real error; never in parallel), and CLAUDE.md's size gate exempts deletion-only PRs; edited in the working tree 2026-10-29, shipped in this task's PR
-- [ ] #6 SLACK__USER_TOKEN is declared env_only with source codespaces; app/.env.example regenerated; local.toml keeps oncall_sync on; the local configuration check passes with the Codespaces secret source; make env-checks run by the human after merge shows the Codespaces secret present
+- [x] #6 SLACK__USER_TOKEN is declared env_only with source codespaces; app/.env.example regenerated; local.toml keeps oncall_sync on; the local configuration check passes with the Codespaces secret source; make env-checks run by the human after merge shows the Codespaces secret present
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,4 +103,6 @@ Assumptions to verify
 2026-10-29 implementation: Requirement frozen dataclass (contracts/plugins/requirements.py); hookspec returns Sequence[Requirement]; host resolver server/plugins/requirements.py (RequirementFailure, PluginRequirementsUnmetError, one CRITICAL plugin_boot_failed per failure with plugin and setting); call_hook_per_plugin now returns per-plugin results; RequiredDependencyError and scribe's adapter deleted. Declarations on scribe, oncall_sync, rant, user_rotations. SLACK__USER_TOKEN source is codespaces; .env.example regenerated. ci.toml and pytest-env pins switch the four plugins off. Configuration check: tests/integration/server/test_server_plugins_configuration_requirements.py (production and local, with negative cases). Lifespan reads ConfiguredSystems with read_configured_systems() directly because the lifespan tests stub the core services; the registry instance is the same read over cached slices. Two existing configuration-phase tests adjusted for the new pins. AC6 left unchecked: make env-checks after merge is a human step. Gates: ruff clean; mypy reports 41 errors in 14 untouched files (modules/, infrastructure/i18n, features/incident scheduling and meet, integrations/slack/channels.py), none in changed files; full pytest 5960 passed; make check-import-contracts 13 kept 0 broken; check-settings-key-ownership OK.
 
 2026-10-29 (review): configured_systems_built moved from read_configured_systems to the core-service build (server/services.py), so the second read the lifespan makes for requirement resolution adds no boot event (one event per boot, as bin/deploy-checks.zsh expects); tests updated. Gates after the fix: ruff All checks passed; mypy on the changed server and contracts files Success (13 files); full pytest 5961 passed, 44 warnings in 164.93s; check-import-contracts 13 kept, 0 broken; check-settings-key-ownership OK. Full mypy reports 41 errors in 14 files none of this diff touches (modules/*, infrastructure/i18n/service.py and resolvers.py, features/incident/scheduling/adapters/google_calendar.py, features/incident/meet/adapters/google_meet.py, integrations/slack/channels.py); pre-existing, CI runs no mypy, not fixed here. AC #6 waits on make env-checks after merge (human).
+
+2026-10-29: pre-merge check passed (human, Logs Insights on /ecs/sre-bot-app): the running revision f5b87b43 (includes #1810) logged configured_systems_built with [slack, google] on both tasks (17:03:48Z, 17:03:57Z). After this PR the event's code.file.path becomes server/services.py; no check, filter or alarm keys on the code location (rg over bin, terraform, .github, docs).
 <!-- SECTION:NOTES:END -->
