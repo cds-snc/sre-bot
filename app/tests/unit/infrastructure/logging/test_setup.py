@@ -2,6 +2,7 @@
 
 Tests cover:
 - configure_logging function
+- uvicorn and warnings routed through the root pipeline; UTC timestamps and logger names
 - Test logging suppression in test environment
 - Recursive redaction installed in the real processor chain (TASK-8)
 - The real (non-test-environment) processor-build code path (regression for
@@ -12,6 +13,8 @@ Tests cover:
 import io
 import json
 import logging
+import sys
+import warnings
 from collections.abc import Iterator
 
 import pytest
@@ -226,11 +229,9 @@ def _root_renderer() -> object:
 
 
 @pytest.fixture
-def production_logging(mock_settings, monkeypatch) -> Iterator[io.StringIO]:
-    """Configure the real production pipeline writing to a buffer, then restore root logging and structlog."""
+def production_logging(mock_settings, monkeypatch, process_logging_state) -> Iterator[io.StringIO]:
+    """Configure the real production pipeline writing to a buffer; process_logging_state restores the rest."""
     root = logging.getLogger()
-    saved_handlers, saved_level = root.handlers[:], root.level
-    saved_config = structlog.get_config()
     monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
     mock_settings.environment = "production"
     configure_logging(mock_settings.environment, LoggingSettings())
@@ -239,8 +240,6 @@ def production_logging(mock_settings, monkeypatch) -> Iterator[io.StringIO]:
     assert isinstance(handler, logging.StreamHandler)
     handler.setStream(stream)
     yield stream
-    root.handlers, root.level = saved_handlers, saved_level
-    structlog.configure(**saved_config)
 
 
 @pytest.mark.unit
@@ -309,12 +308,8 @@ class TestConfigureLoggingRealCodePath:
     """
 
     @pytest.fixture(autouse=True)
-    def _reset_structlog(self):
-        root = logging.getLogger()
-        saved_handlers, saved_level = root.handlers[:], root.level
+    def _reset_structlog(self, process_logging_state):
         yield
-        root.handlers, root.level = saved_handlers, saved_level
-        structlog.reset_defaults()
 
     def test_production_mode_builds_processors_without_error(self, mock_settings, monkeypatch):
         """The real code path builds the pipeline in production mode without raising."""
@@ -371,3 +366,183 @@ class TestConfigureLoggingRealCodePath:
         )
 
         assert logging.getLogger().level == logging.DEBUG
+
+
+def _json_lines(stream: io.StringIO) -> list[dict]:
+    return [json.loads(line) for line in stream.getvalue().splitlines() if line.strip()]
+
+
+def _uvicorn_access_record(path: str = "/hook/abc", status: int = 200, method: str = "GET") -> logging.LogRecord:
+    return logging.LogRecord(
+        "uvicorn.access",
+        logging.INFO,
+        __file__,
+        1,
+        '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:5000", method, path, "1.1", status),
+        None,
+    )
+
+
+@pytest.mark.unit
+class TestUvicornRoutedThroughRootPipeline:
+    """uvicorn's own loggers render through the same JSON chain as every other record."""
+
+    def test_uvicorn_loggers_lose_their_handlers_and_propagate_to_root(self, production_logging):
+        """The four uvicorn loggers end with no handler, propagation on and no level of their own."""
+        for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "uvicorn.asgi"):
+            logging.getLogger(name).handlers = [logging.StreamHandler()]
+            logging.getLogger(name).propagate = False
+            logging.getLogger(name).setLevel(logging.ERROR)
+
+        configure_logging("production", LoggingSettings())
+
+        for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "uvicorn.asgi"):
+            uvicorn_logger = logging.getLogger(name)
+            assert uvicorn_logger.handlers == []
+            assert uvicorn_logger.propagate is True
+            assert uvicorn_logger.level == logging.NOTSET
+
+    def test_access_record_renders_as_one_json_object_with_logger_and_utc_timestamp(self, production_logging):
+        """An access-shaped record is one JSON object carrying level, logger name and a UTC ISO-8601 timestamp."""
+        logging.getLogger("uvicorn.access").handle(_uvicorn_access_record("/hook/abc?x=1", 500, "POST"))
+
+        (record,) = _json_lines(production_logging)
+        assert record["logger"] == "uvicorn.access"
+        assert record["level"] == "info"
+        assert record["event"] == '127.0.0.1:5000 - "POST /hook/abc?x=1 HTTP/1.1" 500'
+        assert record["timestamp"].endswith("Z")
+
+    def test_uvicorn_error_with_exception_renders_as_exactly_one_line(self, production_logging, capfd):
+        """An ERROR with exc_info is one JSON line holding the traceback, with nothing raw on stdout or stderr."""
+        try:
+            raise RuntimeError("boom")
+        except RuntimeError:
+            logging.getLogger("uvicorn.error").exception("Exception in ASGI application")
+
+        (record,) = _json_lines(production_logging)
+        assert record["level"] == "error"
+        assert record["logger"] == "uvicorn.error"
+        assert "RuntimeError: boom" in record["exception"]
+        captured = capfd.readouterr()
+        assert captured.out == ""
+        assert captured.err == ""
+
+    def test_sensitive_field_is_redacted_on_foreign_and_native_records(self, production_logging):
+        """A sensitive-named static field is masked by the same processor on a uvicorn record and on a native event."""
+        configure_logging("production", LoggingSettings(), static_fields={"session.id": "abc-123"})
+        stream = io.StringIO()
+        handler = logging.getLogger().handlers[0]
+        assert isinstance(handler, logging.StreamHandler)
+        handler.setStream(stream)
+        logging.getLogger("uvicorn.error").error("rejected")
+        structlog.get_logger().error("rejected")
+
+        foreign, native = _json_lines(stream)
+        assert foreign["session.id"] == "***REDACTED***"
+        assert native["session.id"] == "***REDACTED***"
+
+    def test_foreign_callsite_fields_point_at_the_emitting_file(self, production_logging):
+        """The record's own file and line become code.file.path and code.line.number, not the logging module's."""
+        logging.getLogger("uvicorn.error").handle(
+            logging.LogRecord("uvicorn.error", logging.ERROR, "/srv/app/vendor/h11_impl.py", 77, "m", None, None)
+        )
+
+        (record,) = _json_lines(production_logging)
+        assert record["code.file.path"].endswith("h11_impl.py")
+        assert record["code.line.number"] == 77
+
+    def test_warnings_render_through_the_pipeline(self, production_logging):
+        """A Python warning raised after configuration is one JSON line from the py.warnings logger."""
+        warnings.warn("deprecated thing", UserWarning, stacklevel=1)
+
+        (record,) = _json_lines(production_logging)
+        assert record["logger"] == "py.warnings"
+        assert "deprecated thing" in record["event"]
+
+
+@pytest.mark.unit
+class TestStructlogNativeLines:
+    """Structlog-native events carry the caller's logger name and an explicit UTC timestamp."""
+
+    def test_native_event_carries_the_caller_module_as_logger(self, production_logging):
+        """A logger from get_logger() without a name is named after the module that created it."""
+        logging.getLogger().setLevel(logging.INFO)
+        structlog.get_logger().info("native_event")
+
+        (record,) = _json_lines(production_logging)
+        assert record["logger"] == __name__
+        assert record["timestamp"].endswith("Z")
+
+    def test_explicit_logger_name_is_kept(self, production_logging):
+        """A name passed to get_logger() is the logger field."""
+        logging.getLogger().setLevel(logging.INFO)
+        structlog.get_logger("explicit.name").info("native_event")
+
+        (record,) = _json_lines(production_logging)
+        assert record["logger"] == "explicit.name"
+
+    def test_time_stamper_sets_utc_explicitly(self):
+        """The timestamp processor is built with utc=True rather than relying on the library default."""
+        stampers = [
+            item for item in _build_base_processors(LoggingSettings()) if isinstance(item, structlog.processors.TimeStamper)
+        ]
+        assert len(stampers) == 1
+        assert stampers[0].utc is True
+
+
+@pytest.mark.unit
+class TestPytestBranchLeavesProcessAlone:
+    """Under pytest configure_logging keeps silencing output and touches nothing else."""
+
+    def test_uvicorn_loggers_and_excepthook_are_untouched(self, process_logging_state):
+        """The suppression branch neither clears uvicorn handlers nor replaces sys.excepthook."""
+        marker = logging.StreamHandler()
+        logging.getLogger("uvicorn").handlers = [marker]
+        hook = sys.excepthook
+
+        configure_logging("production", LoggingSettings())
+
+        assert logging.getLogger("uvicorn").handlers == [marker]
+        assert sys.excepthook is hook
+        assert logging.getLogger().level > logging.CRITICAL
+
+
+@pytest.mark.unit
+class TestBootstrapThenConfigure:
+    """The bootstrap pipeline is replaced, never stacked, by the configured one."""
+
+    def test_bootstrap_renders_production_json_at_info_without_identity(self, monkeypatch, process_logging_state):
+        """The bootstrap handler is a JSON renderer at INFO with no service identity fields."""
+        monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
+
+        logging_setup.configure_bootstrap_logging()
+
+        root = logging.getLogger()
+        assert len(root.handlers) == 1
+        assert isinstance(_root_renderer(), structlog.processors.JSONRenderer)
+        assert root.level == logging.INFO
+
+    def test_configure_logging_replaces_the_bootstrap_handler_and_adds_identity(self, monkeypatch, process_logging_state):
+        """After the real call there is one root handler, and a logger first used afterwards carries the identity."""
+        monkeypatch.setattr(logging_setup, "_is_test_environment", lambda: False)
+        logging_setup.configure_bootstrap_logging()
+
+        configure_logging("production", LoggingSettings(), static_fields={"service.name": "sre-bot"})
+        stream = io.StringIO()
+        handler = logging.getLogger().handlers[0]
+        assert isinstance(handler, logging.StreamHandler)
+        handler.setStream(stream)
+        structlog.get_logger("first.used.after").info("after")
+
+        assert len(logging.getLogger().handlers) == 1
+        (record,) = _json_lines(stream)
+        assert record["service.name"] == "sre-bot"
+
+    def test_bootstrap_is_a_no_op_under_pytest(self):
+        """Under pytest the bootstrap call leaves the root handlers as they were."""
+        before = logging.getLogger().handlers[:]
+
+        logging_setup.configure_bootstrap_logging()
+
+        assert logging.getLogger().handlers == before

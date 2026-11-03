@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-15 19:39
-updated_date: '2026-10-29T15:45:00Z'
+updated_date: '2026-11-03T14:17:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -53,4 +53,6 @@ Out of scope: security headers and RFC 9457 problem details (TASK-28), and the l
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 (TASK-156 planning): service identity (service.name, service.version, service.instance.id, deployment.environment.name) is added by a chain processor, not contextvars, so clear_contextvars() never removes it; request_id stays the only contextvars-bound correlation key (observability.md). The middleware does not bind identity fields.
+
+2026-11-03 (from TASK-28.2's approved plan): uvicorn access lines render through the pipeline after 28.2 and are logged inside the app's send, so add a test that the request_id bound by the middleware appears on a uvicorn access line; binds no identity fields (a chain processor carries them).
 <!-- SECTION:NOTES:END -->

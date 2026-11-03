@@ -2,8 +2,6 @@
 
 Tests cover:
 - mask_sensitive_data processor
-- truncate_large_values processor
-- add_environment_info processor
 - SENSITIVE_PATTERNS constant
 - downgrade_transient_socket_mode_errors processor
 """
@@ -12,10 +10,8 @@ import pytest
 
 from infrastructure.logging.formatters import (
     SENSITIVE_PATTERNS,
-    add_environment_info,
     downgrade_transient_socket_mode_errors,
     mask_sensitive_data,
-    truncate_large_values,
 )
 
 
@@ -260,128 +256,6 @@ class TestMaskSensitiveData:
 
         for key in ("passwd", "pwd", "signature", "session", "passphrase"):
             assert result[key] == "***REDACTED***", f"{key} should be masked"
-
-
-@pytest.mark.unit
-class TestTruncateLargeValues:
-    """Test suite for truncate_large_values processor factory."""
-
-    def test_truncate_large_values_truncates_long_string(self):
-        """Strings longer than max_length are truncated."""
-        processor = truncate_large_values(max_length=50)
-        long_string = "a" * 100
-        event_dict = {
-            "event": "test",
-            "long_field": long_string,
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert len(result["long_field"]) < len(long_string)
-        assert result["long_field"].startswith("a" * 50)
-        assert "[truncated, 100 chars total]" in result["long_field"]
-
-    def test_truncate_large_values_preserves_short_strings(self):
-        """Strings shorter than max_length are not modified."""
-        processor = truncate_large_values(max_length=100)
-        short_string = "short text"
-        event_dict = {
-            "event": "test",
-            "short_field": short_string,
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["short_field"] == short_string
-
-    def test_truncate_large_values_default_length(self):
-        """Default max_length is 500 characters."""
-        processor = truncate_large_values()
-        medium_string = "x" * 400
-        long_string = "y" * 600
-        event_dict = {
-            "event": "test",
-            "medium": medium_string,
-            "long": long_string,
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["medium"] == medium_string  # Not truncated
-        assert len(result["long"]) < len(long_string)  # Truncated
-
-    def test_truncate_large_values_preserves_non_strings(self):
-        """Non-string values are not affected."""
-        processor = truncate_large_values(max_length=50)
-        event_dict = {
-            "event": "test",
-            "number": 12345,
-            "boolean": True,
-            "list": [1, 2, 3],
-            "dict": {"key": "value"},
-            "none": None,
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["number"] == 12345
-        assert result["boolean"] is True
-        assert result["list"] == [1, 2, 3]
-        assert result["dict"] == {"key": "value"}
-        assert result["none"] is None
-
-    def test_truncate_large_values_includes_original_length(self):
-        """Truncation message includes original length."""
-        processor = truncate_large_values(max_length=10)
-        event_dict = {
-            "event": "test",
-            "field": "a" * 50,
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert "50 chars total" in result["field"]
-
-
-@pytest.mark.unit
-class TestAddEnvironmentInfo:
-    """Test suite for add_environment_info processor factory."""
-
-    def test_add_environment_info_adds_environment(self):
-        """Processor adds environment to event dict."""
-        processor = add_environment_info("production")
-        event_dict = {"event": "test"}
-
-        result = processor(None, "info", event_dict)
-
-        assert result["environment"] == "production"
-
-    def test_add_environment_info_preserves_existing_fields(self):
-        """Existing fields are preserved."""
-        processor = add_environment_info("staging")
-        event_dict = {
-            "event": "deployment",
-            "version": "1.2.3",
-            "user": "deploy-bot",
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["environment"] == "staging"
-        assert result["version"] == "1.2.3"
-        assert result["user"] == "deploy-bot"
-
-    def test_add_environment_info_overwrites_existing(self):
-        """If environment already exists, it is overwritten."""
-        processor = add_environment_info("production")
-        event_dict = {
-            "event": "test",
-            "environment": "old_env",
-        }
-
-        result = processor(None, "info", event_dict)
-
-        assert result["environment"] == "production"
 
 
 @pytest.mark.unit

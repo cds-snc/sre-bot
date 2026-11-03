@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T16:25:00Z'
+updated_date: '2026-11-03T14:17:00Z'
 labels:
   - observability
   - lifecycle
@@ -48,3 +49,9 @@ Stage:
 - [ ] #5 A boot test asserts the INFO event count of a ci boot stays at or below the agreed bound
 - [ ] #6 ruff, lint-imports, mypy and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03 (from TASK-28.2's approved plan): uvicorn contributes four startup INFO lines (now JSON), not this task's to change; the webhook import-time lines belong to TASK-168; liveness access hits are DEBUG after 28.2.
+<!-- SECTION:NOTES:END -->

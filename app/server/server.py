@@ -1,3 +1,4 @@
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sns_message_validator import SNSMessageValidator  # type: ignore
@@ -20,7 +21,18 @@ def create_app() -> FastAPI:
 
     A missing ENVIRONMENT, an unreadable configuration file or an invalid host slice
     raises here, before any middleware is built. Start with ``uvicorn --factory``.
+
+    uvicorn keeps only the message of a TypeError raised by the factory, so it is logged
+    with its traceback here before it propagates.
     """
+    try:
+        return _build_app()
+    except TypeError:
+        structlog.get_logger(__name__).critical("app_factory_failed", exc_info=True)
+        raise
+
+
+def _build_app() -> FastAPI:
     configuration = load_host_configuration()
     security_settings = configuration.security
 

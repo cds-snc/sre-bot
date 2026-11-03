@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-15 19:39
-updated_date: '2026-10-29T15:45:00Z'
+updated_date: '2026-11-03T14:17:00Z'
 labels:
   - infrastructure
   - observability
@@ -52,4 +52,6 @@ Scope (terraform only, after TASK-28.2 makes every line JSON):
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 (TASK-156 planning): candidate structured-field alarm in production on { $.event = "security_setting_weakened" } (WARNING, emitted at boot when a setting weakens security; configuration.md). Optional, not decided.
+
+2026-11-03 (from TASK-28.2's approved plan): after 28.2, uvicorn access lines are JSON at INFO whatever the status, so the free-text error filter no longer counts a 5xx response (it did through uvicorn's 'Internal Server Error' text); add a 5xx metric on $.logger = "uvicorn.access" (the status is in the rendered message, not a field: a numeric status field may need a small change in the pipeline). The skip clause HTTP/1.[01]. [1-4][0-9][0-9] in terraform/local.tf becomes dead. Use real post-28.2 lines as test-metric-filter samples. Non-JSON import-time console lines remain until TASK-168.
 <!-- SECTION:NOTES:END -->

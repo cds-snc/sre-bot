@@ -27,7 +27,11 @@ from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sr
 from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import get_logging_settings
-from infrastructure.logging.setup import configure_logging
+from infrastructure.logging.setup import (
+    configure_bootstrap_logging,
+    configure_logging,
+    install_uncaught_exception_hook,
+)
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.aws.settings import get_aws_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
@@ -158,15 +162,26 @@ def validate_legacy_incident_google_tenant(transport: SlackTransportSettings, go
 def load_host_configuration(directory: Path | None = None) -> HostConfiguration:
     """Run the configuration phase once: select, check and install the files, validate every host slice.
 
-    Logging is configured right after the identity and [logging] slices, so every later
+    A bootstrap pipeline renders a failure before the [logging] slice loads as one JSON line.
+    Logging is then configured right after the identity and [logging] slices, so every later
     configuration event, a failure included, renders through the one pipeline
     (decisions/observability.md). Any invalid environment, file, table or key raises
     here, before the app is built.
     """
-    identity = get_identity_settings()
-    files = load_configuration_files(identity.environment, directory)
-    install_configuration_files(files)
-    logging_settings = get_logging_settings()
+    configure_bootstrap_logging()
+    install_uncaught_exception_hook(reported=(ConfigurationError, ValidationError))
+    try:
+        identity = get_identity_settings()
+        files = load_configuration_files(identity.environment, directory)
+        install_configuration_files(files)
+        logging_settings = get_logging_settings()
+    except ValidationError as error:
+        # Logged once here and re-raised unchanged; the uncaught-exception hook skips both types.
+        _log_invalid(ConfigurationError(describe_validation_error(error)))
+        raise
+    except ConfigurationError as error:
+        _log_invalid(error)
+        raise
     configure_logging(identity.environment, logging_settings, static_fields=build_service_identity(identity).log_fields())
     try:
         configuration = _validate_slices(identity)
