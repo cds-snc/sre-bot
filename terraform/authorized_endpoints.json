@@ -1,0 +1,14 @@
+[
+  { "path": "/", "positional_constraint": "EXACTLY", "note": "landing page" },
+  { "path": "/version", "positional_constraint": "EXACTLY", "note": "build version" },
+  { "path": "/health", "positional_constraint": "EXACTLY", "note": "liveness" },
+  { "path": "/docs", "positional_constraint": "EXACTLY", "note": "OpenAPI docs, public by decision" },
+  { "path": "/docs/oauth2-redirect", "positional_constraint": "EXACTLY", "note": "OpenAPI docs, public by decision" },
+  { "path": "/redoc", "positional_constraint": "EXACTLY", "note": "OpenAPI docs, public by decision" },
+  { "path": "/openapi.json", "positional_constraint": "EXACTLY", "note": "OpenAPI docs, public by decision" },
+  { "path": "/geolocate", "positional_constraint": "STARTS_WITH", "note": "legacy GET /geolocate/{ip}" },
+  { "path": "/v1/geolocate", "positional_constraint": "EXACTLY", "note": "geolocate plugin; TASK-124.6 resolves the duplicate" },
+  { "path": "/hook", "positional_constraint": "STARTS_WITH", "note": "webhooks" },
+  { "path": "/api/v1/", "positional_constraint": "STARTS_WITH", "note": "versioned API; authentication is the app's" },
+  { "path": "/.well-known/security.txt", "positional_constraint": "EXACTLY", "note": "served by the ALB, terraform/alb.tf" }
+]

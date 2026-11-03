@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-27 16:07
-updated_date: '2026-10-23T16:27:00Z'
+updated_date: '2026-11-03T20:45:00Z'
 labels:
   - architecture
   - layers
@@ -39,6 +39,7 @@ Scope:
 - [ ] #2 Every remaining app/api/ route is assigned to a rebuild ticket in the TASK-36 inventory
 - [ ] #3 app/api/ is deleted once its last route has moved, and api is removed from the import-linter root packages
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #5 Every route this task moves or mounts passes the TASK-163 edge test (allowed at the edge or listed intentionally internal with a reason); the first authenticated /api/v1 route made live here runs bin/deploy-checks.zsh post edge with a Backstage token: a bad token gets 401 with WWW-Authenticate: Bearer and a valid one a status outside 401/403 (the token part of TASK-163 AC #5)
 <!-- AC:END -->
 
 ## Comments

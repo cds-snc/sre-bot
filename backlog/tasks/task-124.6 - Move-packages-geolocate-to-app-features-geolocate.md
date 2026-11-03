@@ -4,7 +4,7 @@ title: Move packages/geolocate to app/features/geolocate/
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:01
-updated_date: '2026-10-26T13:45:00Z'
+updated_date: '2026-11-03T20:45:00Z'
 labels:
   - plugin-architecture
   - features
@@ -40,4 +40,5 @@ Child of TASK-124. geolocate puts Slack handlers in platforms/ and has a routes.
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 Its settings slice follows decisions/configuration.md: lower snake_case fields and TOML keys, case_sensitive=False, extra=forbid, the <SLICE>__ env prefix with no per-field alias, and any remaining secret published as an SSM SecureString in the task definition (as TASK-111.4 does)
 - [ ] #7 The legacy GET /geolocate/{ip} route (app/api/v1/routes/geolocate.py) no longer imports packages.geolocate: it moves into the plugin's entrypoints/http.py or is retired per TASK-53's route inventory, and its ignore entry in the protected-plugins import contract is removed
+- [ ] #8 The duplicate geolocate HTTP surface is resolved (GET /geolocate/{ip} vs GET /v1/geolocate): the retired path's entry leaves terraform/authorized_endpoints.json, and the TASK-163 edge test passes
 <!-- AC:END -->

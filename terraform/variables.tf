@@ -37,24 +37,3 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
-variable "authorized_endpoints_with_constraints" {
-  description = "List of authorized endpoints with their positional constraints"
-  type = list(object({
-    path                  = string
-    positional_constraint = string
-  }))
-  default = [
-    { path = "/", positional_constraint = "EXACTLY" },
-    { path = "/auth/me", positional_constraint = "EXACTLY" },
-    { path = "/request_access", positional_constraint = "EXACTLY" },
-    { path = "/active_requests", positional_constraint = "EXACTLY" },
-    { path = "/past_requests", positional_constraint = "EXACTLY" },
-    { path = "/accounts", positional_constraint = "EXACTLY" },
-    { path = "/geolocate", positional_constraint = "STARTS_WITH" },
-    { path = "/hook", positional_constraint = "STARTS_WITH" },
-    { path = "/version", positional_constraint = "EXACTLY" },
-    { path = "/access", positional_constraint = "STARTS_WITH" },
-    { path = "/health", positional_constraint = "EXACTLY" },
-    { path = "/.well-known/security.txt", positional_constraint = "EXACTLY" }
-  ]
-}

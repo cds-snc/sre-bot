@@ -3,8 +3,8 @@ id: TASK-37.4
 title: 'Webhooks slice 4: cutover and delete modules/webhooks'
 status: To Do
 assignee: []
-created_date: '2026-07-28 18:40'
-updated_date: '2026-10-15 20:53'
+created_date: 2026-07-28 18:40
+updated_date: '2026-11-03T20:45:00Z'
 labels:
   - migration
   - webhooks
@@ -19,7 +19,7 @@ references:
   - decisions/webhooks.md
   - decisions/migration.md
   - decisions/plugins.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1379'
+  - https://github.com/cds-snc/sre-bot/issues/1379
   - decisions/plugin-architecture.md
 parent_task_id: TASK-37
 priority: high
@@ -52,4 +52,5 @@ Verify: grep every importer of modules/webhooks and models/webhooks before delet
 - [ ] #3 The capability declares its pyproject entry point and enablement key and loads via pm.load_setuptools_entrypoints; boot fails loudly if it does not (test)
 - [ ] #4 TASK-36 smoke tests pass before and after cutover; deprecated-import and import-linter baselines shrank or held
 - [ ] #5 TASK-46 fingerprint emission and TASK-7 hardening are preserved on the new route (test)
+- [ ] #6 The WAF Common Rule Set scope-down and the body cap cover both webhook mount points (/hook/ and /api/v1/hook/), or the duplicate mount is dropped by decision; the TASK-163 edge test's public-by-decision set matches the outcome
 <!-- AC:END -->

@@ -3,8 +3,8 @@ id: TASK-146.3
 title: Incident declare invites the on-call people through the on-call capability
 status: To Do
 assignee: []
-created_date: '2026-10-09 16:44'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-09 16:44
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - oncall
   - capabilities
@@ -12,7 +12,7 @@ dependencies:
   - TASK-146.1
   - TASK-145.7
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1704'
+  - https://github.com/cds-snc/sre-bot/issues/1704
 parent_task_id: TASK-146
 priority: medium
 type: feature
@@ -36,3 +36,15 @@ THIS SLICE
 - [ ] #2 Declare invites the people the on-call fake returns and continues when the lookup fails
 - [ ] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Re-cut for E2: incident coordination assigns a product lead via the on-call capability when a source is configured and supports manual assignment otherwise. Urgent paging is separate and follows the Pager port after the coordination MVP; avoid coupling this task to coordination internals.
+
+---
+<!-- COMMENTS:END -->

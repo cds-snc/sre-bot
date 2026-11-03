@@ -2,7 +2,7 @@
 status: Accepted
 date: 2026-07-06
 applies: target
-scope: API authentication, authorization, CORS, rate limiting, headers, and webhook authenticity.
+scope: API authentication, authorization, CORS, rate limiting, headers, webhook authenticity, and the edge allow-list.
 ---
 
 # API Security
@@ -29,6 +29,8 @@ The 2026-07 review found production CORS resolving to wildcard-with-credentials,
 
 **Request limits:** body size capped at the server; no unbounded `Body(...)` on public routes.
 
+**Edge (amended 2026-11-03):** the WAF's `AuthorizedEndpoints` rule is a positive allow-list kept in step with the application's route table: every route the app mounts is reachable at the edge, and the allow-list exists only to drop requests for paths nothing serves (scanners, fuzzing, forgotten or framework-default paths). It never hides a served route: the code and its OpenAPI documents are public, so the docs routes are allowed, and access control stays the application's authentication and authorization. The list lives in one file, `terraform/authorized_endpoints.json`, read by terraform and by a CI test that loads every installed plugin's routes onto the app and fails on a mounted route the edge would block, on an entry that matches no route, and on a route under the authenticated `/api/v1/` prefix without `get_current_user` that is not recorded as public by decision. A route blocked at the edge on purpose is listed in that test with its reason; the list starts empty. The versioned API is one `/api/v1/` prefix entry, so a new route family needs no terraform change. Keeping the exposed surface equal to the documented one is what [OWASP API9:2023 Improper Inventory Management](https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/) asks.
+
 ## Consequences
 
 - The trust model is uniform: verify at the boundary (transport or route), then code downstream assumes an authenticated principal.
@@ -37,6 +39,7 @@ The 2026-07 review found production CORS resolving to wildcard-with-credentials,
 ## Checks
 
 - Tests: JWT missing-`aud` config fails boot; tampered/HS256 tokens rejected; CORS validator rejects wildcards and the middleware sends no `Access-Control-Allow-Credentials`; unauthenticated request to a feature route → 401; provider-signed webhook with an invalid signature → 403 in all environments; a Bot-issued HMAC webhook with a missing/invalid signature → 401/403; oversized webhook body rejected; a not-yet-migrated legacy webhook is accepted only while flagged legacy and each acceptance emits an origin-fingerprint event; 429 carries `Retry-After`.
+- Edge: the route-table test (`app/tests/unit/server/test_server_edge_allow_list_routes.py`) passes; `bin/deploy-checks.zsh post edge` shows the app, not the WAF, answering an `/api/v1` path after an allow-list change.
 - grep: no `X-Sentinel-Source` (or any header-presence) limiter exemption; `allow_origins` never computed from environment shape.
 
 ## Migration
@@ -48,3 +51,4 @@ Ticket: Phase-0 security hotfixes — known gaps at adoption time: prod CORS wil
 - 2026-10-20: CORS drops credentials mode (bearer tokens need none), methods default to `GET` and `POST`, and the settings live in the `SecuritySettings` slice (TASK-24.2).
 - 2026-10-23: issuers move to `[[security.issuers]]` in the configuration files and each entry is boot-validated (https or loopback `jwks_uri`, asymmetric algorithms, audience, one per issuer); production refuses to boot with the dev bypass flag on or its token set; fail-degraded covers JWKS reachability only (TASK-111.8).
 - 2026-10-29: the dev bypass enabled outside production and an empty issuer list log one `security_setting_weakened` WARNING naming the setting ([configuration.md](configuration.md), TASK-156 planning).
+- 2026-11-03: the edge allow-list follows the route table: one JSON source read by terraform and a CI test, every mounted route reachable (OpenAPI docs included), `/api/v1/` opened as one prefix with authentication enforced by the test, six legacy entries with no route removed (TASK-163).

@@ -5,8 +5,8 @@ title: >-
   api.py, hookspecs) with no consumers
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 17:46'
+created_date: 2026-09-10 16:18
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - identity
 dependencies:
@@ -22,7 +22,7 @@ references:
   - decisions/people-and-accounts.md
   - decisions/plugins.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1628'
+  - https://github.com/cds-snc/sre-bot/issues/1628
 parent_task_id: TASK-83
 priority: medium
 ordinal: 171000
@@ -61,3 +61,15 @@ Nothing consumes it yet, so it can merge without changing behavior.
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-25 (people-and-accounts.md amendment): the domain also needs verified link provenance and a merged_into tombstone on Person, so a merged person still resolves to its survivor. The join flow itself is TASK-83.14.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+E4 coordination prerequisite: the roster uses person identities from this capability, with role-derived and manually added people. Do not add a temporary email, Google group, or Slack group expansion path. E4 waits on this capability before enabling person-based roster reads.
+
+---
+<!-- COMMENTS:END -->

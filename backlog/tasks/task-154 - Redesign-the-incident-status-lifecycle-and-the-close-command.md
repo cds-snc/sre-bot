@@ -3,14 +3,14 @@ id: TASK-154
 title: Redesign the incident status lifecycle and the close command
 status: To Do
 assignee: []
-created_date: '2026-10-15 18:09'
-updated_date: '2026-10-15 18:25'
+created_date: 2026-10-15 18:09
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - incident
 dependencies:
   - TASK-145.8
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1720'
+  - https://github.com/cds-snc/sre-bot/issues/1720
 priority: medium
 ordinal: 395000
 ---
@@ -33,3 +33,15 @@ Standalone rather than a TASK-145 subtask: TASK-145 rebuilds legacy surfaces at 
 - [ ] #1 The lifecycle states, transitions and the behaviour of close are decided and recorded in a dated amendment to decisions/incident-management.md
 - [ ] #2 Follow-up implementation tasks exist for the decided lifecycle, including any status data migration under the shared backfill rule set
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordinated incidents ADR note (doc-11 A1/E1): re-plan the chosen change-severity surface to record each person-chosen severity change. Do not derive severity from the count or breadth of engagements. Choose one owning task during planning to avoid duplicate behavior.
+
+---
+<!-- COMMENTS:END -->
