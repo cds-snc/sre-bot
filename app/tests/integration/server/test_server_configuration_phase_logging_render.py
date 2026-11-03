@@ -124,7 +124,8 @@ def _transport_on(directory: Path, extra: str = "") -> None:
 def test_configuration_phase_event_renders_as_json_in_production(
     _production_phase: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
 ) -> None:
-    """The Slack transport rules' socket-mode notice, emitted while slices validate, is one JSON line at info."""
+    """The Slack transport rules' socket-mode notice, emitted while slices validate, is one JSON line at debug."""
+    monkeypatch.setenv("LOGGING__LOG_LEVEL", "DEBUG")
     _transport_on(_production_phase, '[slack.tenant]\nteam_id = "T0001"\n')
     monkeypatch.setenv("SLACK__BOT_TOKEN", "xoxb-bot")
     monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-app")
@@ -137,7 +138,7 @@ def test_configuration_phase_event_renders_as_json_in_production(
     events = _events(_lines(capfd))
     notices = [event for event in events if event["event"] == "slack_signing_secret_not_set_in_socket_mode"]
     assert len(notices) == 1
-    assert notices[0]["level"] == "info"
+    assert notices[0]["level"] == "debug"
 
 
 def test_logging_is_configured_before_any_other_slice_validates(monkeypatch: pytest.MonkeyPatch) -> None:

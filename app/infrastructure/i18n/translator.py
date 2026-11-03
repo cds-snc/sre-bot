@@ -41,12 +41,12 @@ class Translator:
         self.fallback_locale = fallback_locale
         self.catalogs: dict[Locale, TranslationCatalog] = {}
         self.log = logger.bind(fallback_locale=fallback_locale.value)
-        self.log.info("initialized_translator")
+        self.log.debug("initialized_translator")
 
     def load_all(self) -> None:
         """Load all available locales from loader."""
         self.catalogs = self.loader.load_all()
-        self.log.info("loaded_all_translations", locale_count=len(self.catalogs))
+        self.log.debug("loaded_all_translations", locale_count=len(self.catalogs))
 
     def load_locale(self, locale: Locale) -> None:
         """Load specific locale from loader.
@@ -58,7 +58,7 @@ class Translator:
             FileNotFoundError: If translation files not found.
         """
         self.catalogs[locale] = self.loader.load(locale)
-        self.log.info("loaded_locale_translations", locale=locale.value)
+        self.log.debug("loaded_locale_translations", locale=locale.value)
 
     def translate_message(
         self,

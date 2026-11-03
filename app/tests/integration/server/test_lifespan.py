@@ -1,6 +1,5 @@
 """Integration tests for server.lifespan module."""
 
-import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -9,43 +8,9 @@ from server import lifespan as lifespan_module
 from server.lifespan import (
     _get_logger_from_app,
     _initialize_directory_provider,
-    _is_test_environment,
     _register_legacy_handlers,
     _stop_scheduled_tasks,
 )
-
-
-@pytest.mark.integration
-def test_lifespan_is_test_environment_detects_pytest():
-    """Test that _is_test_environment detects pytest environment."""
-    # Arrange
-
-    # Act
-    is_test = _is_test_environment()
-
-    # Assert
-    assert is_test is True
-
-
-@pytest.mark.integration
-def test_lifespan_is_test_environment_detects_non_pytest():
-    """Test that _is_test_environment returns False when pytest not loaded."""
-    # Arrange
-    original_modules = sys.modules.copy()
-
-    # Temporarily remove pytest from sys.modules
-    if "pytest" in sys.modules:
-        del sys.modules["pytest"]
-
-    try:
-        # Act
-        result = lifespan_module._is_test_environment()
-
-        # Assert
-        assert result is False
-    finally:
-        # Restore sys.modules
-        sys.modules.update(original_modules)
 
 
 @pytest.mark.integration

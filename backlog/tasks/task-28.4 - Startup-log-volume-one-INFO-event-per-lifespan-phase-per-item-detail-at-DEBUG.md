@@ -3,10 +3,10 @@ id: TASK-28.4
 title: >-
   Startup log volume: one INFO event per lifespan phase, per-item detail at
   DEBUG
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-10-29T16:25:00Z'
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-03T18:14:00Z'
 labels:
   - observability
   - lifecycle
@@ -42,12 +42,12 @@ Stage:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An inventory of every event one local boot and one production boot write before the first request, with each event's level and count, recorded in the task notes (production from zsh bin/deploy-checks.zsh output or a Logs Insights query the human runs)
-- [ ] #2 observability.md records the startup logging rule (one INFO event per lifespan phase naming the phase, with counts; per-item registration and construction detail at DEBUG; configuration only in the generated summaries), with cited sources
-- [ ] #3 Each lifespan phase emits one INFO event with its name and counts; per-item registration, construction and webhook-pattern lines log at DEBUG; no WARNING, ERROR or CRITICAL event changes level
-- [ ] #4 No deploy check, alarm filter or test matches a removed or demoted event, verified by rg over bin/, terraform/, .github/ and app/tests
-- [ ] #5 A boot test asserts the INFO event count of a ci boot stays at or below the agreed bound
-- [ ] #6 ruff, lint-imports, mypy and pytest tests --ignore=tests/smoke pass
+- [x] #1 An inventory of every event one local boot and one production boot write before the first request, with each event's level and count, recorded in the task notes (production from zsh bin/deploy-checks.zsh output or a Logs Insights query the human runs)
+- [x] #2 observability.md records the startup logging rule (one INFO event per lifespan phase naming the phase, with counts; per-item registration and construction detail at DEBUG; configuration only in the generated summaries), with cited sources
+- [x] #3 Each lifespan phase emits one INFO event with its name and counts; per-item registration, construction and webhook-pattern lines log at DEBUG; no WARNING, ERROR or CRITICAL event changes level
+- [x] #4 No deploy check, alarm filter or test matches a removed or demoted event, verified by rg over bin/, terraform/, .github/ and app/tests
+- [x] #5 A boot test asserts the INFO event count of a ci boot stays at or below the agreed bound
+- [x] #6 ruff, lint-imports, mypy and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -165,4 +165,34 @@ OQ9 scheduled jobs: confirm that per-job lines go DEBUG and scheduled_tasks_star
 TASK-94: no terraform metric filter keys on a startup event (alarms.tf, local.tf checked); the DEBUG-with-"error"-word hazard is noted above. TASK-168: add AC to remove deploy-checks line 147 exclusion and the plain import lines; examples.py is gone after this task. TASK-164: its CI port reads the new boot key core_services_initialized. TASK-28.3: none. TASK-163: none (terraform only). doc-11: update row 9a.2 with this plan (human edits; doc-11 is untracked and never committed).
 
 2026-11-03: plan approved (human), OQ1-OQ9 as recommended: OQ1 one PR with a size exception; OQ2 configured_systems_built DEBUG, deploy-checks re-keyed on core_services_initialized (present since before 2a73d00a); OQ3 configuration_slice stays INFO; OQ4 webhook lines DEBUG, examples.py deleted, deploy-checks exclusion kept until TASK-168; OQ5 botocore WARNING, slack_sdk untouched; OQ6 bound <= 10 INFO excluding configuration_slice, no repeated INFO name; OQ7 security_services_initialized with issuer_count=0; OQ8 folded in (plan step 7a: Slack start only when enabled, lifespan _is_test_environment guard deleted; closes the doc-11 carry-over follow-up); OQ9 scheduled_tasks_started jobs=N. TASK-28.2 merged and deployed 2026-11-03 (#1814, 90ed5968). observability.md Startup logging rule and lifecycle.md pointer written on main's working tree 2026-11-03, carried by this task's branch. Ripples recorded on TASK-168, TASK-164, TASK-94. AC #1 production half waits for the human's inventory query (notes above).
+
+2026-11-03 AC #1 production inventory (human ran the notes query after TASK-28.2 deployed; agent read tmp/boot-inventory-json.txt): latest boot stream, application_startup -120 s..+180 s, access lines excluded. INFO 99 records over 55 events: configuration_slice 27, loaded_translations 10, initialized_yaml_loader 5, core_service_resolved 3, i18n_resource_registered 3, auto_registered_root_command 2, and 1 each of: application_startup, configuration_summary, core_services_initialized, configured_systems_built, initialized_record_store, security_services_initialization_started, initializing_jwks_manager, jwks_client_initialized, jwks_clients_warmed_up, security_services_initialized, directory_provider_initialization_started, directory_provider_warmup_skipped, directory_provider_initialization_completed, slack_provider_initialized, plugin_manager_created, feature_plugins_loaded, plugin_requirements_resolved, oncall_sync_settings_loaded, i18n_resources_collected, i18n_initialization_started, initialized_translator, loaded_all_translations, translator_created_with_preload, i18n_initialization_completed, i18n_healthcheck_passed, i18n_initialization_completed_and_healthy, slack_commands_registered, feature_routes_registered, feature_startup_warmup_completed, feature_integrations_registered, plugin_configuration_summary, registering_legacy_handlers, legacy_slack_commands_registered, slack_provider_app_available, initializing_slack_app, socket_mode_handler_prepared, slack_signing_secret_not_set_in_socket_mode, slack_interaction_listeners_attached, slack_app_initialized, socket_mode_started, initializing_scheduled_tasks, feature_background_job_scheduled, scheduled_tasks_started; uvicorn 4 (Started server process, Waiting for application startup, Application startup complete, Uvicorn running on); slack_sdk 2 (Starting to receive messages, A new session has been established). WARNING 1: slack_sdk 'As you gave client as well, token will be unused' (foreign, untouched). Non-JSON lines 16 (import-time webhook lines and warnings, the stated residual). Production-only per-step events beyond the ci inventory, demoted to DEBUG under the approved rule: slack_signing_secret_not_set_in_socket_mode (configuration state; the summary shows the signing secret set/unset), slack_provider_app_available, initializing_jwks_manager, jwks_client_initialized, jwks_clients_warmed_up (security_services_initialized carries issuer_count). Expected production INFO after: the 27 slices + configuration_summary + application_startup, core_services_initialized, security_services_initialized, directory_provider_initialized, feature_plugins_loaded, i18n_initialized, feature_integrations_registered, plugin_configuration_summary, slack_app_initialized, socket_mode_started, scheduled_tasks_started, plus the 4 uvicorn and 2 slack_sdk lines. Re-measure after deploy with the same query.
+
+## Implementation notes 2026-11-03
+
+### ci boot inventory AFTER the change (same method as the planning inventory: real create_app plus TestClient lifespan, outside pytest, ENVIRONMENT=ci, pytest-env values, fake AWS credentials; scratch script, not in the repo)
+Startup INFO before: 78 records (27 configuration_slice + 51 others, 4 of them botocore). After: 37 (27 configuration_slice + 10): configuration_summary, application_startup, core_services_initialized, security_services_initialized, directory_provider_initialized, feature_plugins_loaded, i18n_initialized, feature_integrations_registered, plugin_configuration_summary, scheduled_tasks_skipped. Each phase event carries a phase field. Shutdown adds application_shutdown (1). WARNING 4 (security_setting_weakened, incident_comms_registration_skipped, slack_disabled_skipping_init, slack_provider_app_unavailable), ERROR 0: the false ERROR socket_mode_handler_missing and WARNING slack_provider_start_failed of a Slack-off boot are gone (plan step 7a, the approved exception). 13 plain import-time webhook lines remain (TASK-168).
+
+### Files changed (production)
+server/lifespan.py, server/plugins/manager.py, server/services.py, server/configuration/host_configuration.py (signing-secret notice to DEBUG), jobs/scheduled_tasks.py (job_count added), integrations/slack/provider.py, infrastructure/logging/setup.py (botocore held at WARNING unless root is DEBUG), infrastructure/{records/service,audit/service,directory/google,security/jwks}.py, infrastructure/i18n/{factory,loader,resources,service,translator}.py, packages/{oncall_sync,access/catalog,access/request,access/sync}/__init__.py, modules/webhooks/{simple_text,aws_sns_notification}.py, modules/webhooks/patterns/examples.py (deleted), bin/deploy-checks.zsh (boot key core_services_initialized at the baseline sample and boot-end; tenant sample on the Slack-up section dropped; line-147 exclusion kept), decisions/observability.md (field list in the rule extended to the fields the code emits). Production diff about 100 added, 163 removed (77 of them examples.py).
+Tests: new tests/integration/server/{boot_probe.py, test_server_boot_info_event_budget.py, test_lifespan_phase_events.py}, tests/unit/server/plugins/test_server_plugins_manager_registration_counts.py, tests/unit/modules/webhooks/test_webhooks_pattern_log_levels.py, tests/unit/jobs/test_jobs_scheduled_tasks_startup_logging.py, tests/unit/infrastructure/logging/test_logging_setup_library_loggers.py, tests/unit/integrations/slack/test_slack_provider_startup_logging.py. Updated: test_lifespan.py (the lifespan _is_test_environment tests deleted with the function), test_lifespan_slack_start_log.py, test_lifespan_scheduler_start.py, test_server_configuration_phase_logging_render.py (sets LOGGING__LOG_LEVEL=DEBUG, notice is now debug), test_server_configuration_slack_transport_rules.py, test_server_configured_systems_read.py, test_oncall_sync_package_init.py, test_scheduled_tasks.py, and the logger stubs in the three access package init tests (debug added).
+
+### Deviations from the plan
+- Phase counts for feature_integrations_registered come from pm.hook.<hook>.get_hookimpls() (plugins implementing each hook), not the per-plugin result dicts, because hookimpls returning None leave empty result lists. Fields: slack_command_plugins, route_plugins, warmup_plugins.
+- botocore is lowered to WARNING only when the root level is above DEBUG, so DEBUG mode still shows it (the plan said DEBUG recovers them; a plain logger level would not).
+- Also demoted, beyond the plan list: access/request, access/sync, access/catalog providers_warmed lines, translator_created_lazy, i18n_resource_validation_passed, socket_mode_disabled_http_mode, directory_warmup_started/completed (google.py), and the production-only events named in the 2026-11-03 inventory.
+- Extra phase fields added: application_startup phase=startup, scheduled_tasks_started/skipped phase=scheduler, slack_app_initialized and socket_mode_started phase=slack_transport, so every INFO phase event names its phase as the ADR says; the budget test asserts it.
+- ADR: only the parenthetical list of count fields in the Startup logging rule was extended (locale_count, commands, per-hook plugin counts); lifecycle.md unchanged.
+- The Slack-start guard now tests provider.app instead of _is_test_environment; lifespan._is_test_environment deleted. Under pytest, tests that use a provider with an app now call start() (mocked).
+
+### AC #4 evidence: rg --hidden over bin terraform .github app/tests for every demoted event name
+Only matches: bin/deploy-checks.zsh:147 (non-JSON exclusion regex for the three webhook lines, kept until TASK-168) and the tests updated or added in this change, which assert the new DEBUG level. terraform and .github: no match. bin/deploy-checks.zsh no longer matches configured_systems_built.
+
+### Gates
+cd app && uv run ruff check . -> All checks passed!
+zsh -n bin/deploy-checks.zsh -> ok (no bin tests exist)
+make check-import-contracts -> Contracts: 13 kept, 0 broken.
+make check-settings-key-ownership -> OK: every settings key and configuration table has one owner, ...
+cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 41 errors in 14 files (checked 422 source files): the same 41 pre-existing errors in the same 14 files, none new, none fixed.
+cd app && uv run pytest tests --ignore=tests/smoke -> 6034 passed, 44 warnings in 184.48s
 <!-- SECTION:NOTES:END -->

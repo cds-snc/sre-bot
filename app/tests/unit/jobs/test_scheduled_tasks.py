@@ -410,7 +410,7 @@ class TestStaleIncidentChannelsJob:
     def test_init_skips_the_job_and_logs_why_when_no_tenant_is_configured(
         self, mock_schedule_every, mock_tier2, mock_logger, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Without [slack.tenant] the job is never scheduled and the skip is logged at info."""
+        """Without [slack.tenant] the job is never scheduled and the skip is logged at debug."""
         settings = MagicMock()
         settings.tenant = None
         monkeypatch.setattr("jobs.scheduled_tasks.get_slack_settings", lambda: settings)
@@ -420,6 +420,6 @@ class TestStaleIncidentChannelsJob:
         lease_keys = {call.args[0] for call in mock_tier2.call_args_list}
         assert "scheduler:notify_stale_incident_channels" not in lease_keys
         assert len(lease_keys) == 2
-        mock_logger.info.assert_any_call(
+        mock_logger.debug.assert_any_call(
             "scheduled_job_skipped", job_name="notify_stale_incident_channels", reason="slack_not_configured"
         )

@@ -1,4 +1,3 @@
-import sys
 import threading
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
@@ -55,11 +54,6 @@ from server.plugins.manager import (
 from server.services import SvcsServiceScopeOpener, initialize_core_services
 
 
-def _is_test_environment() -> bool:
-    """Detect if running in a test environment."""
-    return "pytest" in sys.modules
-
-
 def _get_logger_from_app() -> BoundLogger:
     # The configuration phase in the app factory already configured logging.
     return structlog.stdlib.get_logger()
@@ -81,7 +75,7 @@ def _log_plugin_configuration_summary(logger: BoundLogger) -> None:
 
 
 def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
-    logger.info("registering_legacy_handlers")
+    logger.debug("registering_legacy_handlers")
     role.register(bot)
     atip.register(bot)
     aws.register(bot)
@@ -94,7 +88,7 @@ def _register_legacy_handlers(bot: App, logger: BoundLogger) -> None:
 def _register_legacy_slack_commands(registrar: SlackCommandRegistrar, logger: BoundLogger) -> None:
     sre.register_commands(registrar)
     dev.register_commands(registrar)
-    logger.info("legacy_slack_commands_registered", modules=["sre", "dev"])
+    logger.debug("legacy_slack_commands_registered", modules=["sre", "dev"])
 
 
 def _start_scheduled_tasks(
@@ -105,12 +99,12 @@ def _start_scheduled_tasks(
     # [scheduler] enabled is the run switch; Tier-2 leases are the duplicate-prevention
     # mechanism across replicas.
     if not scheduler.enabled:
-        logger.info("scheduled_tasks_skipped", reason="scheduler_disabled")
+        logger.info("scheduled_tasks_skipped", phase="scheduler", reason="scheduler_disabled")
         return None
 
     scheduled_tasks.init(register_background_jobs, service_scopes)
     stop_event = cast(threading.Event | None, scheduled_tasks.run_continuously())
-    logger.info("scheduled_tasks_started")
+    logger.info("scheduled_tasks_started", phase="scheduler", jobs=scheduled_tasks.job_count())
     return stop_event
 
 
@@ -131,13 +125,10 @@ def _initialize_security_services(
     already logged the security_setting_weakened warning, so the warmup is skipped.
     """
     log = logger.bind(phase="security")
-    log.info("security_services_initialization_started")
+    log.debug("security_services_initialization_started")
     issuer_config = settings.issuer_config
-    if not issuer_config:
-        return
-
-    jwks_manager = get_jwks_manager()
-    jwks_manager.warmup()
+    if issuer_config:
+        get_jwks_manager().warmup()
     log.info(
         "security_services_initialized",
         issuer_count=len(issuer_config),
@@ -151,7 +142,7 @@ def _initialize_directory_provider(
 ) -> None:
     """Build, warm up, and store the directory provider on app.state."""
     log = logger.bind(phase="directory")
-    log.info("directory_provider_initialization_started")
+    log.debug("directory_provider_initialization_started")
 
     directory_provider = get_directory_provider()
 
@@ -160,11 +151,9 @@ def _initialize_directory_provider(
         if not warmup.is_success:
             log.error("directory_provider_initialization_failed", error=warmup.message)
             raise RuntimeError(f"directory_warmup_failed: {warmup.message}")
-    else:
-        log.info("directory_provider_warmup_skipped")
 
     app.state.directory_provider = directory_provider
-    log.info("directory_provider_initialization_completed")
+    log.info("directory_provider_initialized", warmup=directory_settings.require_startup_warmup)
 
 
 def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogger) -> TranslationService:
@@ -174,11 +163,9 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
     """
     i18n_registry = I18nResourceRegistry()
     call_hook_per_plugin(pm, "register_i18n_resources", logger, registry=i18n_registry)
-    logger.bind(phase="i18n_resource_collection").info(
-        "i18n_resources_collected", resource_count=i18n_registry.get_resource_count()
-    )
+    log = logger.bind(phase="i18n")
+    log.debug("i18n_resources_collected", resource_count=i18n_registry.get_resource_count())
 
-    log = logger.bind(phase="i18n_initialization")
     translation_service = get_translation_service()
     i18n_resources = i18n_registry.list_specs()
 
@@ -207,7 +194,11 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
         log.error("i18n_healthcheck_failed", error=health_result.message)
         raise RuntimeError(f"i18n health check failed: {health_result.message}")
 
-    log.info("i18n_initialization_completed_and_healthy")
+    log.info(
+        "i18n_initialized",
+        resource_count=len(all_resources),
+        locale_count=len(translation_service.translator.get_available_locales()),
+    )
     return translation_service
 
 
@@ -236,7 +227,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     app.state.logger = logger
     registry.register_value(HostInfo, host)
 
-    logger.info("application_startup")
+    logger.info("application_startup", phase="startup")
     # Phase 2: build every core service once; a failing factory stops startup here.
     await initialize_core_services(registry, logger)
     service_scopes = SvcsServiceScopeOpener(registry)
@@ -266,13 +257,11 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     # Phase 3: Register feature commands, routes, and run startup warmup.
     # Providers now have the translator set, so description_key translations
     # resolve correctly at registration time.
-    log = logger.bind(phase="feature_registration")
     register_feature_integrations(
         app=app,
         logger=logger,
         slack_provider=app.state.slack_provider,
     )
-    log.info("feature_integrations_registered")
     _log_plugin_configuration_summary(logger)
     # Legacy sre and dev subcommands must be in the provider's registry before
     # initialize_app binds the root slash commands.
@@ -280,7 +269,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
 
     app.state.slack_provider.initialize_app()
     if app.state.slack_provider and getattr(app.state.slack_provider, "app", None):
-        logger.info("slack_provider_app_available")
+        logger.debug("slack_provider_app_available")
         slack_app = cast(App, app.state.slack_provider.app)
         _register_legacy_handlers(slack_app, logger)
         app.state.bot = slack_app
@@ -300,7 +289,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
         app.state.bot = None
         app.state.socket_mode_handler = None
 
-    if not _is_test_environment():
+    # Only a provider with a Bolt app (Slack enabled and initialised) has a transport to start.
+    if app.state.slack_provider.app:
         start_slack_result = app.state.slack_provider.start()
         if not start_slack_result.is_success:
             logger.warning(
@@ -308,7 +298,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
                 error=start_slack_result.message,
             )
     else:
-        logger.info("slack_provider_start_skipped", reason="test_environment")
+        logger.debug("slack_provider_start_skipped", reason="slack_disabled")
 
     # Phase 6 starts the scheduler alongside the transports, never through one of them.
     app.state.scheduled_stop_event = _start_scheduled_tasks(configuration.scheduler, logger, service_scopes)

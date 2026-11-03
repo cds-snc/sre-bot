@@ -55,7 +55,7 @@ def _build_conditional_write_store() -> ConditionalWriteStore:
 
 def _build_configured_systems() -> ConfiguredSystems:
     systems = read_configured_systems()
-    logger.info("configured_systems_built", systems=[system.value for system in systems.tenants()])
+    logger.debug("configured_systems_built", systems=[system.value for system in systems.tenants()])
     return systems
 
 
@@ -96,7 +96,7 @@ async def initialize_core_services(registry: svcs.Registry, logger: BoundLogger)
     async with svcs.Container(registry) as container:
         for service in CORE_SERVICES:
             await container.aget(service.contract)
-            log.info("core_service_resolved", contract=service.contract.__name__)
+            log.debug("core_service_resolved", contract=service.contract.__name__)
     log.info("core_services_initialized", count=len(CORE_SERVICES))
 
 

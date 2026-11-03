@@ -49,7 +49,7 @@ def _register_sync_event_handlers() -> None:
 def startup_warmup(logger) -> None:
     """Log effective Access Requests settings and warm singletons at startup."""
     settings = get_access_request_settings()
-    logger.info(
+    logger.debug(
         "access_requests_settings_loaded",
         fallback_approver_slug=settings.fallback_approver_slug,
         min_approver_count=settings.min_approver_count,
@@ -59,7 +59,7 @@ def startup_warmup(logger) -> None:
     get_access_runtime_config()
     _register_sync_event_handlers()
     get_access_request_service()
-    logger.info("access_requests_providers_warmed")
+    logger.debug("access_requests_providers_warmed")
 
 
 __all__ = ["access_requests_router"]

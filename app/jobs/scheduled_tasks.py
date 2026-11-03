@@ -44,7 +44,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         job: Callable[[], None],
     ) -> None:
         schedule_lib.every().day.at(schedule).do(safe_run(job))
-        logger.info(
+        logger.debug(
             "feature_background_job_scheduled",
             job_name=job_name,
             cadence="daily",
@@ -60,7 +60,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
     ) -> None:
         seconds = int(every.total_seconds())
         schedule_lib.every(seconds).seconds.do(safe_run(job))
-        logger.info(
+        logger.debug(
             "feature_background_job_scheduled",
             job_name=job_name,
             cadence="interval",
@@ -104,7 +104,7 @@ def init(register_plugin_jobs: Callable[[BackgroundJobRegistry], None], service_
             plugins register their recurring jobs.
         service_scopes: Opener the registry exposes so jobs open a service scope per run.
     """
-    logger.info("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
+    logger.debug("initializing_scheduled_tasks", module="scheduled_tasks", function="init")
 
     schedule.every(5).minutes.do(safe_run(scheduler_heartbeat))
     schedule.every(5).minutes.do(safe_run(integration_healthchecks))
@@ -118,7 +118,7 @@ def init(register_plugin_jobs: Callable[[BackgroundJobRegistry], None], service_
             safe_run(_tier2("scheduler:notify_stale_incident_channels", notify_stale_incident_channels_job)),
         )
     else:
-        logger.info("scheduled_job_skipped", job_name="notify_stale_incident_channels", reason="slack_not_configured")
+        logger.debug("scheduled_job_skipped", job_name="notify_stale_incident_channels", reason="slack_not_configured")
     # Tier-2 job body is idempotent; lease only avoids duplicate cross-replica runs.
     schedule.every().day.at("00:00").do(
         safe_run(_tier2("scheduler:spending_generate_spending_data", spending.execute_spending_data_update_job)),
@@ -182,6 +182,11 @@ def provision_aws_identity_center():
         enable_membership_create=True,
         enable_membership_delete=True,
     )
+
+
+def job_count() -> int:
+    """Return how many jobs the scheduler currently holds."""
+    return len(schedule.get_jobs())
 
 
 def run_continuously(interval=1):

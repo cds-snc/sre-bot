@@ -129,7 +129,7 @@ def test_reading_logs_nothing_so_a_second_read_adds_no_boot_event() -> None:
 
 
 def test_boot_event_names_the_systems_and_no_tenant_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The core-service build logs one configured_systems_built event naming the systems, never a tenant id."""
+    """The core-service build logs one debug configured_systems_built event naming the systems, never a tenant id."""
     systems = StaticConfiguredSystems({WorkplaceSystem.SLACK: "T0123", WorkplaceSystem.GOOGLE: "C0abc"})
     monkeypatch.setattr(services, "read_configured_systems", lambda: systems)
 
@@ -138,4 +138,4 @@ def test_boot_event_names_the_systems_and_no_tenant_id(monkeypatch: pytest.Monke
 
     assert built is systems
     events = [entry for entry in logs if entry["event"] == "configured_systems_built"]
-    assert events == [{"event": "configured_systems_built", "log_level": "info", "systems": ["slack", "google"]}]
+    assert events == [{"event": "configured_systems_built", "log_level": "debug", "systems": ["slack", "google"]}]

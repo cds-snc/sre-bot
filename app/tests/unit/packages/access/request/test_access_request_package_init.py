@@ -63,6 +63,7 @@ def test_request_startup_warmup_registers_handlers_and_warms_runtime_config(
             (),
             {
                 "info": lambda *a, **k: None,
+                "debug": lambda *a, **k: None,
                 "warning": lambda *a, **k: None,
                 "error": lambda *a, **k: None,
             },
@@ -122,6 +123,7 @@ def test_request_startup_warmup_registers_handlers_via_event_dispatcher(monkeypa
             (),
             {
                 "info": lambda *a, **k: None,
+                "debug": lambda *a, **k: None,
                 "warning": lambda *a, **k: None,
                 "error": lambda *a, **k: None,
             },

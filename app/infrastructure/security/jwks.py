@@ -79,7 +79,7 @@ class JWKSManager:
 
                 self.jwks_clients[issuer] = PyJWKClient(jwks_uri, cache_jwk_set=True, lifespan=3600, timeout=10)
                 log = logger.bind(issuer=issuer)
-                log.info("jwks_client_initialized")
+                log.debug("jwks_client_initialized")
             except PyJWKClientError as e:
                 log = logger.bind(issuer=issuer, error=str(e))
                 log.warning("jwks_client_initialization_failed")
@@ -114,7 +114,7 @@ class JWKSManager:
         for issuer in list(self.issuer_config.keys()):
             self.get_jwks_client(issuer)
         log = logger.bind(issuer_count=len(self.issuer_config))
-        log.info("jwks_clients_warmed_up")
+        log.debug("jwks_clients_warmed_up")
 
 
 @lru_cache(maxsize=1)
@@ -127,7 +127,7 @@ def get_jwks_manager() -> JWKSManager:
         The singleton JWKSManager instance.
     """
     log = logger.bind()
-    log.info("initializing_jwks_manager")
+    log.debug("initializing_jwks_manager")
     issuer_config = get_issuer_config()
     if not issuer_config:
         log.warning("jwks_manager_initialized_with_empty_issuer_config")

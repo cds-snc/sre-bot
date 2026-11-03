@@ -77,7 +77,7 @@ class TranslationService:
         """
         logger = structlog.get_logger()
         log = logger.bind(resource_count=len(resources), strict=strict, phase="i18n_init")
-        log.info("i18n_initialization_started")
+        log.debug("i18n_initialization_started")
 
         paths_to_load: list[Path] = []
         for resource in resources:
@@ -122,7 +122,7 @@ class TranslationService:
                 paths_loaded=len(paths_to_load),
                 locales_available=len(self._translator.get_available_locales()),
             )
-            log.info("i18n_initialization_completed")
+            log.debug("i18n_initialization_completed")
             return OperationResult.success()
 
         except Exception as exc:
@@ -162,7 +162,7 @@ class TranslationService:
                 message=error_msg,
             )
 
-        logger.info("i18n_healthcheck_passed", locale_count=len(available))
+        logger.debug("i18n_healthcheck_passed", locale_count=len(available))
         return OperationResult.success()
 
     def translate(

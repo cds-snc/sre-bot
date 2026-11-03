@@ -26,6 +26,9 @@ class _Logger:
     def info(self, event, **kw) -> None:
         self.events.append(("info", {"event": event, **kw}))
 
+    def debug(self, event, **kw) -> None:
+        self.events.append(("debug", {"event": event, **kw}))
+
     def warning(self, event, **kw) -> None:
         self.events.append(("warning", {"event": event, **kw}))
 
@@ -70,7 +73,7 @@ def test_register_background_jobs_noop_without_schedules_or_user_rotations(monke
 
 
 @pytest.mark.unit
-def test_startup_warmup_logs_schedule_and_rotation_counts(monkeypatch) -> None:
+def test_startup_warmup_logs_schedule_and_rotation_counts_at_debug(monkeypatch) -> None:
     pkg = _reload_pkg()
 
     class _FakeSchedule:
@@ -82,6 +85,7 @@ def test_startup_warmup_logs_schedule_and_rotation_counts(monkeypatch) -> None:
     pkg.startup_warmup(logger=logger)
 
     loaded = next(evt for lvl, evt in logger.events if evt["event"] == "oncall_sync_settings_loaded")
+    assert ("debug", loaded) in logger.events
     assert loaded["schedule_count"] == 2
     assert loaded["rotation_count"] == 4
     assert loaded["sync_interval_seconds"] == 300

@@ -244,7 +244,7 @@ class SlackPlatformProvider:
             translator=self._translate_or_fallback,
         )
 
-        self._logger.info(
+        self._logger.debug(
             "slack_provider_initialized",
             socket_mode=socket_mode,
             enabled=enabled,
@@ -281,7 +281,7 @@ class SlackPlatformProvider:
             OperationResult with initialization status
         """
         log = self._logger.bind(socket_mode=self._socket_mode)
-        log.info("initializing_slack_app")
+        log.debug("initializing_slack_app")
 
         if not self._enabled:
             log.warning("slack_disabled_skipping_init")
@@ -325,11 +325,11 @@ class SlackPlatformProvider:
                     socket_credential.get_secret_value() if socket_credential else None,
                     logger=logging.getLogger("slack_sdk.socket_mode"),
                 )
-                log.info("socket_mode_handler_prepared")
+                log.debug("socket_mode_handler_prepared")
             else:
-                log.info("socket_mode_disabled_http_mode")
+                log.debug("socket_mode_disabled_http_mode")
 
-            log.info("slack_app_initialized")
+            log.info("slack_app_initialized", phase="slack_transport", commands=len(self._commands))
             return OperationResult.success(
                 data={"initialized": True, "socket_mode": self._socket_mode},
                 message="Slack app initialization completed",
@@ -527,7 +527,7 @@ class SlackPlatformProvider:
                 name="slack-socket-mode",
             )
             self._socket_thread.start()
-            log.info("socket_mode_started")
+            log.info("socket_mode_started", phase="slack_transport")
             return OperationResult.success(message="Socket Mode started")
         except Exception as e:
             log.error("socket_mode_start_failed", error=str(e))
@@ -609,7 +609,7 @@ class SlackPlatformProvider:
             # Register the handler with Slack Bolt
             self._app.command(slash_command)(create_handler(root_command))
 
-            self._logger.info(
+            self._logger.debug(
                 "auto_registered_root_command",
                 slash_command=slash_command,
                 root=root_command,
@@ -659,7 +659,7 @@ class SlackPlatformProvider:
         for callback_id, listener in self._view_submissions.items():
             self._app.view_submission(callback_id)(listener)
         self._listeners_attached = True
-        self._logger.info(
+        self._logger.debug(
             "slack_interaction_listeners_attached",
             block_actions=sorted(self._block_actions),
             view_submissions=sorted(self._view_submissions),

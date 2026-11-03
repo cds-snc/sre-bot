@@ -63,7 +63,7 @@ def startup_warmup(logger) -> None:
     misconfiguration is detected before traffic.
     """
     settings = get_access_sync_settings()
-    logger.info(
+    logger.debug(
         "access_sync_settings_loaded",
         reconciliation_enabled=settings.reconciliation_enabled,
         reconciliation_schedule=settings.reconciliation_schedule,
@@ -72,7 +72,7 @@ def startup_warmup(logger) -> None:
     get_access_runtime_config()
     _register_request_handlers()
     get_access_sync_coordinator()
-    logger.info("access_sync_providers_warmed")
+    logger.debug("access_sync_providers_warmed")
 
 
 @hookimpl

@@ -70,10 +70,10 @@ def create_translator(
             translations_dir=str(translations_dir),
             locale_count=len(translator.get_available_locales()),
         )
-        log.info("translator_created_with_preload")
+        log.debug("translator_created_with_preload")
     else:
         log = logger.bind(translations_dir=str(translations_dir))
-        log.info("translator_created_lazy")
+        log.debug("translator_created_lazy")
 
     return translator
 
