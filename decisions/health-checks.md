@@ -39,6 +39,7 @@ Keep all four layers — each answers a genuinely different question (image-loca
 - The Dockerfile `HEALTHCHECK`, the ECS `healthCheck`, the ALB target group and the Route53 check target only `/health` or `/version`.
 - `aws_route53_health_check.sre_bot_healthcheck` is consumed by exactly one `aws_cloudwatch_metric_alarm`, or the resource no longer exists.
 - `terraform fmt -check` / `terraform validate` clean on `terraform/route53.tf`.
+- GET `/health` and GET `/version` with status 200 and no query string log at DEBUG; any other method, status or query logs at INFO ([observability.md](observability.md), TASK-28.2).
 
 ## Migration
 
@@ -47,3 +48,4 @@ Tickets: TASK-68 (wire or remove the unwired Route53 health check), TASK-53 (the
 **Changes:**
 - 2026-09-25: every health check is static and serves as liveness and readiness; no dependency check stands behind the platform checks.
 - 2026-10-22: the service's health-check grace period exceeds boot time, because the circuit breaker counts failed health checks (TASK-111.16).
+- 2026-11-03: liveness access lines log at DEBUG, never dropped (TASK-28.2).

@@ -13,13 +13,16 @@ token-shaped value that failed validation.
 
 import json
 import logging
+import sys
 import traceback
+import warnings
 from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
 import pytest
 import structlog
+from pydantic import ValidationError
 
 from contracts.configuration import ConfigurationError, uninstall_configuration_files, uninstall_host_info
 from features.incident.common.settings import get_incident_core_settings
@@ -87,9 +90,18 @@ def _production_phase(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterat
     monkeypatch.setattr(structlog, "configure", lambda **kw: configure(**{**kw, "cache_logger_on_first_use": False}))
     root = logging.getLogger()
     saved_handlers, saved_level = root.handlers[:], root.level
+    uvicorn_loggers = [logging.getLogger(name) for name in ("uvicorn", "uvicorn.error", "uvicorn.access", "uvicorn.asgi")]
+    saved_uvicorn = [(item, item.handlers[:], item.propagate, item.level, item.filters[:]) for item in uvicorn_loggers]
+    saved_hook, saved_showwarning = sys.excepthook, warnings.showwarning
     _clear_caches()
     yield tmp_path
     root.handlers, root.level = saved_handlers, saved_level
+    for item, handlers, propagate, level, filters in saved_uvicorn:
+        item.handlers, item.propagate, item.filters = handlers, propagate, filters
+        item.setLevel(level)
+    sys.excepthook = saved_hook
+    logging.captureWarnings(False)
+    warnings.showwarning = saved_showwarning
     structlog.reset_defaults()
     uninstall_host_info()
     uninstall_configuration_files()
@@ -299,3 +311,107 @@ def test_an_invalid_slice_logs_only_configuration_invalid_and_no_summary(
     names = [event["event"] for event in _events(_lines(capfd))]
     assert "configuration_invalid" in names
     assert "configuration_summary" not in names
+
+
+def _only_invalid_line(capfd: pytest.CaptureFixture[str]) -> dict[str, Any]:
+    """The captured output is exactly one JSON line, a CRITICAL configuration_invalid, with no raw traceback."""
+    lines = _lines(capfd)
+    assert len(lines) == 1
+    assert "Traceback (most recent call last)" not in lines[0]
+    event = json.loads(lines[0])
+    assert event["event"] == "configuration_invalid"
+    assert event["level"] == "critical"
+    assert event["phase"] == "configuration"
+    assert event["logger"] == "server.configuration.host_configuration"
+    return event
+
+
+def test_a_missing_environment_file_logs_one_critical_line_and_raises_the_same_error(
+    _production_phase: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """A missing ENVIRONMENT file fails before [logging] loads as one JSON line naming the file; the error type is unchanged."""
+    (_production_phase / "production.toml").unlink()
+
+    with pytest.raises(ConfigurationError, match="configuration file not found") as raised:
+        load_host_configuration()
+
+    event = _only_invalid_line(capfd)
+    assert event["error"] == str(raised.value)
+    assert "production.toml" in event["error"]
+
+
+def test_malformed_toml_logs_one_critical_line_and_raises_the_same_error(
+    _production_phase: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """A malformed TOML file fails before [logging] loads as one JSON line, with ConfigurationError raised."""
+    (_production_phase / "production.toml").write_text("not = [valid", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError, match="invalid TOML"):
+        load_host_configuration()
+
+    assert "invalid TOML" in _only_invalid_line(capfd)["error"]
+
+
+def test_an_unknown_environment_logs_one_critical_line_without_the_value_and_keeps_the_error_type(
+    monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """An ENVIRONMENT outside the allowed set raises pydantic's ValidationError, logged once and value-free."""
+    monkeypatch.setenv("ENVIRONMENT", "rollback-rehearsal")
+
+    with pytest.raises(ValidationError):
+        load_host_configuration()
+
+    event = _only_invalid_line(capfd)
+    assert "environment" in event["error"]
+    assert "rollback-rehearsal" not in event["error"]
+
+
+def test_an_invalid_logging_table_logs_one_critical_line_and_keeps_the_error_type(
+    _production_phase: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """A bad [logging] value fails the phase as one JSON line from the bootstrap pipeline, ConfigurationError raised."""
+    (_production_phase / "production.toml").write_text("[logging]\nredaction_extra_keys = 5\n", encoding="utf-8")
+
+    with pytest.raises(ConfigurationError):
+        load_host_configuration()
+
+    assert "redaction_extra_keys" in _only_invalid_line(capfd)["error"]
+
+
+def test_an_unreadable_file_is_logged_once_by_the_uncaught_exception_hook(
+    _production_phase: Path, monkeypatch: pytest.MonkeyPatch, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """An OS error reading a file escapes the phase unlogged; the installed hook then renders it as one CRITICAL line."""
+    original = Path.read_text
+
+    def unreadable(self: Path, *args: Any, **kwargs: Any) -> str:
+        if self.name == "production.toml":
+            raise PermissionError(13, "Permission denied", str(self))
+        return original(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unreadable)
+
+    with pytest.raises(PermissionError) as raised:
+        load_host_configuration()
+    assert capfd.readouterr().err == ""
+    sys.excepthook(type(raised.value), raised.value, raised.value.__traceback__)
+
+    (line,) = _lines(capfd)
+    event = json.loads(line)
+    assert event["event"] == "uncaught_exception"
+    assert event["level"] == "critical"
+    assert "PermissionError" in event["exception"]
+
+
+def test_the_uncaught_exception_hook_skips_the_types_the_phase_already_logged(
+    _production_phase: Path, capfd: pytest.CaptureFixture[str]
+) -> None:
+    """After a logged ConfigurationError the hook adds nothing, so the failure stays one line."""
+    (_production_phase / "production.toml").unlink()
+    with pytest.raises(ConfigurationError) as raised:
+        load_host_configuration()
+    capfd.readouterr()
+
+    sys.excepthook(type(raised.value), raised.value, raised.value.__traceback__)
+
+    assert _lines(capfd) == []

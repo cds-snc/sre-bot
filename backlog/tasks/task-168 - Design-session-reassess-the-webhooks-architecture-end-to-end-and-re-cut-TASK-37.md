@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-10-28T19:43:00Z'
+updated_date: '2026-11-03T14:17:00Z'
 labels:
   - architecture
   - webhooks
@@ -40,4 +40,11 @@ Invariants carried over (not reopened): nothing registers at import time and not
 - [ ] #2 TASK-37 and its subtasks, and TASK-47, 48 and 49, are rewritten, superseded or archived to match, each remaining slice a single PR under the size gate
 - [ ] #3 The re-cut slices are placed in the doc-11 work queue ahead of the rows that wait on TASK-37 (TASK-88, TASK-40)
 - [ ] #4 Webhook sender kinds (match, extract, template) are provisioned content and webhook instances managed content (decisions/organisation-content.md, provisioned-content.md, managed-content.md); the session chooses the matching and template engine for every content kind: declarative matching, logic-light templates over a fixed data model with an undefined name an error, size and count limits; the re-cut slices delete the per-sender Python in modules/webhooks/patterns/ and its import-time walk
+- [ ] #5 bin/deploy-checks.zsh post: the Non-JSON section's webhook pattern exclusion (added by TASK-28.2) is removed and any non-JSON line FAILs once import-time pattern discovery is gone
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-03: AC added from TASK-28.2's approved plan; 28.2 leaves the import-time webhook pattern lines plain (unconfigured structlog, local-time stamp) and excludes them in deploy-checks.
+<!-- SECTION:NOTES:END -->

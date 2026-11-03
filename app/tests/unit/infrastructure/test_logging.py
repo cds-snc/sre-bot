@@ -5,7 +5,6 @@ Tests cover:
 - Exception formatting
 - Test environment suppression
 - Production vs development rendering
-- Backward compatibility with get_module_logger (deprecated)
 """
 
 import logging
@@ -86,23 +85,6 @@ class TestLoggingConfiguration:
         legacy_kwarg = "is" + "_production"
         with pytest.raises(TypeError):
             configure_logging(mock_settings.environment, LoggingSettings(), **{legacy_kwarg: False})
-
-
-@pytest.mark.unit
-class TestGetModuleLoggerBackwardCompat:
-    """Tests for get_module_logger backward compatibility."""
-
-    def test_get_module_logger_backward_compatibility(self):
-        """get_module_logger() provides backward compatibility."""
-        logger = structlog.get_logger()
-        # Should return a logger instance
-        assert logger is not None
-
-    def test_get_module_logger_with_none_frame(self):
-        """get_module_logger handles None frame gracefully."""
-        with patch("inspect.currentframe", return_value=None):
-            logger = structlog.get_logger()
-            assert logger is not None
 
 
 @pytest.mark.unit

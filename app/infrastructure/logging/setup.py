@@ -15,6 +15,12 @@ Usage:
     logger = structlog.get_logger()
     logger.info("event_name", key="value")
 
+The same pipeline renders uvicorn's own loggers (their handlers are cleared so they
+propagate to the root handler), Python warnings and, through a bootstrap pipeline and an
+uncaught-exception hook, failures before the [logging] slice loads
+(decisions/observability.md). Lines emitted while modules import, before the app
+factory runs, stay plain.
+
 Dependencies:
     - infrastructure.logging.settings.LoggingSettings (the [logging] slice)
 """
@@ -24,12 +30,14 @@ import logging
 import sys
 from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
+from types import TracebackType
 from typing import Any, Literal
 
 import structlog
 from structlog.processors import CallsiteParameter
 from structlog.stdlib import BoundLogger
 
+from infrastructure.logging.filters import LivenessAccessFilter
 from infrastructure.logging.formatters import downgrade_transient_socket_mode_errors, mask_sensitive_data
 from infrastructure.logging.settings import LoggingSettings
 
@@ -133,7 +141,8 @@ def _build_base_processors(
         _add_static_fields(static_fields or {}),
         # 2. Add metadata
         structlog.stdlib.add_log_level,
-        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.stdlib.add_logger_name,
+        structlog.processors.TimeStamper(fmt="iso", utc=True),
         # 3. Add OpenTelemetry code attributes for debugging
         structlog.processors.CallsiteParameterAdder(
             parameters=[
@@ -243,7 +252,6 @@ def configure_logging(
     handler.setFormatter(
         structlog.stdlib.ProcessorFormatter(
             foreign_pre_chain=[
-                structlog.stdlib.add_logger_name,
                 *processors,
                 downgrade_transient_socket_mode_errors,
             ],
@@ -255,4 +263,59 @@ def configure_logging(
     root_logger.handlers = [handler]
     root_logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))
 
+    _route_uvicorn_through_root()
+    logging.captureWarnings(True)
+
     return structlog.stdlib.get_logger()
+
+
+_UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "uvicorn.asgi")
+
+
+def _route_uvicorn_through_root() -> None:
+    """Let uvicorn's loggers propagate to the root handler and classify liveness access lines.
+
+    uvicorn installs its own handlers (propagate False) before it imports the app, so
+    clearing them here, from the app factory, puts every later uvicorn line in the pipeline.
+    """
+    for name in _UVICORN_LOGGERS:
+        uvicorn_logger = logging.getLogger(name)
+        uvicorn_logger.handlers = []
+        uvicorn_logger.propagate = True
+        uvicorn_logger.setLevel(logging.NOTSET)
+    access_logger = logging.getLogger("uvicorn.access")
+    if not any(isinstance(item, LivenessAccessFilter) for item in access_logger.filters):
+        access_logger.addFilter(LivenessAccessFilter())
+
+
+def configure_bootstrap_logging() -> None:
+    """Install the production JSON pipeline at INFO with no service identity.
+
+    Runs first in the configuration phase so a failure before the [logging] slice loads
+    (identity, file selection) is one JSON line; configure_logging replaces it once the
+    real settings are known. The default slice is built without reading any file.
+    """
+    if _is_test_environment():
+        return
+    configure_logging("production", LoggingSettings.model_construct())
+
+
+def install_uncaught_exception_hook(reported: tuple[type[BaseException], ...]) -> None:
+    """Render an exception that escapes the app factory as one CRITICAL JSON line.
+
+    uvicorn logs only a TypeError from the factory; anything else reaches sys.excepthook
+    and would print a raw multi-line traceback. Exceptions in ``reported`` were already
+    logged where they were raised and are not logged twice. The exit status is unchanged.
+    """
+    if _is_test_environment():
+        return
+
+    def hook(exc_type: type[BaseException], exc: BaseException, traceback: TracebackType | None) -> None:
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc, traceback)
+            return
+        if issubclass(exc_type, reported):
+            return
+        structlog.get_logger(__name__).critical("uncaught_exception", exc_info=(exc_type, exc, traceback))
+
+    sys.excepthook = hook

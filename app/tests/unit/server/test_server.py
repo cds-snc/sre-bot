@@ -1,6 +1,7 @@
 """Unit tests for server.server module."""
 
 import pytest
+import structlog
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -145,6 +146,38 @@ def test_create_app_fails_before_building_on_invalid_environment(monkeypatch):
             server.create_app()
     finally:
         get_identity_settings.cache_clear()
+
+
+@pytest.mark.unit
+def test_create_app_logs_a_type_error_with_its_traceback_and_re_raises_it(monkeypatch):
+    """uvicorn keeps only a TypeError's message, so the factory logs it at critical with exc_info before re-raising."""
+
+    def failing_configuration():
+        raise TypeError("bad factory argument")
+
+    monkeypatch.setattr(server, "load_host_configuration", failing_configuration)
+
+    with structlog.testing.capture_logs() as entries, pytest.raises(TypeError, match="bad factory argument"):
+        server.create_app()
+
+    (entry,) = [item for item in entries if item["event"] == "app_factory_failed"]
+    assert entry["log_level"] == "critical"
+    assert entry["exc_info"] is True
+
+
+@pytest.mark.unit
+def test_create_app_leaves_other_errors_unlogged_by_the_factory(monkeypatch):
+    """Only a TypeError is logged by the factory guard; any other error propagates untouched."""
+
+    def failing_configuration():
+        raise RuntimeError("elsewhere")
+
+    monkeypatch.setattr(server, "load_host_configuration", failing_configuration)
+
+    with structlog.testing.capture_logs() as entries, pytest.raises(RuntimeError):
+        server.create_app()
+
+    assert [item["event"] for item in entries] == []
 
 
 @pytest.mark.unit

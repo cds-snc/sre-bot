@@ -18,8 +18,6 @@ Public API:
 
 Formatters:
     - mask_sensitive_data(): Processor to redact sensitive fields
-    - truncate_large_values(): Processor to limit string lengths
-    - add_environment_info(): Processor to add environment name
 
 Example (Best Practice):
     import structlog
@@ -55,9 +53,7 @@ from infrastructure.logging.context import (
 # Log formatters/processors
 from infrastructure.logging.formatters import (
     SENSITIVE_PATTERNS,
-    add_environment_info,
     mask_sensitive_data,
-    truncate_large_values,
 )
 from infrastructure.logging.settings import LoggingSettings, get_logging_settings
 from infrastructure.logging.setup import (
@@ -74,8 +70,6 @@ __all__ = [
     "clear_request_context",
     # Formatters
     "mask_sensitive_data",
-    "truncate_large_values",
-    "add_environment_info",
     "SENSITIVE_PATTERNS",
     # Settings
     "LoggingSettings",

@@ -141,9 +141,14 @@ if [[ $phase == post ]]; then
   elif (( reconnected > 0 )); then result runtime_errors "WARN (Socket Mode reconnected on $reconnected task(s))"
   else result runtime_errors PASS; fi
 
-  section "Non-JSON lines since the deploy (uvicorn lines expected until TASK-28.2)"
-  print "count=$(li_count $since 'filter @message not like /^\s*\{/')"
-  li $since 'filter @message not like /^\s*\{/ | fields @message | limit 15' | mask
+  section "Non-JSON lines since the deploy (every line is JSON except import-time output: webhook pattern events and warnings)"
+  # The webhook pattern events and Python warnings raised while modules import are printed before the app factory
+  # configures logging, so they stay plain. TASK-168 removes the import-time discovery and this exclusion with it.
+  nonjson='filter @message not like /^\s*\{/ and @message not like /registered_notification_pattern|registered_pattern|no_handlers_found_in_module|notification_handlers_initialization_complete/ and @message not like /[A-Za-z]*Warning: /'
+  nonjson_count=$(li_count $since $nonjson)
+  print "count=$nonjson_count"
+  li $since "$nonjson | fields @message | limit 15" | mask
+  [[ $nonjson_count == 0 ]] && result non_json_lines PASS || result non_json_lines "WARN ($nonjson_count plain lines; read the samples above)"
 
   tasks=$(print -r -- $dep | jq -r .runningCount)
 
