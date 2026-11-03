@@ -55,6 +55,7 @@ def test_sync_startup_warmup_registers_handlers_and_warms_runtime_config(monkeyp
             (),
             {
                 "info": lambda *a, **k: None,
+                "debug": lambda *a, **k: None,
                 "warning": lambda *a, **k: None,
                 "error": lambda *a, **k: None,
             },
@@ -112,6 +113,7 @@ def test_sync_startup_warmup_registers_handlers_via_event_dispatcher(monkeypatch
             (),
             {
                 "info": lambda *a, **k: None,
+                "debug": lambda *a, **k: None,
                 "warning": lambda *a, **k: None,
                 "error": lambda *a, **k: None,
             },
@@ -144,6 +146,7 @@ def test_sync_startup_warmup_raises_when_runtime_config_is_invalid(monkeypatch):
                 (),
                 {
                     "info": lambda *a, **k: None,
+                    "debug": lambda *a, **k: None,
                     "warning": lambda *a, **k: None,
                     "error": lambda *a, **k: None,
                 },

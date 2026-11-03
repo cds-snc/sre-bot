@@ -23,7 +23,7 @@ def startup_warmup(logger) -> None:
     # Validate runtime config and provider assembly before serving traffic.
     get_access_runtime_config()
     get_catalog_service()
-    logger.info("access_catalog_providers_warmed")
+    logger.debug("access_catalog_providers_warmed")
 
 
 __all__ = ["access_catalog_router"]

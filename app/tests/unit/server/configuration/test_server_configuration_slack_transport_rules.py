@@ -82,14 +82,14 @@ def test_http_mode_with_every_credential_passes_without_notice() -> None:
     assert not _notices(entries)
 
 
-def test_production_shape_boots_and_logs_the_notice_once_at_info() -> None:
-    """Socket Mode without a signing secret is production's shape: it boots, with one info notice."""
+def test_production_shape_boots_and_logs_the_notice_once_at_debug() -> None:
+    """Socket Mode without a signing secret is production's shape: it boots, with one debug notice."""
     with capture_logs() as entries:
         validate_slack_transport(_transport(), _slack())
 
     notices = _notices(entries)
     assert len(notices) == 1
-    assert notices[0]["log_level"] == "info"
+    assert notices[0]["log_level"] == "debug"
     assert "socket_mode" in str(notices[0]["detail"])
     assert "SLACK__SIGNING_SECRET" in str(notices[0]["detail"])
 

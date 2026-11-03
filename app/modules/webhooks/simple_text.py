@@ -226,7 +226,7 @@ def init_pattern_handlers():
                     for attr in dir(mod):
                         if attr.endswith("_HANDLER"):
                             register_pattern(getattr(mod, attr))
-                            logger.info("registered_pattern", pattern=attr, module=mod_name)
+                            logger.debug("registered_pattern", pattern=attr, module=mod_name)
                 except Exception as e:
                     logger.warning("register_pattern_failed", module=mod_name, error=str(e))
 

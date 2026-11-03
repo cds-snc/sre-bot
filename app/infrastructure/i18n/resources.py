@@ -44,7 +44,7 @@ class I18nResourceRegistry:
 
         self._paths_seen.add(path_key)
         self._specs.append(spec)
-        log.info("i18n_resource_registered", required=spec.required)
+        log.debug("i18n_resource_registered", required=spec.required)
 
     def list_specs(self) -> list[I18nResourceSpec]:
         """Get all registered resource specifications.
@@ -96,7 +96,7 @@ class I18nResourceRegistry:
             )
 
         log = logger.bind(registered_count=len(self._specs))
-        log.info("i18n_resource_validation_passed")
+        log.debug("i18n_resource_validation_passed")
         return OperationResult.success()
 
     def get_resource_count(self) -> int:

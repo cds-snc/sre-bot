@@ -36,6 +36,7 @@ def test_catalog_startup_warmup_validates_runtime_config(monkeypatch):
             (),
             {
                 "info": lambda *a, **k: None,
+                "debug": lambda *a, **k: None,
                 "warning": lambda *a, **k: None,
                 "error": lambda *a, **k: None,
             },
@@ -66,6 +67,7 @@ def test_catalog_startup_warmup_raises_when_runtime_config_is_invalid(
                 (),
                 {
                     "info": lambda *a, **k: None,
+                    "debug": lambda *a, **k: None,
                     "warning": lambda *a, **k: None,
                     "error": lambda *a, **k: None,
                 },

@@ -332,7 +332,7 @@ def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
                 pattern = getattr(mod, attr)
                 register_notification_pattern(pattern)
                 registered_count += 1
-                log.info(
+                log.debug(
                     "registered_notification_pattern",
                     pattern_name=getattr(pattern, "name", attr),
                     handler_attr=attr,
@@ -347,7 +347,7 @@ def _register_handlers_from_module(mod, mod_name: str) -> tuple[int, int]:
                 failed_count += 1
 
     if registered_count == 0:
-        log.info(
+        log.debug(
             "no_handlers_found_in_module",
             module=mod_name,
         )

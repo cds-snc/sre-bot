@@ -262,12 +262,19 @@ def configure_logging(
     root_logger = logging.getLogger()
     root_logger.handlers = [handler]
     root_logger.setLevel(getattr(logging, effective_log_level.upper(), logging.INFO))
+    if root_logger.level > logging.DEBUG:
+        for library_logger in _QUIET_LIBRARY_LOGGERS:
+            logging.getLogger(library_logger).setLevel(logging.WARNING)
 
     _route_uvicorn_through_root()
     logging.captureWarnings(True)
 
     return structlog.stdlib.get_logger()
 
+
+# Library loggers whose INFO lines are connection detail (credential and endpoint discovery, once
+# per client). They are held at WARNING unless the root level is DEBUG, which shows them again.
+_QUIET_LIBRARY_LOGGERS = ("botocore",)
 
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.error", "uvicorn.access", "uvicorn.asgi")
 

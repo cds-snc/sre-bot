@@ -43,7 +43,7 @@ def get_plugin_manager() -> FeaturePluginManager:
     pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
 
-    logger.info("plugin_manager_created")
+    logger.debug("plugin_manager_created")
     return pm
 
 
@@ -99,7 +99,7 @@ def resolve_plugin_requirements(pm: FeaturePluginManager, logger: BoundLogger, s
             not configured; each such setting is logged as ``plugin_boot_failed`` first.
     """
     resolve_requirements(pm, logger, systems)
-    logger.info("plugin_requirements_resolved")
+    logger.debug("plugin_requirements_resolved")
 
 
 def register_feature_integrations(
@@ -123,17 +123,30 @@ def register_feature_integrations(
 
     if slack_provider:
         _register_slack_per_plugin(pm, slack_provider, logger)
-        logger.info("slack_commands_registered")
+        logger.debug("slack_commands_registered")
 
     if event_dispatcher:
         call_hook_per_plugin(pm, "register_event_handlers", logger, dispatcher=event_dispatcher)
-        logger.info("event_handlers_registered")
+        logger.debug("event_handlers_registered")
 
     call_hook_per_plugin(pm, "register_routes", logger, app=app)
-    logger.info("feature_routes_registered")
+    logger.debug("feature_routes_registered")
 
     call_hook_per_plugin(pm, "startup_warmup", logger, logger=logger)
-    logger.info("feature_startup_warmup_completed")
+    logger.debug("feature_startup_warmup_completed")
+
+    logger.info(
+        "feature_integrations_registered",
+        phase="feature_registration",
+        slack_command_plugins=_implementing_plugin_count(pm, "register_slack_commands") if slack_provider else 0,
+        route_plugins=_implementing_plugin_count(pm, "register_routes"),
+        warmup_plugins=_implementing_plugin_count(pm, "startup_warmup"),
+    )
+
+
+def _implementing_plugin_count(pm: FeaturePluginManager, hook_name: str) -> int:
+    """Return how many registered plugins implement ``hook_name``; a blocked plugin is not registered."""
+    return len(getattr(pm.hook, hook_name).get_hookimpls())
 
 
 def _register_slack_per_plugin(pm: FeaturePluginManager, registrar: SlackCommandRegistrar, logger: BoundLogger) -> None:

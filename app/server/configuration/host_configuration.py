@@ -119,7 +119,7 @@ def validate_slack_transport(transport: SlackTransportSettings, slack: SlackSett
 
     The rules join the [slack_transport] slice with the Slack vendor slice, so they run here
     rather than in either slice. Messages name the key, never a value. Socket Mode without
-    the signing secret is production's shape: it boots, with an info notice.
+    the signing secret is production's shape: it boots, with a debug notice; the configuration summary shows the secret set or unset.
     """
     if not transport.enabled:
         return
@@ -132,7 +132,7 @@ def validate_slack_transport(transport: SlackTransportSettings, slack: SlackSett
     if not transport.socket_mode and not slack.signing_secret:
         raise ConfigurationError(f"{SlackKey.SIGNING} is required when [slack_transport] socket_mode is false")
     if transport.socket_mode and not slack.signing_secret:
-        structlog.get_logger(__name__).info(
+        structlog.get_logger(__name__).debug(
             "slack_signing_secret_not_set_in_socket_mode",
             detail=(
                 f"{SlackKey.SIGNING} is not set. Socket Mode does not need it for request authenticity "

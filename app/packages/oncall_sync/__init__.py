@@ -57,7 +57,7 @@ def startup_warmup(logger) -> None:
     schedules = get_oncall_schedules()
     user_rotations = get_rotations()
     rotation_count = sum(len(s.rotations) for s in schedules)
-    logger.info(
+    logger.debug(
         "oncall_sync_settings_loaded",
         sync_interval_seconds=int(SYNC_INTERVAL.total_seconds()),
         schedule_count=len(schedules),

@@ -77,7 +77,7 @@ class YAMLTranslationLoader(TranslationLoader):
             raise ValueError(f"Translations directory not found: {self.translations_dir}")
 
         self.log = logger.bind(translations_dir=str(self.translations_dir), use_cache=use_cache)
-        self.log.info("initialized_yaml_loader")
+        self.log.debug("initialized_yaml_loader")
 
     def load(self, locale: Locale) -> TranslationCatalog:
         """Load translations for a locale from YAML files.
@@ -122,7 +122,7 @@ class YAMLTranslationLoader(TranslationLoader):
             file_count=len(yaml_files),
             namespace_count=len(catalog.messages),
         )
-        log.info("loaded_translations")
+        log.debug("loaded_translations")
 
         if self.use_cache:
             self.cache[locale] = catalog

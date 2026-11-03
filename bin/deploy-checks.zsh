@@ -92,7 +92,7 @@ if [[ $phase == pre ]]; then
   print "slack_app_initialized: $(li_count $since 'filter event = "slack_app_initialized"')"
   print "error or critical lines: $(li_count $since 'filter level in ["error","critical"]')"
   li $since 'filter level in ["error","critical"] | stats count() as n by event, level | sort n desc | limit 10'
-  li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | sort @timestamp desc | limit 3'
+  li $since 'filter event = "core_services_initialized" | fields @timestamp, @message | sort @timestamp desc | limit 3'
 
 fi
 
@@ -109,8 +109,8 @@ if [[ $phase == post ]]; then
   since=$(print -r -- $dep | jq -r '.createdAt | if type=="number" then floor else (sub("\\.[0-9]+";"") | sub("[+-][0-9:]+$";"Z") | fromdateiso8601) end')
   print "window_start=$(date -u -d @$since +%FT%TZ)"
 
-  # Boot ends 5 minutes after the last configured_systems_built (10 minutes after the rollout started if none).
-  booted=$(li $since 'filter event = "configured_systems_built" | stats max(toMillis(@timestamp)) as t' | jq -r '.t // empty' | head -1)
+  # Boot ends 5 minutes after the last core_services_initialized (10 minutes after the rollout started if none).
+  booted=$(li $since 'filter event = "core_services_initialized" | stats max(toMillis(@timestamp)) as t' | jq -r '.t // empty' | head -1)
   if [[ -n $booted ]]; then boot_end=$(( ${booted%%.*} / 1000 + 300 )); else boot_end=$(( since + 600 )); fi
   now=$(date -u +%s); (( boot_end > now )) && boot_end=$now
 
@@ -155,7 +155,6 @@ if [[ $phase == post ]]; then
   section "Slack up"
   print "slack_app_initialized: $(li_count $since 'filter event = "slack_app_initialized"')"
   print "socket session established: $(li_count $since 'filter @message like /session has been established/')"
-  li $since 'filter event = "configured_systems_built" | fields @timestamp, @message | limit 4'
   bad=$(li_count $since 'filter event in ["slack_disabled_skipping_init","slack_app_initialization_failed","slack_provider_app_unavailable","incident_comms_registration_skipped"] or @message like /missing_bot_token|missing_app_token|invalid_auth|not_authed/')
   [[ $bad == 0 ]] && result slack_up PASS || result slack_up "FAIL ($bad lines; rerun the samples above)"
 

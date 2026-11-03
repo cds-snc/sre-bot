@@ -182,7 +182,7 @@ class DynamoDBRecordStore(RecordStore):
 
     def __init__(self, dynamodb: DynamoDBClient) -> None:
         self._dynamodb = dynamodb
-        logger.info("initialized_record_store")
+        logger.debug("initialized_record_store")
 
     def _map_sdk_exception(self, exc: Exception) -> OperationResult[Any]:
         status, error_code, retry_after = classify_aws_error(exc)

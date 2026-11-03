@@ -20,6 +20,8 @@ from fastapi import FastAPI
 from jobs.settings import get_scheduler_settings
 from tests.factories.lifespan import lifespan
 
+JOB_COUNT = 3
+
 
 @pytest.fixture
 def logger() -> MagicMock:
@@ -60,6 +62,7 @@ def stubbed_startup(logger: MagicMock, provider: MagicMock, stop_event: threadin
         stack.enter_context(patch("server.lifespan._register_legacy_handlers"))
         stack.enter_context(patch("server.lifespan.scheduled_tasks.init", init))
         stack.enter_context(patch("server.lifespan.scheduled_tasks.run_continuously", return_value=stop_event))
+        stack.enter_context(patch("server.lifespan.scheduled_tasks.job_count", return_value=JOB_COUNT))
         yield
     get_scheduler_settings.cache_clear()
 
@@ -82,7 +85,7 @@ async def test_the_scheduler_starts_when_enabled_with_the_slack_transport_off(
 
     init.assert_called_once()
     assert len(init.call_args.args) == 2
-    assert "scheduled_tasks_started" in _events(logger.info)
+    logger.info.assert_any_call("scheduled_tasks_started", phase="scheduler", jobs=JOB_COUNT)
     assert stop_event.is_set()
 
 
@@ -128,7 +131,7 @@ async def test_the_scheduler_is_not_started_when_disabled_and_the_skip_is_logged
         assert app.state.scheduled_stop_event is None
 
     init.assert_not_called()
-    logger.info.assert_any_call("scheduled_tasks_skipped", reason="scheduler_disabled")
+    logger.info.assert_any_call("scheduled_tasks_skipped", phase="scheduler", reason="scheduler_disabled")
 
 
 @pytest.mark.integration

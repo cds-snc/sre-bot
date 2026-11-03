@@ -75,7 +75,7 @@ class DynamoDBAuditTrailService:
     def __init__(self, storage: RecordStore, table_name: str) -> None:
         self._storage = storage
         self._table = audit_table(table_name)
-        logger.info("initialized_audit_trail_service")
+        logger.debug("initialized_audit_trail_service")
 
     # ------------------------------------------------------------------
     # Write

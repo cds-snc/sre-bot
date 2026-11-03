@@ -395,14 +395,14 @@ class GoogleDirectoryProvider:
             OperationResult: success when the API responds successfully.
         """
         log = logger.bind(provider="google", operation="warmup")
-        log.info("directory_warmup_started")
+        log.debug("directory_warmup_started")
         service = self._get_service(["https://www.googleapis.com/auth/admin.directory.customer.readonly"])
         result = self._call(
             "warmup",
             lambda: service.customers().get(customerKey=self._customer_id).execute(),
         )
         if result.is_success:
-            log.info("directory_warmup_completed")
+            log.debug("directory_warmup_completed")
             return OperationResult.success()
 
         log.error("directory_warmup_failed", error=result.message)
