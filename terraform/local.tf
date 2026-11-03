@@ -1,4 +1,8 @@
 locals {
+  # The WAF AuthorizedEndpoints allow-list; app/tests/unit/server/test_server_edge_allow_list_routes.py
+  # checks it against every route the app mounts (decisions/security.md).
+  authorized_endpoints = jsondecode(file("${path.module}/authorized_endpoints.json"))
+
   api_cloudwatch_log_group = "/ecs/sre-bot-app"
   error_logged             = "SREBotErrorLogged"
   error_namespace          = "SREBot"

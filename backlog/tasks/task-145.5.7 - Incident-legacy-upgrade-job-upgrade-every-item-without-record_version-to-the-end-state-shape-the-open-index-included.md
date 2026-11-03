@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-14 23:10
-updated_date: '2026-10-23T17:29:00Z'
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - incident
   - features
@@ -74,3 +74,15 @@ TIMING
 
 2026-10-20 (SLACK_TEAM_ID review): this job is the first writer to persist tenants without a request, so it verifies the configured tenant with auth.test before apply (AC7) and owns the lookup warning (AC8). Depends on TASK-157 (inbound tenant guard).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordinated incidents target-shape note (doc-11 E1): extend the verified legacy upgrade so it writes one working-surface binding per legacy incident item. Keep the migration idempotent and do not contract the old lookup until the backfill is verified.
+
+---
+<!-- COMMENTS:END -->

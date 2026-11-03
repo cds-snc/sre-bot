@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-29T18:45:00Z'
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - incident
   - features
@@ -91,3 +91,15 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 
 2026-10-29 (TASK-175 planning): incident.scribe declares slack.tenant and google_workspace.tenant as plugin requirements; deleting TASK-173's legacy-handler boot rule here leaves scribe's declarations in place.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordinated incidents target-shape note (doc-11 E1 contract): after every legacy incident has a verified working-surface binding, remove channel_id and the by_channel lookup/index. This is the contract step; preserve no permanent dual-read fallback.
+
+---
+<!-- COMMENTS:END -->

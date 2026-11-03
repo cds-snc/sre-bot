@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - incident
   - features
@@ -110,3 +110,15 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 
 - 2026-10-28 (TASK-167 accepted): locales/incident.*.yml carry CDS wording; each incident surface rebuild moves the strings it touches to provisioned organisation wording (message overrides by key over generic app strings, decisions/organisation-content.md, i18n.md), keeping generic defaults in the app.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordinated incidents target-shape note (doc-11 row 18): after the A1 incident-management ADR amendment, re-plan declare to create incident_surface_bindings and use binding-based lookup. E1.1/E1.2 are the first slices; retain the by_channel fallback only until legacy bindings are backfilled, then retire it in the existing contract task.
+
+---
+<!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-29T18:45:00Z'
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - oncall
   - capabilities
@@ -45,3 +45,15 @@ THIS SLICE
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 (TASK-175 planning): oncall_sync declares Requirement("opsgenie.tenant") in register_requirements (decisions/plugins.md); when this task makes Opsgenie optional, drop that declaration.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Re-cut for E2: keep oncall_sync consuming the on-call capability; do not make it an Opsgenie-specific consumer. Update the capability adapter and this feature together when the accepted on-call ADR selects GoAlert.
+
+---
+<!-- COMMENTS:END -->

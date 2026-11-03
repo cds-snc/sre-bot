@@ -6,12 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-26T13:45:00Z'
+updated_date: '2026-11-03T19:02:00Z'
 labels:
   - oncall
   - capabilities
 dependencies:
-  - TASK-25.6
   - TASK-114
 references:
   - https://github.com/cds-snc/sre-bot/issues/1702
@@ -44,3 +43,23 @@ THIS SLICE
 - [ ] #6 With no Opsgenie settings the capability registers and the self-managed source answers (boot test, decisions/oncall.md)
 - [ ] #7 Deleting user_rotations also removes its [plugins.incident_response] key, its module from the protected-plugins import contract, and the oncall_sync -> user_rotations ignore entries (repointed to the capability's api)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Re-cut for E2: the GoAlert schedule source is the target, not a simultaneous Opsgenie/self-managed-source build. The on-call ADR decision precedes implementation; remove the Opsgenie adapter as part of the cutover. The delivery map places this after coordination and treats 2027-04-05 as non-binding within the 2–3 week window.
+
+---
+
+created: 2026-11-03T19:02:00Z
+
+---
+
+Dependency re-cut (2026-11-03): TASK-25.6 is Opsgenie-client-specific and is no longer a prerequisite for the GoAlert target within the 2–3 week window. Re-add it only if the accepted on-call design explicitly needs a transitional Opsgenie read.
+
+---
+<!-- COMMENTS:END -->

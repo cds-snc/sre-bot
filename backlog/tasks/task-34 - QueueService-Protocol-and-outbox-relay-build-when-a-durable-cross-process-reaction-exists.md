@@ -5,8 +5,8 @@ title: >-
   reaction exists)
 status: To Do
 assignee: []
-created_date: '2026-07-07 19:56'
-updated_date: '2026-09-24 20:10'
+created_date: 2026-07-07 19:56
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -19,7 +19,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - claude-research-outcome.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1288'
+  - https://github.com/cds-snc/sre-bot/issues/1288
   - decisions/plugin-architecture.md
 priority: low
 ordinal: 34000
@@ -55,17 +55,34 @@ Steps when triggered:
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-07-28 13:20
+
 ---
+
 Scope refinement from a 2026-07-28 architecture review: (1) Relay choice - prefer a POLLING relay (polling-publisher pattern) as the portable default for the outbox; treat DynamoDB Streams (transaction-log-tailing) as an AWS-only latency optimization behind the SAME relay Protocol, never leaking Streams into feature code. reliability.md updated to state this. (2) These three primitives are NOT interchangeable: the conditional-write store (TASK-58 / idempotency-coordination) gives mutual exclusion + dedup; QueueService gives durable at-least-once work; DynamoDB Streams only relays committed writes. QueueService sits BESIDE the conditional-write store, never replaces it. (3) Concrete triggers that make this non-speculative now: the notifications rebuild (TASK-32 - durable 'must deliver even if we crash' delivery is QueueService work, not a bespoke queue) and the retry-store consolidation (TASK-59, which depends on this task and folds app/infrastructure/resilience/retry/ onto QueueService). (4) Full-end-state mandate: ship the QueueService capability + SQS adapter + in-memory fake + DLQ/redrive as the single durable-queue owner; no bespoke per-feature durable queues survive alongside it.
+
 ---
 
 created: 2026-07-28 14:34
+
 ---
+
 2026-07-28 approvals architecture (decisions/approvals.md): the generic approval-workflow capability adds a third concrete, non-speculative consumer for this task. Its cross-package effect steps and the reclassified access/sync -> access/request advance (SYNC_COMPLETED/SYNC_FAILED, moved off the event bus per events.md) are durable workflow steps that ride the outbox/QueueService. TASK-61 (access/request refactor) depends on this; TASK-60 (approvals capability) designs its steps to hand off over this queue. Alongside notifications (TASK-32) and retry consolidation (TASK-59), the durable-work triggers now clearly exist.
+
 ---
 
 created: 2026-09-24 20:10
+
 ---
+
 2026-09-24 alignment with decisions/plugin-architecture.md and reliability.md: the queue (and publish-subscribe) Protocol is a core-service contract born in app/contracts/, implemented in app/infrastructure/queue/ with a transactional outbox, and resolved from the service registry (TASK-109). decisions/events.md is deleted and there is no in-process event bus; this contract is the only path for reactions that must reach every replica or survive a restart. First concrete consumer: the approvals continuation (TASK-61).
+
+---
+
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordination is the first durable cross-process consumer. When the E4 foundation is planned, split this task into atomic multi-item record write, queue infrastructure, and outbox write/relay slices, each within the PR size gate; coordination consumes the resulting idempotent event path.
+
 ---
 <!-- COMMENTS:END -->

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-28T19:43:00Z'
+updated_date: '2026-11-03T19:02:00Z'
 labels:
   - oncall
   - capabilities
@@ -16,6 +16,7 @@ references:
   - decisions/oncall.md
   - decisions/plugin-architecture.md
   - https://github.com/cds-snc/sre-bot/issues/1701
+  - backlog/docs/doc-15 - Coordinated-incidents-delivery-map.md
 priority: medium
 type: feature
 ordinal: 364000
@@ -58,6 +59,14 @@ created: 2026-10-27T20:32:00Z
 ---
 
 2026-10-27 (human, TASK-111.12 planning): Atlassian ends Opsgenie support on 2027-04-05 (decisions/oncall.md). Opsgenie is only ever an adapter, behind on-call and user rotations; the on-call and user-rotations features are to be re-architected for alignment with the rest of the codebase and the product vision, and the incident feature is expected to change at a larger scale, so this task is re-cut before it is planned. The replacement schedule source is chosen in that re-cut, before the end of support. TASK-111.12 still moves the Opsgenie slice onto the files so its old names are unread before TASK-111.15.
+
+---
+
+created: 2026-11-03T19:00:00Z
+
+---
+
+Approved coordinated-incidents map re-cuts this parent around GoAlert after the coordination MVP (TASK-165.3). The 2–3 week program window makes Opsgenie end-of-support on 2027-04-05 a non-blocking date constraint for this plan; E2 removes Opsgenie in the GoAlert cutover, with no separate stopgap planned. Update the on-call ADR before implementation. Leads are read through the on-call capability port; paging is a separate capability.
 
 ---
 <!-- COMMENTS:END -->

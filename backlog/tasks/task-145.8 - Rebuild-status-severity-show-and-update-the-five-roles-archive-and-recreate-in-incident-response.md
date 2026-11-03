@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-11-03T19:00:00Z'
 labels:
   - incident
   - features
@@ -86,3 +86,15 @@ Over the gate as one task (~800 lines); each half about 400.
 ## Blast radius and rollback
 Each subcommand's legacy registration is removed with its rebuild; a revert restores it. Status fan-out is the riskiest path: it writes four systems.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-03T19:00:00Z
+
+---
+
+Coordinated incidents ADR note (doc-11 A1/E1): re-plan the chosen change-severity surface to record each person-chosen severity change. Do not derive severity from the count or breadth of engagements. Choose one owning task during planning to avoid duplicate behavior.
+
+---
+<!-- COMMENTS:END -->

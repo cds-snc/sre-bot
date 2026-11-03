@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-03T20:45:00Z'
 labels:
   - deployment
   - ci
@@ -59,6 +59,7 @@ Security:
 - [ ] #8 No CI output contains a secret value, checked by a test over the scripts' output with a canary
 - [ ] #9 The delivery-session process and docs/runbooks no longer ask the human to run the automated checks by hand
 - [ ] #10 The bin tests and ruff pass for the moved or changed scripts
+- [ ] #11 The TASK-163 edge post check (bin/deploy-checks.zsh post edge) runs in CI with the other post-deploy checks, or is recorded as retired
 <!-- AC:END -->
 
 ## Implementation Notes

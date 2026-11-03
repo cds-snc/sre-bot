@@ -191,7 +191,7 @@ resource "aws_wafv2_web_acl" "sre-bot" {
         statement {
           or_statement {
             dynamic "statement" {
-              for_each = var.authorized_endpoints_with_constraints
+              for_each = local.authorized_endpoints
               content {
                 byte_match_statement {
                   search_string = statement.value.path
