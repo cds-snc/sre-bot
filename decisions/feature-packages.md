@@ -41,7 +41,7 @@ app/features/<feature>/
 └── locales/           # EN/FR catalogues (see i18n.md)
 ```
 
-A package's `__init__.py` states each vendor or capability it cannot run without in a `register_requirements` hookimpl and states none it uses optionally ([plugins.md](plugins.md)); the generator's template includes the hook. A package generator creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
+A package's `__init__.py` declares each vendor or capability it cannot run without in a `register_requirements` hookimpl that returns `Requirement` values, and declares none it uses optionally ([plugins.md](plugins.md)); the generator's template includes the hook, returning an empty list. A package generator creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
 
 ### Complex features: an umbrella directory, never a flat prefix
 
@@ -131,3 +131,4 @@ Tolerated until then:
 - 2026-10-09: rule 2 becomes the purpose test (audience or outcome, the domain's word, never a mechanism); TASK-135 had merged two packages by mechanism and this rule would have caught it (TASK-145).
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
 - 2026-10-29: a package states the vendors and capabilities it requires in a `register_requirements` hookimpl, per plugins.md; the generator template includes it (TASK-172).
+- 2026-10-29: `register_requirements` returns `Requirement` declarations the host resolves, per plugins.md (TASK-175 planning); the generator template returns an empty list.

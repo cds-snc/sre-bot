@@ -130,7 +130,11 @@ async def test_lifespan_registers_host_info_in_the_service_registry(_config_dir:
             assert container.get(HostInfo) is configuration.host_info
 
 
-async def test_an_installed_entry_point_without_an_enablement_key_fails_boot_naming_it(_config_dir: Path) -> None:
+async def test_an_installed_entry_point_without_an_enablement_key_fails_boot_naming_it(
+    _config_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The pytest-env pin of the area would supply the key the file lacks.
+    monkeypatch.delenv("PLUGINS__WORKPLACE_UTILITIES")
     base = _config_dir / "base.toml"
     base.write_text(base.read_text(encoding="utf-8").replace("rant = true\n", ""), encoding="utf-8")
     (_config_dir / "ci.toml").write_text("", encoding="utf-8")
@@ -148,5 +152,8 @@ async def test_the_lifespan_loads_plugins_with_the_disabled_names_from_the_files
         async with build_lifespan(configuration)(FastAPI()):
             pass
 
-    assert configuration.disabled_plugins == frozenset({"access.catalog", "access.request", "access.sync", "incident.scribe"})
+    # The files switch off the access plugins; the pytest-env pins also switch off every plugin that declares a requirement.
+    assert configuration.disabled_plugins == frozenset(
+        {"access.catalog", "access.request", "access.sync", "incident.scribe", "oncall_sync", "user_rotations", "rant"}
+    )
     assert load_plugins.call_args.args[1] == configuration.disabled_plugins

@@ -25,10 +25,10 @@ from pydantic import ValidationError
 from structlog.testing import capture_logs
 
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
-from contracts.plugins.requirements import RequiredDependencyError
 from server.configuration import load_host_configuration
 from server.lifespan import build_lifespan
 from server.plugins.manager import get_plugin_manager
+from server.plugins.requirements import PluginRequirementsUnmetError
 from tests.fixtures.plugin_dists import write_plugin_dist
 
 pytestmark = pytest.mark.integration
@@ -36,12 +36,22 @@ pytestmark = pytest.mark.integration
 NEEDY_MODULE = "fake_plugin_needing_openai"
 NEEDY_SOURCE = """
 from contracts.plugins.namespace import hookimpl
-from contracts.plugins.requirements import RequiredDependencyError
+from contracts.plugins.requirements import Requirement
 
 
 @hookimpl
 def register_requirements():
-    raise RequiredDependencyError("openai.tenant")
+    return (Requirement("openai.tenant"),)
+"""
+SECOND_MODULE = "fake_plugin_needing_slack"
+SECOND_SOURCE = """
+from contracts.plugins.namespace import hookimpl
+from contracts.plugins.requirements import Requirement
+
+
+@hookimpl
+def register_requirements():
+    return (Requirement("slack.tenant"), Requirement("openai.tenant"))
 """
 WARMUP_MODULE = "fake_plugin_invalid_settings"
 WARMUP_SOURCE = """
@@ -75,7 +85,7 @@ def _fresh_plugin_manager() -> Iterator[None]:
     get_plugin_manager.cache_clear()
     yield
     get_plugin_manager.cache_clear()
-    for module in (NEEDY_MODULE, WARMUP_MODULE, PLAIN_MODULE):
+    for module in (NEEDY_MODULE, SECOND_MODULE, WARMUP_MODULE, PLAIN_MODULE):
         sys.modules.pop(module, None)
 
 
@@ -107,7 +117,7 @@ async def test_lifespan_aborts_naming_the_plugin_and_setting_when_a_required_dep
     _install(monkeypatch, tmp_path, {"needy": NEEDY_MODULE}, {NEEDY_MODULE: NEEDY_SOURCE})
     reached_yield = False
 
-    with ExitStack() as stack, capture_logs() as events, pytest.raises(RequiredDependencyError):
+    with ExitStack() as stack, capture_logs() as events, pytest.raises(PluginRequirementsUnmetError):
         _stub_startup(stack)
         async with build_lifespan(configuration)(FastAPI()):
             reached_yield = True
@@ -119,9 +129,36 @@ async def test_lifespan_aborts_naming_the_plugin_and_setting_when_a_required_dep
     assert (event["plugin"], event["phase"], event["error_type"], event["setting"]) == (
         "needy",
         "register_requirements",
-        "RequiredDependencyError",
+        "PluginRequirementsUnmetError",
         "openai.tenant",
     )
+
+
+async def test_lifespan_logs_one_event_per_unmet_requirement_across_plugins_then_aborts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    configuration = load_host_configuration()
+    _install(
+        monkeypatch,
+        tmp_path,
+        {"needy": NEEDY_MODULE, "second": SECOND_MODULE},
+        {NEEDY_MODULE: NEEDY_SOURCE, SECOND_MODULE: SECOND_SOURCE},
+    )
+    reached_yield = False
+
+    with ExitStack() as stack, capture_logs() as events, pytest.raises(PluginRequirementsUnmetError):
+        _stub_startup(stack)
+        async with build_lifespan(configuration)(FastAPI()):
+            reached_yield = True
+
+    assert reached_yield is False
+    failures = _boot_failures(events)
+    assert all(set(event) == EVENT_FIELDS for event in failures)
+    assert sorted((str(event["plugin"]), str(event["setting"])) for event in failures) == [
+        ("needy", "openai.tenant"),
+        ("second", "openai.tenant"),
+        ("second", "slack.tenant"),
+    ]
 
 
 async def test_lifespan_aborts_naming_the_setting_when_a_plugin_settings_slice_fails_validation(

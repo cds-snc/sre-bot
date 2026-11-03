@@ -33,7 +33,9 @@ cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)'        # ~70s
 cd app && uv run pytest tests --ignore=tests/smoke
 ```
 
-Run every 3-5 edits and before completion, and report the actual output as
+During implementation run ruff and the targeted test files only. At the end run
+the full mypy (then fix), then the full pytest alone: once each, never in
+parallel, rerun only on a real error. Report the actual output as
 evidence — never assert success without it.
 
 ## Hard Constraints

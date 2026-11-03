@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-10-29T14:23:00Z'
+updated_date: '2026-10-29T18:44:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -54,6 +54,8 @@ Operator tooling lives in app/bin/ (decisions/migration.md). Follow the existing
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-29 (TASK-172): the generator's __init__.py template includes a register_requirements hookimpl stub (decisions/plugins.md and feature-packages.md 2026-10-29): a plugin states each vendor or capability it cannot run without there, none it uses optionally.
+
+2026-10-29 (TASK-175 planning, human): register_requirements returns Requirement declarations the host resolves (decisions/plugins.md, feature-packages.md); the generator's __init__.py stub returns an empty list instead of resolving and raising.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

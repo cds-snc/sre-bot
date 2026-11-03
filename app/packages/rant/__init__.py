@@ -1,9 +1,16 @@
 """Rant package - shout a message to the channel in bold uppercase."""
 
 from contracts.plugins.namespace import hookimpl
+from contracts.plugins.requirements import Requirement
 from contracts.slack.registrar import SlackCommandRegistrar
 from packages.rant.platforms import slack
 from packages.rant.service import format_rant
+
+
+@hookimpl
+def register_requirements() -> tuple[Requirement, ...]:
+    """Require the Slack tenant: the command shouts into a Slack channel."""
+    return (Requirement("slack.tenant"),)
 
 
 @hookimpl

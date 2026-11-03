@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-10-23T17:05:00Z'
+updated_date: '2026-10-29T18:45:00Z'
 labels:
   - oncall
   - capabilities
@@ -39,3 +39,9 @@ THIS SLICE
 - [ ] #3 The usergroup sync behaviour is unchanged: existing tests pass with the lookup stubbed through the capability's fake
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-29 (TASK-175 planning): oncall_sync declares Requirement("opsgenie.tenant") in register_requirements (decisions/plugins.md); when this task makes Opsgenie optional, drop that declaration.
+<!-- SECTION:NOTES:END -->

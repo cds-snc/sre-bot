@@ -1,6 +1,6 @@
 """Guard that the ci configuration switches off every plugin that states a requirement.
 
-CI configures no vendor tenant, so an enabled plugin with a ``register_requirements``
+CI configures no vendor tenant or token, so an enabled plugin with a ``register_requirements``
 hookimpl would abort every CI boot. Every installed entry point is loaded on a
 throwaway pluggy manager (none blocked) to find the plugins that implement the hook;
 the plugin tables of base.toml and ci.toml are read straight from the files and
@@ -40,5 +40,5 @@ def test_ci_files_switch_off_every_plugin_that_states_a_requirement() -> None:
     stating = _plugins_stating_requirements()
     enabled = _ci_enablement()
 
-    assert "incident.scribe" in stating
+    assert {"incident.scribe", "oncall_sync", "rant", "user_rotations"} <= stating
     assert sorted(name for name in stating if enabled.get(name, False)) == []

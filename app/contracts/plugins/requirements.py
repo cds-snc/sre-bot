@@ -1,18 +1,18 @@
-"""The error a plugin raises when a vendor or capability it requires is not configured.
+"""The requirements a plugin declares: configuration settings that must be set for it to run.
 
 A plugin states its requirements in its ``register_requirements`` hookimpl by
-resolving each one and raising this error, naming the configuration setting to
-set, when one is absent (decisions/plugins.md). The host aborts boot on it.
+returning a ``Requirement`` for each, naming the setting by its dotted path. The
+host resolves them, so a plugin carries no vendor code (decisions/plugins.md).
 """
 
+from dataclasses import dataclass
 
-class RequiredDependencyError(Exception):
-    """A vendor or capability an enabled plugin requires is not configured.
 
-    Carries only the configuration setting to fix, such as ``openai.tenant``,
-    never a configured value.
+@dataclass(frozen=True)
+class Requirement:
+    """One configuration setting an enabled plugin requires, such as ``openai.tenant``.
+
+    The path is ``<settings table>.<field>``. It names a setting, never a configured value.
     """
 
-    def __init__(self, setting: str) -> None:
-        super().__init__(f"required dependency not configured: set {setting} or switch the plugin off")
-        self.setting = setting
+    setting: str

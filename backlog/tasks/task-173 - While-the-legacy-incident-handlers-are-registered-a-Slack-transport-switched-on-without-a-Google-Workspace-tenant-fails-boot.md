@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-27T18:11:00Z'
-updated_date: '2026-10-29T14:34:00Z'
+updated_date: '2026-10-29T17:08:00Z'
 labels:
   - configuration
   - plugins
@@ -105,4 +105,6 @@ Q4 Add the check to env-checks/deploy-checks? Recommend no change; existing pre 
 - 2026-10-29: plan approved (human), with the 2026-10-29 rulings above.
 
 2026-10-29 implemented in the working tree from main cd090014 (same tree as TASK-172, disjoint files), In Progress. host_configuration.py: validate_legacy_incident_google_tenant(transport, google) beside validate_slack_transport, called in _validate_slices on the Google slice (after the Slack rules; a half Google entry fails in the slice first), message 'GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID is required when [slack_transport] enabled is true', comment names the legacy incident handlers and TASK-145.13. Tests: unit test_server_configuration_legacy_incident_google_rule (off, on with tenant, on without: exact message); integration test_lifespan_vendor_slice_validation (+3: no Google tenant fails naming the key with no token value, half entry fails on SERVICE_ACCOUNT_KEY first, both tenants boot); logging_render production test given a Google tenant. configuration.md Tolerated item reworded (since TASK-173, function named), Changes line; blob line points at TASK-176. Gates on the combined 172+173 tree: ruff All checks passed, format clean; mypy 41 errors in 14 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 5884 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK. ACs 1-3 checked. Production: the three GOOGLE_WORKSPACE__TENANT__* SSM parameters are in the task definition (terraform/ssm.tf) and hold the values 111.10.2 verified; a blank one would fail boot and the circuit breaker rolls back. Codespaces need the GOOGLE_WORKSPACE__TENANT__* secrets (local.toml enables the transport) or SLACK_TRANSPORT__ENABLED=false in app/.env.
+
+2026-10-29 (human): no manual deploy or env check is required for this task. Since the SSM blob migration closed, those checks run only for a task that changes terraform, the task definition, IAM or SSM parameters, or adds, renames or removes an environment name or secret, and for the contract step that deletes what a running revision used. Every AC is checked; the human sets Done.
 <!-- SECTION:NOTES:END -->

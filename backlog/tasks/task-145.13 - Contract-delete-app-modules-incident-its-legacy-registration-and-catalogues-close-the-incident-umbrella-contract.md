@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-29T00:22:00Z'
+updated_date: '2026-10-29T18:45:00Z'
 labels:
   - incident
   - features
@@ -88,4 +88,6 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 2026-10-15 (human default): legacy attributes are left on stored items; there is no strip pass, since nothing reads them once the bridge (TASK-145.5.8) and the TASK-145.5.7 job are deleted.
 
 - 2026-10-29 (TASK-173 assessment): the legacy Google requirement outlives declare's rebuild (eight modules under app/modules/incident import Google), so this task, not TASK-145.7, deletes TASK-173's rule; AC added.
+
+2026-10-29 (TASK-175 planning): incident.scribe declares slack.tenant and google_workspace.tenant as plugin requirements; deleting TASK-173's legacy-handler boot rule here leaves scribe's declarations in place.
 <!-- SECTION:NOTES:END -->

@@ -9,13 +9,12 @@ text: a validation message renders the input value, which may be a secret.
 import importlib.metadata
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
 from contracts.configuration import ConfigurationSlice, built_slices
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
-from contracts.plugins.requirements import RequiredDependencyError
 
 if TYPE_CHECKING:
     import pluggy
@@ -48,22 +47,29 @@ def attribute_built_slices(plugin: str) -> Generator[None]:
         _built_by_plugin.setdefault(plugin, set()).update(added)
 
 
-def call_hook_per_plugin(pm: pluggy.PluginManager, hook_name: str, logger: BoundLogger, /, **kwargs: object) -> None:
+def call_hook_per_plugin(
+    pm: pluggy.PluginManager, hook_name: str, logger: BoundLogger, /, **kwargs: object
+) -> dict[str, list[Any]]:
     """Call ``hook_name`` on each registered plugin in turn, logging and re-raising the first failure.
 
     The event's phase is the hook name. A blocked (disabled) plugin is listed
     without a plugin object and is skipped.
+
+    Returns:
+        Each plugin's non-None hookimpl results by entry-point name, in call order.
     """
+    results: dict[str, list[Any]] = {}
     plugins = [(name, plugin) for name, plugin in pm.list_name_plugin() if plugin is not None]
     for name, plugin in plugins:
         others = [other for _, other in plugins if other is not plugin]
         hook = pm.subset_hook_caller(hook_name, remove_plugins=others)
         try:
             with attribute_built_slices(name):
-                hook(**kwargs)
+                results[name] = list(hook(**kwargs))
         except Exception as error:
             log_plugin_boot_failed(logger, plugin=name, phase=hook_name, error=error)
             raise
+    return results
 
 
 def load_entry_points(pm: pluggy.PluginManager, logger: BoundLogger) -> None:
@@ -101,8 +107,6 @@ def log_plugin_boot_failed(logger: BoundLogger, *, plugin: str, phase: str, erro
 def _setting_at_fault(error: Exception) -> str | None:
     """Name the configuration setting at fault, from the error's structure only."""
     match error:
-        case RequiredDependencyError():
-            return error.setting
         case ValidationError():
             locations = (".".join(str(part) for part in detail["loc"]) for detail in error.errors(include_input=False))
             return ", ".join(f"{error.title}.{location}" if location else error.title for location in locations)

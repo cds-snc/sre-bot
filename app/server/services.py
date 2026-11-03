@@ -11,6 +11,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 
+import structlog
 import svcs
 from structlog.stdlib import BoundLogger
 
@@ -22,6 +23,8 @@ from infrastructure.coordination import DynamoDBConditionalWriteStore, get_condi
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws.client import get_aws_client
 from server.configured_systems import read_configured_systems
+
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(frozen=True)
@@ -51,7 +54,9 @@ def _build_conditional_write_store() -> ConditionalWriteStore:
 
 
 def _build_configured_systems() -> ConfiguredSystems:
-    return read_configured_systems()
+    systems = read_configured_systems()
+    logger.info("configured_systems_built", systems=[system.value for system in systems.tenants()])
+    return systems
 
 
 CORE_SERVICES: tuple[CoreService, ...] = (
