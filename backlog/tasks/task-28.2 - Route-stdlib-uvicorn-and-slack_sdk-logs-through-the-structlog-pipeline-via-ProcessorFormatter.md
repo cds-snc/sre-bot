@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-09-15 14:08
-updated_date: '2026-11-03T15:40:00Z'
+updated_date: '2026-11-03T17:20:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -177,4 +177,6 @@ Gates (from app/): ruff check . -> All checks passed!; ruff format --check . -> 
 Open for the human: A1 (aws logs test-metric-filter of terraform/local.tf on a captured JSON access line, uvicorn.error ERROR line and an import-time console line) needs AWS and was not run. Task left In Progress.
 
 2026-11-03 test fix: test_malformed_access_arguments_pass_through_unchanged failed when pytest's capture handlers run below WARNING (e.g. -o log_level=INFO). pytest 9 catching_logs attaches its LogCaptureHandler to every non-propagating logger at test entry (_pytest/logging.py:357-366); the fixture set propagate False without restoring it, and the malformed records ('msg' with tuple args) raised TypeError when that handler formatted them. Fixed in the test only: each malformed case carries a message matching its args, and the fixture restores propagate. Logging tests pass at INFO, DEBUG and WARNING; full pytest tests --ignore=tests/smoke: 6010 passed, 44 warnings in 175.21s.
+
+2026-11-03: merged (#1814, 90ed5968, 16:24:40Z); build_and_deploy run 41673920664 success (verify waited out the alarm window), no alarm. Closed: every AC checked, no manual check required; the human sets Done. Rollback target now 90ed5968's image tag. A1 (test-metric-filter) optional, not run.
 <!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
-updated_date: '2026-10-30T00:02:00Z'
+updated_date: '2026-11-03T17:20:00Z'
 labels:
   - configuration
   - human
@@ -41,4 +41,6 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 2026-10-29: AC #3 checked, human archived doc-14 (backlog/archive/docs) before the blob delete; the blob names stay recorded in AC #1.
 
 2026-10-30: AC #6 checked, human reported TASK-177 archived. #1, #2, #4 still open.
+
+2026-11-03: asked at session start; #1, #2 and #4 still open (human).
 <!-- SECTION:NOTES:END -->
