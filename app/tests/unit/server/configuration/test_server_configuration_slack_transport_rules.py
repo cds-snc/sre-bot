@@ -50,10 +50,19 @@ def test_transport_off_requires_nothing() -> None:
     assert not _notices(entries)
 
 
-def test_transport_on_without_the_tenant_entry_fails_naming_the_key() -> None:
-    """The transport cannot run without knowing its workspace."""
-    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] team_id"):
+def test_transport_on_without_the_tenant_entry_fails_naming_the_keys() -> None:
+    """The transport cannot run without knowing its tenant; the message names both ids that can fill it."""
+    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] team_id or enterprise_id is required"):
         validate_slack_transport(_transport(), _slack(team_id=None))
+
+
+def test_transport_on_with_an_enterprise_only_tenant_boots() -> None:
+    """An org-wide install names its Enterprise org and no workspace; the transport accepts it."""
+    slack = SlackSettings.model_construct(
+        tenant=SlackTenant(enterprise_id="E0ORG"), bot_token=BOT_TOKEN, app_token=APP_TOKEN, signing_secret=None
+    )
+
+    validate_slack_transport(_transport(), slack)
 
 
 def test_transport_on_without_the_bot_token_fails_naming_the_key() -> None:

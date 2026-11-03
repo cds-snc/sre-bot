@@ -8,8 +8,9 @@ and local.toml each name theirs; ci.toml none). The tokens and the signing secre
 read only from the environment as SLACK__<FIELD>, as a single-workspace Bolt app is
 configured (decisions/configuration.md). A present tenant entry needs the bot token,
 and any secret set without a tenant entry fails, so Slack is never half configured.
-The tenant entry is the expected tenant; checking each request against it, and the
-optional enterprise id, are TASK-157's.
+The tenant entry is the expected tenant: a workspace (team) id, an Enterprise org id, or
+both. The Slack runtime verifies every inbound request against it and refuses any other
+tenant (server/slack/tenant_guard.py).
 
 Whether and how the transport runs is the [slack_transport] slice
 (server/slack/settings.py). The rules that join the two (the transport switched on
@@ -20,8 +21,9 @@ Feature-domain configuration (channel IDs, user-group IDs) lives with the consum
 """
 
 from functools import lru_cache
+from typing import cast
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import SettingsConfigDict
 
 from contracts.configuration import ConfigurationSlice, env_only
@@ -30,25 +32,45 @@ _SECRETS = ("bot_token", "user_token", "app_token", "signing_secret")
 
 
 class SlackTenant(BaseModel):
-    """The Slack tenant this instance works with: the expected tenant, in Slack's terms."""
+    """The Slack tenant this instance works with: the expected tenant, in Slack's terms.
+
+    Each id set here is verified against every inbound Slack request; a request from any
+    other workspace or Enterprise org is refused. An org-wide install has no single
+    workspace, so the entry needs team_id, enterprise_id or both.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    team_id: str = Field(description="Slack workspace (team) id, as auth.test returns it.")
+    team_id: str | None = Field(
+        default=None, description="Slack workspace (team) id, as auth.test returns it; verified on every request."
+    )
+    enterprise_id: str | None = Field(
+        default=None,
+        description="Slack Enterprise org id, as auth.test returns it; verified on every request. Unset outside Enterprise orgs.",
+    )
 
-    @field_validator("team_id")
+    @field_validator("team_id", "enterprise_id")
     @classmethod
-    def _strip_and_reject_blank(cls, value: str) -> str:
-        # The id is opaque (Slack documents no format), so only blankness is checked.
+    def _strip_and_reject_blank(cls, value: str | None, info: ValidationInfo) -> str | None:
+        # The ids are opaque (Slack documents no format), so only blankness is checked.
+        if value is None:
+            return None
         value = value.strip()
         if not value:
-            raise ValueError("team_id must not be blank")
+            raise ValueError(f"{info.field_name} must not be blank")
         return value
+
+    @model_validator(mode="after")
+    def _names_a_tenant(self) -> SlackTenant:
+        if self.team_id is None and self.enterprise_id is None:
+            raise ValueError("[slack.tenant] needs team_id or enterprise_id")
+        return self
 
     @property
     def tenant_id(self) -> str:
-        """Return Slack's tenant id for this entry: the workspace (team) id."""
-        return self.team_id
+        """Return Slack's tenant id for this entry: the Enterprise org id when set, otherwise the workspace id."""
+        # _names_a_tenant guarantees one of the two ids.
+        return self.enterprise_id or cast(str, self.team_id)
 
 
 class SlackSettings(ConfigurationSlice):
@@ -57,7 +79,8 @@ class SlackSettings(ConfigurationSlice):
     Keys of [slack]:
         request_timeout_seconds, retry_max_attempts, transient_retry_after_seconds,
         unauthorized_errors, not_found_errors, transient_errors.
-        [slack.tenant] team_id: the workspace this instance works with. Default: none.
+        [slack.tenant] team_id and enterprise_id: the workspace and Enterprise org this instance
+        works with, at least one; each is verified on every inbound request. Default: none.
 
     Environment only:
         SLACK__BOT_TOKEN, SLACK__USER_TOKEN, SLACK__APP_TOKEN, SLACK__SIGNING_SECRET.
@@ -120,7 +143,7 @@ class SlackSettings(ConfigurationSlice):
         if self.tenant is None:
             for field in _SECRETS:
                 if getattr(self, field):
-                    raise ValueError(f"SLACK__{field.upper()} is set but [slack.tenant] team_id is not")
+                    raise ValueError(f"SLACK__{field.upper()} is set but [slack.tenant] is not")
         return self
 
 

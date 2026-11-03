@@ -27,7 +27,7 @@ logger = get_logger()
 def channel_url(channel_id: str) -> str:
     """Link to a channel through Slack's deep link, naming the configured workspace when there is one."""
     tenant = get_slack_settings().tenant
-    query = {"channel": channel_id} | ({"team": tenant.team_id} if tenant else {})
+    query = {"channel": channel_id} | ({"team": tenant.team_id} if tenant and tenant.team_id else {})
     return f"https://slack.com/app_redirect?{urlencode(query)}"
 
 

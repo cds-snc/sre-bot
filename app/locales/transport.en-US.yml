@@ -1,0 +1,2 @@
+transport:
+  slack.tenant_mismatch: ":warning: This app only serves its own Slack workspace, so this request was not processed."

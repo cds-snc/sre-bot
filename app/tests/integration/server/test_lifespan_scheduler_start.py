@@ -59,6 +59,7 @@ def stubbed_startup(logger: MagicMock, provider: MagicMock, stop_event: threadin
         stack.enter_context(patch("server.lifespan.get_slack_provider", return_value=provider))
         stack.enter_context(patch("server.lifespan.register_feature_integrations"))
         stack.enter_context(patch("server.lifespan._register_legacy_slack_commands"))
+        stack.enter_context(patch("server.lifespan.install_slack_tenant_guard"))
         stack.enter_context(patch("server.lifespan._register_legacy_handlers"))
         stack.enter_context(patch("server.lifespan.scheduled_tasks.init", init))
         stack.enter_context(patch("server.lifespan.scheduled_tasks.run_continuously", return_value=stop_event))

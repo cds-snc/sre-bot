@@ -24,8 +24,9 @@ dev_bypass_enabled = false
 
 [slack]
 # The Slack client's per-call timeout, retry budget and error-code catalogues.
-# Each deployment that works with a workspace names it in [slack.tenant] team_id in
-# its own file; the tokens come from the environment as SLACK__<FIELD>.
+# Each deployment that works with Slack names its tenant in [slack.tenant] in its own
+# file: team_id (the workspace), enterprise_id (an Enterprise org), or both. Every
+# inbound request is checked against it. The tokens come from the environment as SLACK__<FIELD>.
 request_timeout_seconds = 10
 retry_max_attempts = 2
 transient_retry_after_seconds = 30

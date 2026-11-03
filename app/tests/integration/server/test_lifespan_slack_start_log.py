@@ -42,6 +42,7 @@ def stubbed_startup(logger: MagicMock, provider: MagicMock) -> Iterator[None]:
         stack.enter_context(patch("server.lifespan.get_slack_provider", return_value=provider))
         stack.enter_context(patch("server.lifespan.register_feature_integrations"))
         stack.enter_context(patch("server.lifespan._register_legacy_slack_commands"))
+        stack.enter_context(patch("server.lifespan.install_slack_tenant_guard"))
         yield
 
 

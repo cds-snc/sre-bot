@@ -38,6 +38,13 @@ def test_channel_url_without_a_tenant_leaves_the_workspace_to_slack() -> None:
         assert core.channel_url("C0123") == "https://slack.com/app_redirect?channel=C0123"
 
 
+def test_channel_url_with_an_enterprise_only_tenant_leaves_the_workspace_to_slack() -> None:
+    """An org-wide tenant names no single workspace, so the link carries none."""
+    tenant = SimpleNamespace(team_id=None, enterprise_id="E0ORG")
+    with patch("modules.incident.core.get_slack_settings", return_value=SimpleNamespace(tenant=tenant)):
+        assert core.channel_url("C0123") == "https://slack.com/app_redirect?channel=C0123"
+
+
 def helper_generate_default_incident_params():
     return IncidentPayload(
         name="name",
