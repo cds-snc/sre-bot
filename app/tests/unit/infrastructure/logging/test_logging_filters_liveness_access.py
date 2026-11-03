@@ -36,6 +36,7 @@ def access_logger() -> Iterator[tuple[logging.Logger, _Capture]]:
     logger.removeHandler(handler)
     logger.removeFilter(liveness_filter)
     logger.setLevel(logging.NOTSET)
+    logger.propagate = True
 
 
 def _access(logger: logging.Logger, method: str, path: str, status: int) -> None:
@@ -99,13 +100,25 @@ def test_every_other_access_line_stays_at_info(access_logger, method, path, stat
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("args", [None, (), ("only", "two"), {"method": "GET"}, ("a", "GET", "/version", "1.1", "200")])
-def test_malformed_access_arguments_pass_through_unchanged(access_logger, args):
-    """A record whose arguments are not the access shape (or a non-integer status) is left at INFO."""
+@pytest.mark.parametrize(
+    ("msg", "args"),
+    [
+        ("msg", None),
+        ("msg", ()),
+        ("%s %s", ("only", "two")),
+        ("%(method)s", {"method": "GET"}),
+        ('%s - "%s %s HTTP/%s" %s', ("a", "GET", "/version", "1.1", "200")),
+    ],
+)
+def test_malformed_access_arguments_pass_through_unchanged(access_logger, msg, args):
+    """A record whose arguments are not the access shape (or a non-integer status) is left at INFO.
+
+    Each message matches its arguments so any handler attached to the logger can render it.
+    """
     logger, handler = access_logger
     logger.setLevel(logging.INFO)
 
-    record = logging.LogRecord(logger.name, logging.INFO, __file__, 1, "msg", None, None)
+    record = logging.LogRecord(logger.name, logging.INFO, __file__, 1, msg, None, None)
     record.args = args
     logger.handle(record)
 

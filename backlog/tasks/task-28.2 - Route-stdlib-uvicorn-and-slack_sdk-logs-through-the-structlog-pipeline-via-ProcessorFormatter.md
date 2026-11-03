@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-09-15 14:08
-updated_date: '2026-11-03T15:08:00Z'
+updated_date: '2026-11-03T15:40:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -175,4 +175,6 @@ Tests: extended test_setup.py, unit conftest (process_logging_state fixture), te
 Deviations: (1) an unreadable file (OSError) is not a ConfigurationError, so load_host_configuration does not log it; the uncaught-exception hook renders it as one uncaught_exception CRITICAL line (tested in-process by invoking the hook, loader untouched). (2) The subprocess cases run with PYTHONWARNINGS=ignore: the real main import emits plain dependency DeprecationWarnings (fastapi/testclient, slowapi) to stderr before create_app, which is the plan's D6 residual 'import-time warnings'; they are present in production too. (3) uvicorn re-raises the captured SIGTERM after shutdown, so the subprocess exit status on SIGTERM is -15; the test accepts 0 or -15 and asserts 'Finished server process'. A5 holds: no error or critical line on SIGTERM shutdown. (4) The [logging] invalid case raises ConfigurationError (ConfigurationSlice wraps pydantic), not ValidationError; both are in the hook's reported tuple.
 Gates (from app/): ruff check . -> All checks passed!; ruff format --check . -> 1082 files already formatted; make check-import-contracts -> Contracts: 13 kept, 0 broken; make check-settings-key-ownership -> OK; mypy -> Found 41 errors in 14 files (checked 423 source files), all the pre-existing ones outside touched files; pytest tests --ignore=tests/smoke -> 6010 passed, 44 warnings in 185.67s.
 Open for the human: A1 (aws logs test-metric-filter of terraform/local.tf on a captured JSON access line, uvicorn.error ERROR line and an import-time console line) needs AWS and was not run. Task left In Progress.
+
+2026-11-03 test fix: test_malformed_access_arguments_pass_through_unchanged failed when pytest's capture handlers run below WARNING (e.g. -o log_level=INFO). pytest 9 catching_logs attaches its LogCaptureHandler to every non-propagating logger at test entry (_pytest/logging.py:357-366); the fixture set propagate False without restoring it, and the malformed records ('msg' with tuple args) raised TypeError when that handler formatted them. Fixed in the test only: each malformed case carries a message matching its args, and the fixture restores propagate. Logging tests pass at INFO, DEBUG and WARNING; full pytest tests --ignore=tests/smoke: 6010 passed, 44 warnings in 175.21s.
 <!-- SECTION:NOTES:END -->
