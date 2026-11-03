@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-10-23T16:26:00Z'
-updated_date: '2026-11-03T21:06:00Z'
+updated_date: '2026-11-03T21:45:00Z'
 labels:
   - security
   - configuration
@@ -37,10 +37,10 @@ Scope:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 decisions/security.md records the edge rule: the WAF allow-list is derived from or checked against the app's mounted routes, and authentication stays in the app
-- [ ] #2 terraform authorized_endpoints_with_constraints allows the authenticated /api/v1 routes; the tf_plan shows only the WAF rule change
+- [x] #2 terraform authorized_endpoints_with_constraints allows the authenticated /api/v1 routes; the tf_plan shows only the WAF rule change
 - [x] #3 A CI test fails when a mounted route is blocked by the terraform allow-list and is not listed as intentionally internal
 - [ ] #4 The sre-bot ECS egress can fetch the Backstage jwks_uri (evidence in the notes)
-- [ ] #5 After apply: an /api/v1 path is answered by the app (not a WAF 403) and /docs and /openapi.json answer 200, shown by deploy-checks post edge; the bad- and valid-Backstage-token checks run with the first PR that makes an authenticated /api/v1 route live (TASK-53 step 3 or TASK-165.2)
+- [x] #5 After apply: an /api/v1 path is answered by the app (not a WAF 403) and /docs and /openapi.json answer 200, shown by deploy-checks post edge; the bad- and valid-Backstage-token checks run with the first PR that makes an authenticated /api/v1 route live (TASK-53 step 3 or TASK-165.2)
 - [x] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 - [x] #7 The edge allow-list lives in one file, terraform/authorized_endpoints.json, read by terraform (local.authorized_endpoints feeding the AuthorizedEndpoints rule) and by the CI test; variables.tf no longer holds a copy
 - [x] #8 The CI route inventory is generic: it loads every sre_bot entry point (enabled or not) onto the app built by create_app and fails if its plugin set differs from the installed entry points, so routes of future plugins are checked with no change to the test
@@ -133,6 +133,12 @@ Implemented 2026-11-03 on task-163-edge-allow-list, In Progress.
 - bin/deploy-checks.zsh: task check edge (post), probe helper sends a token on curl's stdin; stale TASK-163 HTTP header removed. Read-only probe of production today: /api/v1/edge-probe, /docs and an unknown path answer 403 text/html (WAF); /version 200 application/json. After apply the check expects 404 application/json on the default probe path.
 - Gates: ruff clean, format clean, import contracts 13 kept, key ownership OK, mypy 41 errors in 14 untouched legacy files (pre-existing, none in new files), pytest 6052 passed.
 Open: AC #2 (tf_plan on the PR shows only the AuthorizedEndpoints statements), AC #4 (Backstage owners confirm the NAT egress may fetch the jwks_uri), AC #5 (post edge after tf_apply and the deploy).
+
+2026-11-03 merged (#1816, 023aa1e5, 21:19Z); Terraform Apply success; deployed on sre-bot-task:77 (image tag 023aa1e55636f198ffad49399c27971536c34fb9-2026-11-03).
+- AC #2: PR tf_plan 'Plan: 0 to add, 1 to change, 0 to destroy' (aws_wafv2_web_acl.sre-bot in place). The rule set is re-rendered as a whole; the multiset diff of removed vs added lines differs only in AuthorizedEndpoints search strings: removed /access, /accounts, /active_requests, /auth/me, /past_requests, /request_access; added /api/v1/, /docs, /docs/oauth2-redirect, /redoc, /openapi.json, /v1/geolocate. The managed rule sets come back identical.
+- AC #5: zsh bin/deploy-checks.zsh post edge (tmp/deploy-checks/post-edge-20261103T214306Z.txt, 21:43Z): rollout PASS, slack_up PASS, version PASS (023aa1e5), runtime_errors PASS; GET /api/v1/edge-probe without a token 404 application/json (the app, not the WAF 403): edge_api_reaches_app PASS; edge_docs_docs PASS; edge_docs_openapi_json PASS; edge_bad_token SKIPPED (no live authenticated /api/v1 route; the token checks run with TASK-53 step 3 or TASK-165.2, per the AC). jwt_validation_failed 0.
+- Not from this change: the deploy job failed (the known bake-time race, TASK-164; rollout COMPLETED, 2/2 running); boot_errors FAIL on 3 slack_listener_error view_submission lines at 21:23-21:24Z (user modal submissions; this PR changed no app runtime code, and the 2026-10-29 pre baseline also has one). non_json_lines WARN (4 known import-time lines).
+Open: AC #4 (Backstage owners' written confirmation that the NAT egress may fetch the jwks_uri; required before the first live authenticated route).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
