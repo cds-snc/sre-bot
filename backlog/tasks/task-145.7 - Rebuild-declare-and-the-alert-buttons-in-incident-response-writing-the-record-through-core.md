@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-03T19:00:00Z'
+updated_date: '2026-11-04T14:01:00Z'
 labels:
   - incident
   - features
@@ -109,6 +109,8 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 2026-10-20 (SLACK_TEAM_ID review): writers stamp the configured Slack tenant, which TASK-157's runtime guard has verified against the request (decisions/workplace-systems.md rule 3); with SLACK_ENTERPRISE_ID set the tenant is the Enterprise org id. Depends on TASK-157.
 
 - 2026-10-28 (TASK-167 accepted): locales/incident.*.yml carry CDS wording; each incident surface rebuild moves the strings it touches to provisioned organisation wording (message overrides by key over generic app strings, decisions/organisation-content.md, i18n.md), keeping generic defaults in the app.
+
+2026-11-04 (TASK-145.5.7 planning, human approved): (1) incident.response is already a plugin when this task starts: TASK-145.5.7.3 adds its entry point, contract (m) entry, [plugins.incident_response] key (true in base, false in ci), register_requirements for the Slack and Google tenants, and one hookimpl registering the legacy upgrade job; declare is added to that plugin. (2) The binding backfill (doc-11 row 18) is a step added to the TASK-145.5.7 job, not a new runner (incident-management.md Migration rule 3): after declare writes bindings and lookups fall back (rule 1), the step puts one binding per record from its conversation map idempotently and raises the version marker to 2 for every item below it (rule 4 amendment recorded for A1, doc-11 row 17a). (3) Batch writers stamp the tenant verified through contracts/workplace TenantVerifier (workplace-systems.md rule 3, 2026-11-04).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

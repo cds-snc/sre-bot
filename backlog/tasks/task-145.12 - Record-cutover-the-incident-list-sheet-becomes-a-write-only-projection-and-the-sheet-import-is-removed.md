@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-11-04T14:01:00Z'
 labels:
   - incident
   - features
@@ -42,7 +42,7 @@ THIS SLICE
 <!-- AC:BEGIN -->
 - [ ] #1 No code reads the incident list sheet as input to a decision; the projection adapter exposes only append and update-status
 - [ ] #2 The sheet import (create_missing_incidents and its caller) is deleted with its tests; no code writes a legacy-shape incident item; the rerun of the TASK-145.5.7 job (dry run then apply, per environment) after deploy is recorded in the notes
-- [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from INCIDENT_CORE__FULL_READ_MAX_ITEMS (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
+- [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from [incident_core] full_read_max_items (features/incident/common/settings.py, added by TASK-145.5.7) (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #5 The projection reads the incident list sheet id from [incident_core] list_sheet_id and every subdomain that writes the projection states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 <!-- AC:END -->
@@ -59,7 +59,7 @@ Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after 
 ## Steps
 1. Replace every sheet read with IncidentStore reads: listings use list_open (open index), the per-channel lookup uses find_by_conversation; delete get_incidents_from_sheet and its callers' sheet paths. The duplicate-row check is removed: the declare appends the projection row once, inside its idempotent write.
 2. Delete create_missing_incidents, complete_incidents_details if unused after, and the load-incidents dev command with its tests.
-3. IncidentListProjection interface in core/api.py (append_row, update_status) with one adapter over capabilities.spreadsheets.api (if TASK-121 landed) and a rebuild job regenerating the sheet from the store with RecordStore.read_all (TASK-27.5), max_items from INCIDENT_CORE__FULL_READ_MAX_ITEMS (added by TASK-145.5.7); past the cap the rebuild fails without writing; response calls the projection from declare and status change.
+3. IncidentListProjection interface in core/api.py (append_row, update_status) with one adapter over capabilities.spreadsheets.api (if TASK-121 landed) and a rebuild job regenerating the sheet from the store with RecordStore.read_all (TASK-27.5), max_items from [incident_core] full_read_max_items (added by TASK-145.5.7); past the cap the rebuild fails without writing; response calls the projection from declare and status change.
 4. /sre incident list (active and stale) reads IncidentStore.list_open; stale filters on last activity client-side over the open incidents.
 5. After deploy, per environment: rerun the TASK-145.5.7 job, dry run then apply; record the reports in the notes.
 
@@ -89,4 +89,6 @@ Sheet consumers see the same rows. Revert restores the sheet reads and the impor
 2026-10-20 (TASK-27.5 planning): AC3 rewritten. The whole-table read rule (decisions/cloud-portability.md contract 4) makes listings an index read (list_open) and removes the sheet duplicate-row check; only the rebuild uses read_all.
 
 2026-10-28 (TASK-111.14): new incident list rows hold the channel as Slack's deep link (slack.com/app_redirect?channel=<id>&team=<team_id>), older rows hold gcdigital.slack.com/archives/<id>; modules/incident/incident_folder.channel_id_from_link reads both until the sheet import is removed here.
+
+2026-11-04 (TASK-145.5.7 planning, human): the whole-table cap is the files key [incident_core] full_read_max_items, not an environment name (decisions/cloud-portability.md contract 4 amended); AC3 and step 3 reworded. The rerun of the TASK-145.5.7 job after this task merges is a dry run then apply per environment.
 <!-- SECTION:NOTES:END -->

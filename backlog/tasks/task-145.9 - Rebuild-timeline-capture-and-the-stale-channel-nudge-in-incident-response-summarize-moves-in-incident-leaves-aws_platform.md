@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-26T15:06:00Z'
+updated_date: '2026-11-04T14:02:00Z'
 labels:
   - incident
   - features
@@ -88,6 +88,8 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 2026-10-13 re-ground: with the TASK-147 postmortem-records flag off, capture and removal behave exactly as today, including the report's timeline section and who may react. The timeline records are written regardless of the flag, but nothing user-facing reads them until it is on. The capture-permission rule is decided by TASK-147.1 and announced by TASK-147.8; this slice does not change it.
 
 2026-10-14 (TASK-145.5 split): precondition before this task merges: the TASK-145.5.7 incident legacy upgrade job (which also fills the open index) has run (dry run, then apply) in each environment after TASK-145.8 deployed and reported pending=0; TASK-145.13 removes the job (updated 2026-10-15). Timeline key format supersedes 'ts#entry_id': partition incident_id, sort entry_key '<posted_at ISO-8601 UTC, microseconds, +00:00>#<entry_id>', where entry_id is a uuid5 over system, tenant, conversation and message id for captured messages (a re-capture writes the same key, so put_if_not_exists dedupes) and a uuid4 for manual entries; the Slack ts stays in the source_message reference. The GSIs use projection ALL. IAM index access comes from TASK-152.
+
+2026-11-04 (TASK-145.5.7 planning, human approved): the nudge job registers with the lease_ttl keyword on register_interval/register_daily added by TASK-145.5.7.1, its TTL from the response settings slice (reliability.md 2026-11-04). Precondition unchanged: the TASK-145.5.7 job has run (dry run then apply) after TASK-145.8 deploys.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

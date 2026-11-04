@@ -5,8 +5,8 @@ title: >-
   scheduler registry (scheduler-as-clock-driven transport)
 status: To Do
 assignee: []
-created_date: '2026-07-28 16:29'
-updated_date: '2026-10-14 18:57'
+created_date: 2026-07-28 16:29
+updated_date: '2026-11-04T14:01:00Z'
 labels:
   - architecture
   - reliability
@@ -19,7 +19,7 @@ references:
   - decisions/reliability.md
   - decisions/plugins.md
   - decisions/platform-transports.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1373'
+  - https://github.com/cds-snc/sre-bot/issues/1373
 priority: medium
 ordinal: 94000
 ---
@@ -58,6 +58,12 @@ BREAKDOWN GUIDANCE FOR THE PLANNING CODING AGENT: check the single-PR size gate.
 - [ ] #1 Tests pass (behavior unchanged for existing jobs; new Protocol shape covered)
 - [ ] #2 A human-approved implementation plan exists on this task (via task-planner) before any implementation PR opens; planner has checked the single-PR size gate and decomposed if needed
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (TASK-145.5.7 planning, human approved): TASK-145.5.7.1 adds the Tier-2 part of AC#1/#2: a lease_ttl: timedelta | None keyword on BackgroundJobRegistry.register_interval and register_daily (None = Tier-1; a value = the host wraps the job in run_if_leased with that TTL, taken from the job's own settings, never the scheduler default). The rest of this task stands: the declarative tier/schedule Protocol, host jobs moved onto it, _tier2 deleted, the default TTL kept for modules jobs (reliability.md 2026-11-04).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
