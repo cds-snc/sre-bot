@@ -16,7 +16,6 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from features.incident.common import vocabulary
 from features.incident.core import api
 from features.incident.core.adapters import slack as slack_adapter
-from features.incident.core.adapters import status_updates as status_updates_adapter
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from tests.factories.incident import incident_on, slack_conversation
 
@@ -25,12 +24,10 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture(autouse=True)
 def _clear_provider_cache() -> Iterator[None]:
-    """Keep the cached reader and store from leaking between tests."""
+    """Keep the cached reader from leaking between tests."""
     api.get_incident_transcript_reader.cache_clear()
-    api.get_status_update_store.cache_clear()
     yield
     api.get_incident_transcript_reader.cache_clear()
-    api.get_status_update_store.cache_clear()
 
 
 def test_api_exports_exactly_the_public_names() -> None:
@@ -55,9 +52,9 @@ def test_api_exports_exactly_the_public_names() -> None:
         "TranscriptMessage",
         "VideoCallReference",
         "build_incident_store",
+        "build_status_update_store",
         "find_incident_for_conversation",
         "get_incident_transcript_reader",
-        "get_status_update_store",
         "translate",
     ]
     assert all(hasattr(api, name) for name in api.__all__)
@@ -145,21 +142,6 @@ def test_status_update_store_signatures_carry_only_domain_types_and_operation_re
     assert inspect.signature(store.latest).return_annotation == OperationResult[api.StatusUpdate | None]
     assert inspect.signature(store.list_for_incident).return_annotation == OperationResult[Sequence[api.StatusUpdate]]
     assert inspect.signature(store.transition).return_annotation == OperationResult[api.StatusUpdate]
-
-
-def test_status_update_store_provider_returns_one_cached_store_built_by_the_dynamodb_adapter(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The provider builds the DynamoDB-backed store once and hands out that same instance."""
-    built = MagicMock(spec=status_updates_adapter.DynamoDbStatusUpdateStore)
-    builder = MagicMock(return_value=built)
-    monkeypatch.setattr(api, "build_status_update_store", builder)
-
-    store = api.get_status_update_store()
-
-    assert store is built
-    assert api.get_status_update_store() is built
-    builder.assert_called_once_with()
 
 
 def test_incident_store_signatures_carry_only_domain_types_and_operation_results() -> None:

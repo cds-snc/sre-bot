@@ -7,8 +7,9 @@ check. Payloads are form-encoded as Slack posts them and fed to
 ``App.dispatch`` with listeners run inline; the harness sends every payload as
 user ``USER_ID``. Only edges are stubbed: ``WebClient.api_call`` records Web API
 calls, the plugin's service scopes resolve an empty ``InMemoryRecordStore`` and
-Slack configured under one tenant, and the entrypoint's ``set_published`` is the real service bound to a
-core ``InMemoryStatusUpdateStore`` and a fixed ``now``. The publisher is the real
+Slack configured under one tenant, and the entrypoint's ``set_published`` is the
+real service over the status-update store the handler builds on those records,
+with a fixed ``now``. The publisher is the real
 copy-ready one. Assertions read the HTTP status Bolt returns, the exact Web API
 calls made (one ``views.update`` and nothing posted to a channel) and the record
 left in the store.
@@ -33,9 +34,15 @@ from features.incident.comms.entrypoints.slack_views import (
 )
 from features.incident.comms.history import set_published
 from features.incident.comms.publisher import render_copy_ready
-from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
-from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
-from tests.factories.incident import incident_scopes
+from features.incident.core.api import (
+    StatusUpdate,
+    StatusUpdateStage,
+    StatusUpdateState,
+    StatusUpdateStore,
+    StatusUpdateText,
+)
+from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import incident_scopes, status_update_store_in
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
@@ -81,16 +88,20 @@ def _published() -> StatusUpdate:
 
 
 @pytest.fixture
-def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
-    status_updates = InMemoryStatusUpdateStore()
-    monkeypatch.setattr(history, "set_published", partial(set_published, now=_NOW, store=status_updates))
-    monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
-    return status_updates
+def records() -> InMemoryRecordStore:
+    return InMemoryRecordStore()
 
 
 @pytest.fixture
-def harness(monkeypatch: pytest.MonkeyPatch, store: InMemoryStatusUpdateStore) -> Iterator[Harness]:
-    yield from harness_fixture("incident.comms", incident_scopes)(monkeypatch, comms_module)
+def store(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore) -> StatusUpdateStore:
+    monkeypatch.setattr(history, "set_published", partial(set_published, now=_NOW))
+    monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
+    return status_update_store_in(records)
+
+
+@pytest.fixture
+def harness(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore, store: StatusUpdateStore) -> Iterator[Harness]:
+    yield from harness_fixture("incident.comms", lambda: incident_scopes(records))(monkeypatch, comms_module)
 
 
 def _toggle_action(*, published: bool) -> dict[str, Any]:
@@ -108,7 +119,7 @@ def _copy_ready_view(update: StatusUpdate) -> dict[str, Any]:
     return build_copy_ready_view(copy, "en-US", _METADATA, update=update)
 
 
-def test_toggle_is_acked(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_toggle_is_acked(harness: Harness, store: StatusUpdateStore) -> None:
     """Bolt routes the toggle press to the plugin's listener and acks it with HTTP 200."""
     store.append(_APPROVED)
 
@@ -117,7 +128,7 @@ def test_toggle_is_acked(harness: Harness, store: InMemoryStatusUpdateStore) -> 
     assert response.status == 200
 
 
-def test_publish_stores_the_presser_and_time(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_publish_stores_the_presser_and_time(harness: Harness, store: StatusUpdateStore) -> None:
     """Marking an approved update published leaves it published by the pressing user at the fixed time."""
     store.append(_APPROVED)
 
@@ -126,7 +137,7 @@ def test_publish_stores_the_presser_and_time(harness: Harness, store: InMemorySt
     assert store.latest(_INCIDENT).data == _published()
 
 
-def test_publish_updates_the_modal_once_in_place(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_publish_updates_the_modal_once_in_place(harness: Harness, store: StatusUpdateStore) -> None:
     """The only Web API call is one views.update, by view id and hash, to the published record's copy-ready view."""
     store.append(_APPROVED)
 
@@ -137,7 +148,7 @@ def test_publish_updates_the_modal_once_in_place(harness: Harness, store: InMemo
     ]
 
 
-def test_undo_clears_the_publication(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_undo_clears_the_publication(harness: Harness, store: StatusUpdateStore) -> None:
     """Marking a published update not published leaves it approved with no publication time or person."""
     store.append(_APPROVED)
     store.transition(_published(), expected_state=StatusUpdateState.APPROVED)
@@ -147,7 +158,7 @@ def test_undo_clears_the_publication(harness: Harness, store: InMemoryStatusUpda
     assert store.latest(_INCIDENT).data == _APPROVED
 
 
-def test_undo_updates_the_modal_once_in_place(harness: Harness, store: InMemoryStatusUpdateStore) -> None:
+def test_undo_updates_the_modal_once_in_place(harness: Harness, store: StatusUpdateStore) -> None:
     """The undo's only Web API call is one views.update to the approved record's copy-ready view."""
     store.append(_APPROVED)
     store.transition(_published(), expected_state=StatusUpdateState.APPROVED)

@@ -20,7 +20,7 @@ from features.incident.comms import providers
 from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.domain import PublishedRecord
 from features.incident.comms.ports import StatusPagePublisher
-from features.incident.core.api import StatusUpdate, StatusUpdateState, StatusUpdateStore, get_status_update_store
+from features.incident.core.api import StatusUpdate, StatusUpdateState, StatusUpdateStore
 
 logger = structlog.get_logger()
 
@@ -29,7 +29,7 @@ async def get_approved_update(
     incident_id: str,
     sequence: int,
     *,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdate]:
     """Return the incident's record at ``sequence`` when it is approved or published.
 
@@ -38,7 +38,7 @@ async def get_approved_update(
         is a draft; ``STATUS_UPDATE_CONFLICT`` when the incident has no such
         sequence; otherwise the store's classified error.
     """
-    return _read_approved(store or get_status_update_store(), incident_id, sequence)
+    return _read_approved(store, incident_id, sequence)
 
 
 async def set_published(
@@ -48,7 +48,7 @@ async def set_published(
     published: bool,
     actor: str,
     now: datetime | None = None,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdate]:
     """Mark the approved update at ``sequence`` as published, or as not published.
 
@@ -58,7 +58,7 @@ async def set_published(
         published: The target state the button carried.
         actor: Platform user id of the person who toggled it.
         now: The current time; injected in tests.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
 
     Returns:
         Success with the stored record, also when it already is in the target
@@ -68,7 +68,6 @@ async def set_published(
         state; otherwise the store's classified error.
     """
     log = logger.bind(operation="set_published", incident_id=incident_id, sequence=sequence, actor=actor, published=published)
-    store = store or get_status_update_store()
     target_state = StatusUpdateState.PUBLISHED if published else StatusUpdateState.APPROVED
     read = _read_approved(store, incident_id, sequence)
     if not read.is_success or read.data is None:
@@ -107,6 +106,7 @@ async def read_published(
     *,
     labels_en: ProfileLabels,
     labels_fr: ProfileLabels,
+    store: StatusUpdateStore,
     publisher: StatusPagePublisher | None = None,
 ) -> OperationResult[PublishedRecord]:
     """Return the approved update at ``sequence`` with its copy-ready text.
@@ -115,7 +115,7 @@ async def read_published(
         Success with the record and its text; the read's classified error (see
         ``get_approved_update``) or the publisher's.
     """
-    return await _render(await get_approved_update(incident_id, sequence), labels_en, labels_fr, publisher)
+    return await _render(await get_approved_update(incident_id, sequence, store=store), labels_en, labels_fr, publisher)
 
 
 async def set_published_and_render(
@@ -126,6 +126,7 @@ async def set_published_and_render(
     actor: str,
     labels_en: ProfileLabels,
     labels_fr: ProfileLabels,
+    store: StatusUpdateStore,
     publisher: StatusPagePublisher | None = None,
 ) -> OperationResult[PublishedRecord]:
     """Mark the approved update at ``sequence`` published or not, then return it with its copy-ready text.
@@ -134,7 +135,7 @@ async def set_published_and_render(
         Success with the stored record and its text; the toggle's classified
         error (see ``set_published``) or the publisher's.
     """
-    toggled = await set_published(incident_id, sequence, published=published, actor=actor)
+    toggled = await set_published(incident_id, sequence, published=published, actor=actor, store=store)
     return await _render(toggled, labels_en, labels_fr, publisher)
 
 

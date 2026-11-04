@@ -5,8 +5,9 @@ record through the ``StatusPagePublisher``. A refused approval is returned with
 its code and nothing is rendered; a rendering failure is returned as the
 publisher classified it.
 
-Records live in the core's ``InMemoryStatusUpdateStore`` through the real
-``approve_status_update`` (replaced on the module with its store bound); a
+Records live in the core's ``InMemoryStatusUpdateStore`` passed to the call
+and used by the real ``approve_status_update`` (replaced on the module with a
+fixed clock bound); a
 recording publisher stands in for the copy-ready adapter, so the tests see
 exactly which record reached it and with which labels.
 """
@@ -66,11 +67,13 @@ class _RecordingPublisher:
 def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
     status_updates.append(_DRAFT)
-    monkeypatch.setattr(approval, "approve_status_update", partial(approve_status_update, store=status_updates, now=_NOW))
+    monkeypatch.setattr(approval, "approve_status_update", partial(approve_status_update, now=_NOW))
     return status_updates
 
 
-async def _approve(publisher: _RecordingPublisher, edit: StatusUpdateEdit = _EDIT) -> OperationResult[CopyReadyText]:
+async def _approve(
+    publisher: _RecordingPublisher, store: InMemoryStatusUpdateStore, edit: StatusUpdateEdit = _EDIT
+) -> OperationResult[CopyReadyText]:
     return await approve_and_publish(
         "inc-1",
         1,
@@ -79,6 +82,7 @@ async def _approve(publisher: _RecordingPublisher, edit: StatusUpdateEdit = _EDI
         labels_en=build_profile_labels("en-US"),
         labels_fr=build_profile_labels("fr-FR"),
         publisher=publisher,
+        store=store,
     )
 
 
@@ -86,7 +90,7 @@ async def test_an_approval_renders_the_approved_record(store: InMemoryStatusUpda
     """The approved record, with its approver, reaches the publisher with both languages' labels; its text is returned."""
     publisher = _RecordingPublisher(OperationResult.success(data=_COPY))
 
-    result = await _approve(publisher)
+    result = await _approve(publisher, store)
 
     assert (result.is_success, result.data) == (True, _COPY)
     approved = replace(_DRAFT, state=StatusUpdateState.APPROVED, approver="U9", approved_at=_NOW)
@@ -97,7 +101,7 @@ async def test_a_refused_approval_renders_nothing(store: InMemoryStatusUpdateSto
     """Blank fields refuse the approval with their code, and the publisher is never called."""
     publisher = _RecordingPublisher(OperationResult.success(data=_COPY))
 
-    result = await _approve(publisher, edit=replace(_EDIT, en=replace(_TEXT, impact="  ")))
+    result = await _approve(publisher, store, edit=replace(_EDIT, en=replace(_TEXT, impact="  ")))
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_FIELDS_INVALID
     assert publisher.calls == []
@@ -108,7 +112,7 @@ async def test_a_stale_approval_renders_nothing(store: InMemoryStatusUpdateStore
     store.append(replace(_DRAFT, sequence=2))
     publisher = _RecordingPublisher(OperationResult.success(data=_COPY))
 
-    result = await _approve(publisher)
+    result = await _approve(publisher, store)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
     assert publisher.calls == []
@@ -119,7 +123,7 @@ async def test_a_rendering_failure_is_returned_as_classified(store: InMemoryStat
     failed = OperationResult.permanent_error(message="draft", error_code=ErrorCode.STATUS_UPDATE_NOT_APPROVED)
     publisher = _RecordingPublisher(failed)
 
-    result = await _approve(publisher)
+    result = await _approve(publisher, store)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_NOT_APPROVED
     latest = store.latest("inc-1").data

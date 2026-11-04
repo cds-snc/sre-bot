@@ -196,6 +196,7 @@ announce_channel_id = ""
 # INCIDENT_CORE__LIST_SHEET_ID, never in a configuration file.
 incidents_table = "incidents"
 timeline_table = "sre_bot_incident_timeline"
+status_updates_table = "sre_bot_incident_status_updates"
 folder_id = ""
 report_template_id = ""
 list_sheet_id = ""

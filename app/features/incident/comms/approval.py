@@ -29,7 +29,6 @@ from features.incident.core.api import (
     StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateStore,
-    get_status_update_store,
 )
 
 logger = structlog.get_logger()
@@ -41,7 +40,7 @@ async def get_draft_for_review(
     incident_id: str,
     sequence: int,
     *,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
 ) -> OperationResult[StatusUpdate]:
     """Return the incident's latest record when it is a draft at ``sequence``.
 
@@ -49,7 +48,6 @@ async def get_draft_for_review(
         Success with the draft. ``STATUS_UPDATE_CONFLICT`` when a newer record
         exists or the target is not a draft; otherwise the store's classified error.
     """
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
@@ -65,7 +63,7 @@ async def approve_status_update(
     *,
     approver: str,
     edit: StatusUpdateEdit,
-    store: StatusUpdateStore | None = None,
+    store: StatusUpdateStore,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdate]:
     """Approve the pending draft at ``sequence`` with the approver's edits.
@@ -75,7 +73,7 @@ async def approve_status_update(
         sequence: The draft the approver reviewed.
         approver: Platform user id of the approver.
         edit: The reviewed stage and fields in both languages.
-        store: Holds the incident's status updates; core's by default.
+        store: Holds the incident's status updates.
         now: The current time; injected in tests.
 
     Returns:
@@ -95,7 +93,6 @@ async def approve_status_update(
             error_code=ErrorCode.STATUS_UPDATE_FIELDS_INVALID,
         )
 
-    store = store or get_status_update_store()
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return _failure(listed)
@@ -157,6 +154,7 @@ async def approve_and_publish(
     edit: StatusUpdateEdit,
     labels_en: ProfileLabels,
     labels_fr: ProfileLabels,
+    store: StatusUpdateStore,
     publisher: StatusPagePublisher | None = None,
 ) -> OperationResult[CopyReadyText]:
     """Approve the pending draft at ``sequence``, then render the approved record as copy-ready text.
@@ -168,6 +166,7 @@ async def approve_and_publish(
         edit: The reviewed stage and fields in both languages.
         labels_en: English labels and zone suffix for the rendering.
         labels_fr: French labels and zone suffix for the rendering.
+        store: Holds the incident's status updates.
         publisher: Renders the approved record; the comms provider's by default.
 
     Returns:
@@ -175,7 +174,7 @@ async def approve_and_publish(
         its classified error and nothing is rendered; a rendering failure is
         returned as the publisher classified it.
     """
-    approved = await approve_status_update(incident_id, sequence, approver=approver, edit=edit)
+    approved = await approve_status_update(incident_id, sequence, approver=approver, edit=edit, store=store)
     if not approved.is_success or approved.data is None:
         return _failure(approved)
     publisher = publisher or providers.get_status_page_publisher()

@@ -1,8 +1,8 @@
 """In-memory incident core stores with the real stores' observable rules.
 
 For tests and local runs. ``InMemoryStatusUpdateStore``: appends only where
-nothing is stored, an identical replay is success, state changes only from the
-expected state, newest first. ``InMemoryIncidentStore``: the incident reads
+nothing is stored, state changes only from the expected state, a repeat of a
+write that landed is a conflict, newest first. ``InMemoryIncidentStore``: the incident reads
 with the same classifications as ``RecordIncidentStore``.
 """
 
@@ -12,19 +12,24 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from features.incident.core.domain import ConversationReference, Incident, StatusUpdate, StatusUpdateState
-from features.incident.core.store import IncidentStore, ambiguous_conversation, no_such_incident, not_an_incident
+from features.incident.core.store import (
+    IncidentStore,
+    StatusUpdateStore,
+    ambiguous_conversation,
+    no_such_incident,
+    not_an_incident,
+)
 
 
-class InMemoryStatusUpdateStore:
+class InMemoryStatusUpdateStore(StatusUpdateStore):
     """Hold status updates in a dict keyed by incident id and sequence."""
 
     def __init__(self) -> None:
         self._updates: dict[tuple[str, int], StatusUpdate] = {}
 
     def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
-        """Store a new update at its sequence; a different record already there is a conflict."""
-        stored = self._updates.get((update.incident_id, update.sequence))
-        if stored is not None and stored != update:
+        """Store a new update at its sequence; any record already there is a conflict."""
+        if (update.incident_id, update.sequence) in self._updates:
             return _conflict()
         self._updates[(update.incident_id, update.sequence)] = update
         return OperationResult.success(data=update)
@@ -38,8 +43,6 @@ class InMemoryStatusUpdateStore:
         if not expected_state.can_move_to(update.state):
             raise ValueError(f"no status update transition from {expected_state} to {update.state}")
         stored = self._updates.get((update.incident_id, update.sequence))
-        if stored == update:
-            return OperationResult.success(data=update)
         if stored is None or stored.state is not expected_state:
             return _conflict()
         self._updates[(update.incident_id, update.sequence)] = update

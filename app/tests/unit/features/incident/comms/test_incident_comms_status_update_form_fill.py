@@ -29,12 +29,14 @@ from features.incident.comms.domain import (
 )
 from features.incident.comms.form import fill_status_update_form
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE
+from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from tests.factories.incident import incident_on, incident_store_with, slack_conversation
@@ -80,6 +82,7 @@ class _Calls:
         self.read = read
         self.fills: list[dict[str, Any]] = []
         self.reads = 0
+        self.read_stores: list[StatusUpdateStore] = []
 
     async def fill(
         self, incidents: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
@@ -87,8 +90,9 @@ class _Calls:
         self.fills.append({"incidents": incidents, "conversation": conversation, "sequence": sequence, **kwargs})
         return self.filled
 
-    async def get_draft(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def get_draft(self, incident_id: str, sequence: int, *, store: StatusUpdateStore) -> OperationResult[StatusUpdate]:
         self.reads += 1
+        self.read_stores.append(store)
         return self.read
 
 
@@ -103,7 +107,7 @@ def _install(
     return calls
 
 
-async def _fill(edit: StatusUpdateEdit | None = _EDIT) -> OperationResult[Any]:
+async def _fill(edit: StatusUpdateEdit | None = _EDIT, *, store: StatusUpdateStore | None = None) -> OperationResult[Any]:
     return await fill_status_update_form(
         incident_store_with(incident_on(_CHANNEL, "inc-1")),
         slack_conversation(_CHANNEL),
@@ -114,6 +118,7 @@ async def _fill(edit: StatusUpdateEdit | None = _EDIT) -> OperationResult[Any]:
         wording=_WORDING,
         instructions="be brief",
         security_confirmed=True,
+        store=InMemoryStatusUpdateStore() if store is None else store,
     )
 
 
@@ -122,9 +127,12 @@ async def test_a_fill_returns_the_new_draft_and_its_kind(monkeypatch: pytest.Mon
     """The new draft fills the form with its kind and AI offered; the typed values were the model's base."""
     calls = _install(monkeypatch, OperationResult.success(data=StatusUpdateDraftOutcome(update=_FILLED, kind=kind)))
 
-    result = await _fill()
+    store = InMemoryStatusUpdateStore()
+
+    result = await _fill(store=store)
 
     assert result.is_success and result.data is not None
+    assert calls.fills[0]["store"] is store
     assert (result.data.update, result.data.kind, result.data.kept, result.data.ai_available) == (_FILLED, kind, False, True)
     assert calls.fills[0]["current"] == _EDIT
     assert (calls.fills[0]["conversation"], calls.fills[0]["sequence"]) == (slack_conversation(_CHANNEL), 4)
@@ -149,9 +157,12 @@ async def test_a_refusal_keeps_the_stored_draft_overlaid_with_the_typed_values(
     """A refusal or failure keeps the stored draft with the typed values and the code; AI stays offered unless unavailable."""
     calls = _install(monkeypatch, OperationResult.permanent_error(message="refused", error_code=code))
 
-    result = await _fill()
+    store = InMemoryStatusUpdateStore()
+
+    result = await _fill(store=store)
 
     assert result.is_success and result.data is not None
+    assert calls.read_stores == [store]
     assert result.data.update == replace(_STORED, stage=_EDIT.stage, en=_EDIT.en, fr=_EDIT.fr)
     assert (result.data.kept, result.data.failure_code, result.data.ai_available) == (True, code, ai_available)
     assert calls.reads == 1

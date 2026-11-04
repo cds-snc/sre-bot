@@ -40,6 +40,7 @@ from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,
     StatusUpdateState,
+    StatusUpdateStore,
     StatusUpdateText,
 )
 from tests.factories.incident import incident_scopes, slack_conversation
@@ -124,6 +125,7 @@ class _Services:
     events: list[str] = field(default_factory=list)
     save_calls: list[dict[str, Any]] = field(default_factory=list)
     read_calls: list[tuple[str, int]] = field(default_factory=list)
+    stores: list[StatusUpdateStore] = field(default_factory=list)
 
     def save(
         self,
@@ -133,14 +135,17 @@ class _Services:
         *,
         edit: StatusUpdateEdit,
         author: str,
+        store: StatusUpdateStore,
     ) -> OperationResult[StatusUpdate]:
         assert isinstance(incidents, IncidentStore)
         self.events.append("save")
+        self.stores.append(store)
         self.save_calls.append({"conversation": conversation, "sequence": sequence, "edit": edit, "author": author})
         return self.saved
 
-    async def read(self, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+    async def read(self, incident_id: str, sequence: int, *, store: StatusUpdateStore) -> OperationResult[StatusUpdate]:
         self.events.append("read")
+        self.stores.append(store)
         self.read_calls.append((incident_id, sequence))
         return self.stored
 
@@ -183,6 +188,7 @@ class TestSaved:
         assert services.save_calls == [
             {"conversation": slack_conversation(_CHANNEL), "sequence": _SEQUENCE, "edit": _EDIT, "author": _USER}
         ]
+        assert len(services.stores) == 1 and isinstance(services.stores[0], StatusUpdateStore)
 
     @pytest.mark.parametrize("locale", ["en-US", "fr-FR"])
     def test_shows_the_saved_draft_form_for_the_new_sequence(self, monkeypatch: pytest.MonkeyPatch, locale: str) -> None:
