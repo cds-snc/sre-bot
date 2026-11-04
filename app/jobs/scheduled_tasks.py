@@ -105,8 +105,10 @@ def safe_run(job: Callable[..., Any]) -> Callable[..., None]:
         try:
             job(*args, **kwargs)
         except Exception as e:
+            # The one log of a failed run, traceback included (decisions/reliability.md).
             logger.error(
                 "safe_run_error",
+                exc_info=e,
                 error=str(e),
                 module=job.__module__,
                 function=job.__name__,

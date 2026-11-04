@@ -63,7 +63,13 @@ def test_base_keeps_the_access_plugins_off_and_every_other_plugin_on() -> None:
 
     assert {name for name, enabled in keys.items() if not enabled} == ACCESS_PLUGINS
     # ci.toml also switches off the plugins that declare requirements: ci configures no vendor tenant or token.
-    assert get_plugins_settings().disabled() == ACCESS_PLUGINS | {"incident.scribe", "oncall_sync", "user_rotations", "rant"}
+    assert get_plugins_settings().disabled() == ACCESS_PLUGINS | {
+        "incident.response",
+        "incident.scribe",
+        "oncall_sync",
+        "user_rotations",
+        "rant",
+    }
 
 
 def test_disabled_access_plugins_register_no_route_and_no_openapi_path() -> None:

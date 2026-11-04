@@ -212,6 +212,12 @@ security_group_id = ""
 notify_management_group_id = ""
 # Non-public: set from the environment as INCIDENT_RESPONSE__HANDBOOK_ID.
 handbook_id = ""
+# The incident legacy upgrade job (features/incident/README.md, run procedure): off registers
+# nothing; an environment sets dry_run, then apply, in its own file. The lease is sized to the
+# longest run (one whole-table read, one guarded write per item) and stays under the interval.
+upgrade_mode = "off"
+upgrade_interval_minutes = 30
+upgrade_lease_ttl_seconds = 900
 
 [incident_postmortem]
 # Non-public: set from the environment as INCIDENT_POSTMORTEM__CALENDAR_ID.
@@ -251,6 +257,7 @@ sheet_id = ""
 
 [plugins.incident_response]
 "incident.comms" = true
+"incident.response" = true
 "incident.scribe" = true
 oncall_sync = true
 user_rotations = true

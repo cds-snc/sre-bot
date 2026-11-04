@@ -1,11 +1,12 @@
-"""Unit tests for the [incident_response] slice: the declare path's Slack ids and the handbook id.
+"""Unit tests for the [incident_response] slice: the declare path's Slack ids, the handbook id and the upgrade job keys.
 
 Settings are built from the checked-in configuration files the test run installs (or the
 real loader for one environment) and from the environment with monkeypatch; nothing is
 stubbed. The Slack ids are deployment configuration: declared empty in base.toml, set in
 production.toml only. The handbook id is non-public: declared empty in base.toml, held by no
-environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. An
-unknown key fails naming it.
+environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. The
+legacy upgrade job keys are declared in base.toml at their defaults (mode off) and set by no
+environment file; a value outside its range fails naming the key. An unknown key fails naming it.
 """
 
 import tomllib
@@ -16,13 +17,14 @@ from pathlib import Path
 import pytest
 
 from contracts.configuration import ConfigurationError, install_configuration_files, uninstall_configuration_files
-from features.incident.response.settings import IncidentResponseSettings, get_incident_response_settings
+from features.incident.response.settings import IncidentResponseSettings, UpgradeMode, get_incident_response_settings
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
 
 pytestmark = pytest.mark.unit
 
 _FIELDS = ("handbook_id",)
 _SLACK_IDS = ("announcement_channel_id", "security_group_id", "notify_management_group_id")
+_UPGRADE_KEYS = {"upgrade_mode": "off", "upgrade_interval_minutes": 30, "upgrade_lease_ttl_seconds": 900}
 
 
 @dataclass(frozen=True)
@@ -34,18 +36,62 @@ class _Files:
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setitem(IncidentResponseSettings.model_config, "env_file", None)
-    for name in (f"INCIDENT_RESPONSE__{field.upper()}" for field in _SLACK_IDS):
+    for name in (f"INCIDENT_RESPONSE__{field.upper()}" for field in (*_SLACK_IDS, *_UPGRADE_KEYS)):
         monkeypatch.delenv(name, raising=False)
     get_incident_response_settings.cache_clear()
     yield
     get_incident_response_settings.cache_clear()
 
 
-def test_base_declares_every_key_empty() -> None:
+def test_base_declares_every_id_empty_and_the_upgrade_keys_at_their_defaults() -> None:
     base = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))
 
-    assert base["incident_response"] == dict.fromkeys((*_SLACK_IDS, *_FIELDS), "")
+    assert base["incident_response"] == {**dict.fromkeys((*_SLACK_IDS, *_FIELDS), ""), **_UPGRADE_KEYS}
     assert "incident" not in base
+
+
+@pytest.mark.parametrize("environment", ["ci", "local", "production"])
+def test_no_environment_file_switches_the_upgrade_job_on(environment: str) -> None:
+    """Every environment runs with the job unregistered until its run procedure sets the mode in its own file."""
+    install_configuration_files(load_configuration_files(environment))
+
+    settings = IncidentResponseSettings()
+
+    assert (settings.upgrade_mode, settings.upgrade_interval_minutes, settings.upgrade_lease_ttl_seconds) == (
+        UpgradeMode.OFF,
+        30,
+        900,
+    )
+
+
+@pytest.mark.parametrize("mode", ["dry_run", "apply"])
+def test_the_upgrade_mode_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch, mode: str) -> None:
+    install_configuration_files(load_configuration_files("ci"))
+    monkeypatch.setenv("INCIDENT_RESPONSE__UPGRADE_MODE", mode)
+
+    assert IncidentResponseSettings().upgrade_mode is UpgradeMode(mode)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [("upgrade_mode", "nonsense"), ("upgrade_interval_minutes", "0"), ("upgrade_lease_ttl_seconds", "0")],
+)
+def test_an_upgrade_key_out_of_range_fails_naming_it(monkeypatch: pytest.MonkeyPatch, key: str, value: str) -> None:
+    install_configuration_files(load_configuration_files("ci"))
+    monkeypatch.setenv(f"INCIDENT_RESPONSE__{key.upper()}", value)
+
+    with pytest.raises(ConfigurationError, match=key):
+        IncidentResponseSettings()
+
+
+def test_the_smallest_interval_and_lease_are_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_configuration_files(load_configuration_files("ci"))
+    monkeypatch.setenv("INCIDENT_RESPONSE__UPGRADE_INTERVAL_MINUTES", "1")
+    monkeypatch.setenv("INCIDENT_RESPONSE__UPGRADE_LEASE_TTL_SECONDS", "1")
+
+    settings = IncidentResponseSettings()
+
+    assert (settings.upgrade_interval_minutes, settings.upgrade_lease_ttl_seconds) == (1, 1)
 
 
 @pytest.mark.parametrize("environment", ["ci", "local", "production"])

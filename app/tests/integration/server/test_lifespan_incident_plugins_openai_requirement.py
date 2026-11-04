@@ -29,7 +29,7 @@ from server.plugins.requirements import PluginRequirementsUnmetError
 pytestmark = pytest.mark.integration
 
 ACCESS_PLUGINS = frozenset({"access.catalog", "access.request", "access.sync"})
-OTHER_REQUIRING_PLUGINS = frozenset({"oncall_sync", "user_rotations", "rant"})
+OTHER_REQUIRING_PLUGINS = frozenset({"incident.response", "oncall_sync", "user_rotations", "rant"})
 
 
 @pytest.fixture(autouse=True)
