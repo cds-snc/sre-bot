@@ -3,10 +3,10 @@ id: TASK-157
 title: >-
   Slack inbound tenant guard: check every request's enterprise and team against
   the configured Slack tenant; optional [slack.tenant] enterprise_id
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-20 18:35
-updated_date: '2026-11-03T23:58:00Z'
+updated_date: '2026-11-04T18:46:00Z'
 labels:
   - security
   - slack
@@ -129,6 +129,8 @@ Implemented 2026-11-03 on task-157-slack-tenant-guard (from main 023aa1e5), In P
 - Gates (sequential): cd app && uv run ruff check . -> All checks passed!; ruff format --check -> 1097 files already formatted; uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 41 errors in 14 files (pre-existing legacy files, none touched: same baseline as TASK-163); uv run pytest tests --ignore=tests/smoke -> 6106 passed; make check-import-contracts -> Contracts: 13 kept, 0 broken; make check-settings-key-ownership -> OK; uv run python -m bin.generate_env_example --check -> OK (39 names). (AC #5, #9)
 After merge (human): zsh bin/deploy-checks.zsh pre at merge for the rollback tag, post after the deploy (runtime errors section fails on any slack_tenant_mismatch); smoke: one slash command and one button or modal in the SRE test channel; Logs Insights event = slack_tenant_mismatch expects 0.
 Smoke test, spelled out (2026-11-03): in Slack, not curl (Socket Mode has no inbound HTTP endpoint). After the production deploy, in the SRE test channel: /sre help (production prefix is empty) answers as before, and one interactive element (a button or a modal) works; then Logs Insights on the sre-bot log group since the deploy: filter event = "slack_tenant_mismatch" returns 0 lines. Optional before merge: run the branch locally (local.toml names the same workspace T2G2S06PM, prefix dev-) and /dev-sre help answers.
+
+2026-11-04 deploy (human report): #1817 merged 13:28 UTC as dc79aa33; build_and_deploy run 41838429008 success (build, sbom, deploy). bin/deploy-checks.zsh post, run 2026-11-04T17:54:49Z (tmp/deploy-checks/post-20261104T175449Z.txt): task-definition sre-bot-task:78, rolloutState COMPLETED 2/2, image tag dc79aa33b3779fc52e05a7a2cbf3172cf28bf3ee-2026-11-04 (digest sha256:75c724d8...); rollout PASS; boot_errors PASS; slack_up PASS (slack_app_initialized 2, socket session established 2); version PASS (/version = dc79aa33), health 200, root 200; non_json_lines WARN (4 known import-time lines: built_conditional_write_store debug, starlette TestClient noqa); runtime_errors FAIL (other=1 lost=0): one aws_identity_store_group_memberships_error at 17:31:36Z, an AWS Identity Store call, not the Slack guard, outside this task; Socket Mode reconnects 0. Task-definition names unchanged by this task (no new env name, OQ3). Slack smoke (human, 2026-11-04): clean: /sre help answered, a button or modal worked, slack_tenant_mismatch = 0 since the deploy. That settles TASK-145.5.7's D10: with the team_id-only [slack.tenant] entry, inbound requests carry no enterprise id that the guard refuses. All ACs were already checked; task stays In Progress for the human to close.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

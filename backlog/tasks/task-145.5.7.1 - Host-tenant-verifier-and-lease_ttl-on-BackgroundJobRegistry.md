@@ -1,10 +1,10 @@
 ---
 id: TASK-145.5.7.1
 title: Host tenant verifier and lease_ttl on BackgroundJobRegistry
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-04T14:04:00Z'
-updated_date: '2026-11-04T14:18:00Z'
+updated_date: '2026-11-04T18:19:00Z'
 labels:
   - incident
   - reliability
@@ -32,12 +32,12 @@ D2 (approved): lease_ttl: timedelta | None = None keyword on BackgroundJobRegist
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 TenantVerifier Protocol exists in contracts/workplace/, is exported from contracts.workplace, and returns an OperationResult carrying the verified tenant id (tested with a structural fake)
-- [ ] #2 The Slack host verifier calls auth.test through the integrations/slack client factory and judges the returned team_id and enterprise_id with the unchanged check_slack_tenant: matches (team only, enterprise only, both) return the configured tenant id; a team mismatch, an enterprise mismatch and an Enterprise org the entry does not name return UNAUTHORIZED naming the expected and received ids
-- [ ] #3 A failed auth.test call returns the status classify_slack_error gives (and a PERMANENT error for an unclassified exception) with no token in the result or logs; no [slack.tenant] entry and the Google system each return a not-configured / unsupported error without any call
-- [ ] #4 TenantVerifier is registered in the svcs registry at startup beside ConfiguredSystems; startup resolution makes no Slack call
-- [ ] #5 register_interval and register_daily accept lease_ttl: timedelta | None = None; None leaves every current registration unchanged; a value wraps the job in run_if_leased with get_lease_store(ttl) and the name scheduler:<job_name>; a non-positive TTL is rejected at registration
-- [ ] #6 Verified by targeted tests, ruff, then once mypy and once full pytest, from app/; make check-import-contracts is green
+- [x] #1 TenantVerifier Protocol exists in contracts/workplace/, is exported from contracts.workplace, and returns an OperationResult carrying the verified tenant id (tested with a structural fake)
+- [x] #2 The Slack host verifier calls auth.test through the integrations/slack client factory and judges the returned team_id and enterprise_id with the unchanged check_slack_tenant: matches (team only, enterprise only, both) return the configured tenant id; a team mismatch, an enterprise mismatch and an Enterprise org the entry does not name return UNAUTHORIZED naming the expected and received ids
+- [x] #3 A failed auth.test call returns the status classify_slack_error gives (and a PERMANENT error for an unclassified exception) with no token in the result or logs; no [slack.tenant] entry and the Google system each return a not-configured / unsupported error without any call
+- [x] #4 TenantVerifier is registered in the svcs registry at startup beside ConfiguredSystems; startup resolution makes no Slack call
+- [x] #5 register_interval and register_daily accept lease_ttl: timedelta | None = None; None leaves every current registration unchanged; a value wraps the job in run_if_leased with get_lease_store(ttl) and the name scheduler:<job_name>; a non-positive TTL is rejected at registration
+- [x] #6 Verified by targeted tests, ruff, then once mypy and once full pytest, from app/; make check-import-contracts is green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -96,4 +96,6 @@ Gates after implementation: ruff, targeted tests, then once mypy and once full p
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (human approved): plan approved as written, with D1-D10.
+
+2026-11-04 implemented (TDD, tests first and red) on top of rebased #1735 (main 1420fbb5), as uncommitted work for branch stack-k/task-145.5.7.1-host-tenant-verifier-and-lease. 7 production files, +177/-7: contracts/operations/codes.py (TENANT_CHECK_FAILED, TENANT_MISMATCH); contracts/workplace/tenant_verifier.py (new Protocol, verified_tenant(system) -> OperationResult[str]) exported from contracts/workplace/__init__.py; server/tenant_verification.py (new HostTenantVerifier: settings and Web client read per call; Slack auth.test judged by the unchanged check_slack_tenant; mismatch UNAUTHORIZED/TENANT_MISMATCH naming expected and received ids plus one tenant_verification_mismatch warning; a failed call keeps classify_slack_error's status and retry hint with TENANT_CHECK_FAILED, and an unclassified exception is PERMANENT naming its type only; no entry CONFIG_NOT_CONFIGURED, Google UNSUPPORTED_OPERATION, both without a call); server/services.py (CoreService(TenantVerifier) after ConfiguredSystems; the factory reads nothing); contracts/scheduler/registry.py and jobs/scheduled_tasks.py (lease_ttl keyword on register_daily/register_interval; None leaves the job as is; a value wraps it in run_if_leased(get_lease_store(seconds), 'scheduler:<job_name>') inside safe_run; under one second is rejected at registration with ValueError: the plan said <= 0, but a sub-second TTL truncates to 0 s, so the bound is 1 s). _tier2 untouched (TASK-64's contraction). Tests: new test_server_tenant_verification_slack.py (5 match/mismatch cases incl. D10's unnamed Enterprise org, blank/non-str ids, 5 failure classes with no token in result or logs, unconfigured and Google make no call), test_contracts_workplace_tenant_verifier_protocol.py, test_server_services_tenant_verifier_resolve.py (startup resolves every core service with a Slack factory that raises), test_jobs_scheduled_tasks_registry_lease.py; updated the registry Protocol, registration, workplace export and scope-entry-point fake tests; tests/factories/tenant_verifier.py FakeTenantVerifier for 145.5.7.2. Gates from app/: uv run ruff check . -> All checks passed!; ruff format --check . -> 1105 files already formatted; targeted pytest (tests/unit/server, contracts, jobs, oncall_sync, access/sync, integration/server) green; make check-import-contracts -> Contracts: 13 kept, 0 broken; make check-settings-key-ownership -> OK; mypy . --exclude .venv (once) -> Found 41 errors in 14 files (checked 425 source files), all pre-existing, none in a touched file; pytest tests --ignore=tests/smoke (once) -> 6149 passed in 178.26s. ACs #1-#6 checked.
 <!-- SECTION:NOTES:END -->

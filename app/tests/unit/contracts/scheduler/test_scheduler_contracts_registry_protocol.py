@@ -30,10 +30,14 @@ class _FakeRegistry:
         self.daily: list[tuple[str, str, Callable[[], None]]] = []
         self.interval: list[tuple[str, timedelta, Callable[[], None]]] = []
 
-    def register_daily(self, *, job_name: str, schedule: str, job: Callable[[], None]) -> None:
+    def register_daily(
+        self, *, job_name: str, schedule: str, job: Callable[[], None], lease_ttl: timedelta | None = None
+    ) -> None:
         self.daily.append((job_name, schedule, job))
 
-    def register_interval(self, *, job_name: str, every: timedelta, job: Callable[[], None]) -> None:
+    def register_interval(
+        self, *, job_name: str, every: timedelta, job: Callable[[], None], lease_ttl: timedelta | None = None
+    ) -> None:
         self.interval.append((job_name, every, job))
 
     @property
@@ -59,8 +63,8 @@ def test_fake_registry_satisfies_the_protocol_and_records_registrations() -> Non
 @pytest.mark.parametrize(
     ("method", "expected"),
     [
-        ("register_daily", ["self", "job_name", "schedule", "job"]),
-        ("register_interval", ["self", "job_name", "every", "job"]),
+        ("register_daily", ["self", "job_name", "schedule", "job", "lease_ttl"]),
+        ("register_interval", ["self", "job_name", "every", "job", "lease_ttl"]),
     ],
 )
 def test_registry_methods_take_keyword_only_arguments(method: str, expected: list[str]) -> None:
@@ -68,6 +72,11 @@ def test_registry_methods_take_keyword_only_arguments(method: str, expected: lis
 
     assert list(params) == expected
     assert all(param.kind is inspect.Parameter.KEYWORD_ONLY for name, param in params.items() if name != "self")
+
+
+@pytest.mark.parametrize("method", ["register_daily", "register_interval"])
+def test_the_lease_ttl_defaults_to_none_so_a_job_stays_tier_1(method: str) -> None:
+    assert inspect.signature(getattr(BackgroundJobRegistry, method)).parameters["lease_ttl"].default is None
 
 
 def test_contracts_scheduler_imports_only_the_standard_library_and_contracts() -> None:
