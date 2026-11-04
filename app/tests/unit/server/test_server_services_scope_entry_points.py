@@ -77,10 +77,10 @@ class _RecordingJobRegistry:
     def service_scopes(self) -> ServiceScopeOpener:
         return self._service_scopes
 
-    def register_daily(self, *, job_name: str, schedule: str, job: Callable[[], None]) -> None:
+    def register_daily(self, *, job_name: str, schedule: str, job: Callable[[], None], lease_ttl: Any = None) -> None:
         self.jobs[job_name] = job
 
-    def register_interval(self, *, job_name: str, every: Any, job: Callable[[], None]) -> None:
+    def register_interval(self, *, job_name: str, every: Any, job: Callable[[], None], lease_ttl: Any = None) -> None:
         self.jobs[job_name] = job
 
 

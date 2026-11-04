@@ -13,9 +13,9 @@ from contracts.workplace import WorkplaceSystem
 pytestmark = pytest.mark.unit
 
 
-def test_the_package_root_exports_the_vocabulary_and_the_configured_systems_read() -> None:
-    """The package root is the stable import path for the vocabulary and the read."""
-    assert contracts.workplace.__all__ == ["ConfiguredSystems", "WorkplaceSystem"]
+def test_the_package_root_exports_the_vocabulary_the_configured_systems_read_and_the_tenant_verifier() -> None:
+    """The package root is the stable import path for the vocabulary, the read and the verifier."""
+    assert contracts.workplace.__all__ == ["ConfiguredSystems", "TenantVerifier", "WorkplaceSystem"]
 
 
 def test_members_are_the_supported_systems_with_their_stored_values() -> None:

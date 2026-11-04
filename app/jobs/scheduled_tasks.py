@@ -42,13 +42,16 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         job_name: str,
         schedule: str,
         job: Callable[[], None],
+        lease_ttl: timedelta | None = None,
     ) -> None:
-        schedule_lib.every().day.at(schedule).do(safe_run(job))
+        job_to_run = _leased_or_plain(job_name, job, lease_ttl)
+        schedule_lib.every().day.at(schedule).do(safe_run(job_to_run))
         logger.debug(
             "feature_background_job_scheduled",
             job_name=job_name,
             cadence="daily",
             schedule=schedule,
+            lease_ttl_seconds=_seconds(lease_ttl),
         )
 
     def register_interval(
@@ -57,15 +60,44 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         job_name: str,
         every: timedelta,
         job: Callable[[], None],
+        lease_ttl: timedelta | None = None,
     ) -> None:
+        job_to_run = _leased_or_plain(job_name, job, lease_ttl)
         seconds = int(every.total_seconds())
-        schedule_lib.every(seconds).seconds.do(safe_run(job))
+        schedule_lib.every(seconds).seconds.do(safe_run(job_to_run))
         logger.debug(
             "feature_background_job_scheduled",
             job_name=job_name,
             cadence="interval",
             every_seconds=seconds,
+            lease_ttl_seconds=_seconds(lease_ttl),
         )
+
+
+def _seconds(ttl: timedelta | None) -> int | None:
+    return None if ttl is None else int(ttl.total_seconds())
+
+
+def _leased_or_plain(job_name: str, job: Callable[[], None], lease_ttl: timedelta | None) -> Callable[[], None]:
+    """Return the job as is (Tier-1) or wrapped in a lease named scheduler:<job_name> (Tier-2).
+
+    The TTL is the job's own, never the scheduler default; one under a second is
+    rejected here, at registration, so a bad value fails startup instead of a run.
+    """
+    if lease_ttl is None:
+        return job
+    ttl_seconds = int(lease_ttl.total_seconds())
+    if ttl_seconds < 1:
+        raise ValueError(f"lease_ttl for {job_name} must be at least one second, got {lease_ttl}")
+    lock_store = get_lease_store(ttl_seconds)
+
+    def leased() -> None:
+        run_if_leased(lock_store, f"scheduler:{job_name}", job)
+
+    # safe_run logs the module and name of the job it wraps.
+    leased.__module__ = job.__module__
+    leased.__name__ = getattr(job, "__name__", "leased_job")
+    return leased
 
 
 def safe_run(job: Callable[..., Any]) -> Callable[..., None]:

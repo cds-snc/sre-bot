@@ -17,7 +17,7 @@ import svcs
 
 from contracts.coordination import ConditionalWriteStore
 from contracts.records import RecordStore
-from contracts.workplace import ConfiguredSystems
+from contracts.workplace import ConfiguredSystems, TenantVerifier
 from infrastructure.coordination import DynamoDBConditionalWriteStore
 from infrastructure.records.service import DynamoDBRecordStore
 from server.services import CORE_SERVICES, register_core_services
@@ -41,8 +41,8 @@ def _registry() -> svcs.Registry:
     return registry
 
 
-def test_core_services_cover_records_coordination_and_configured_systems() -> None:
-    assert {entry.contract for entry in CORE_SERVICES} == {RecordStore, ConditionalWriteStore, ConfiguredSystems}
+def test_core_services_cover_records_coordination_configured_systems_and_tenant_verification() -> None:
+    assert {entry.contract for entry in CORE_SERVICES} == {RecordStore, ConditionalWriteStore, ConfiguredSystems, TenantVerifier}
 
 
 def test_registered_contracts_resolve_to_the_dynamodb_stores() -> None:
