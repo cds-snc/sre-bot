@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-10-20 18:35
-updated_date: '2026-11-03T23:25:00Z'
+updated_date: '2026-11-03T23:58:00Z'
 labels:
   - security
   - slack
@@ -128,6 +128,7 @@ Implemented 2026-11-03 on task-157-slack-tenant-guard (from main 023aa1e5), In P
 - Tests: tests/unit/server/slack/test_server_slack_tenant_guard_verdict.py (10 rule cases), test_server_slack_tenant_guard_dispatch.py (real Bolt App; command, block_actions, view_submission, view_closed, message_action, block_suggestion, event: match passes, mismatch acked with no listener, one mismatch log without text, notice only with a response URL, failing notice still acks, Slack Connect event passes, url_verification unaffected, install without tenant fails), tests/integration/server/test_lifespan_slack_tenant_guard_install.py, settings/rule/configured-systems/channel_url tests extended; three lifespan tests stub the install, one regex follows the message. Mutation: guard always passing fails 19 dispatch tests.
 - Gates (sequential): cd app && uv run ruff check . -> All checks passed!; ruff format --check -> 1097 files already formatted; uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 41 errors in 14 files (pre-existing legacy files, none touched: same baseline as TASK-163); uv run pytest tests --ignore=tests/smoke -> 6106 passed; make check-import-contracts -> Contracts: 13 kept, 0 broken; make check-settings-key-ownership -> OK; uv run python -m bin.generate_env_example --check -> OK (39 names). (AC #5, #9)
 After merge (human): zsh bin/deploy-checks.zsh pre at merge for the rollback tag, post after the deploy (runtime errors section fails on any slack_tenant_mismatch); smoke: one slash command and one button or modal in the SRE test channel; Logs Insights event = slack_tenant_mismatch expects 0.
+Smoke test, spelled out (2026-11-03): in Slack, not curl (Socket Mode has no inbound HTTP endpoint). After the production deploy, in the SRE test channel: /sre help (production prefix is empty) answers as before, and one interactive element (a button or a modal) works; then Logs Insights on the sre-bot log group since the deploy: filter event = "slack_tenant_mismatch" returns 0 lines. Optional before merge: run the branch locally (local.toml names the same workspace T2G2S06PM, prefix dev-) and /dev-sre help answers.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
