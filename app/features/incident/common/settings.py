@@ -1,7 +1,8 @@
 """Incident core settings: the [incident_core] table of the configuration files.
 
-The record tables, the new-incident system policy, and the incident Google document ids
-every subdomain shares. Vendor tenant ids stay in the vendor slices and reach the
+The record tables, the cap on a whole-table read of the incidents table, the
+new-incident system policy, and the incident Google document ids every subdomain
+shares. Vendor tenant ids stay in the vendor slices and reach the
 incident feature through the configured-systems read. The document ids are non-public
 values (decisions/configuration.md): declared empty in base.toml, set only from the
 environment as INCIDENT_CORE__<FIELD>. An empty id does not fail boot; the legacy code
@@ -21,7 +22,8 @@ class IncidentCoreSettings(ConfigurationSlice):
     """Table names of the incident record, the system that hosts new incidents, and the shared document ids.
 
     Keys of [incident_core]:
-        incidents_table, timeline_table, status_updates_table, new_incident_system (absent: unset).
+        incidents_table, timeline_table, status_updates_table, full_read_max_items,
+        new_incident_system (absent: unset).
 
     Environment only (non-public values):
         INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, INCIDENT_CORE__LIST_SHEET_ID.
@@ -38,6 +40,11 @@ class IncidentCoreSettings(ConfigurationSlice):
     status_updates_table: str = Field(
         default="sre_bot_incident_status_updates",
         description="Records table holding every incident's public status updates, each its own item.",
+    )
+    full_read_max_items: int = Field(
+        default=10000,
+        ge=1,
+        description="Most items a whole-table read of the incidents table returns; past it the read fails instead of truncating.",
     )
     new_incident_system: WorkplaceSystem | None = Field(
         default=None,

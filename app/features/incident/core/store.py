@@ -151,8 +151,9 @@ class RecordIncidentStore(IncidentStore):
         """Return the one incident whose conversation is ``conversation``.
 
         Queries the by_channel index with a small bound; index reads return full
-        items. A candidate of another system or tenant, or with an unreadable
-        conversation, is skipped before parsing; a legacy candidate is upgraded
+        items. A candidate of another system or tenant is skipped before parsing
+        and logged as a warning naming both tenants; one with an unreadable
+        conversation is skipped; a legacy candidate is upgraded
         first. A candidate that cannot be read cannot be checked, so the lookup
         fails closed. A full
         page means more may exist, so it is ambiguous; there is no fallback read.
@@ -175,8 +176,20 @@ class RecordIncidentStore(IncidentStore):
             if item is None:
                 return incident_record_unreadable()
             stored = read_reference(item, "conversation", ConversationReference, item.get("id"))
-            if stored is not None and (stored.system, stored.tenant) == (conversation.system, conversation.tenant):
+            if stored is None:
+                continue
+            if (stored.system, stored.tenant) == (conversation.system, conversation.tenant):
                 matches.append(item)
+            else:
+                # Never the vendor id: the channel id is the query key the caller already holds.
+                logger.warning(
+                    "incident_conversation_candidate_dropped",
+                    incident_id=item.get("id"),
+                    stored_system=stored.system.value,
+                    stored_tenant=stored.tenant,
+                    requested_system=conversation.system.value,
+                    requested_tenant=conversation.tenant,
+                )
         if not matches:
             return not_an_incident()
         if len(matches) > 1:

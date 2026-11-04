@@ -10,7 +10,13 @@ Pure and never raising: no store, no settings (the configured tenant per
 workplace system is passed in) and no guessing. A required value that cannot be
 matched makes the whole item an ``UnreadableLegacyItem`` naming the incident
 id, the legacy attribute and its stored value. An optional value that cannot be
-matched is dropped and logged with the incident id and attribute, never a link.
+matched is dropped and logged with the incident id and attribute, never a link,
+and named in ``UpgradedItem.dropped`` so the upgrade job can count it.
+
+The legacy ``teams`` value is never read: it names the Drive folder chosen for
+the report's placement, not a product, and a product is not a team. It is not
+mapped to ``product``, not counted as dropped, and stays on the stored item as a
+legacy attribute; no engagement is inferred from it.
 
 The upgraded item holds the record's attributes only: the writers and the
 upgrade job add ``record_version`` and the open index attributes, and
@@ -22,7 +28,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, TypeIs
 from urllib.parse import urlsplit
 
 import structlog
@@ -45,9 +51,15 @@ _ROLES = ("incident_commander", "operations_lead")
 
 @dataclass(frozen=True)
 class UpgradedItem:
-    """A legacy item in the end-state item shape, ready for the end-state parser."""
+    """A legacy item in the end-state item shape, ready for the end-state parser.
+
+    Attributes:
+        item: The record's attributes.
+        dropped: The legacy attributes whose optional value could not be matched, in mapping order.
+    """
 
     item: dict[str, Any]
+    dropped: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -65,6 +77,18 @@ class UnreadableLegacyItem:
     value: object
 
 
+class _Drops:
+    """Collects the optional legacy attributes one upgrade drops, logging each one."""
+
+    def __init__(self, incident_id: object) -> None:
+        self.incident_id = incident_id
+        self.fields: list[str] = []
+
+    def add(self, field: str, **context: object) -> None:
+        logger.warning("incident_legacy_field_dropped", incident_id=self.incident_id, field=field, **context)
+        self.fields.append(field)
+
+
 class _Unreadable(Exception):
     def __init__(self, field: str, value: object) -> None:
         super().__init__(field)
@@ -79,6 +103,7 @@ def upgrade_legacy_item(item: Mapping[str, Any], tenants: Mapping[WorkplaceSyste
     system has none makes the item unreadable rather than losing the reference.
     """
     incident_id = item.get("id")
+    drops = _Drops(incident_id)
     try:
         upgraded: dict[str, Any] = {
             "id": _required_text(item, "id"),
@@ -89,18 +114,17 @@ def upgrade_legacy_item(item: Mapping[str, Any], tenants: Mapping[WorkplaceSyste
             "security_incident": _security_flag(item),
         }
         optional = {
-            "product": _product(item, incident_id),
-            "severity": _severity(item, incident_id),
-            **{field: _optional_time(item, legacy, incident_id) for legacy, field in _TIMES.items()},
+            "severity": _severity(item, drops),
+            **{field: _optional_time(item, legacy, drops) for legacy, field in _TIMES.items()},
             **{role: _role(item, role) for role in _ROLES},
             "conversation": _conversation(item, tenants),
-            "report": _report(item, tenants, incident_id),
-            "video_call": _video_call(item, tenants, incident_id),
+            "report": _report(item, tenants, drops),
+            "video_call": _video_call(item, tenants, drops),
         }
     except _Unreadable as exc:
         return UnreadableLegacyItem(incident_id=incident_id, field=exc.field, value=exc.value)
     upgraded.update((field, value) for field, value in optional.items() if value is not None)
-    return UpgradedItem(item=upgraded)
+    return UpgradedItem(item=upgraded, dropped=tuple(drops.fields))
 
 
 def _blank(value: object) -> bool:
@@ -111,8 +135,13 @@ def _unknown(value: object) -> bool:
     return _blank(value) or (isinstance(value, str) and value.strip().casefold() == "unknown")
 
 
-def _dropped(incident_id: object, field: str, **context: object) -> None:
-    logger.warning("incident_legacy_field_dropped", incident_id=incident_id, field=field, **context)
+def _integral(value: object) -> TypeIs[int | Decimal]:
+    """Whether a stored number is a whole number: never a bool, NaN or infinity."""
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value()
 
 
 def _required_text(item: Mapping[str, Any], field: str) -> str:
@@ -171,40 +200,27 @@ def _read_time(value: object) -> datetime | None:
         return None
 
 
-def _optional_time(item: Mapping[str, Any], legacy: str, incident_id: object) -> str | None:
+def _optional_time(item: Mapping[str, Any], legacy: str, drops: _Drops) -> str | None:
     value = item.get(legacy)
     if _unknown(value):
         return None
     parsed = _read_time(value)
     if parsed is None:
-        _dropped(incident_id, legacy)
+        drops.add(legacy)
         return None
     return format_stored_time(parsed)
 
 
-def _product(item: Mapping[str, Any], incident_id: object) -> str | None:
-    teams = item.get("teams")
-    if teams is None:
-        return None
-    if not isinstance(teams, list):
-        _dropped(incident_id, "teams")
-        return None
-    first = teams[0] if teams else None
-    if _unknown(first):
-        return None
-    if not isinstance(first, str):
-        _dropped(incident_id, "teams")
-        return None
-    return first.strip()
-
-
-def _severity(item: Mapping[str, Any], incident_id: object) -> int | None:
+def _severity(item: Mapping[str, Any], drops: _Drops) -> int | None:
     value = item.get("severity")
     if _blank(value) or (isinstance(value, str) and value.strip().casefold() == "none"):
         return None
+    # An integral number 0-4 is read as the end-state reader reads the same attribute.
+    if _integral(value) and 0 <= value <= 4:
+        return int(value)
     match = _SEVERITY.fullmatch("".join(value.split()).casefold()) if isinstance(value, str) else None
     if match is None:
-        _dropped(incident_id, "severity", value=value)
+        drops.add("severity", value=value)
         return None
     return int(match.group(1))
 
@@ -236,24 +252,24 @@ def _conversation(item: Mapping[str, Any], tenants: Mapping[WorkplaceSystem, str
     return _reference(WorkplaceSystem.SLACK, tenants, "channel_id", channel_id.strip(), None)
 
 
-def _report(item: Mapping[str, Any], tenants: Mapping[WorkplaceSystem, str], incident_id: object) -> dict[str, str] | None:
+def _report(item: Mapping[str, Any], tenants: Mapping[WorkplaceSystem, str], drops: _Drops) -> dict[str, str] | None:
     url = item.get("report_url")
     if _blank(url):
         return None
     match = _REPORT_DOCUMENT_ID.search(url) if isinstance(url, str) else None
     if match is None:
-        _dropped(incident_id, "report_url")
+        drops.add("report_url")
         return None
     return _reference(WorkplaceSystem.GOOGLE, tenants, "report_url", match.group(1), url)
 
 
-def _video_call(item: Mapping[str, Any], tenants: Mapping[WorkplaceSystem, str], incident_id: object) -> dict[str, str] | None:
+def _video_call(item: Mapping[str, Any], tenants: Mapping[WorkplaceSystem, str], drops: _Drops) -> dict[str, str] | None:
     url = item.get("meet_url")
     if _blank(url) or (isinstance(url, str) and url.strip().upper() == "TBC"):
         return None
     code = _meet_code(url) if isinstance(url, str) else None
     if code is None:
-        _dropped(incident_id, "meet_url")
+        drops.add("meet_url")
         return None
     return _reference(WorkplaceSystem.GOOGLE, tenants, "meet_url", code, url)
 

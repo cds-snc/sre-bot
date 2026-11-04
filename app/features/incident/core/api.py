@@ -9,6 +9,8 @@ applies first. ``IncidentStore`` reads the incident record and
 the incident id; entry points build both per service scope with
 ``build_incident_store`` and ``build_status_update_store`` and pass them, with
 the conversation reference they build, to the subdomain services.
+``build_legacy_upgrade`` builds the incident legacy upgrade (``LegacyUpgrade``,
+reporting an ``UpgradeReport``) from the services its job resolves per run.
 """
 
 from collections.abc import Sequence
@@ -18,7 +20,7 @@ from typing import Protocol, runtime_checkable
 
 from contracts.operations.result import OperationResult
 from contracts.records import RecordStore
-from contracts.workplace import ConfiguredSystems
+from contracts.workplace import ConfiguredSystems, TenantVerifier
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.i18n import translate
@@ -39,6 +41,7 @@ from features.incident.core.domain import (
     TranscriptMessage,
     VideoCallReference,
 )
+from features.incident.core.legacy_upgrade import LegacyUpgrade, UpgradeReport
 from features.incident.core.store import (
     IncidentStore,
     RecordIncidentStore,
@@ -54,6 +57,7 @@ __all__ = [
     "Incident",
     "IncidentStore",
     "IncidentTranscriptReader",
+    "LegacyUpgrade",
     "MessageReference",
     "PostmortemMeetingReference",
     "ReportReference",
@@ -66,8 +70,10 @@ __all__ = [
     "StatusUpdateText",
     "TimelineEntry",
     "TranscriptMessage",
+    "UpgradeReport",
     "VideoCallReference",
     "build_incident_store",
+    "build_legacy_upgrade",
     "build_status_update_store",
     "find_incident_for_conversation",
     "get_incident_transcript_reader",
@@ -140,6 +146,26 @@ def build_status_update_store(records: RecordStore, settings: IncidentCoreSettin
     core settings.
     """
     return RecordStatusUpdateStore(records, status_updates_table(settings.status_updates_table))
+
+
+def build_legacy_upgrade(
+    records: RecordStore, systems: ConfiguredSystems, verifier: TenantVerifier, settings: IncidentCoreSettings
+) -> LegacyUpgrade:
+    """Return the incident legacy upgrade over the resolved ``RecordStore``.
+
+    A plain function, called by the upgrade job inside its service scope with the
+    services it resolved there. The table name and the whole-table read cap come
+    from the incident core settings; the tenants are copied from the
+    configured-systems read, as for the read path's bridge, and the verifier
+    confirms the Slack one before any write.
+    """
+    return LegacyUpgrade(
+        records,
+        incidents_table(settings.incidents_table),
+        dict(systems.tenants()),
+        verifier,
+        settings.full_read_max_items,
+    )
 
 
 @lru_cache(maxsize=1)
