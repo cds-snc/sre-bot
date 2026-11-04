@@ -4,7 +4,7 @@ title: Due action-item reminders as a scheduled job behind the flag
 status: To Do
 assignee: []
 created_date: 2026-10-13 14:00
-updated_date: '2026-10-23T17:35:00Z'
+updated_date: '2026-11-04T14:02:00Z'
 labels:
   - incident
   - features
@@ -28,3 +28,9 @@ A background job, registered through the hookimpl with a lease, reminds owners o
 <!-- AC:BEGIN -->
 - [ ] #1 Reminders are sent once per due window, safe to run twice, and only while the flag is on
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (TASK-145.5.7 planning, human approved): the reminders job takes its lease through the lease_ttl keyword on the feature job registry added by TASK-145.5.7.1, its TTL from the postmortem settings (reliability.md 2026-11-04).
+<!-- SECTION:NOTES:END -->

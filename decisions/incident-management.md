@@ -122,7 +122,8 @@ Tolerated until then, each closing in a TASK-145 slice:
 - `IncidentTranscriptReader` taking a conversation id string; `find_incident_for_conversation` served by a scan of the legacy table;
 - `documents`, `drive`, `meet` and `scheduling` as adapter-only siblings, and two Google Docs adapters;
 - draft and summarize calling the OpenAI `Summarizer` directly, and `comms`' local `TextGenerator` interface, until TASK-25.10;
-- the single Google tenant as the implied system for every new incident.
+- the single Google tenant as the implied system for every new incident;
+- `response` registering the legacy upgrade job (TASK-145.5.7) until TASK-145.13 deletes it: a runner is registered by the subdomain whose process owns the data, never by a subdomain named for the migration (feature-packages.md rule 2).
 
 **Legacy data upgrade.** Every migration of stored legacy data, in this feature and others, follows one rule set:
 1. Expand, backfill, switch reads, contract: writers produce the end-state shape and readers accept both before any backfill runs.
@@ -131,7 +132,7 @@ Tolerated until then, each closing in a TASK-145 slice:
 4. A version marker: the backfill only touches items without it and stamps it, so reruns change nothing; the read bridge applies only to items without it.
 5. Legacy attributes stay on the item until the contract step.
 6. The backfill is final only once no legacy writer remains, so it is rerun after the last legacy writer is removed.
-7. A value the upgrade cannot map with confidence fails the run with the list of records to fix by hand; it is never guessed. The bridge and the job are deleted once a production run reports nothing pending.
+7. A required value the upgrade cannot map with confidence fails the run with the list of records to fix by hand; it is never guessed. An optional value it cannot map is dropped from the end-state attributes, counted in the run's report with the record and field, and kept on the item as a legacy attribute (rule 5), as the reader drops an unmappable optional value ([cloud-portability.md](cloud-portability.md) contract 4). The bridge and the job are deleted once a production run reports nothing pending.
 
 For incidents (TASK-145.5.8 builds the function, TASK-145.5.7 the job, TASK-145.13 deletes both): the legacy status matches the five values ignoring case and surrounding spaces; a missing security flag is no, because it was only stored from 2026-10-07; `none` and a missing severity are unset; `"Unknown"` and blank times and products are not recorded; the bare channel id, report URL and Meet URL become references for the configured Slack and Google tenants.
 
@@ -152,3 +153,4 @@ For incidents (TASK-145.5.8 builds the function, TASK-145.5.7 the job, TASK-145.
 - 2026-10-23: the postmortem flag is a configuration-file key, never an environment variable; the incident settings live in `common/settings.py` with one owner per table, which the legacy module reads too (TASK-111.15.1).
 - 2026-10-27: a new-incident policy that does not resolve fails boot naming the key instead of leaving declare unregistered: an enabled plugin's requirements abort boot ([plugins.md](plugins.md), TASK-172); comms' AI drafting stays the designed optional use of text generation.
 - 2026-10-28: a subdomain's slice class lives in its own `settings.py` unless two or more subdomains read it, as configuration.md rules; the legacy declare-path values move to `[incident_response]` (human, TASK-111.15.1 planning).
+- 2026-11-04: Migration rule 7 separates a required value (fails the run) from an optional one (dropped, counted, kept as a legacy attribute), matching the TASK-145.5.8 bridge; `response` becomes a plugin now and registers the legacy upgrade job, guarded on every attribute it read, until TASK-145.13; a later upgrade step on end-state items raises the version marker (recorded for A1, doc-11 row 17a) (TASK-145.5.7 planning, human).

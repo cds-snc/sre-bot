@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-03T19:00:00Z'
+updated_date: '2026-11-04T14:02:00Z'
 labels:
   - incident
   - features
@@ -90,6 +90,8 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 - 2026-10-29 (TASK-173 assessment): the legacy Google requirement outlives declare's rebuild (eight modules under app/modules/incident import Google), so this task, not TASK-145.7, deletes TASK-173's rule; AC added.
 
 2026-10-29 (TASK-175 planning): incident.scribe declares slack.tenant and google_workspace.tenant as plugin requirements; deleting TASK-173's legacy-handler boot rule here leaves scribe's declarations in place.
+
+2026-11-04 (TASK-145.5.7 planning, human approved): (1) incident.response stays a plugin: this task deletes only the hookimpl lines that register the legacy upgrade job, its [incident_response] upgrade_mode, upgrade_interval_minutes and upgrade_lease_ttl_seconds keys, the job and legacy_items.py, and the Tolerated line in incident-management.md. (2) 'Nothing pending' includes the binding step TASK-145.7 adds to the job: channel_id and by_channel are retired only after a production run reports no missing bindings.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

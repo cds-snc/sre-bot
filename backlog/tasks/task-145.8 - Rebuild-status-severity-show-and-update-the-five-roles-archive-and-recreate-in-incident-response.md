@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-03T19:00:00Z'
+updated_date: '2026-11-04T14:01:00Z'
 labels:
   - incident
   - features
@@ -86,6 +86,12 @@ Over the gate as one task (~800 lines); each half about 400.
 ## Blast radius and rollback
 Each subcommand's legacy registration is removed with its rebuild; a revert restores it. Status fan-out is the riskiest path: it writes four systems.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (TASK-145.5.7 planning, human approved): the TASK-145.5.7 upgrade job writes each legacy item in one update guarded on record_version absent plus every scalar attribute the bridge read, at its read value (status, name, user_id, created_at, security_incident, channel_id, report_url, meet_url, severity, the legacy times, incident_commander, operations_lead) and each end-state attribute it sets as read. Whatever this task decides for a partial update of an item without record_version must keep that guard meaningful: a write here that changes one of those attributes makes the job's write lose (guard_lost), never be overwritten by it.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
