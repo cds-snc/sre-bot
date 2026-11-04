@@ -57,7 +57,7 @@ from server.slack.settings import SlackTransportSettings, get_slack_transport_se
 class SlackKey(StrEnum):
     """The Slack slice keys the transport rules name."""
 
-    TEAM_ID = "[slack.tenant] team_id"
+    TENANT = "[slack.tenant] team_id or enterprise_id"
     BOT = "SLACK__BOT_TOKEN"
     APP = "SLACK__APP_TOKEN"
     SIGNING = "SLACK__SIGNING_SECRET"
@@ -124,7 +124,7 @@ def validate_slack_transport(transport: SlackTransportSettings, slack: SlackSett
     if not transport.enabled:
         return
     if slack.tenant is None:
-        raise ConfigurationError(f"{SlackKey.TEAM_ID} is required when [slack_transport] enabled is true")
+        raise ConfigurationError(f"{SlackKey.TENANT} is required when [slack_transport] enabled is true")
     if not slack.bot_token:
         raise ConfigurationError(f"{SlackKey.BOT} is required when [slack_transport] enabled is true")
     if transport.socket_mode and not slack.app_token:

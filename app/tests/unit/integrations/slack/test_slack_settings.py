@@ -38,7 +38,7 @@ _TENANT = '[slack.tenant]\nteam_id = "T0TENANT"\n'
 @pytest.fixture(autouse=True)
 def _isolated_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Clear the slice's variables, the .env file and the cached singleton."""
-    for name in (*_SECRETS, "SLACK__TENANT__TEAM_ID", "SLACK__COMMAND_PREFIX"):
+    for name in (*_SECRETS, "SLACK__TENANT__TEAM_ID", "SLACK__TENANT__ENTERPRISE_ID", "SLACK__COMMAND_PREFIX"):
         monkeypatch.delenv(name, raising=False)
     for field in SlackSettings.model_fields:
         monkeypatch.delenv(f"SLACK__{field.upper()}", raising=False)
@@ -184,7 +184,7 @@ def test_slack_settings_secret_without_the_tenant_fails_naming_the_key(
     monkeypatch.setenv(name, _SECRETS[name])
     _install(tmp_path)
 
-    with pytest.raises(ConfigurationError, match=f"{name} is set but \\[slack.tenant\\] team_id is not") as raised:
+    with pytest.raises(ConfigurationError, match=f"{name} is set but \\[slack.tenant\\] is not") as raised:
         SlackSettings()
 
     assert _SECRETS[name] not in _rendered(raised.value)
@@ -196,12 +196,13 @@ def test_slack_settings_secret_without_the_tenant_fails_naming_the_key(
         ("[slack]\nunknown_key = 1\n", "[slack] unknown_key"),
         ('[slack.tenant]\nteam_id = "T0TENANT"\nunknown_key = 1\n', "[slack] tenant.unknown_key"),
         ('[slack.tenant]\nteam_id = "   "\n', "[slack] tenant.team_id"),
+        ('[slack.tenant]\nenterprise_id = "   "\n', "[slack] tenant.enterprise_id"),
     ],
 )
 def test_slack_settings_invalid_file_entry_fails_naming_file_table_and_key(
     environment: str, location: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An unknown key in [slack] or [slack.tenant], or a blank team id, fails naming where to fix it."""
+    """An unknown key in [slack] or [slack.tenant], or a blank team or enterprise id, fails naming where to fix it."""
     monkeypatch.setenv("SLACK__BOT_TOKEN", BOT_TOKEN)
     _install(tmp_path, environment=environment)
 
@@ -209,6 +210,61 @@ def test_slack_settings_invalid_file_entry_fails_naming_file_table_and_key(
         SlackSettings()
 
     assert str(tmp_path / "local.toml") in str(raised.value)
+
+
+@pytest.mark.parametrize(
+    ("environment", "expected", "tenant_id"),
+    [
+        ('[slack.tenant]\nenterprise_id = "E0ORG"\n', SlackTenant(enterprise_id="E0ORG"), "E0ORG"),
+        (
+            '[slack.tenant]\nteam_id = "T0TENANT"\nenterprise_id = "E0ORG"\n',
+            SlackTenant(team_id="T0TENANT", enterprise_id="E0ORG"),
+            "E0ORG",
+        ),
+        (_TENANT, SlackTenant(team_id="T0TENANT"), "T0TENANT"),
+    ],
+)
+def test_slack_settings_tenant_id_is_the_enterprise_id_when_set(
+    environment: str, expected: SlackTenant, tenant_id: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The entry takes a team id, an enterprise id or both; the tenant id is the enterprise id when one is set."""
+    monkeypatch.setenv("SLACK__BOT_TOKEN", BOT_TOKEN)
+    _install(tmp_path, environment=environment)
+
+    settings = SlackSettings()
+
+    assert settings.tenant == expected
+    assert settings.tenant.tenant_id == tenant_id
+
+
+def test_slack_settings_tenant_entry_without_any_id_fails_naming_both_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty [slack.tenant] names no tenant: boot fails naming both keys that could fill it."""
+    monkeypatch.setenv("SLACK__BOT_TOKEN", BOT_TOKEN)
+    _install(tmp_path, environment="[slack.tenant]\n")
+
+    with pytest.raises(ConfigurationError, match="team_id or enterprise_id") as raised:
+        SlackSettings()
+
+    assert str(tmp_path / "local.toml") in str(raised.value)
+
+
+def test_slack_settings_reads_the_enterprise_id_from_the_environment(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SLACK__TENANT__ENTERPRISE_ID reaches the tenant entry, as [slack.tenant] enterprise_id does in the files."""
+    monkeypatch.setenv("SLACK__BOT_TOKEN", BOT_TOKEN)
+    monkeypatch.setenv("SLACK__TENANT__ENTERPRISE_ID", "E0ORG")
+    _install(tmp_path)
+
+    assert SlackSettings().tenant == SlackTenant(enterprise_id="E0ORG")
+
+
+def test_slack_settings_strips_the_enterprise_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Surrounding whitespace is not part of the opaque Enterprise org id."""
+    monkeypatch.setenv("SLACK__BOT_TOKEN", BOT_TOKEN)
+    _install(tmp_path, environment='[slack.tenant]\nenterprise_id = " E0ORG "\n')
+
+    assert SlackSettings().tenant == SlackTenant(enterprise_id="E0ORG")
 
 
 def test_slack_settings_strips_the_team_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

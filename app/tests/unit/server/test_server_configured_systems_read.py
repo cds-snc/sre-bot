@@ -77,6 +77,13 @@ def test_slack_without_a_team_id_is_not_configured() -> None:
     assert slack_tenant(_slack()) is None
 
 
+def test_slack_tenant_is_the_enterprise_id_when_one_is_set() -> None:
+    """Slack keys org data by the Enterprise org id, so it wins over the workspace id."""
+    settings = SlackSettings.model_construct(tenant=SlackTenant(team_id="T0123", enterprise_id="E0ORG"))
+
+    assert slack_tenant(settings) == "E0ORG"
+
+
 def test_slack_tenant_entry_configures_the_system() -> None:
     """A tenant entry is what configures a system; [slack_transport] enabled only switches the transport."""
     assert slack_tenant(_slack("T0123")) == "T0123"

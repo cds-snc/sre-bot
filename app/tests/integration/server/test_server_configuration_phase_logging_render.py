@@ -191,7 +191,7 @@ def test_transport_on_without_the_tenant_entry_fails_without_the_token(
     monkeypatch.setenv("SLACK__BOT_TOKEN", SECRET)
     monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-app")
 
-    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] team_id") as raised:
+    with pytest.raises(ConfigurationError, match=r"\[slack.tenant\] is not") as raised:
         load_host_configuration()
 
     lines = _lines(capfd)

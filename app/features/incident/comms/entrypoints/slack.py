@@ -20,7 +20,7 @@ the ``IncidentStore`` there from the resolved ``RecordStore`` and the
 configured systems, builds the channel's ``ConversationReference`` under the
 configured Slack tenant, and passes both to the service inside the scope.
 Registration reads the configured systems once: without a Slack tenant nothing
-is registered and one startup event names ``[slack.tenant] team_id``.
+is registered and one startup event names ``[slack.tenant]``.
 
 The New update button, shown when no draft is pending, starts a draft by hand
 (no model call, no security read) and replaces the modal with the review form
@@ -131,7 +131,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
     with scopes.create_scope() as services:
         slack_configured = WorkplaceSystem.SLACK in services.get(ConfiguredSystems).tenants()
     if not slack_configured:
-        logger.warning("incident_comms_registration_skipped", reason="slack_not_configured", setting="[slack.tenant] team_id")
+        logger.warning("incident_comms_registration_skipped", reason="slack_not_configured", setting="[slack.tenant]")
         return
 
     def _dispatch_status_update(payload: CommandPayload) -> CommandResponse:

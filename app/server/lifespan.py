@@ -26,6 +26,7 @@ from infrastructure.i18n import (
 from infrastructure.security import get_jwks_manager
 from infrastructure.security.settings import SecuritySettings
 from integrations.slack.provider import get_slack_provider
+from integrations.slack.settings import get_slack_settings
 from jobs import scheduled_tasks
 from jobs.settings import SchedulerSettings
 from modules import (
@@ -52,6 +53,7 @@ from server.plugins.manager import (
     resolve_plugin_requirements,
 )
 from server.services import SvcsServiceScopeOpener, initialize_core_services
+from server.slack.tenant_guard import install_slack_tenant_guard
 
 
 def _get_logger_from_app() -> BoundLogger:
@@ -271,6 +273,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     if app.state.slack_provider and getattr(app.state.slack_provider, "app", None):
         logger.debug("slack_provider_app_available")
         slack_app = cast(App, app.state.slack_provider.app)
+        # Every request is checked against [slack.tenant] before any listener runs.
+        install_slack_tenant_guard(slack_app, get_slack_settings().tenant)
         _register_legacy_handlers(slack_app, logger)
         app.state.bot = slack_app
         app.state.socket_mode_handler = app.state.slack_provider.socket_mode_handler
