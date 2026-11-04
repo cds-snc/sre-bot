@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: 2026-10-14 23:09
-updated_date: '2026-10-28T13:47:00Z'
+updated_date: '2026-11-04T18:11:00Z'
 labels:
   - incident
   - features
@@ -89,6 +89,8 @@ Implemented 2026-10-20 on stack-k/task-145.5.6-status-update-store (layer 10), o
 - Docs: incident README core row, comms README diagram; TASK-140.11 stale legacy_incidents reference replaced.
 
 Gates (2026-10-20, from app/): make check-sdk-typing, check-vendor-package-contract, check-aws-platform-seam, check-runtime-imports, check-import-contracts (12 kept, 0 broken), check-fake-coverage all OK; ruff check and format clean; make test 4600 passed + 772 passed; mypy repo-wide 48 errors in 19 files, 0 in touched files.
+
+2026-11-04 rebase onto main 1420fbb5 (from base a2b65676): 8 conflicts resolved onto the TASK-111 settings shape. common/settings.py: STATUS_UPDATES_TABLE/alias becomes the files key status_updates_table on the [incident_core] slice (default sre_bot_incident_status_updates, blank rejected naming the key), declared in config/base.toml beside timeline_table; core/api.py reads settings.status_updates_table; the settings and builder tests use the lowercase field. core/adapters/status_updates.py keeps only the item conversion (main's service_role_map rename fell with the deleted DynamoDB store); comms/entrypoints/slack.py keeps the three-store scope with main's Generator annotation; the deleted Stubber test stays deleted (main had only renamed attributes in it); incident README keeps main's [incident_core] wording plus the status-updates table; TASK-152 and doc-13 take main's version; the two doc-13-only commits dropped as empty. Gates from app/: uv run ruff check . -> All checks passed!; targeted pytest tests/unit/features/incident tests/integration/features/incident -> 1674 passed; make check-import-contracts -> Contracts: 13 kept, 0 broken; make check-settings-key-ownership -> OK; python -m bin.generate_env_example --check -> OK (39 names); mypy . --exclude .venv -> Found 41 errors in 14 files, all pre-existing and none in a touched file (same baseline as TASK-157); pytest tests --ignore=tests/smoke -> 6113 passed in 187.07s.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
