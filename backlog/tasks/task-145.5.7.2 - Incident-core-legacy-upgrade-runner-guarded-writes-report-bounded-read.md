@@ -4,7 +4,7 @@ title: 'Incident core legacy upgrade runner: guarded writes, report, bounded rea
 status: To Do
 assignee: []
 created_date: '2026-11-04T14:04:00Z'
-updated_date: '2026-11-04T14:18:00Z'
+updated_date: '2026-11-04T17:26:00Z'
 labels:
   - incident
   - features
@@ -81,4 +81,6 @@ BLAST/ROLLBACK: unregistered code plus a settings key with a default; git revert
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (human approved): OQ12: the records contract's ExpectedValue is not widened (no vendor type in the contract, cloud-portability.md contract 4). The runner guards an integral Decimal read value as int; a non-integral number in a guarded field makes the item unreadable (blocks apply, listed with id and field).
+
+2026-11-04 (human approved, coordinated-incidents reconciliation): R1: the bridge (features/incident/core/adapters/legacy_items.py _product, shared by the read path and the job, Migration rule 2) no longer maps legacy teams to product: the legacy teams value is the name of the Drive folder chosen for the report's placement, not a product, and a product is not a team. product stays unset on every upgraded item; teams stays on the item as a legacy attribute (rule 5); it is not counted in dropped (deliberately unmapped; the bridge docstring and the run procedure say why); no engagement is inferred from it (D33). Nothing reads Incident.product today (rg), so the read path shows no change. Tests: a legacy item with one team and one with several both upgrade with product unset and teams kept; update the existing legacy-item tests that expect product = teams[0].
 <!-- SECTION:NOTES:END -->

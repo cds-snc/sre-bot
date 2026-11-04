@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-11-04T17:26:00Z'
 labels:
   - incident
   - features
@@ -106,4 +106,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 2026-10-19: Stack K layer 13 after TASK-145.5.5 was split (TASK-145.5.9 and TASK-145.5.10 are layers 7 and 8, the cutover layer 9); re-plan after the cutover is implemented.
 
 - 2026-10-28 (TASK-167 accepted): the scribe labels carry CDS wording (cyber.gc.ca, security@cds-snc.ca, 'CDS Staff'); organisation wording is provisioned message overrides by key over generic app strings (decisions/organisation-content.md). The surface that absorbs or rebuilds each label moves it there (this task for scribe's section writer, 145.11 for the rest of scribe).
+
+2026-11-04 (human approved, coordinated-incidents reconciliation): option C: ProductCatalog is out of this task's scope. Drive folders are never a source of products (incident-management.md 2026-11-04); TASK-165.1 builds the ProductCatalog port with its catalogue adapter (Backstage) once the product-catalog ADR defines a product. Listing the incident Drive folders, if declare still needs it, is report-placement configuration of the IncidentReport adapter, not a catalogue. The Opsgenie schedule read from folder metadata belongs to the on-call capability (TASK-146), not here. Re-check the title, description and ACs at re-plan (after layer 11).
 <!-- SECTION:NOTES:END -->

@@ -32,6 +32,9 @@ complete without them.
 
 Keep the design feature-scoped: do not rewrite app-wide architecture here, and do
 not invent permanent policy inline — reference or propose a decision record.
+Apply the [domain-model-evolution skill](../../.claude/skills/domain-model-evolution/SKILL.md)
+before fixing or pivoting a domain entity; use its scenario, compatibility,
+ADR-detail and human-review gates.
 Never run git commands.
 
 Prefer the `task-planner` handoff so the packet is persisted into backlog tasks

@@ -7,6 +7,7 @@ effort: medium
 skills:
   - feature-architecture
   - type-model-boundaries
+  - domain-model-evolution
   - fastapi-api-patterns
   - implementation-planning
 color: purple
@@ -29,6 +30,9 @@ Delegate codebase reconnaissance to the `codebase-researcher` subagent.
   `app/infrastructure`; `app/modules` is legacy and never a reference.
 - Plugin-registerable package design with lifespan-driven startup.
 - Type boundary rules apply to every contract you declare.
+- Apply the [domain-model-evolution skill](../skills/domain-model-evolution/SKILL.md)
+  before fixing or pivoting a domain entity; use its scenario, compatibility,
+  ADR-detail and human-review gates.
 - Overarching principles for rich-workflow features belong in decision records —
   reference or propose an ADR rather than inventing permanent policy inline.
 - Write files only to produce the packet or an ADR draft; never production code.

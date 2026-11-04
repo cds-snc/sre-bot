@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-03T19:02:00Z'
+updated_date: '2026-11-04T17:26:00Z'
 labels:
   - oncall
   - capabilities
@@ -49,6 +49,8 @@ LAYERS, each a single PR under the size gate: TASK-146.1 (the capability, with b
 
 <!-- SECTION:NOTES:BEGIN -->
 - 2026-10-28 (TASK-167 accepted, decisions/organisation-content.md): the re-cut assigns two content kinds. On-call schedule mappings (a schedule source's schedule to a Slack user group; today oncall_sync/rotations.json, pointers only, swaps live in Opsgenie) are provisioned content (provisioned-content.md). Self-managed rosters (members and cadence; today user_rotations/rotations/) are managed content (managed-content.md). Both stay tolerated in the code until the re-cut slices land. If Opsgenie's replacement supports overrides, self-managed rosters may not be needed (human).
+
+2026-11-04 (human approved, coordinated-incidents reconciliation): the declare flow's on-call invite, today read from an Opsgenie schedule in the product Drive folder's metadata, stays on the legacy path until this capability provides it; TASK-145.6 no longer builds a ProductCatalog over Drive folders (incident-management.md 2026-11-04).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

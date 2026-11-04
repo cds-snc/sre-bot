@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-04T14:18:00Z'
+updated_date: '2026-11-04T17:27:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -34,15 +34,15 @@ updated_date: '2026-11-04T14:18:00Z'
 | 9 | TASK-145.5.5 cutover | `stack-k/task-145.5.5-incident-cutover` | #1734 | merged | 2026-10-20 18:52 UTC, deployed and checked. Task Done. |
 | 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | `stack-k/task-145.5.6-status-update-store` | #1735 | in review | Base `main`, last push 2026-10-20: built before the TASK-111 chain (its `common/settings.py` hunk still uses BaseSettings aliases), so it needs a rebase onto `main` before layer 11 stacks on it. Task file still says To Do. It merges only once layer 11a is submitted above it. |
 | 11a | TASK-145.5.7.1 host TenantVerifier in contracts/workplace (server/ implementation reusing TASK-157's check_slack_tenant) and the lease_ttl keyword on the feature job registry | `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` | - | plan approved | ~170 LOC, 7 files, host only. Full plan in the subtask. Implement after TASK-157 is deployed with its smoke recorded. |
-| 11b | TASK-145.5.7.2 incident core upgrade runner: bounded read, guarded writes, report with unmatched_status/unreadable/dropped, AC8 warning | `stack-k/task-145.5.7.2-upgrade-runner` | - | planned | ~245 LOC, 7 files. Outline; OQ12 decided (integral Decimal as int). |
+| 11b | TASK-145.5.7.2 incident core upgrade runner: bounded read, guarded writes, report with unmatched_status/unreadable/dropped, AC8 warning | `stack-k/task-145.5.7.2-upgrade-runner` | - | planned | ~245 LOC, 7 files. Outline; OQ12 decided (integral Decimal as int). 2026-11-04: legacy teams no longer mapped to product (product unset, teams kept); scenario matrix in the parent plan. |
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | - | planned | ~140 LOC, 8 files. Outline; OQ11 decided (entry module response/plugin.py). |
-| 12 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 11. |
+| 12 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 11. ProductCatalog is out of scope (2026-11-04, option C: built with the catalogue in TASK-165.1, never over Drive folders). |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
 
 ## Position
 
-- Checked out: `main`. Uncommitted Stack K work, all for the first layer-11a commit: the task files of TASK-145.5.7 and 145.5.7.1 to 145.5.7.3, the notes on TASK-64, 145.7, 145.8, 145.9, 145.12, 145.13 and 147.6, the four amended ADRs (`decisions/workplace-systems.md`, `incident-management.md`, `reliability.md`, `cloud-portability.md`) and this doc.
+- Checked out: `task-145.5.7-plan` (merged as #1818; identical to `main`). The Stack K planning work is on `main`; uncommitted on this tree are only the coordinated-incidents direction edits of a parallel session (not Stack K) and this doc. Previously uncommitted, now merged: the task files of TASK-145.5.7 and 145.5.7.1 to 145.5.7.3, the notes on TASK-64, 145.7, 145.8, 145.9, 145.12, 145.13 and 147.6, the four amended ADRs (`decisions/workplace-systems.md`, `incident-management.md`, `reliability.md`, `cloud-portability.md`) and this doc.
 - Open PRs: #1735 (layer 10), pre-TASK-111 base, needs a rebase onto `main`. TASK-157 (#1817) merged 2026-11-04 13:28 UTC (dc79aa33); its deploy and smoke are not yet recorded.
 - `gh stack` is not installed in the devcontainer: `gh extension install github/gh-stack`.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, the untracked `task-165.*`, `task-178`, `task-179` files.
@@ -53,17 +53,14 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 1. **human**: record TASK-157's deploy: `bin/deploy-checks.zsh post` and the Slack smoke (`/sre help` plus a button or modal; `slack_tenant_mismatch` = 0). **agent**: write them into TASK-157's notes. The smoke also settles the auth.test assumption (D10): no enterprise id arrives inbound with the team_id-only entry.
 2. Done 2026-11-04: OQ11 and OQ12 answered.
-3. **human**: create layer 11a, commit the planning work on it (the tree must be clean for the rebase), then rebase both open layers onto `main` and submit:
+3. Done 2026-11-04: the planning commit merged on `main` as its own PR (#1818), not on layer 11a (the stack was not rebased, and the cherry-pick onto the 2026-10-20 base conflicted in every file). The local 11a branch `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` exists, empty, at #1735's old tip `cdb41d28`.
+4. **agent** (next session, before 11a): rebase #1735 onto `main`. `git merge-tree` shows 8 conflicts: `app/features/incident/README.md`, `common/settings.py`, `comms/entrypoints/slack.py`, `core/adapters/status_updates.py`, `tests/unit/features/incident/common/test_incident_common_settings_load.py`, `tests/unit/features/incident/core/test_incident_core_status_update_store.py` (deleted by #1735, modified on main), and the TASK-145.5.6 and TASK-152 task files. The agent resolves them onto the TASK-111 settings shape and re-runs 145.5.6's gates; the **human** runs:
    ```
    gh stack checkout stack-k/task-145.5.6-status-update-store
-   gh stack add stack-k/task-145.5.7.1-host-tenant-verifier-and-lease
-   git add backlog/tasks/task-145.5.7*.md backlog/tasks/task-64\ -*.md backlog/tasks/task-145.7\ -*.md backlog/tasks/task-145.8\ -*.md backlog/tasks/task-145.9\ -*.md backlog/tasks/task-145.12\ -*.md backlog/tasks/task-145.13\ -*.md backlog/tasks/task-147.6\ -*.md decisions/workplace-systems.md decisions/incident-management.md decisions/reliability.md decisions/cloud-portability.md decisions/plugins.md "backlog/docs/stacks/doc-13 - Stack-K-handoff.md"
-   git commit -m "TASK-145.5.7 Plan the incident legacy upgrade job in three layers"
    gh stack rebase
    gh stack submit
    ```
-   Resolve #1735's conflicts with the TASK-111 chain during the rebase (its `common/settings.py` still uses BaseSettings aliases), then re-request review of #1735.
-4. **agent**: once next action 1 is recorded, implement TASK-145.5.7.1 on its branch (TDD, gates); the human then commits and runs `gh stack submit`.
+   then re-requests review of #1735. The 11a branch is rebased with it and then holds the #1818 task files from `main`.
 5. Once 11a is submitted above it, #1735 may merge (`gh stack sync`, `gh stack submit`). Then 11b (`gh stack add stack-k/task-145.5.7.2-upgrade-runner`) and 11c.
 6. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
 

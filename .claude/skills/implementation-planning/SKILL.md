@@ -7,6 +7,8 @@ description: Review-ready implementation plans grounded in real code, with the m
 
 Use this skill when writing the implementation plan for a backlog task (checkpoint #2 for human review). A plan is a contract: reviewable in minutes, executable without re-research, and sized for a single reviewable PR.
 
+For new or changed domain models, apply the [domain-model-evolution](../domain-model-evolution/SKILL.md) gate before plan approval, even when planning starts without an architecture-stage handoff.
+
 ## Ground the Plan in Real Code
 
 1. Never plan from memory or from the task description alone. Run the searches (`rg`, `grep -rn`), read the files, and enumerate exact call sites (`path:line`) the change will touch.
@@ -20,6 +22,7 @@ Use this skill when writing the implementation plan for a backlog task (checkpoi
 3. **Test matrix** — happy path, boundary, failure, and (where relevant) authorization/idempotency cases, with intended test file names per `testing-standards`.
 4. **Assumptions and doubts** — everything the plan takes on faith, each with how to verify it (for example: "assumes all environment branching reads the typed `ENVIRONMENT` and that `PREFIX` is read only by frozen `app/modules/` command registration — verify with repo-wide grep including terraform/ and scripts/").
 5. **Blast radius and rollback** — what breaks if this ships wrong, whether a single `git revert` restores service, and any ordering constraints (for example: env vars must exist in manifests before code requiring them merges).
+6. **Domain-model evolution** — include the [gate's](../domain-model-evolution/SKILL.md) scenario/cardinality matrix, edge-case evidence, decisions and compatibility/cascade plan for human review; otherwise state why it is not applicable. Keep this evidence in the approved task plan, not only a delivery map.
 
 ## Single-PR Size Gate (MANDATORY)
 

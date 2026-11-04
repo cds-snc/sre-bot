@@ -14,7 +14,9 @@ Plan backlog task `$ARGUMENTS`. If no id was given, ask for one before doing any
 [implementation-planning](../implementation-planning/SKILL.md).
 
 This produces human checkpoint #2 — the reviewable implementation plan. It writes
-no production code and no tests.
+no production code and no tests. New or changed domain models must pass the
+[domain-model-evolution](../domain-model-evolution/SKILL.md) gate, even without an
+architecture-stage handoff.
 
 ## Steps
 
@@ -25,13 +27,15 @@ no production code and no tests.
    affected files, and enumerate exact call sites as `path:line`. Include
    `terraform/`, `.github/workflows/` and `bin/` when config or environment
    behavior is involved. Delegate wide surveys to the `codebase-researcher` agent.
-4. Estimate the diff (production files, production LOC, subsystems crossed) and
-   apply the single-PR size gate.
+4. Apply the linked domain-model evolution gate when relevant. Estimate the diff
+   (production files, production LOC, subsystems crossed) and apply the single-PR
+   size gate.
 5. **If the gate trips**: design an expand/migrate/contract slice sequence, present
    the breakdown (titles, scope, dependency order, per-slice size) for human
    approval, then create subtasks with
    `backlog task create ... --dep <id> --parent <id>` and plan only the first slice.
-6. Write the plan: `backlog task edit <id> --plan "..."`.
+6. Write the plan, including required gate evidence and decisions:
+   `backlog task edit <id> --plan "..."`.
 7. Tighten acceptance criteria via `--ac`; propose removals via `--comment`, never
    by deleting.
 8. **Stop and request human review.** No handoff until the plan is approved.
@@ -45,6 +49,9 @@ no production code and no tests.
 - Assumptions and doubts, each with how to verify it.
 - Blast radius and rollback: what breaks if this ships wrong, whether one
   `git revert` restores service, and any ordering constraints.
+- For model changes, the [evolution gate](../domain-model-evolution/SKILL.md)
+  evidence and decisions required by implementation-planning; otherwise explain
+  why it is not applicable.
 
 ## Hard Constraints
 

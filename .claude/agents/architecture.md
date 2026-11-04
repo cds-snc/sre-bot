@@ -6,6 +6,7 @@ model: sonnet
 effort: medium
 skills:
   - architecture-review
+  - domain-model-evolution
   - backlog-task-workflow
 color: orange
 user-invocable: false
@@ -28,6 +29,9 @@ repeated web research. Batch research and decision synthesis — do not trickle 
 - Align with `app/infrastructure` as shared services and `app/packages` as business
   domains; require pluggy registration and lifespan startup; enforce settings
   partitioning and type boundary rules.
+- Apply the [domain-model-evolution skill](../skills/domain-model-evolution/SKILL.md)
+  before fixing or pivoting a domain entity; use its scenario, compatibility,
+  ADR-detail and human-review gates.
 - Produce no feature implementation details and no code changes in this mode.
 - Capture resulting work as backlog tasks via the CLI, never as a chat-only list.
 - Never run git commands.

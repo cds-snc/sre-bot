@@ -24,6 +24,10 @@ Use this skill when introducing or refactoring interfaces, domain types, and tra
 - Name a `Protocol` for the role it plays (`Reader`, `Lookup`, `Store`, `Provider`, `Registrar`, `Sender`), never for the pattern: `SlackReplySender`, `DirectoryProvider`, `IdempotencyStore`. Keep `Port` out of class, function and variable names.
 - In docstrings and decision-record prose, say "interface". Keep "port" only where a record discusses ports-and-adapters itself; elsewhere it reads as a network port.
 
+## Record Shape and Evolution
+
+Choosing a type does not settle entity reuse or compatibility. Apply the [domain-model-evolution](../domain-model-evolution/SKILL.md) gate before a new or reshaped entity is fixed in a decision record or approved task plan.
+
 ## Protocol Alignment Pattern
 
 - Define one canonical contract for shared behavior (for example, service-level `Protocol` with concrete `OperationResult[T]` generics).
@@ -38,6 +42,7 @@ Use this skill when introducing or refactoring interfaces, domain types, and tra
 - Broad protocols exposing more methods than a consumer uses.
 - Parallel protocols that describe the same method with different return shapes.
 - Pattern-named protocols and providers (`SomethingPort`, `get_something_port`): the name says which pattern is in use, not what the interface does.
+- Merging or duplicating entities on field similarity alone without the record-evolution gate above.
 
 ## Review Checklist
 

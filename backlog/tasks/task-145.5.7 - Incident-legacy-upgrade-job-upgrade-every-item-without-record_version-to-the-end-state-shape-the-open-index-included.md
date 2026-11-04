@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-14 23:10
-updated_date: '2026-11-04T14:18:00Z'
+updated_date: '2026-11-04T17:26:00Z'
 labels:
   - incident
   - features
@@ -112,6 +112,19 @@ GATES (each slice): ruff, targeted tests during TDD; at the end once mypy then o
 
 BLAST RADIUS AND ROLLBACK
 .1 and .2 are unregistered additions; .3 ships mode off, so no slice changes runtime behavior at merge and each reverts alone (revert .3 before .2 before .1 if several). The only data-writing moment is a later configuration change to dry_run then apply, writing additive attributes only (legacy attributes stay), guarded per item, so a mistaken apply never destroys legacy data. Production cannot run scripts: the report event is the only evidence; run per environment, dry run then apply, after TASK-145.8 deploys and again after TASK-145.12; TASK-145.9 merges only after a production report shows pending 0; TASK-145.13 removes the hookimpl lines and job keys.
+
+SCENARIO AND CARDINALITY EVIDENCE (domain-model-evolution, approved 2026-11-04). Entity: the incident record, legacy item -> end-state shape.
+| Relationship | Domain permits | Legacy holds | Upgrade writes |
+| --- | --- | --- | --- |
+| products per incident | 0 or 1 (one product's response; several products coordinate through engagements) | teams: a Drive folder name list, not a product | product unset; teams kept as a legacy attribute; no engagement inferred (D33) |
+| conversations per incident | 1 now; many working-surface bindings later | channel_id | one conversation reference with the verified Slack tenant; TASK-145.7 adds the binding step (marker 2) |
+| tenants per system | 1, verified | none stored | the tenant TenantVerifier confirms (auth.test) |
+| report, video call | 0 or 1 each | report_url, meet_url | references when mappable, else dropped and counted |
+| each of the five roles | 0 or 1 | incident_commander, operations_lead | as stored |
+| action items | 0..many (TASK-147.2 core store) | none (postmortem document) | nothing |
+| root / workstream links | absent = standalone | none | nothing (TASK-165.5 decides) |
+| visibility | security flag yes/no; privacy and embargo later | security_incident, often absent | missing = no; no privacy or embargo inferred |
+Contrasting scenarios for TASK-145.5.7.2 tests: (1) happy path: a single-team Closed incident with every field mappable upgrades with no open index and product unset; (2) most likely to break: an open security incident listing several teams, lowercase status, no stored security flag and an integral Decimal number in a guarded field upgrades with open_bucket and opened_at, security_incident false, product unset, teams kept, and the guard values normalised; a concurrent edit to any guarded field between read and write is guard_lost.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -154,6 +167,14 @@ created: 2026-11-04T14:18:00Z
 ---
 
 2026-11-04 (human approved): OQ11 (entry module features.incident.response.plugin, contract (m) protects that module) and OQ12 (integral Decimal guarded as int, non-integral unreadable, ExpectedValue not widened) approved; the TASK-145.5.7.1 plan approved.
+
+---
+
+created: 2026-11-04T17:26:00Z
+
+---
+
+2026-11-04 (human approved, coordinated-incidents reconciliation): R1 (legacy teams not mapped to product), the revised R2/R3 (product stays on the record, optional, a product-catalogue id from TASK-165.1; a product is not a team; ADR amended) and R4 option C (ProductCatalog built with the catalogue in TASK-165.1, never over Drive folders) approved; the scenario and cardinality evidence is appended to the plan.
 
 ---
 <!-- COMMENTS:END -->
