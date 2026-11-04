@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-04T17:27:00Z'
+updated_date: '2026-11-04T20:00:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -32,9 +32,9 @@ updated_date: '2026-11-04T17:27:00Z'
 | 7 | TASK-145.5.9 configured-systems read | `stack-k/task-145.5.5-cutover` | #1728 | merged | Done. |
 | 8 | TASK-145.5.10 IncidentStore builder | `stack-k/task-145.5.10-incident-store-builder` | #1730 | merged | 2026-10-20 17:18 UTC. |
 | 9 | TASK-145.5.5 cutover | `stack-k/task-145.5.5-incident-cutover` | #1734 | merged | 2026-10-20 18:52 UTC, deployed and checked. Task Done. |
-| 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | `stack-k/task-145.5.6-status-update-store` | #1735 | in review | Base `main`, last push 2026-10-20: built before the TASK-111 chain (its `common/settings.py` hunk still uses BaseSettings aliases), so it needs a rebase onto `main` before layer 11 stacks on it. Task file still says To Do. It merges only once layer 11a is submitted above it. |
-| 11a | TASK-145.5.7.1 host TenantVerifier in contracts/workplace (server/ implementation reusing TASK-157's check_slack_tenant) and the lease_ttl keyword on the feature job registry | `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` | - | plan approved | ~170 LOC, 7 files, host only. Full plan in the subtask. Implement after TASK-157 is deployed with its smoke recorded. |
-| 11b | TASK-145.5.7.2 incident core upgrade runner: bounded read, guarded writes, report with unmatched_status/unreadable/dropped, AC8 warning | `stack-k/task-145.5.7.2-upgrade-runner` | - | planned | ~245 LOC, 7 files. Outline; OQ12 decided (integral Decimal as int). 2026-11-04: legacy teams no longer mapped to product (product unset, teams kept); scenario matrix in the parent plan. |
+| 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | `stack-k/task-145.5.6-status-update-store` | #1735 | in review | Rebased locally 2026-11-04 onto `main` 1420fbb5 (8 conflicts resolved onto the TASK-111 shape: `status_updates_table` is an `[incident_core]` files key declared in base.toml; doc-13 and TASK-152 took main's version; the two doc-13-only commits dropped as empty; now 2 commits). Gates green (pytest 6113, mypy 41 pre-existing). Not yet force-pushed. Task file says Done (human, 2026-10-20 commit). Merges once 11a is submitted above it. |
+| 11a | TASK-145.5.7.1 host TenantVerifier in contracts/workplace (server/tenant_verification.py reusing TASK-157's check_slack_tenant unchanged) and the lease_ttl keyword on the feature job registry | `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` | - | ready | Implemented 2026-11-04 with TDD, uncommitted on top of rebased layer 10: 7 prod files +177/-7; ACs #1-#6 checked, In Progress. Fails closed: Google UNSUPPORTED_OPERATION, no entry CONFIG_NOT_CONFIGURED. lease_ttl under 1 s rejected at registration. pytest 6149, mypy 41 pre-existing, contracts 13 kept. tests/factories/tenant_verifier.py is the fake for 11b. |
+| 11b | TASK-145.5.7.2 incident core upgrade runner: bounded read, guarded writes, report with unmatched_status/unreadable/dropped, AC8 warning | `stack-k/task-145.5.7.2-upgrade-runner` | - | planned | ~245 LOC, 7 files. Outline; OQ12 decided (integral Decimal as int). 2026-11-04: legacy teams no longer mapped to product (product unset, teams kept); scenario matrix in the parent plan. Starts after #1819 merges (it carries R1, the teams/product decision, in the task file) and the stack is rebased onto it. |
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | - | planned | ~140 LOC, 8 files. Outline; OQ11 decided (entry module response/plugin.py). |
 | 12 | TASK-145.6 core resource interfaces | - | - | planned | 2026-10-09 plan stale; re-plan after layer 11. ProductCatalog is out of scope (2026-11-04, option C: built with the catalogue in TASK-165.1, never over Drive folders). |
 
@@ -42,26 +42,21 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Position
 
-- Checked out: `task-145.5.7-plan` (merged as #1818; identical to `main`). The Stack K planning work is on `main`; uncommitted on this tree are only the coordinated-incidents direction edits of a parallel session (not Stack K) and this doc. Previously uncommitted, now merged: the task files of TASK-145.5.7 and 145.5.7.1 to 145.5.7.3, the notes on TASK-64, 145.7, 145.8, 145.9, 145.12, 145.13 and 147.6, the four amended ADRs (`decisions/workplace-systems.md`, `incident-management.md`, `reliability.md`, `cloud-portability.md`) and this doc.
-- Open PRs: #1735 (layer 10), pre-TASK-111 base, needs a rebase onto `main`. TASK-157 (#1817) merged 2026-11-04 13:28 UTC (dc79aa33); its deploy and smoke are not yet recorded.
-- `gh stack` is not installed in the devcontainer: `gh extension install github/gh-stack`.
-- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, the untracked `task-165.*`, `task-178`, `task-179` files.
+- Checked out: `stack-k/task-145.5.6-status-update-store` (layer 10, rebased locally onto `main` 1420fbb5, not yet pushed). Uncommitted on it: the TASK-145.5.6 rebase notes (belong to layer 10) and all of layer 11a (code, tests, the TASK-145.5.7.1 and TASK-157 task files). The empty local branch `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` still points at the old `cdb41d28` and must be deleted before `gh stack add` recreates it.
+- Parked for #1819 (`plan/coordinated-incidents-direction`): the TASK-145.5.7 D10 note and this doc, as files in the session scratchpad, and in `git stash` `stash@{0}` (TASK-145.5.7 and TASK-157 notes; the TASK-157 part already rides with 11a).
+- Open PRs: #1735 (layer 10, in review), #1819 (coordinated-incidents direction, planning, from `main`; edits TASK-145.5.7, 145.5.7.2, 145.6, 145.7, 146, 147.x, 165, `decisions/incident-management.md` and this doc).
+- TASK-157 (#1817) deployed 2026-11-04 (task-definition :78) and smoked clean (slack_tenant_mismatch = 0); D10 settled. Task In Progress for the human to close.
+- Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`, the untracked `task-165.*`, `task-178`, `task-179` files.
 - Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. Production `[slack.tenant]` names team_id only. Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
 - No background agents.
 
 ## Next actions
 
-1. **human**: record TASK-157's deploy: `bin/deploy-checks.zsh post` and the Slack smoke (`/sre help` plus a button or modal; `slack_tenant_mismatch` = 0). **agent**: write them into TASK-157's notes. The smoke also settles the auth.test assumption (D10): no enterprise id arrives inbound with the team_id-only entry.
-2. Done 2026-11-04: OQ11 and OQ12 answered.
-3. Done 2026-11-04: the planning commit merged on `main` as its own PR (#1818), not on layer 11a (the stack was not rebased, and the cherry-pick onto the 2026-10-20 base conflicted in every file). The local 11a branch `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` exists, empty, at #1735's old tip `cdb41d28`.
-4. **agent** (next session, before 11a): rebase #1735 onto `main`. `git merge-tree` shows 8 conflicts: `app/features/incident/README.md`, `common/settings.py`, `comms/entrypoints/slack.py`, `core/adapters/status_updates.py`, `tests/unit/features/incident/common/test_incident_common_settings_load.py`, `tests/unit/features/incident/core/test_incident_core_status_update_store.py` (deleted by #1735, modified on main), and the TASK-145.5.6 and TASK-152 task files. The agent resolves them onto the TASK-111 settings shape and re-runs 145.5.6's gates; the **human** runs:
-   ```
-   gh stack checkout stack-k/task-145.5.6-status-update-store
-   gh stack rebase
-   gh stack submit
-   ```
-   then re-requests review of #1735. The 11a branch is rebased with it and then holds the #1818 task files from `main`.
-5. Once 11a is submitted above it, #1735 may merge (`gh stack sync`, `gh stack submit`). Then 11b (`gh stack add stack-k/task-145.5.7.2-upgrade-runner`) and 11c.
+1. **human** (Phase A, done 2026-11-04 if the 11a PR exists): layer 10 notes committed, #1735 force-pushed rebased, TASK-157 set Done and 11a committed on its own branch, 11a submitted above #1735.
+2. **human** (Phase B): the TASK-145.5.7 D10 note and this doc committed on #1819.
+3. **human** (Phase C): #1819 merged; the stack rebased onto `main` (`gh stack rebase`, `gh stack submit`; no file overlap, so no conflict expected); `gh stack add stack-k/task-145.5.7.2-upgrade-runner` creates the empty 11b branch on top of 11a.
+4. **human**, any time after Phase A: re-review and merge #1735 (after merging: `gh stack sync`, `gh stack submit`). 11a stays open until 11b is submitted above it.
+5. **agent** (next session): full plan of TASK-145.5.7.2 (11b) against the rebased stack, including R1 from #1819 (the bridge's `_product` no longer maps legacy teams; product unset, teams kept, not counted as dropped); `/plan-task 145.5.7.2` and stop for approval, then TDD.
 6. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
 
 ## Open decisions
@@ -71,5 +66,6 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Planning queue
 
-- TASK-145.5.7.2 and 145.5.7.3: outlines with OQ11 and OQ12 decided; full plans at their pickup.
-- TASK-145.6: re-plan after layer 11.
+- TASK-145.5.7.2 (11b): outline with OQ12 and R1 decided; full plan at its pickup, after #1819 merges.
+- TASK-145.5.7.3 (11c): outline with OQ11 decided; full plan after 11b.
+- TASK-145.6: re-plan after layer 11 (ProductCatalog out of scope).

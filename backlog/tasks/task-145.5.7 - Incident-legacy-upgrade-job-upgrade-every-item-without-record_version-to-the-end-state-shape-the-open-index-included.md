@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-14 23:10
-updated_date: '2026-11-04T17:26:00Z'
+updated_date: '2026-11-04T18:01:00Z'
 labels:
   - incident
   - features
@@ -133,6 +133,8 @@ Contrasting scenarios for TASK-145.5.7.2 tests: (1) happy path: a single-team Cl
 2026-10-15: scope widened from the open-index reconcile to the single incident legacy upgrade job (human, Stack K layer 5 planning). Needs re-planning at pickup, with a size-gate re-check then.
 
 2026-10-20 (SLACK_TEAM_ID review): this job is the first writer to persist tenants without a request, so it verifies the configured tenant with auth.test before apply (AC7) and owns the lookup warning (AC8). Depends on TASK-157 (inbound tenant guard).
+
+2026-11-04: D10 settled by TASK-157's production smoke (deploy dc79aa33, task-definition :78): /sre help plus a button or modal answered with slack_tenant_mismatch = 0 under the team_id-only [slack.tenant] entry, so no enterprise id arrives inbound and the host TenantVerifier (145.5.7.1) can reuse check_slack_tenant unchanged. 145.5.7.1 implementation unblocked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
