@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-13 13:59
-updated_date: '2026-10-23T17:05:00Z'
+updated_date: '2026-11-04T16:10:00Z'
 labels:
   - incident
   - features
@@ -27,7 +27,8 @@ ordinal: 369000
 The postmortem becomes a record the app owns, not a Google Doc. Today the report doc is the whole postmortem: the timeline is a doc section filled by floppy-disk reactions, and action items are a hand-kept table at the end with priority, owner and a pasted URL to an external task, with nothing tying them to GitHub Issues, no interactivity and no tracking across incidents.
 
 Target (decisions/incident-management.md, postmortem):
-- Facts (timeline, severity, roles, impact window, participants) and action items are records through the records contract. Action items carry owner, priority, due date, status and a reference to the issue that tracks the work (GitHub Issues first, as a feature-owned adapter; an issue-tracking capability only when a second tracker is needed).
+- Facts (timeline, severity, roles, impact window, participants) are records through the records contract. Action items carry owner, priority, due date, status and a reference to the issue that tracks the work (GitHub Issues first, as a feature-owned adapter; an issue-tracking capability only when a second tracker is needed).
+- Action items are an incident record type, not a postmortem one (decided 2026-11-04): core/ owns the ActionItem record and its store with a kind, response or follow_up, so in-incident work (TASK-165.4) and coordinated incidents reuse the same store, due index, tracker adapter and status sync. This epic builds them and writes follow_up items only; coordination adds optional references (engagement, finding, repository) later without changing existing items.
 - The report document keeps one job: real-time co-writing of the narrative (what happened, contributing factors, lessons). The bot creates it from the record, with the facts and action items rendered as read-only context, and stores a snapshot of the narrative in the record when the review is marked complete. One feature-owned Google Docs adapter; no documents capability until a second suite or consumer exists (workplace-systems.md rule 2).
 - No in-app editor and no new editing dependency.
 

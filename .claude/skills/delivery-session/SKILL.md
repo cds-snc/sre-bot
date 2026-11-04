@@ -22,12 +22,13 @@ Every plan decision is judged against the whole map, not the single task: a choi
 1. Assess it against the current ADRs (`decisions/`) and the map's entire scope. Is there an ADR addressing it, or a gap?
 2. Is an upcoming task already addressing it? Name the task and row.
 3. If there is a gap, research current industry and modern-framework practice online (cite sources), propose the fix to the decision, and propose the scope changes to the affected tasks.
+4. If the question or a new use case touches a domain entity, apply [domain-model-evolution](../domain-model-evolution/SKILL.md) with domain-relevant scenarios before choosing. Raise a model pivot at the planning checkpoint, not mid-implementation.
 
 Production stays up throughout. Prefer expand/migrate/contract ordering, flags default off, and changes one `git revert` undoes. State the blast radius of a merge, since merging to `main` deploys (terraform applies on push).
 
 ## Planning checkpoint
 
-If the task has no approved plan, run `/plan-task <id>` and stop. Present the open questions with a recommendation each, then ask whether to stay the course or correct it. The human changing direction here is the expected outcome of scoping, not a failure: apply the correction to the plan, the ADR and the affected tasks.
+If the task has no approved plan, or a model pivot changes its approved assumptions, run `/plan-task <id>` and stop for human review. Present the open questions with a recommendation each, then ask whether to stay the course or correct it. A correction is an expected outcome of scoping, not a failure: preserve the evidence and apply the approved pivot cascade from [domain-model-evolution](../domain-model-evolution/SKILL.md).
 
 ## Implement
 

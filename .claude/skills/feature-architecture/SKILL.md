@@ -12,6 +12,7 @@ Design the feature: `$ARGUMENTS`.
 **Run as**: `feature-architecture` agent · Tier M (Claude Sonnet 5).
 **Follow**: [implementation-planning](../implementation-planning/SKILL.md),
 [type-model-boundaries](../type-model-boundaries/SKILL.md),
+[domain-model-evolution](../domain-model-evolution/SKILL.md),
 [fastapi-api-patterns](../fastapi-api-patterns/SKILL.md).
 
 Translate approved app-level decisions into **one** feature-sized,
@@ -29,7 +30,9 @@ implementation-ready packet. No app-wide architecture rewrites here.
    - **Level 3 (Rich workflow)** — multi-step orchestration, multiple
      endpoints/channels, richer interaction surfaces (Slack/Teams/webhooks),
      policy- or config-driven behavior, cross-layer integration.
-4. Define ingress and egress models, naming which boundary owns validation.
+4. Define ingress and egress models, naming which boundary owns validation. Apply
+   the [domain-model-evolution](../domain-model-evolution/SKILL.md) gate before
+   fixing a new or reshaped entity.
 5. Define control flow and interaction layers (HTTP, background jobs, transports,
    external adapters).
 6. Define the failure taxonomy and its HTTP error mapping.
@@ -37,12 +40,13 @@ implementation-ready packet. No app-wide architecture rewrites here.
    each to an existing decision record or a proposed ADR update. Permanent policy
    belongs in `decisions/`, never inline in a feature packet.
 8. Produce the test specification matrix: happy path, boundary, failure,
-   authorization, idempotency.
+   authorization, idempotency, plus applicable evolution-gate scenarios and
+   edge cases.
 9. Size the delivery against the single-PR size gate. Level 2/3 features usually
    decompose into several backlog tasks up front (expand → migrate → contract),
    each independently shippable.
-10. Hand off to `/plan-task` so the packet is persisted into backlog tasks rather
-    than left as chat output.
+10. Hand off to `/plan-task` so the packet, scenario matrix, edge-case evidence and
+    decisions reach human-approved task plans rather than remaining chat output.
 
 ## Hard Constraints
 
@@ -56,6 +60,7 @@ implementation-ready packet. No app-wide architecture rewrites here.
 ## Output
 
 Feature context and scope · applicable ADRs and derived constraints · complexity
-level with rationale · ingress/egress models · interaction sequence and ownership ·
+level with rationale · scenarios the model was tested against · ingress/egress
+models · interaction sequence and ownership ·
 error taxonomy and API mapping · depth-appropriate design detail · acceptance
 criteria · TDD test matrix · implementation handoff checklist.

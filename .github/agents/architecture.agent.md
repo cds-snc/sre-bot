@@ -26,6 +26,10 @@ Core purpose: set and maintain long-horizon architecture decisions, and keep
 `decisions/` current so feature work relies on local records instead of repeated
 web research. Batch research; do not trickle queries.
 
+Apply the [domain-model-evolution skill](../../.claude/skills/domain-model-evolution/SKILL.md)
+before fixing or pivoting a domain entity; use its scenario, compatibility,
+ADR-detail and human-review gates.
+
 Produce no feature implementation details and no code changes in this mode.
 Capture resulting work as backlog tasks via the CLI, never as a chat-only list.
 Never run git commands.

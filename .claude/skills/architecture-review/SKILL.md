@@ -23,10 +23,13 @@ implementation details and no code changes.
 3. Run web research for any applicable record older than **30 days**, plus any
    missing or outdated standards (FastAPI, Python typing, Pydantic, settings,
    validation, startup patterns). Batch the research; do not trickle queries.
-4. Propose 2-3 options with tradeoffs and lifecycle impact.
+4. Propose 2-3 options with tradeoffs and lifecycle impact. When an option names
+   or reshapes a domain entity, apply the
+   [domain-model-evolution](../domain-model-evolution/SKILL.md) gate first.
 5. Recommend one, with adoption criteria.
 6. Update or create decision records with date, status, rationale, alternatives,
-   consequences and **cited sources**.
+   consequences and **cited sources**. For entity decisions, use the linked
+   evolution gate's ADR-detail and human-review guidance.
 7. Capture the resulting implementation work as backlog tasks via the CLI
    (`backlog task create ... --ref decisions/<record>.md --dep --parent`) — never
    as a chat-only to-do list.
@@ -46,6 +49,7 @@ implementation details and no code changes.
 
 Context and scope boundaries · records reviewed and their current relevance ·
 standards gaps and external references consulted · freshness audit (checked,
-refreshed, deferred-with-reason) · 2-3 options with tradeoffs · chosen approach and
+refreshed, deferred-with-reason) · scenarios the model was tested against (when
+entities change) · 2-3 options with tradeoffs · chosen approach and
 why · risks and mitigations · decision-record update plan · backlog tasks created ·
 feature-architecture handoff packet.

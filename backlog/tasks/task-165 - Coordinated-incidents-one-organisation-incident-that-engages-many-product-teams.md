@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-11-03T19:02:00Z'
+updated_date: '2026-11-04T16:11:00Z'
 labels:
   - incident
 milestone: m-7
@@ -24,7 +24,9 @@ ordinal: 437000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 COORDINATOR: this is the parent for coordinated-incident work only. The GoAlert on-call/paging work (TASK-146) and cloud investigations (TASK-179) are sibling work items, not children of this task. Shared content plumbing (TASK-178) is also tracked separately because it serves multiple consumers.
 
-WHY: some incidents affect the organization across many products: a critical vulnerability, leaked credentials, shared-platform outage, vendor breach, or privacy incident. Coordinators need one incident to engage product teams, collect triage and progress, and provide a safe consolidated view.
+WHY: some incidents affect the organization across many products: a critical vulnerability, leaked credentials, shared-platform outage, vendor breach, or privacy incident. Coordinators need one incident to engage product teams, collect triage and progress, and provide a safe consolidated view. Some of them hold many issues at once: a vulnerability disclosure program (VDP) or pentest report brings many findings across many products and repositories. That is still one incident, never one per vulnerability: findings are optional records inside it, and each team's work is action items that reference a finding and a repository (large-scale-incident-analysis.md §5.14).
+
+WORK MODEL: action items are one incident record type in core/ with a kind, response or follow_up, shared with the postmortem (decisions/incident-management.md, amended 2026-11-04; the store is built by TASK-147.2). Coordination adds optional references on it (engagement, finding, repository, root incident id) rather than a task record of its own. D35–D38 (findings, per-repository progress, where items live, embargo and disclosure dates) are recorded in the coordination ADR by TASK-165.2.
 
 SCOPE AND ORDER: after TASK-145 completes the incident rebuild in the doc-11 target shape, coordination is delivered first in whole epics. Engagement leads use the on-call capability when available; the coordinator can assign manually when no source is configured. The 2–3 week target means the Opsgenie end-of-support date is not a current sequencing constraint; TASK-146 removes Opsgenie as part of the GoAlert cutover.
 
@@ -32,7 +34,7 @@ TEAM COMPOSITION: Google Workspace is the primary IdP but does not yet have stan
 
 PLAYBOOKS: provisioned organisation/team playbooks are delivered first; managed in-flight editing is a separate later epic. Both follow the organisation-content, provisioned-content, and managed-content decisions.
 
-VALIDATION: a scripted staging CVE dry run is required at the post-MVP re-plan checkpoint. A full tabletop exercise with product leads is optional because priorities outside this project may limit their availability.
+VALIDATION: a scripted staging CVE dry run and a scripted VDP walk-through (one report, several findings across several products and repositories, on paper against the MVP) are required at the post-MVP re-plan checkpoint; the walk-through confirms D35–D38 before E6 starts. A full tabletop exercise with product leads is optional because priorities outside this project may limit their availability.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -41,4 +43,5 @@ VALIDATION: a scripted staging CVE dry run is required at the post-MVP re-plan c
 - [ ] #2 The delivery map orders coherent epics and dependencies; each epic is decomposed into reviewable single-PR implementation tasks when it is next, and is not considered delivered while temporary dual paths or fallbacks remain.
 - [ ] #3 A CVE can be run end to end through Slack by hand, with API parity, before playbooks exist; the scripted dry run is completed, while a full product-lead tabletop remains optional.
 - [ ] #4 Provisioned organisation/team playbooks, incident types, and per-type templates are delivered first; managed playbook edits follow through the shared validated, authorized, versioned, audited write path, with the configured Google template remaining the default.
+- [ ] #5 A report with many findings (a VDP or pentest report) runs as one incident: findings are tracked inside it, each product's action items reference the finding and the repository, and the roll-up by finding shows progress across teams; a scripted VDP dry run is completed after the findings epic.
 <!-- AC:END -->
