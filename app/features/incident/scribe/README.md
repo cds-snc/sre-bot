@@ -18,12 +18,12 @@ Paths are relative to `app/features/incident/scribe/` unless they start with
 | --- | --- | --- |
 | Slack handler | `handle_draft_command` in `entrypoints/slack.py` | `handle_summarize_command` in `entrypoints/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
-| Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`ports.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
-| Adapters | `adapters/slack.py` (report link from bookmarks), `core/adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
-| Wiring | `providers.py`: `get_incident_report_link_lookup`, `get_incident_document_store`; `core/api.py`: `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
+| Interfaces | `IncidentStore`, `IncidentReport`, `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
+| Adapters | `core/adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
+| Wiring | `entrypoints/slack.py` builds the `IncidentStore` per service scope (`core/api.py`: `build_incident_store`); `core/api.py`: `get_incident_report`, `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
 | Settings | `IncidentDraftSettings`, prefix `INCIDENT_DRAFT__` | `IncidentSummarySettings`, prefix `INCIDENT_SUMMARY__` |
 | Locale files | `locales/incident_draft.en-US.yml`, `locales/incident_draft.fr-FR.yml` | `locales/incident_summary.en-US.yml`, `locales/incident_summary.fr-FR.yml` |
-| Tests (`tests/unit/features/incident/scribe/`) | `test_incident_scribe_draft_{service,adapter,slack,settings,locales}.py`, `test_incident_scribe_conversation_draft.py`, `test_incident_scribe_providers_document_store.py`, `test_incident_scribe_slack_adapter_lookup.py` | `test_incident_scribe_summary_{service,slack,settings,locales}.py`, `test_incident_scribe_conversation_summarize.py` |
+| Tests (`tests/unit/features/incident/scribe/`) | `test_incident_scribe_draft_{service,adapter,slack,settings,locales}.py`, `test_incident_scribe_conversation_draft.py`, `test_incident_scribe_draft_report_default.py`, `test_incident_scribe_requirements_report_ids.py` | `test_incident_scribe_summary_{service,slack,settings,locales}.py`, `test_incident_scribe_conversation_summarize.py` |
 | Details | [Reference: draft](#sre-incident-draft) | [Reference: summarize](#sre-incident-summarize) |
 
 Both use cases share `test_incident_scribe_plugin_registration.py`.
@@ -48,25 +48,26 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   ├─► Summarizer ─────────────── integrations.openai                            (text generation)
   │
   │   draft only:
-  ├─► IncidentReportLinkLookup ── providers.py ──► adapters/slack.py            (bookmarks)
-  └─► IncidentDocumentStore ───── providers.py ──► core/adapters/google_docs.py (Docs read, Drive copy, Docs fill)
+  ├─► IncidentStore ──────────── core/api.py (built per service scope)          (the channel's incident and its report)
+  └─► IncidentReport ─────────── core/api.py ──► core/adapters/google_docs.py   (Docs read, Drive copy, Docs fill)
 ```
 
 ### Files
 
-- `__init__.py` — pluggy hookimpls only: `register_slack_commands` and
+- `__init__.py` — pluggy hookimpls only: `register_requirements` (the OpenAI,
+  Slack and Google Workspace tenants and the `[incident_core]` `folder_id` and
+  `report_template_id`), `register_slack_commands` and
   `register_i18n_resources`. The plugin is loaded from the `incident.scribe`
   entry point under `[project.entry-points.sre_bot]` in `app/pyproject.toml`
   (`decisions/plugins.md`); no import-time side effects.
 - `entrypoints/slack.py` — the two five-step command handlers (`draft`,
   `summarize`) registered under `sre.incident` by one `register`; the draft
-  handler posts the progress notice when the service signals the start;
-  ephemeral responses; no `slack_sdk` import.
+  handler opens one service scope, builds the incident store and the
+  channel's conversation reference there, and posts the progress notice when
+  the service signals the start; ephemeral responses; no `slack_sdk` import.
 - `entrypoints/slack_views.py` — the replies, notices and every translated
   string, reached through `core.api.translate` (no scribe module imports
   `infrastructure.i18n`). No Slack SDK import.
-- `ports.py` — the scribe-owned interfaces: `IncidentDocumentStore` and
-  `IncidentReportLinkLookup`.
 - `service.py` — the draft and summarize use cases. It imports
   `features/incident/core` through `core/api.py` only. Empty history returns an
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
@@ -74,15 +75,11 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `AI_AUTHOR`. `TranscriptMessage` and the document section types
   (`DocumentSection`, heading + instructions; `SectionDraft`, `DocumentField`,
   `DraftWriteResult`) come from `features/incident/core` through `core/api.py`.
-- `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
-  plain strings and no links on an API error.
 - `core/adapters/google_docs.py` — the umbrella's Google Docs and Drive
-  adapter (Docs read + Drive copy + Docs populate); the scribe package itself
+  adapter behind `IncidentReport` (Docs read + Drive copy + Docs populate); the scribe package itself
   imports no Google code. `service.py` imports the
   `Summarizer` interface and `entrypoints/slack.py` the transport models, both by
   design.
-- `providers.py` — feature-local DI wiring for the document store and the
-  report-link lookup.
 - `settings.py` — partitioned feature settings, one class and one cached getter
   per use case.
 - `locales/` — EN/FR message catalogues, one pair per use case. One
@@ -102,7 +99,7 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 2. **Domain values.** Add frozen dataclasses to `domain.py` only if the use
    case needs its own values.
 3. **Adapters.** A new external call goes in `adapters/<system>.py`, wired
-   through a cached getter in `providers.py`. If a second incident subdomain
+   through a cached getter in a `providers.py`. If a second incident subdomain
    will need the same interface, it belongs in `core/` instead (see
    [Where does new work go](../README.md#where-does-new-work-go)).
 4. **Settings.** Add a `BaseSettings` class and an `lru_cache` getter to
@@ -176,8 +173,9 @@ guidance is left exactly as it is, ready for a human.
 #### How it works
 
 1. **Locate and read the channel.** The handler makes one service call. The
-   service finds the incident document via the channel's "Incident report"
-   bookmark (the package's `IncidentReportLinkLookup` interface), then reads
+   service resolves the channel to its incident (`find_incident_for_conversation`)
+   and takes the report the record references; a channel that is no incident,
+   or an incident without a report, gets the no-document notice. It then reads
    the transcript through the `IncidentTranscriptReader` interface of
    `features/incident/core`: fetched from channel creation, display names
    resolved, each message carrying its time, and noise removed:
@@ -426,11 +424,13 @@ ours will not help.
 
 `OPENAI__API_KEY` (`integrations.openai`, whose `[openai.tenant]` entry also
 supplies the endpoint and model, and whose `[openai]` table the timeout) and the Google Workspace service account, with the `documents` and
-`drive` scopes.
+`drive` scopes. The `[incident_core]` `folder_id` and `report_template_id`
+(`INCIDENT_CORE__FOLDER_ID`, `INCIDENT_CORE__REPORT_TEMPLATE_ID`) must be set:
+the plugin declares them, so boot stops naming the one that is empty.
 
 #### Required Slack scopes
 
-`bookmarks:read`, `channels:history`/`groups:history`, `channels:read`/`groups:read`, `users:read`.
+`channels:history`/`groups:history`, `channels:read`/`groups:read`, `users:read`.
 
 ### `/sre incident summarize`
 

@@ -1,4 +1,10 @@
-"""Tests for the incident scribe Slack platform adapter: the draft command."""
+"""Tests for the incident scribe Slack platform adapter: the draft command.
+
+The handler opens a service scope from a fake scope opener resolving an
+in-memory record store and Slack configured under one tenant, so the
+conversation reference it builds for the channel is observable on the stubbed
+service call.
+"""
 
 from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,6 +13,7 @@ import pytest
 
 from contracts.operations import OperationResult, OperationStatus
 from contracts.slack.models import CommandPayload
+from features.incident.core.api import ConversationReference, IncidentStore
 from features.incident.scribe.domain import DraftedDocument
 from features.incident.scribe.entrypoints.slack import handle_draft_command, register
 from features.incident.scribe.service import (
@@ -15,6 +22,7 @@ from features.incident.scribe.service import (
     NO_ANSWERS_CODE,
     NO_DOCUMENT_CODE,
 )
+from tests.factories.incident import incident_scopes, slack_conversation
 from tests.factories.slack import FakeSlackReply
 
 pytestmark = pytest.mark.unit
@@ -26,7 +34,11 @@ def _service(result: OperationResult[DraftedDocument], *, signal_start: bool = T
     """Stub the service call: signal the start as the service does once the report is found, then return ``result``."""
 
     async def _call(
-        conversation_id: str, *, limit: int | None = None, on_started: Callable[[], None] | None = None
+        incidents: IncidentStore,
+        conversation: ConversationReference,
+        *,
+        limit: int | None = None,
+        on_started: Callable[[], None] | None = None,
     ) -> OperationResult[DraftedDocument]:
         if signal_start and on_started is not None:
             on_started()
@@ -70,7 +82,7 @@ class TestRegisterCommands:
         with patch("features.incident.scribe.entrypoints.slack.handle_draft_command") as mock_handle:
             fallback(payload)
 
-        mock_handle.assert_called_once_with(payload, {}, provider.reply)
+        mock_handle.assert_called_once_with(payload, {}, provider.reply, provider.service_scopes)
 
 
 class TestHandleDraftCommand:
@@ -79,7 +91,7 @@ class TestHandleDraftCommand:
         outcome = _outcome(drafted=("Trigger", "Impact"), unanswered=("Lessons Learned",))
 
         with patch(_DRAFT, new=_service(OperationResult.success(data=outcome))) as mock_service:
-            response = handle_draft_command(payload, {}, FakeSlackReply())
+            response = handle_draft_command(payload, {}, FakeSlackReply(), incident_scopes())
 
         assert response.ephemeral is True
         assert response.message == (
@@ -92,14 +104,16 @@ class TestHandleDraftCommand:
         assert "\n" not in response.message
         # One service call, for the channel the command was run in.
         mock_service.assert_awaited_once()
-        assert mock_service.await_args.args == ("C123",)
+        incidents, conversation = mock_service.await_args.args
+        assert isinstance(incidents, IncidentStore)
+        assert conversation == slack_conversation("C123")
 
     def test_no_document_renders_the_notice(self):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         result: OperationResult[DraftedDocument] = OperationResult.permanent_error(message="x", error_code=NO_DOCUMENT_CODE)
 
         with patch(_DRAFT, new=_service(result, signal_start=False)):
-            response = handle_draft_command(payload, {}, FakeSlackReply())
+            response = handle_draft_command(payload, {}, FakeSlackReply(), incident_scopes())
 
         assert response.ephemeral is True
         assert response.message == "I couldn't find an incident document bookmarked in this channel."
@@ -116,7 +130,7 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=_service(OperationResult.permanent_error(message="x", error_code=error_code))):
-            response = handle_draft_command(payload, {}, FakeSlackReply())
+            response = handle_draft_command(payload, {}, FakeSlackReply(), incident_scopes())
 
         assert response.ephemeral is True
         assert fragment in response.message.lower()
@@ -125,7 +139,7 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=_service(OperationResult.transient_error(message="boom", error_code="SERVER_ERROR"))):
-            response = handle_draft_command(payload, {}, FakeSlackReply())
+            response = handle_draft_command(payload, {}, FakeSlackReply(), incident_scopes())
 
         assert response.message.startswith("❌")
 
@@ -134,7 +148,7 @@ class TestHandleDraftCommand:
         reply = FakeSlackReply()
 
         with patch(_DRAFT, new=AsyncMock()) as mock_service:
-            response = handle_draft_command(payload, {}, reply)
+            response = handle_draft_command(payload, {}, reply, incident_scopes())
 
         assert response.ephemeral is True
         assert response.message.startswith("\u274c")
@@ -150,7 +164,7 @@ class TestHandleDraftCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_DRAFT, new=_service(OperationResult.success(data=_outcome()))) as mock_service:
-            handle_draft_command(payload, parsed_args, FakeSlackReply())
+            handle_draft_command(payload, parsed_args, FakeSlackReply(), incident_scopes())
 
         assert mock_service.await_args.kwargs["limit"] == expected
 
@@ -161,7 +175,7 @@ class TestProgressNotice:
     def _run(self, reply, *, signal_start: bool = True):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
         with patch(_DRAFT, new=_service(OperationResult.success(data=_outcome()), signal_start=signal_start)):
-            return handle_draft_command(payload, {}, reply)
+            return handle_draft_command(payload, {}, reply, incident_scopes())
 
     def test_an_ephemeral_notice_is_posted_to_the_invoker(self):
         reply = FakeSlackReply()
@@ -202,7 +216,7 @@ class TestPartialDraftMessage:
             partial=partial,
         )
         with patch(_DRAFT, new=_service(OperationResult.success(data=outcome))):
-            return handle_draft_command(payload, {}, FakeSlackReply())
+            return handle_draft_command(payload, {}, FakeSlackReply(), incident_scopes())
 
     def test_a_partial_run_links_the_draft_and_explains_the_gap(self):
         response = self._run(partial=True)

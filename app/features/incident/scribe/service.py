@@ -2,7 +2,7 @@
 
 Drafting: the incident document created at channel creation is a template:
 each heading is followed by guidance describing what belongs in that section.
-This service reads those heading/guidance pairs through the ``IncidentDocumentStore``, treats
+This service reads those heading/guidance pairs through the incident core ``IncidentReport``, treats
 the guidance as per-section drafting instructions, answers each one from the
 incident channel transcript via the ``Summarizer`` interface
 (``integrations.openai``), and writes the answers into a new draft document on
@@ -10,9 +10,10 @@ each run (a fresh copy of the incident report template). The incident report
 created at channel creation is only ever read, never modified.
 
 ``draft_incident_document_from_conversation`` is the use case a platform
-handler calls: it finds the incident report through the
-``IncidentReportLinkLookup``, reads the conversation's transcript through the
-incident core ``IncidentTranscriptReader`` and drafts from it.
+handler calls: it resolves the conversation to its incident with the incident
+core command check, takes the report the record references, reads the
+conversation's transcript through the incident core ``IncidentTranscriptReader``
+and drafts from it.
 
 Summarizing: ``summarize_incident_conversation`` reads the conversation's
 transcript through the same ``IncidentTranscriptReader`` and delegates to the
@@ -35,18 +36,22 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
-from contracts.operations import OperationResult
+from contracts.operations import OperationResult, OperationStatus
 from features.incident.core.api import (
+    ConversationReference,
     DocumentField,
     DocumentSection,
+    IncidentReport,
+    IncidentStore,
     IncidentTranscriptReader,
+    ReportReference,
     SectionDraft,
     TranscriptMessage,
+    find_incident_for_conversation,
+    get_incident_report,
     get_incident_transcript_reader,
 )
-from features.incident.scribe import providers
 from features.incident.scribe.domain import AI_AUTHOR, DraftedDocument
-from features.incident.scribe.ports import IncidentDocumentStore, IncidentReportLinkLookup
 from features.incident.scribe.settings import (
     IncidentDraftSettings,
     IncidentSummarySettings,
@@ -170,9 +175,6 @@ _MODEL_FIELD_LABELS = (
 )
 _AUTHORS_FIELD_LABEL = "Author(s)"
 
-# The incident report is a Google Doc; its id is what the document store reads.
-_DOC_ID_PATTERN = re.compile(r"https://docs\.google\.com/document/d/([a-zA-Z0-9_-]+)")
-
 # Pull-request links as they appear in Slack messages. The model writes "PR
 # 1898" in prose, so the number is mapped back to the URL somebody actually
 # posted. Group 1 is the repository, kept so a PR the channel discussed without
@@ -223,45 +225,51 @@ _LIST_HEADING_MARKERS = (
 
 
 async def draft_incident_document_from_conversation(
-    conversation_id: str,
+    incidents: IncidentStore,
+    conversation: ConversationReference,
     *,
     limit: int | None = None,
     on_started: Callable[[], None] | None = None,
     reader: IncidentTranscriptReader | None = None,
-    report_links: IncidentReportLinkLookup | None = None,
 ) -> OperationResult[DraftedDocument]:
-    """Draft a filled-in copy of an incident conversation's report.
+    """Draft a filled-in copy of the report of the incident a conversation belongs to.
 
-    Finds the report document, then reads the conversation from its start --
-    without this bot's own posts and the platform's system events -- and drafts
-    from that transcript.
+    Resolves the conversation to its incident and takes the report the record
+    references, then reads the conversation from its start -- without this bot's
+    own posts and the platform's system events -- and drafts from that transcript.
 
     Args:
-        conversation_id: The incident conversation to draft from.
+        incidents: The incident store the caller built in its service scope.
+        conversation: The conversation the command came from.
         limit: Maximum number of messages to read. Missing or not positive
             means the configured default; larger values are capped.
-        on_started: Called once when the report document has been found, before
-            the slow work (reading the transcript, the model call, the document
-            writes) begins. Not called when there is no report document.
+        on_started: Called once when the report is known, before the slow work
+            (reading the transcript, the model call, the document writes)
+            begins. Not called when there is no report.
         reader: Optional ``IncidentTranscriptReader``; defaults to the incident
             core's process singleton. Injected in tests.
-        report_links: Optional ``IncidentReportLinkLookup``; defaults to the
-            Slack-backed adapter from ``providers``. Injected in tests.
 
     Returns:
         The ``OperationResult`` of ``draft_incident_document`` for the report
-        and the messages read, or a permanent error with ``NO_DOCUMENT`` when
-        the conversation links to no report document.
+        and the messages read; a permanent error with ``NO_DOCUMENT`` when the
+        conversation is no incident or its incident has no report; any other
+        incident lookup failure as classified.
     """
-    log = logger.bind(operation="draft_incident_document_from_conversation", conversation_id=conversation_id)
+    log = logger.bind(operation="draft_incident_document_from_conversation", conversation_id=conversation.vendor_id)
 
-    if report_links is None:
-        report_links = providers.get_incident_report_link_lookup()
-
-    document_id = _find_report_document_id(report_links.find_report_links(conversation_id), log)
-    if document_id is None:
+    found = find_incident_for_conversation(incidents, conversation)
+    if not found.is_success and found.status is not OperationStatus.NOT_FOUND:
+        log.warning("incident_draft_incident_lookup_failed", status=found.status, error_code=found.error_code)
+        return OperationResult.error(
+            status=found.status,
+            message=found.message or "The incident could not be read",
+            error_code=found.error_code,
+            retry_after=found.retry_after,
+        )
+    report = found.data.report if found.is_success and found.data is not None else None
+    if report is None:
         return OperationResult.permanent_error(
-            message="No incident report document is linked from the conversation",
+            message="The conversation's incident has no report document",
             error_code=NO_DOCUMENT_CODE,
         )
 
@@ -271,31 +279,30 @@ async def draft_incident_document_from_conversation(
     settings = get_incident_draft_settings()
     reader = reader or get_incident_transcript_reader()
     messages = reader.read_transcript(
-        conversation_id,
-        since=_resolve_draft_window_start(reader, conversation_id, settings),
+        conversation.vendor_id,
+        since=_resolve_draft_window_start(reader, conversation.vendor_id, settings),
         limit=_resolve_draft_limit(limit, settings),
         exclude_own_and_system_messages=True,
     )
 
-    return await draft_incident_document(document_id, messages)
+    return await draft_incident_document(report, messages)
 
 
 async def draft_incident_document(
-    document_id: str,
+    report: ReportReference,
     messages: Sequence[TranscriptMessage],
     *,
-    documents: IncidentDocumentStore | None = None,
+    reports: IncidentReport | None = None,
     summarizer: Summarizer | None = None,
 ) -> OperationResult[DraftedDocument]:
-    """Draft a filled-in copy of the incident document from channel history.
+    """Draft a filled-in copy of the incident report from channel history.
 
     Args:
-        document_id: Google Docs id of the source incident document. It is
-            only ever read, never modified.
+        report: The incident's report. It is only ever read, never modified.
         messages: Chronologically ordered incident-channel messages -- the only
             source of facts for the drafted content.
-        documents: Optional ``IncidentDocumentStore``; defaults to the
-            Google-Docs-backed adapter from ``providers``. Injected in tests.
+        reports: Optional ``IncidentReport``; defaults to the incident core's
+            process singleton. Injected in tests.
         summarizer: Optional ``Summarizer`` interface; defaults to the process
             singleton. Injected in tests.
 
@@ -310,14 +317,14 @@ async def draft_incident_document(
     """
     log = logger.bind(
         operation="draft_incident_document",
-        document_id=document_id,
+        document_id=report.vendor_id,
         message_count=len(messages),
     )
 
-    if documents is None:
-        documents = providers.get_incident_document_store()
+    reports = reports or get_incident_report()
 
-    sections = [s for s in documents.read_sections(document_id) if not _is_human_only(s.heading)]
+    read = reports.read_sections(report)
+    sections = [s for s in (read.data or ()) if not _is_human_only(s.heading)] if read.is_success else []
     if not sections:
         log.warning("incident_draft_document_unreadable")
         return OperationResult.permanent_error(
@@ -394,7 +401,7 @@ async def draft_incident_document(
     # model supplied still ends up hyperlinking its "PR <number>".
     links = _resolve_pr_links(messages, drafts)
     drafts = _collapse_pr_references(drafts)
-    written = documents.write_draft_document(document_id, drafts, fields, links)
+    written = reports.write_draft_copy(report, drafts, fields, links).data
     if written is None:
         log.warning("incident_draft_write_failed", section_count=len(drafts))
         return OperationResult.transient_error(
@@ -523,19 +530,6 @@ def _format_time(posted_at: datetime | None, tzname: str) -> str:
     except ZoneInfoNotFoundError, ValueError:
         logger.warning("incident_draft_unknown_timezone", timezone=tzname)
     return moment.strftime("%Y-%m-%d %H:%M %Z")
-
-
-def _find_report_document_id(links: Sequence[str], log: structlog.stdlib.BoundLogger) -> str | None:
-    """Return the document id of the first report link that carries one.
-
-    ``None`` when there is no link or none points at a Google Doc.
-    """
-    for link in links:
-        match = _DOC_ID_PATTERN.search(link)
-        if match:
-            return match.group(1)
-        log.warning("incident_draft_bookmark_link_invalid", link=link)
-    return None
 
 
 def _resolve_draft_limit(limit: int | None, settings: IncidentDraftSettings) -> int:

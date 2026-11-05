@@ -1,4 +1,4 @@
-"""Tests for the Google-backed IncidentDocumentStore adapter."""
+"""Tests for the Google Docs section reader and draft writer behind GoogleDocsIncidentReport."""
 
 import re
 from unittest.mock import MagicMock, patch
@@ -7,7 +7,7 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from contracts.operations.status import OperationStatus
-from features.incident.core.adapters.google_docs import GoogleDocsIncidentDocument, _merge_overlapping
+from features.incident.core.adapters.google_docs import _merge_overlapping, read_document_sections, write_draft_document
 from features.incident.core.api import DocumentField, DocumentSection, SectionDraft
 from integrations.google_workspace import client as google_workspace_client
 
@@ -103,9 +103,8 @@ def _document() -> dict:
 
 class TestReadSections:
     def test_parses_headings_with_their_instruction_text(self, docs_service):
-        adapter = GoogleDocsIncidentDocument()
         docs_service.documents.return_value.get.return_value.execute.return_value = _document()
-        sections = adapter.read_sections("D1")
+        sections = read_document_sections("D1").data or []
 
         assert sections == [
             DocumentSection(heading="Trigger", instructions="Describe what caused the incident to begin.\n"),
@@ -113,16 +112,17 @@ class TestReadSections:
         ]
         assert all(section.has_instructions for section in sections)
 
-    def test_fetch_failure_returns_empty_list(self, docs_service):
-        adapter = GoogleDocsIncidentDocument()
+    def test_an_unusable_fetch_is_a_transient_failure(self, docs_service):
         docs_service.documents.return_value.get.return_value.execute.return_value = None
-        assert adapter.read_sections("D1") == []
+        assert read_document_sections("D1").status is OperationStatus.TRANSIENT_ERROR
 
     @pytest.mark.parametrize("status", [404, 403, 503])
-    def test_fetch_http_error_returns_empty_list(self, docs_service, google_client, status):
+    def test_a_fetch_http_error_is_its_classified_failure(self, docs_service, google_client, status):
         docs_service.documents.return_value.get.return_value.execute.side_effect = _http_error(status)
         google_client.classify_google_error.side_effect = google_workspace_client.classify_google_error
-        assert GoogleDocsIncidentDocument().read_sections("D1") == []
+        result = read_document_sections("D1")
+
+        assert result.status is google_workspace_client.classify_google_error(_http_error(status))[0]
 
         google_client.get_docs_service.assert_called_once()
 
@@ -230,7 +230,7 @@ def _write(docs_service, drafts, *, fields=()):
     """Run write_draft_document against a copied template and return requests."""
     docs_service.documents.return_value.get.return_value.execute.return_value = _template_document()
     docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-    written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts, fields)
+    written = write_draft_document("D1", drafts, fields)
     # The first batch is the content fill; a second, cosmetic batch shrinks the
     # metadata labels afterwards.
     return written, _batch_requests(docs_service)
@@ -263,14 +263,14 @@ class TestWriteDraftDocument:
         docs_service.documents.return_value.get.return_value.execute.side_effect = _http_error(status)
         google_client.classify_google_error.side_effect = google_workspace_client.classify_google_error
         drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
-        assert GoogleDocsIncidentDocument().write_draft_document("D1", drafts) is None
+        assert write_draft_document("D1", drafts) is None
 
     @pytest.mark.parametrize("status", [404, 403, 503])
     def test_populate_http_error_returns_none(self, docs_service, google_client, status):
         docs_service.documents.return_value.batchUpdate.return_value.execute.side_effect = _http_error(status)
         google_client.classify_google_error.side_effect = google_workspace_client.classify_google_error
         drafts = [SectionDraft(heading="Summary", content="x", is_drafted=True)]
-        assert GoogleDocsIncidentDocument().write_draft_document("D1", drafts) is None
+        assert write_draft_document("D1", drafts) is None
 
     def test_copies_the_source_report_rather_than_building_a_blank_doc(self, drive_service, docs_service):
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
@@ -319,7 +319,7 @@ class TestWriteDraftDocument:
                 get_response={"name": "testing draft functionality", "parents": ["FOLDER1"]},
             )
             mock_client.classify_google_error.return_value = (OperationStatus.TRANSIENT_ERROR, "503", None)
-            written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+            written = write_draft_document("D1", drafts)
 
         assert written is None
         docs_service.documents.return_value.batchUpdate.assert_not_called()
@@ -333,7 +333,7 @@ class TestWriteDraftDocument:
             google_client.get_drive_service.return_value = service
             google_client.classify_google_error.return_value = (OperationStatus.NOT_FOUND, "404", None)
             mock_resources.return_value.folder_id = "FALLBACK_FOLDER"
-            written = GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+            written = write_draft_document("D1", drafts)
 
         assert written is not None
         assert _copy_request(service)["body"]["parents"] == ["FALLBACK_FOLDER"]
@@ -506,7 +506,7 @@ class TestMetadataFields:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        written = GoogleDocsIncidentDocument().write_draft_document("D1", [], fields)
+        written = write_draft_document("D1", [], fields)
 
         assert written is None
 
@@ -565,9 +565,7 @@ class TestRegularTextLabels:
         """The pass is cosmetic; a draft that exists beats one that errored."""
         docs_service.documents.return_value.get.return_value.execute.return_value = _template_document()
         docs_service.documents.return_value.batchUpdate.return_value.execute.side_effect = [{}, None]
-        written = GoogleDocsIncidentDocument().write_draft_document(
-            "D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)]
-        )
+        written = write_draft_document("D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)])
 
         assert written is not None
         assert written.document_id == "NEW1"
@@ -594,7 +592,7 @@ class TestBannerAccumulation:
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return _batch_requests(docs_service)
 
     def test_every_stale_banner_is_deleted(self, docs_service):
@@ -656,7 +654,7 @@ class TestInlineLabelValues:
         document = self._impact_template()
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return document, _batch_requests(docs_service)
 
     _CONTENT = (
@@ -734,7 +732,7 @@ class TestEmptyImpactLabels:
         document = document or self._impact_document()
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return document, _batch_requests(docs_service)
 
     @staticmethod
@@ -794,7 +792,7 @@ class TestPullRequestHyperlinks:
         drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = _template_document()
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), links)
+        write_draft_document("D1", drafts, (), links)
         return _batch_requests(docs_service)
 
     @staticmethod
@@ -900,7 +898,7 @@ class TestEnsuredGuidance:
     def _run(self, docs_service, document, drafts):
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return _batch_requests(docs_service)
 
     def test_missing_guidance_is_restored_under_both_headings(self, docs_service):
@@ -986,7 +984,7 @@ class TestPreFilledMetadataIsNotDuplicated:
         drafts = [SectionDraft(heading="Impact", content=content, is_drafted=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return document, _batch_requests(docs_service)
 
     def test_a_label_that_already_has_a_value_is_not_written_beside(self, docs_service):
@@ -1030,7 +1028,7 @@ class TestPreFilledMetadataIsNotDuplicated:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
 
         requests = _batch_requests(docs_service)
         deletes = [r["deleteContentRange"]["range"] for r in requests if "deleteContentRange" in r]
@@ -1078,7 +1076,7 @@ class TestStaleSectionContentSweep:
         drafts = [SectionDraft(heading="Summary", content="A newer, tighter summary.", is_drafted=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return _batch_requests(docs_service)
 
     @staticmethod
@@ -1144,7 +1142,7 @@ class TestLabelHeadingsAreNotSections:
 
     def test_labelled_headings_are_not_offered_as_sections(self, docs_service):
         docs_service.documents.return_value.get.return_value.execute.return_value = self._document()
-        sections = GoogleDocsIncidentDocument().read_sections("D1")
+        sections = read_document_sections("D1").data or []
 
         headings = [s.heading for s in sections]
         assert headings == ["Impact", "Summary"]
@@ -1168,7 +1166,7 @@ class TestLabelHeadingsAreNotSections:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
 
         requests = _batch_requests(docs_service)
         placed = {r["insertText"]["text"].strip(): r["insertText"]["location"]["index"] for r in requests if "insertText" in r}
@@ -1184,7 +1182,7 @@ class TestLabelHeadingsAreNotSections:
         """Otherwise "Other:" looms over "End-users:" beside it."""
         docs_service.documents.return_value.get.return_value.execute.return_value = self._document()
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)])
+        write_draft_document("D1", [SectionDraft(heading="Summary", content="x", is_drafted=True)])
 
         styling = _batch_requests(docs_service)
         styles = [r["updateParagraphStyle"]["paragraphStyle"]["namedStyleType"] for r in styling if "updateParagraphStyle" in r]
@@ -1218,13 +1216,13 @@ class TestMetadataBlockBelowLabelHeadings:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", [], (), {})
+        write_draft_document("D1", [], (), {})
         requests = _batch_requests(docs_service)
         assert requests == []  # nothing to write without fields
 
         docs_service.documents.return_value.batchUpdate.reset_mock()
         docs_service.documents.return_value.get.return_value.execute.return_value = self._document()
-        GoogleDocsIncidentDocument().write_draft_document("D1", [], fields, {})
+        write_draft_document("D1", [], fields, {})
 
         requests = _batch_requests(docs_service)
         inserted = _inserted_text(requests)
@@ -1243,9 +1241,7 @@ class TestMetadataBlockBelowLabelHeadings:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        written = GoogleDocsIncidentDocument().write_draft_document(
-            "D1", [], [DocumentField(label="Note", value="should not be written")], {}
-        )
+        written = write_draft_document("D1", [], [DocumentField(label="Note", value="should not be written")], {})
 
         assert written is None
 
@@ -1268,7 +1264,7 @@ class TestDoubledValueRepair:
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
         # A real run always carries at least one drafted section.
         drafts = [SectionDraft(heading="Summary", content="Checkout was down.", is_drafted=True)]
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
+        write_draft_document("D1", drafts, (), {})
         return _batch_requests(docs_service)
 
     def test_a_doubled_value_is_collapsed(self, docs_service):
@@ -1361,7 +1357,7 @@ class TestEditsNeverOverlap:
         ]
         docs_service.documents.return_value.get.return_value.execute.return_value = self._accumulated_draft()
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), {})
+        write_draft_document("D1", drafts, (), {})
         return _batch_requests(docs_service)
 
     def test_no_two_deletions_overlap(self, docs_service):
@@ -1436,7 +1432,7 @@ class TestTemplateNoiseRemoved:
         document = self._document()
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return document, _batch_requests(docs_service)
 
     @staticmethod
@@ -1545,7 +1541,7 @@ class TestActionItemsTable:
         drafts = [SectionDraft(heading="Action Items:", content=content, is_drafted=True, as_list=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
         return document, _batch_requests(docs_service)
 
     @staticmethod
@@ -1602,7 +1598,7 @@ class TestActionItemsTable:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
 
         requests = _batch_requests(docs_service)
         table = document["body"]["content"][-1]["table"]
@@ -1626,7 +1622,7 @@ class TestActionItemsTable:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
 
         requests = _batch_requests(docs_service)
         assert "A point" in _inserted_text(requests)
@@ -1705,7 +1701,7 @@ class TestReportIsReadOnly:
 
         docs_service.documents.return_value.get.return_value.execute.return_value = document
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts)
+        write_draft_document("D1", drafts)
 
         call = docs_service.documents.return_value.batchUpdate.call_args_list[0]
         document_id = call.kwargs["documentId"]
@@ -1726,7 +1722,7 @@ class TestEveryPullRequestFormIsLinked:
         drafts = [SectionDraft(heading="Summary", content=content, is_drafted=True)]
         docs_service.documents.return_value.get.return_value.execute.return_value = _template_document()
         docs_service.documents.return_value.batchUpdate.return_value.execute.return_value = {}
-        GoogleDocsIncidentDocument().write_draft_document("D1", drafts, (), self._LINKS)
+        write_draft_document("D1", drafts, (), self._LINKS)
         requests = _batch_requests(docs_service)
         return [
             r["updateTextStyle"]["textStyle"]["link"]["url"]

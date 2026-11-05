@@ -39,6 +39,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "DraftWriteResult",
         "ExternalCaseReference",
         "Incident",
+        "IncidentReport",
         "IncidentStore",
         "IncidentTranscriptReader",
         "LegacyUpgrade",
@@ -61,6 +62,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "build_legacy_upgrade",
         "build_status_update_store",
         "find_incident_for_conversation",
+        "get_incident_report",
         "get_incident_transcript_reader",
         "translate",
     ]

@@ -6,8 +6,9 @@ the lifespan's own ``_register_legacy_slack_commands``, onto a real
 ``SlackPlatformProvider`` bound to a real ``slack_bolt.App``, then feeds form-encoded slash-command requests to
 ``App.dispatch``. Only the edges are faked: the Slack Web API client (which
 also backs each package's Slack lookup adapter), the ``response_url`` webhook
-that Bolt's ``respond`` posts to, and each package's backing service (patched
-per test).
+that Bolt's ``respond`` posts to, the incident records (an in-memory record
+store holding one legacy incident on the test channel, its report linked), and
+each package's backing service (patched per test).
 
 ``legacy_handler_harness`` registers the hard-coded legacy modules through the
 lifespan's own ``_register_legacy_handlers`` on a fresh Bolt app, and feeds it
@@ -42,11 +43,11 @@ import packages.rant as rant_module
 import packages.user_rotations as user_rotations_module
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from features.incident.scribe import providers as incident_scribe_providers
 from features.incident.scribe import service as incident_scribe_service
-from features.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup
+from infrastructure.records.in_memory import InMemoryRecordStore
 from integrations.sentinel import client as sentinel_client
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -56,7 +57,7 @@ from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
 from server.slack.settings import get_slack_transport_settings
-from tests.factories.incident import incident_scopes
+from tests.factories.incident import GOOGLE_TENANT, SLACK_TENANT, incident_scopes, seed_legacy_incident
 from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authorize_single_workspace, unpatched_app_init
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
@@ -73,6 +74,7 @@ CHANNEL_ID = "C0INCIDENT"
 TRIGGER_ID = "trigger-123"
 TEAM_ID = "T0TEAM"
 RESPONSE_URL = "https://hooks.slack.test/commands/response"
+REPORT_URL = "https://docs.google.com/document/d/doc-source/edit"
 
 
 INCIDENT_FOLDERS: tuple[dict[str, str], ...] = (
@@ -118,6 +120,7 @@ class SlackCommandHarness:
     provider: SlackPlatformProvider
     client: FakeSlackClient
     command_prefix: str
+    records: InMemoryRecordStore = field(default_factory=InMemoryRecordStore)
     responses: list[dict[str, Any]] = field(default_factory=list)
 
     def dispatch(self, command: str, text: str = "") -> BoltResponse:
@@ -167,16 +170,18 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     )
     provider._app = app
     provider._client = client
-    provider.set_scope_opener(incident_scopes())
+    # The incident records the entry points read: the channel is one legacy incident with its report linked.
+    records = InMemoryRecordStore()
+    seed_legacy_incident(records, CHANNEL_ID, report_url=REPORT_URL)
+    provider.set_scope_opener(
+        incident_scopes(records, tenants={WorkplaceSystem.SLACK: SLACK_TENANT, WorkplaceSystem.GOOGLE: GOOGLE_TENANT})
+    )
 
     # Each package's Slack lookups run through its real adapter over the same fake client.
     web_client = cast(WebClient, client)
     monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(web_client))
     monkeypatch.setattr(
         incident_scribe_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(web_client)
-    )
-    monkeypatch.setattr(
-        incident_scribe_providers, "get_incident_report_link_lookup", lambda: SlackIncidentReportLinkLookup(web_client)
     )
 
     plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)
@@ -187,7 +192,7 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     _register_legacy_slack_commands(provider, structlog.get_logger())
     provider._auto_register_root_commands()
 
-    harness = SlackCommandHarness(app=app, provider=provider, client=client, command_prefix=command_prefix)
+    harness = SlackCommandHarness(app=app, provider=provider, client=client, command_prefix=command_prefix, records=records)
     capture_response_url_posts(monkeypatch, harness.responses)
     return harness
 
