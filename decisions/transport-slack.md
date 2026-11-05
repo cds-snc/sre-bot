@@ -69,7 +69,8 @@ Tolerated until then:
 - sync `SocketModeHandler` in `provider.py` beside the `AsyncApp` in `bootstrap.py`;
 - dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside the `register_slack_commands(registrar: SlackCommandRegistrar)` hookspec;
 - `slack_sdk.WebClient` imported outside `adapters/` in `packages/oncall_sync/providers.py` and `packages/rant/platforms/slack.py`;
-- legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls.
+- legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls;
+- the incident `IncidentTranscriptReader` on the synchronous `WebClient` (its callers in `comms/` are synchronous), until those callers are async; `IncidentConversation` already uses the async clients.
 
 **Changes:**
 - 2026-09-24: runtime moves to `server/slack/`, hookspecs and the outbound Protocol to `contracts/`, per plugin-architecture.md; dropped the closed `PREFIX` retirement; Migration names epic tickets only; shared Slack helpers never wrap Bolt or `slack_sdk`, and a standard toolkit is an open Draft.
@@ -83,4 +84,5 @@ Tolerated until then:
 - 2026-10-23: the transport slice moves to `server/slack/settings.py` in TASK-112.1, ahead of the runtime (TASK-26.2); the legacy modules read the command prefix from `SlackTransportInfo` in `contracts/slack/`, and the provider takes its transport values from the host.
 - 2026-10-23: TASK-112.1 shipped: the transport slice is in `server/slack/settings.py` with `enabled` and `socket_mode`; the cross-slice rules run in the configuration phase; `SLACK_ENABLED` and `SLACK_SOCKET_MODE` are no longer read; the transport-slice tolerated item is replaced by the legacy prefix reader.
 - 2026-11-03: TASK-157: the tenant check compares installation-scoped ids only (Slack Connect), acks every refused request, posts a translated ephemeral notice off the ack path, and is enforced with no flag.
+- 2026-11-05: an outbound-only Slack caller holds two async handles, reads on `get_async_slack_web_client` and non-idempotent writes on the rate-limit-only write handle ([outbound-clients.md](outbound-clients.md)); first user `IncidentConversation` (TASK-145.6.3); the transcript reader's synchronous client is tolerated.
 - 2026-11-06: legacy ids at rebuild: modal-internal ids take the plugin prefix; ids on posted messages keep a legacy alias until the legacy contract task (TASK-36.1.2 OQ1, human; resolves the conflict with [migration.md](migration.md) recipe step 4 and TASK-145.7 vs TASK-145.10).
