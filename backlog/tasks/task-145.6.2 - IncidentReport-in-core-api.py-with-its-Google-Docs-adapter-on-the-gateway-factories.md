@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T01:17:00Z'
+updated_date: '2026-11-05T14:53:00Z'
 labels:
   - incident
   - features
@@ -56,7 +56,7 @@ Full plan 2026-11-05, grounded at main 5deb8406 + #1823 and the TASK-145.6.1 pla
 4. pyproject.toml: delete the core adapter's ignore entries to infrastructure.drive, infrastructure.drive.factory, infrastructure.drive.models (renamed there by 145.6.1). No incident module imports infrastructure.drive (TASK-120 AC #2).
 5. core/adapters/in_memory.py: InMemoryIncidentReport (stores created reports, placeholders applied, sections, draft copies; returns references for a test tenant; parity suite shared with the adapter).
 6. scribe: ports.py loses IncidentDocumentStore and IncidentReportLinkLookup; providers.py loses get_incident_document_store and get_incident_report_link_lookup; service.py takes IncidentReport and the incident's ReportReference (:260, :286, :317, :319, :396 rewired; :173 _DOC_ID_PATTERN and :527 _find_report_document_id deleted); scribe/adapters/slack.py deleted; the scribe entry point (scribe/entrypoints/slack.py, as comms/entrypoints/slack.py:178-190 builds the store) resolves the incident through find_incident_for_conversation with the store from build_incident_store and replies as today when the channel is not an incident or the record has no report (i18n keys unchanged).
-7. scribe/__init__.py register_requirements adds the two incident_core requirements (after C4's host task).
+7. scribe/__init__.py register_requirements adds the two incident_core requirements (after C4's host task) (TASK-184, approved 2026-11-05; it must merge before this step). TASK-184 OQ1 (human, 2026-11-05): the CI configuration check is fixed here, not in TASK-184: tests/integration/server/test_server_plugins_configuration_requirements.py builds only the vendor slices, so extend it to build the incident_core slice (get_incident_core_settings, or the configuration phase) and supply placeholders for the env_only INCIDENT_CORE__FOLDER_ID and INCIDENT_CORE__REPORT_TEMPLATE_ID names, checked against terraform/ssm.tf or the Codespaces secrets per the plugins.md CI rule (TASK-175); production SSM must hold both values before merge (deploy-checks pre).
 8. tests/integration/legacy_surface/conftest.py: the report-link patch (:49, :179) replaced by a seeded InMemoryIncidentStore with a report reference.
 
 ## Domain-model evolution gate
