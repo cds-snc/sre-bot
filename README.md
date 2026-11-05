@@ -98,14 +98,15 @@ This project uses [Visual Studio Code Remote - Containers](https://code.visualst
   cd app && uv sync
   ```
 
-4. Add a `.env` file to the `/workspace/app` folder (Contact SRE team for the project-specific .env setup)
-5. Launch the dev bot:
+4. Add a `.env` file to the `/workspace/app` folder (Contact SRE team for the project-specific .env setup; `app/.env.example` lists every name). In a Codespace, the repository's Codespaces secrets provide most of them.
+5. To use Google Workspace, log in with your own Google account and get access to the development service account. Never use a key. Follow [Run the bot locally](docs/runbooks/set-up-google-workspace-access.md#8a-run-the-bot-locally-codespace-or-devcontainer); the [Google Workspace README](app/integrations/google_workspace/README.md#service-identity) has a table of which credentials apply where.
+6. Launch the dev bot:
 
   ```sh
   make dev
   ```
 
-6. Test your development in the dedicated Slack channel (SRE team will confirm which channel to use)
+7. Test your development in the dedicated Slack channel (SRE team will confirm which channel to use)
 
 ---
 

@@ -12,6 +12,17 @@ COPY .devcontainer/apt-packages.txt ./
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && xargs apt-get -y install --no-install-recommends <apt-packages.txt
 
+# Google Cloud CLI, for the Google identity a developer runs the bot with:
+# gcloud auth application-default login, then impersonation of the service account
+# (docs/runbooks/set-up-google-workspace-access.md, "Run the bot locally"). Google's apt repository,
+# signed by its published key: https://cloud.google.com/sdk/docs/install#deb
+RUN curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] https://packages.cloud.google.com/apt cloud-sdk main" \
+    > /etc/apt/sources.list.d/google-cloud-sdk.list \
+    && apt-get update && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get -y install --no-install-recommends google-cloud-cli \
+    && apt-get clean -y
+
 # Setup aliases and autocomplete
 RUN echo "\n\
     complete -C /usr/local/bin/aws_completer aws\n\

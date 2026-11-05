@@ -36,7 +36,7 @@ from server.configured_systems import read_configured_systems
 from server.plugins.manager import load_plugins
 from server.plugins.requirements import declared_requirements, unmet_requirements
 from server.plugins.settings import get_plugins_settings
-from tests.factories.google_service_account import service_account_key
+from tests.factories.google_service_account import CLIENT_EMAIL, service_account_key
 
 pytestmark = pytest.mark.integration
 
@@ -60,9 +60,19 @@ def _clean_settings_caches() -> Iterator[None]:
         getter.cache_clear()
 
 
+# The Google tenant's values are shape-checked at boot: the key must parse, the email must be
+# the key's account, and the audience must be a provider audience. Every other secret is opaque.
+_SHAPED = {
+    "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY": service_account_key(),
+    "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL": CLIENT_EMAIL,
+    "GOOGLE_WORKSPACE__TENANT__FEDERATION_AUDIENCE": (
+        "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/sre-bot/providers/aws-ecs"
+    ),
+}
+
+
 def _placeholder(name: str) -> str:
-    # The Google key must parse as a service-account key to build credentials; every other secret is opaque.
-    return service_account_key() if name == "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY" else PLACEHOLDER
+    return _SHAPED.get(name, PLACEHOLDER)
 
 
 def _problems(

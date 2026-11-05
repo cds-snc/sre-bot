@@ -3,10 +3,10 @@ id: TASK-180
 title: >-
   Keyless Google credentials: Workload Identity Federation from the ECS task
   role to the bot's service account
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T00:09:00Z'
-updated_date: '2026-11-05T21:18:00Z'
+updated_date: '2026-11-05T21:47:00Z'
 labels:
   - security
   - configuration
@@ -41,16 +41,16 @@ Human GCP steps (in cdssnc, from the README service identity section): enable ia
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL and GOOGLE_WORKSPACE__TENANT__FEDERATION_AUDIENCE set, every Google factory authenticates through STS and service-account impersonation from the ECS task role and reads no key; tests drive the chain with a fake supplier and no network I/O
-- [ ] #2 The AWS supplier reads the botocore session's refreshable credentials on each call, so rotated task-role credentials are picked up, and the region from the session
-- [ ] #3 Source selection: an audience means AWS federation and wins over a key (both coexist until TASK-182); else a key means the key, and a set SERVICE_ACCOUNT_EMAIL must equal the key's client_email; else the email alone means application default credentials impersonating it, resolved on first use; a customer id with none of them, an audience without the email, or an audience of the wrong shape (a placeholder included) fails boot naming the variable; boot makes no network call
-- [ ] #4 Delegating factories on the federated and application-default paths delegate through signJwt (impersonated credentials with a subject); the key path keeps with_subject; all request exactly the scopes requested today; impersonated credentials are cached per subject and scope set and refresh themselves
-- [ ] #5 Before this PR merges, a terraform-only expand PR (no task, as #1792) declares GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL in terraform/ssm.tf and the human sets its value and the Codespaces secret; this PR changes no terraform; deploy-checks pre at merge and post google after its deploy pass with every task on the key and the email matching it (the audience parameter is TASK-180.1)
+- [x] #1 With GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL and GOOGLE_WORKSPACE__TENANT__FEDERATION_AUDIENCE set, every Google factory authenticates through STS and service-account impersonation from the ECS task role and reads no key; tests drive the chain with a fake supplier and no network I/O
+- [x] #2 The AWS supplier reads the botocore session's refreshable credentials on each call, so rotated task-role credentials are picked up, and the region from the session
+- [x] #3 Source selection: an audience means AWS federation and wins over a key (both coexist until TASK-182); else a key means the key, and a set SERVICE_ACCOUNT_EMAIL must equal the key's client_email; else the email alone means application default credentials impersonating it, resolved on first use; a customer id with none of them, an audience without the email, or an audience of the wrong shape (a placeholder included) fails boot naming the variable; boot makes no network call
+- [x] #4 Delegating factories on the federated and application-default paths delegate through signJwt (impersonated credentials with a subject); the key path keeps with_subject; all request exactly the scopes requested today; impersonated credentials are cached per subject and scope set and refresh themselves
+- [ ] #5 This PR changes no terraform and deploys on the key with both new names absent. After it deploys: a terraform-only PR (no task, as #1792) declares GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL in terraform/ssm.tf, the human sets its value before any deploy and redeploys the running tag; deploy-checks pre at this merge, and post google after the redeploy, pass with every task on the key and the email set (boot checks it is the key's account). The audience parameter is TASK-180.1; the Codespaces secret is TASK-185
 - [ ] #6 A Codespace or devcontainer authenticates with gcloud application-default login plus Token Creator, granted per developer and revocable; the devcontainer installs the gcloud CLI; the Codespaces key secret is no longer needed (deleted by TASK-182; the development account is TASK-185)
-- [ ] #7 ruff, mypy, lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
+- [x] #7 ruff, mypy, lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
 - [ ] #8 A google task check in bin/deploy-checks.zsh (post only; per task credential source from the configuration summary and error counts, never message bodies; google:federation requires federation on every task) passes on the key after this PR deploys; TASK-180.1 runs it after the cutover; TASK-183 deletes it when Done
-- [ ] #9 Documentation a new developer can follow: the Google README and the runbook carry a credentials-at-a-glance table (ECS, Codespace or devcontainer, another platform through a credential configuration file, the key until TASK-182), the selection order and troubleshooting rows per source; the root README's local setup links to them; the runbook's 'Until TASK-180 ships' section names only what TASK-180.1, 181 and 183 still change
-- [ ] #10 Portability: the application-default path accepts a Workload Identity Federation credential configuration file (file-sourced token, no key) through GOOGLE_APPLICATION_CREDENTIALS, proven by a test with no network; decisions/service-accounts.md rule 5 names the AWS supplier as the ECS adapter and application default credentials as the platform default
+- [x] #9 Documentation a new developer can follow: the Google README and the runbook carry a credentials-at-a-glance table (ECS, Codespace or devcontainer, another platform through a credential configuration file, the key until TASK-182), the selection order and troubleshooting rows per source; the root README's local setup links to them; the runbook's 'Until TASK-180 ships' section names only what TASK-180.1, 181 and 183 still change
+- [x] #10 Portability: the application-default path accepts a Workload Identity Federation credential configuration file (file-sourced token, no key) through GOOGLE_APPLICATION_CREDENTIALS, proven by a test with no network; decisions/service-accounts.md rule 5 names the AWS supplier as the ECS adapter and application default credentials as the platform default
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -190,6 +190,31 @@ Blast radius: the expand PR changes nothing that runs. This PR's deploy runs the
 - gcloud's remote login flow works in a Codespace. Checked while writing the runbook section, with a fresh Codespace.
 <!-- SECTION:PLAN:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 implementation (TDD; branch task-180-keyless-google-credentials from main).
+
+Done:
+- integrations/google_workspace/settings.py: tenant entry gains service_account_email (non-public, codespaces) and federation_audience (non-public, local); service_account_key optional. Source chosen at boot in order: audience (shape-checked: project number, pool and provider ids of 4-32 [a-z0-9-]; AWS region required from botocore's config, no network), key (email must be the key's client_email), email alone (ADC). Exposes authentication, credentials (key path), aws_region.
+- integrations/google_workspace/client.py: credential_source(tenant) (lru_cache) builds KeyCredentialSource, or ImpersonatingCredentialSource over aws.Credentials with BotocoreCredentialsSupplier, or over google.auth.default (lazy, locked). Impersonated credentials are cached per (subject, scopes); a subject delegates through signJwt. DefaultCredentialsError maps to GoogleCredentialsRefused(application_default_credentials_unavailable). _token_error_code reads IAM's status and STS's "Error code" prefix.
+- bin/deploy-checks.zsh: google and google:federation checks (post only), reading set and partial field names of the google_workspace configuration_slice, plus google_token_refused counts by cause.
+- .devcontainer/Dockerfile: Google Cloud CLI from Google's apt repo (verified in debian:bookworm-slim: SDK 592.0.0; --no-launch-browser exists).
+- pyproject CI blanks and .env.example regenerated; docs: Google README (credentials at a glance, selection order, causes), runbook (provider id aws-ecs: Google requires 4-32 characters, so the former `aws` was invalid; section 8a Run the bot locally; boot and cause troubleshooting tables; transition section), root README step 5.
+- ADRs: configuration.md (parameter ordering corrected, see below), outbound-clients.md Changes, service-accounts.md and cloud-portability.md from planning.
+
+Deviations from the plan:
+- No credentials.py: the vendor-package contract (bin/check_vendor_package_contract.py, outbound-clients.md) allows only __init__, client and settings modules, and construction belongs in client.py. Settings validates only.
+- AC #5 order reversed: the tenant entry rejects unknown variables (extra=forbid; verified), so the email parameter must follow this PR, not precede it.
+- google.auth.default resolves a credential file's project once on the first call (one STS exchange plus a Cloud Resource Manager read): library behaviour, not boot.
+
+Observation (not changed, for the human): google-auth 2.62 starts a background regional-access-boundary lookup after a token refresh, on every credential type in googleapis.com, using the request object of the call, i.e. the service's httplib2.Http, which is not thread-safe (outbound-clients.md). It already runs on the key path in production. Tests switch it off (conftest no_regional_access_boundary_lookup). Worth a follow-up task: pass a dedicated transport for refresh, or confirm the lookup is harmless.
+
+Gates: ruff All checks passed; make check-import-contracts 13 kept 0 broken; make check-settings-key-ownership OK; check-vendor-package-contract, check-runtime-imports, check-sdk-typing OK; mypy Found 41 errors in 14 files (all pre-existing, none in touched files); pytest tests --ignore=tests/smoke 6294 passed.
+
+Open ACs: #5 (terraform-only PR, value, redeploy, deploy-checks), #6 (a human logs in from a Codespace with a temporary grant), #8 (post google after deploy).
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
@@ -198,6 +223,14 @@ created: 2026-11-05T21:17:00Z
 ---
 
 2026-11-05 (human approved the program-scope reassessment): ACs reworded. #3 adds precedence, the email check and lazy ADC. #5 follows the #1792 expand precedent, and the audience parameter, GCP steps and runbook walk-through move to TASK-180.1. #6 adds the gcloud CLI. #8 is the check only. #9 is documentation for a new developer. #10 is new (portability). TASK-185 created for the development identity.
+
+---
+
+created: 2026-11-05T21:46:00Z
+
+---
+
+2026-11-05 (implementation): AC #5 reordered. The tenant entry rejects unknown variables (extra=forbid), so an email parameter created before this code ships would fail every deploy of today's main. This PR ships first with both names optional; the terraform-only PR and the value follow before the next deploy. decisions/configuration.md and the runbook say so.
 
 ---
 <!-- COMMENTS:END -->
