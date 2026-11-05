@@ -7,6 +7,7 @@ the end-state parser; logs are captured with structlog's capture_logs.
 """
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import Any
 
 import pytest
@@ -62,25 +63,46 @@ def test_a_minimal_legacy_item_records_nothing_optional() -> None:
     assert (incident.conversation, incident.report, incident.video_call) == (None, None, None)
 
 
-def test_the_first_team_is_the_product() -> None:
-    assert _read(_legacy(teams=["GC Notify", "GC Forms"])).product == "GC Notify"
-
-
-@pytest.mark.parametrize("teams", [["Unknown"], ["unknown "], [""], ["  "], []])
-def test_an_unknown_or_blank_team_is_no_product(teams: list[str]) -> None:
+@pytest.mark.parametrize("teams", [["GC Notify"], ["GC Notify", "GC Forms"]])
+def test_legacy_teams_never_become_the_product(teams: list[str]) -> None:
+    """The legacy teams value names a Drive folder, not a product, so one team or several leave product unset."""
     with capture_logs() as logs:
-        incident = _read(_legacy(teams=teams))
+        upgraded = _upgraded(_legacy(teams=teams))
 
-    assert incident.product is None
+    assert "product" not in upgraded
+    assert parse_incident_item(upgraded).data is not None
     assert _dropped(logs) == []
 
 
-def test_teams_that_are_not_a_list_are_dropped_and_logged() -> None:
-    with capture_logs() as logs:
-        incident = _read(_legacy(teams="GC Notify"))
+@pytest.mark.parametrize("teams", [["Unknown"], [""], [], "GC Notify", [Decimal(1)], None])
+def test_any_legacy_teams_value_is_neither_mapped_nor_dropped(teams: object) -> None:
+    upgraded = upgrade_legacy_item(_legacy(teams=teams), TENANTS)
 
-    assert incident.product is None
-    assert _dropped(logs) == [(INCIDENT_ID, "teams")]
+    assert isinstance(upgraded, UpgradedItem)
+    assert "product" not in upgraded.item
+    assert upgraded.dropped == ()
+
+
+def test_every_dropped_optional_value_is_carried_with_its_legacy_attribute() -> None:
+    """The upgrade job counts drops from the result, in mapping order, beside the existing log events."""
+    with capture_logs() as logs:
+        upgraded = upgrade_legacy_item(
+            _legacy(
+                severity="critical", end_impact_time="soon", report_url="https://example.com/x", meet_url="https://example.com/m"
+            ),
+            TENANTS,
+        )
+
+    assert isinstance(upgraded, UpgradedItem)
+    assert upgraded.dropped == ("severity", "end_impact_time", "report_url", "meet_url")
+    assert _dropped(logs) == [(INCIDENT_ID, field) for field in upgraded.dropped]
+
+
+def test_a_readable_item_drops_nothing() -> None:
+    upgraded = upgrade_legacy_item(_legacy(severity="sev-2", detection_time="1760536700"), TENANTS)
+
+    assert isinstance(upgraded, UpgradedItem)
+    assert upgraded.dropped == ()
 
 
 @pytest.mark.parametrize(
@@ -95,6 +117,27 @@ def test_teams_that_are_not_a_list_are_dropped_and_logged() -> None:
 )
 def test_a_severity_matches_ignoring_case_and_spaces(stored: str, expected: Severity) -> None:
     assert _read(_legacy(severity=stored)).severity is expected
+
+
+@pytest.mark.parametrize(
+    ("stored", "expected"), [(0, Severity.SEV0), (2, Severity.SEV2), (Decimal(4), Severity.SEV4), (Decimal("3.0"), Severity.SEV3)]
+)
+def test_an_integral_number_from_0_to_4_is_that_severity(stored: object, expected: Severity) -> None:
+    """The end-state reader reads such a number under the same attribute, so a read is the same before and after the upgrade."""
+    with capture_logs() as logs:
+        incident = _read(_legacy(severity=stored))
+
+    assert incident.severity is expected
+    assert _dropped(logs) == []
+
+
+@pytest.mark.parametrize("stored", [5, -1, Decimal("2.5"), True, Decimal("NaN"), Decimal("Infinity")])
+def test_any_other_number_is_an_unmatched_severity(stored: object) -> None:
+    with capture_logs() as logs:
+        incident = _read(_legacy(severity=stored))
+
+    assert incident.severity is None
+    assert _dropped(logs) == [(INCIDENT_ID, "severity")]
 
 
 @pytest.mark.parametrize("stored", ["none", "None", "", "  "])

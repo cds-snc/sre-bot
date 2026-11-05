@@ -69,6 +69,20 @@ def test_a_blank_table_name_is_rejected_naming_the_key(monkeypatch: pytest.Monke
         IncidentCoreSettings()
 
 
+def test_the_full_read_cap_defaults_to_ten_thousand_items() -> None:
+    """Far above today's 323 incidents, so a whole-table read fails only on a table that outgrew it."""
+    assert IncidentCoreSettings().full_read_max_items == 10000
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_full_read_cap_below_one_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    """A cap below one could never read a table, so the slice fails naming the key."""
+    monkeypatch.setenv("INCIDENT_CORE__FULL_READ_MAX_ITEMS", value)
+
+    with pytest.raises(ConfigurationError, match="full_read_max_items"):
+        IncidentCoreSettings()
+
+
 def test_the_new_incident_policy_is_unset_by_default() -> None:
     """Unset resolves later to the only configured system, so most instances never set it."""
     assert IncidentCoreSettings().new_incident_system is None
@@ -98,6 +112,7 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
         "incidents_table": "incidents",
         "timeline_table": "sre_bot_incident_timeline",
         "status_updates_table": "sre_bot_incident_status_updates",
+        "full_read_max_items": 10000,
         "folder_id": "",
         "report_template_id": "",
         "list_sheet_id": "",
