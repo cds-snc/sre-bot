@@ -2,10 +2,13 @@
 
 A plugin returns ``Requirement`` values from ``register_requirements``; it holds no
 vendor code. The host resolves each one: a workplace-system tenant through the
-configured-systems read, any other setting through the cached, validated settings
-slice that owns it. An empty secret counts as unset. Every unmet requirement of every
-enabled plugin is collected, each is logged once as a CRITICAL ``plugin_boot_failed``
-event naming the plugin and the setting, and one aggregate error stops boot.
+configured-systems read, a vendor setting through the cached, validated settings
+slice that owns it, and any other table (a feature's own) through the configuration
+slice already built for it in the configuration phase, so the host imports no feature;
+a slice not built by then is never built here and its requirement is unmet. An empty
+secret counts as unset. Every unmet requirement of every enabled plugin is collected,
+each is logged once as a CRITICAL ``plugin_boot_failed`` event naming the plugin and
+the setting, and one aggregate error stops boot.
 The events name settings only, never a configured value.
 """
 
@@ -15,6 +18,7 @@ from typing import TYPE_CHECKING
 
 from pydantic import SecretStr
 
+from contracts.configuration import built_slices, slice_table
 from contracts.plugins.requirements import Requirement
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from integrations.openai.settings import get_openai_settings
@@ -33,7 +37,8 @@ WORKPLACE_SETTINGS: Mapping[str, WorkplaceSystem] = {
     "slack.tenant": WorkplaceSystem.SLACK,
     "google_workspace.tenant": WorkplaceSystem.GOOGLE,
 }
-# The cached settings slice that owns each other settings table.
+# The vendor settings slice each table resolves through, built on demand; it takes precedence
+# over a built slice on the same table. Any other table resolves only through built_slices().
 SETTINGS_SLICES: Mapping[str, Callable[[], object]] = {
     "openai": get_openai_settings,
     "opsgenie": get_opsgenie_settings,
@@ -59,18 +64,22 @@ class PluginRequirementsUnmetError(Exception):
 
 
 def is_requirement_met(requirement: Requirement, systems: ConfiguredSystems) -> bool:
-    """Resolve one requirement; an unknown settings table or a missing attribute is unmet."""
+    """Resolve one requirement; a table no vendor or built slice reads, or a missing attribute, is unmet."""
     system = WORKPLACE_SETTINGS.get(requirement.setting)
     if system is not None:
         return system in systems.tenants()
     table, *path = requirement.setting.split(".")
-    read = SETTINGS_SLICES.get(table)
-    if read is None or not path:
+    if not path:
         return False
-    value: object = read()
+    read = SETTINGS_SLICES.get(table)
+    value: object = read() if read is not None else _built_slice(table)
     for field in path:
         value = getattr(value, field, None)
     return _is_set(value)
+
+
+def _built_slice(table: str) -> object | None:
+    return next((built for built in built_slices() if slice_table(built) == table), None)
 
 
 def _is_set(value: object) -> bool:

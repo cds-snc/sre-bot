@@ -3,10 +3,10 @@ id: TASK-184
 title: >-
   Plugin requirements resolve a feature's own settings table from the built
   slices
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T01:15:00Z'
-updated_date: '2026-11-05T14:53:00Z'
+updated_date: '2026-11-05T15:05:00Z'
 labels:
   - plugins
   - configuration
@@ -27,11 +27,11 @@ A plugin's register_requirements can name only workplace tenants and the openai,
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A requirement on a table read by a built configuration slice is met when the named attribute is set and unmet when it is empty, None or an empty secret, with no feature module imported by server/plugins
-- [ ] #2 A requirement on a table no slice reads, or naming a missing attribute, stays unmet and is reported as plugin_boot_failed naming the plugin and the setting, never a value
-- [ ] #3 Workplace tenant requirements and the openai, opsgenie and slack tables resolve exactly as before
-- [ ] #4 decisions/plugins.md states how a requirement on a feature's own table resolves
-- [ ] #5 A feature table whose slice is not built when requirements resolve is unmet (never built on demand), and a slice built before plugin boot resolves for any plugin, whichever built it
+- [x] #1 A requirement on a table read by a built configuration slice is met when the named attribute is set and unmet when it is empty, None or an empty secret, with no feature module imported by server/plugins
+- [x] #2 A requirement on a table no slice reads, or naming a missing attribute, stays unmet and is reported as plugin_boot_failed naming the plugin and the setting, never a value
+- [x] #3 Workplace tenant requirements and the openai, opsgenie and slack tables resolve exactly as before
+- [x] #4 decisions/plugins.md states how a requirement on a feature's own table resolves
+- [x] #5 A feature table whose slice is not built when requirements resolve is unmet (never built on demand), and a slice built before plugin boot resolves for any plugin, whichever built it
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -110,4 +110,6 @@ Implemented as its own single PR from an up-to-date main (#1823 merged 2026-11-0
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 (human): plan approved, OQ1-OQ3 as recommended. OQ1: the CI configuration check changes in TASK-145.6.2 step 7, not here. OQ2: a non-tenant google_workspace.* requirement resolves through the built slice (none declared today). OQ3: a feature slice not built in the configuration phase stays unmet (fail closed). Single PR from an up-to-date main (#1823 merged); merges before TASK-145.6.2 is implemented. The approval edits ride in the TASK-145.6.1 (layer 12a) PR.
+
+2026-11-05 implemented (TDD) on task-184-feature-table-requirements above the approval commit. server/plugins/requirements.py: after the workplace map and the vendor map (unchanged precedence; a bare table still returns before any slice is read), a table resolves through contracts.configuration.built_slices() by slice_table; never built on demand. Tests: 12 new cases in tests/unit/server/plugins/test_server_plugins_requirements_resolve.py (stand-in built slices; one real throwaway ConfigurationSlice over its own installed base file, unmet before it is built and met after; vendor precedence; two plugins share one built slice; plugin_boot_failed names plugin and setting, no value in the events or the error). decisions/plugins.md requirements paragraph states the rule (AC #4). tests/integration/server/test_server_plugins_configuration_requirements.py untouched (OQ1: TASK-145.6.2 step 7). Gates: ruff clean; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK; mypy 41 errors in 14 files, all pre-existing and none in touched files; pytest tests --ignore=tests/smoke 6162 passed. Done is the human's.
 <!-- SECTION:NOTES:END -->

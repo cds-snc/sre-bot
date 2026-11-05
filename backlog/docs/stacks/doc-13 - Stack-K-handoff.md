@@ -44,7 +44,7 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Position
 
-- Checked out: `main` at f45d4ec1 (#1823 merged 2026-11-05 14:45 UTC, squashing TASK-169 and the TASK-145.6 / 145.6.2 / 184 planning commits). 2026-11-05 afternoon session: TASK-184 plan approved (OQ1-OQ3), recorded on TASK-184 and in TASK-145.6.2 step 7, decisions/plugins.md log line; this doc. Those edits are committed on `task-184-feature-table-requirements` (from `main`), the branch that carries TASK-184's implementation.
+- Checked out: `main` at f45d4ec1 (#1823 merged 2026-11-05 14:45 UTC, squashing TASK-169 and the TASK-145.6 / 145.6.2 / 184 planning commits). 2026-11-05 afternoon session: TASK-184 plan approved (OQ1-OQ3), recorded on TASK-184 and in TASK-145.6.2 step 7, decisions/plugins.md log line; this doc. Those edits are committed on `task-184-feature-table-requirements` (from `main`). Later the same day TASK-184 was implemented above that commit (all ACs checked, In Progress); its PR (base `main`) is the side PR in review while 12a is worked.
 - Open stack PRs: #1821 (11b, base `main`), #1822 (11c, top).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
@@ -52,7 +52,7 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Next actions
 
-1. **agent**: implement TASK-184 (doc-11 row 13b) on `task-184-feature-table-requirements` above its approval commit; one PR from `main`. It is a side PR: in review while 12a is worked, and it merges before 12b.
+1. **human**: push `task-184-feature-table-requirements`, open its PR (base `main`), review and merge. It is a side PR: in review while 12a is worked, and it merges before 12b.
 2. **human**: `gh stack checkout stack-k/task-145.5.7.3-response-registers-upgrade`, `gh stack rebase` (onto `main` with #1823), `gh stack submit`, `gh stack add stack-k/task-145.6.1-google-docs-move`.
 3. **agent**: implement TASK-145.6.1 with TDD; submit 12a so #1822 can merge.
 4. **human**: re-review and merge #1821; then `gh stack sync`, `gh stack submit`. #1822 merges only after 12a is submitted above it.
@@ -70,5 +70,5 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 - TASK-145.6.1 (12a): plan approved.
 - TASK-145.6.2 (12b): plan approved 2026-11-05.
-- TASK-184 (side PR, gates 12b): plan approved 2026-11-05; implement next.
+- TASK-184 (side PR, gates 12b): implemented 2026-11-05, PR to open from `task-184-feature-table-requirements`.
 - TASK-145.6.3 (12c): outline (narrowed by C3); full plan at pickup.
