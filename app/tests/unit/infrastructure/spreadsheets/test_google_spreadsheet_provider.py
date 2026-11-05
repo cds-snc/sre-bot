@@ -13,6 +13,7 @@ from infrastructure.spreadsheets.google import GoogleSpreadsheetProvider
 from infrastructure.spreadsheets.models import SheetCell
 from infrastructure.spreadsheets.provider import SpreadsheetProvider
 from integrations.google_workspace import client as google_client_module
+from integrations.google_workspace.client import KeyCredentialSource
 
 
 class FakeResp(dict):
@@ -256,8 +257,8 @@ def test_sheets_factory_resource_inherits_configured_retry_default(
             return self
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    # The slice builds the base credentials once at boot; the client derives from them.
-    settings.tenant.credentials = FakeCredentials()
+    # The slice chooses the credential source once at boot; the client asks it per call.
+    monkeypatch.setattr(google_client_module, "credential_source", lambda tenant: KeyCredentialSource(FakeCredentials()))
     monkeypatch.setattr(
         google_client_module,
         "build",

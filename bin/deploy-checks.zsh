@@ -18,13 +18,17 @@
 #               on an authenticated route a bad token gets 401; with SREBOT_PROBE_TOKEN in the environment (a Backstage
 #               token, never printed) a valid token gets neither 401 nor 403; jwt_validation_failed count (informational).
 #               Kept until the first authenticated /api/v1 route has run it with a token (TASK-163; TASK-164 moves it to CI)
+#   google      post: every running task logged the google_workspace configuration_slice with a tenant, the credential
+#               source each uses (aws_federation, key or application_default, read from which tenant fields are set:
+#               names only), and no google_token_refused since the rollout (counted by cause). google:federation also
+#               requires aws_federation on every task, after the cutover. TASK-180 and TASK-180.1; TASK-183 deletes it
 # Output: tmp/deploy-checks/<phase>-<UTC timestamp>.txt (gitignored, never commit it)
 # Rollback: docs/runbooks/roll-back-a-deployment.md, with the image_tag printed by pre.
 
 setopt no_unset
 unsetopt xtrace verbose
 
-TASK_CHECKS=(summary edge)
+TASK_CHECKS=(summary edge google google:federation)
 PRE_CHECKS=()  # task checks with a pre part
 phase=${1:-}
 [[ $phase == pre || $phase == post ]] || { print -u2 "usage: $0 pre | post [${(j:|:)TASK_CHECKS} ...]"; exit 2 }
@@ -193,6 +197,33 @@ if [[ $phase == post ]]; then
   print "version=$version head_sha=$head_sha"
   [[ $version == *${head_sha[1,7]}* ]] && result version PASS || result version "CHECK (compare with the run's head sha)"
   print "health=$(curl -s -o /dev/null -w '%{http_code}' $BASE_URL/health) root=$(curl -s -o /dev/null -w '%{http_code}' $BASE_URL/)"
+
+  if (( ${checks[(Ie)google]} || ${checks[(Ie)google:federation]} )); then  # TASK-180, TASK-180.1
+    section "Google (TASK-180: credential source per task from the field names set; refusal causes only)"
+    rows=$(li $since 'filter event = "configuration_slice" and slice = "google_workspace" | stats latest(@message) as m by @logStream')
+    streams=0 configured=0 federated=0
+    for row in ${(f)rows}; do
+      (( streams++ ))
+      # A set field is listed under "set", or under "partial" with its tail when it is non-public and long; tails are not printed.
+      fields=$(print -r -- $row | jq -r '.m | fromjson | ((.set // []) + ((.partial // {}) | keys)) | join(" ")')
+      if [[ " $fields " != *" tenant.customer_id "* ]]; then source=unconfigured
+      elif [[ " $fields " == *" tenant.federation_audience "* ]]; then source=aws_federation; (( federated++ ))
+      elif [[ " $fields " == *" tenant.service_account_key "* ]]; then source=key
+      else source=application_default; fi
+      [[ $source != unconfigured ]] && (( configured++ ))
+      email=$([[ " $fields " == *" tenant.service_account_email "* ]] && print set || print unset)
+      print "$(print -r -- $row | jq -r '."@logStream"'): source=$source service_account_email=$email"
+    done
+    (( streams >= tasks && configured == streams && streams > 0 )) && result google_configured PASS \
+      || result google_configured "FAIL ($configured configured of $streams log streams, $tasks tasks running)"
+    refused=$(li_count $since 'filter event = "google_token_refused"')
+    li $since 'filter event = "google_token_refused" | stats count() as n by cause'
+    [[ $refused == 0 ]] && result google_no_refusal PASS || result google_no_refusal "FAIL ($refused refusals; causes above, see the runbook troubleshooting table)"
+    if (( ${checks[(Ie)google:federation]} )); then
+      (( federated == streams && streams > 0 )) && result google_federation PASS \
+        || result google_federation "FAIL ($federated of $streams tasks on aws_federation)"
+    fi
+  fi
 
   if (( ${checks[(Ie)edge]} )); then  # TASK-163
     edge_path=${EDGE_PROBE_PATH:-/api/v1/edge-probe}

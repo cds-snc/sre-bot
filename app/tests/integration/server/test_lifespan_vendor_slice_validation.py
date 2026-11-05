@@ -84,7 +84,7 @@ def _vendor_slices_without_dotenv(monkeypatch: pytest.MonkeyPatch) -> Iterator[N
     for field in ("bot_token", "user_token", "app_token", "signing_secret"):
         monkeypatch.setenv(f"SLACK__{field.upper()}", "")
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "")
-    for field in ("service_account_key", "delegated_user_email"):
+    for field in ("service_account_key", "delegated_user_email", "service_account_email", "federation_audience"):
         monkeypatch.setenv(f"GOOGLE_WORKSPACE__TENANT__{field.upper()}", "")
     get_slack_settings.cache_clear()
     get_slack_transport_settings.cache_clear()
@@ -179,7 +179,7 @@ async def test_slack_transport_on_with_a_half_google_tenant_fails_on_the_google_
     monkeypatch.setenv("SLACK__APP_TOKEN", "xapp-secret-boot-0003")
     monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
 
-    await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY is required when")
+    await _boot_fails_naming("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID is set without a credential")
 
 
 async def test_slack_transport_on_with_both_tenants_boots(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -308,6 +308,31 @@ async def test_absent_vendor_entries_boot_without_a_network_call(monkeypatch: py
     assert get_openai_settings().tenant is None
     assert all(getter().tenant is None for getter in _VENDOR_GETTERS)
     assert get_sentinel_settings().customer_id == ""
+    assert connects == []
+
+
+async def test_a_federated_google_tenant_boots_without_a_network_call(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The ECS adapter is built at boot from the environment; STS and IAM are reached only by the first call."""
+    connects: list[object] = []
+    monkeypatch.setattr(socket.socket, "connect", lambda self, address: connects.append(address))
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID", "C03abc123")
+    monkeypatch.setenv(
+        "GOOGLE_WORKSPACE__TENANT__FEDERATION_AUDIENCE",
+        "//iam.googleapis.com/projects/123456789012/locations/global/workloadIdentityPools/sre-bot/providers/aws-ecs",
+    )
+    monkeypatch.setenv("GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL", "sre-bot@cdssnc.iam.gserviceaccount.com")
+    monkeypatch.setenv("AWS_REGION", "ca-central-1")
+    reached_yield = False
+
+    with ExitStack() as stack:
+        _stub_later_phases(stack)
+        async with lifespan(FastAPI()):
+            reached_yield = True
+
+    tenant = get_google_workspace_settings().tenant
+    assert reached_yield is True
+    assert tenant is not None
+    assert tenant.authentication == "aws_federation"
     assert connects == []
 
 

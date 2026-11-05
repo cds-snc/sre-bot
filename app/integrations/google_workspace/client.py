@@ -6,27 +6,46 @@ decisions/outbound-clients.md — clients raise typed SDK exceptions; adapters
 classify them. Each factory returns a stub-typed Resource built with the
 narrow OAuth scopes its caller needs.
 
-Nothing here runs at boot: the tenant's credentials are shape-checked and built once
-by the settings slice, with no network call. The first token is fetched when the
-first API call runs, so a revoked key, a deleted project or a missing domain-wide
-delegation surfaces there, as GoogleCredentialsRefused: the token endpoint's error
-code is logged as the cause and the message is fixed, never the library's text.
+Credential construction (decisions/service-accounts.md rule 5): the settings slice chooses
+the source at boot; ``credential_source`` builds it once per tenant, with no network call:
+- AWS federation is the ECS adapter. google-auth's built-in AWS source reads only
+  environment variables or EC2 metadata, and Fargate has neither, so
+  ``BotocoreCredentialsSupplier`` hands google-auth the botocore session's task-role
+  credentials; Google STS exchanges them and the service account is impersonated.
+- Application default credentials are the platform default: a developer's gcloud login, a
+  GCP runtime, or a Workload Identity Federation credential configuration file for another
+  platform (``GOOGLE_APPLICATION_CREDENTIALS``, no key, no code), then impersonation.
+- The key is tolerated until TASK-182.
+On both keyless sources domain-wide delegation goes through IAM signJwt. Each (subject,
+scopes) pair gets one credentials object that refreshes itself.
+The first token is fetched when the first API call runs. So a refused federation, a
+missing Token Creator grant, a revoked key, a missing developer login or a missing
+domain-wide delegation surfaces there, as GoogleCredentialsRefused: the refusal's code
+is logged as the cause and the message is fixed, never the library's text.
 """
 
+import json
 import re
-from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, cast
+import threading
+from collections.abc import Callable, Sequence
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
+import botocore.session
+import google.auth
 import google_auth_httplib2
 import httplib2
 import structlog
-from google.auth.exceptions import RefreshError
+from google.auth import aws, impersonated_credentials
+from google.auth import credentials as google_credentials
+from google.auth.exceptions import DefaultCredentialsError, RefreshError
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from googleapiclient.http import HttpRequest
 
 from contracts.operations.status import OperationStatus
-from integrations.google_workspace.settings import get_google_workspace_settings
+from integrations.google_workspace.settings import GoogleWorkspaceTenant, get_google_workspace_settings
 
 if TYPE_CHECKING:
     from googleapiclient._apis.admin.directory_v1 import (  # pyright: ignore[reportMissingModuleSource]
@@ -45,14 +64,148 @@ _UNAUTHORIZED_STATUSES = {401, 403}
 _TRANSIENT_STATUSES = {429, 500, 502, 503, 504}
 # An OAuth error code (RFC 6749 section 5.2) is lower snake case; anything else is not logged.
 _OAUTH_ERROR_CODE = re.compile(r"^[a-z_]{1,64}$")
+# google-auth's STS errors start "Error code <code>: ..."; only the code is kept.
+_STS_ERROR_CODE = re.compile(r"^Error code ([a-z_]{1,64})\b")
+
+
+# The source credential only calls IAM Credentials, which takes the cloud-platform scope.
+_CLOUD_PLATFORM = "https://www.googleapis.com/auth/cloud-platform"
+_AWS4_REQUEST_SUBJECT = "urn:ietf:params:aws:token-type:aws4_request"
+# Google's maximum for a service-account access token without an organisation exception.
+_TOKEN_LIFETIME_SECONDS = 3600
+# Callers use a fixed set of (subject, scopes) pairs; the bound only guards against a defect.
+_MAX_CACHED_CALLS = 64
+
+
+class GoogleCredentialSource(Protocol):
+    """Hands the client the credentials for one call: the caller's scopes, optionally as a delegated user."""
+
+    def for_call(self, scopes: Sequence[str], subject: str | None) -> google_credentials.Credentials:
+        """Return credentials limited to ``scopes``, acting as ``subject`` through domain-wide delegation when set."""
+        ...
+
+
+class KeyCredentialSource:
+    """The stored key, tolerated until TASK-182: copies of the boot-time credentials per call."""
+
+    def __init__(self, credentials: service_account.Credentials) -> None:
+        self._credentials = credentials
+
+    def for_call(self, scopes: Sequence[str], subject: str | None) -> google_credentials.Credentials:
+        credentials = self._credentials
+        if subject:
+            credentials = credentials.with_subject(subject)
+        if scopes:
+            credentials = credentials.with_scopes(list(scopes))
+        return credentials
+
+
+class ImpersonatingCredentialSource:
+    """Impersonates the bot's service account from a source credential resolved on first use.
+
+    With a subject, IAM signs the delegation assertion (signJwt) and the token endpoint
+    grants a delegated token; without one, IAM issues the service account's own token.
+    """
+
+    def __init__(self, service_account_email: str, resolve_source: Callable[[], google_credentials.Credentials]) -> None:
+        self._service_account_email = service_account_email
+        self._resolve_source = resolve_source
+        self._source: google_credentials.Credentials | None = None
+        self._calls: dict[tuple[str | None, frozenset[str]], impersonated_credentials.Credentials] = {}
+        self._lock = threading.Lock()
+
+    def for_call(self, scopes: Sequence[str], subject: str | None) -> google_credentials.Credentials:
+        key = (subject or None, frozenset(scopes))
+        with self._lock:
+            cached = self._calls.get(key)
+            if cached is None:
+                if self._source is None:
+                    self._source = self._resolve_source()
+                if len(self._calls) >= _MAX_CACHED_CALLS:
+                    self._calls.clear()
+                cached = impersonated_credentials.Credentials(
+                    source_credentials=self._source,
+                    target_principal=self._service_account_email,
+                    target_scopes=sorted(scopes),
+                    subject=subject or None,
+                    lifetime=_TOKEN_LIFETIME_SECONDS,
+                )
+                self._calls[key] = cached
+        return cached
+
+
+class BotocoreCredentialsSupplier(aws.AwsSecurityCredentialsSupplier):
+    """The ECS task role's credentials for Google STS, read from the botocore session on every call.
+
+    botocore's credentials object refreshes itself before the task role's credentials expire,
+    so each call returns the current frozen set. A failure is reported as a fixed code: the
+    library's text can name the credentials endpoint or the role.
+    """
+
+    def __init__(self, session: Any, region: str) -> None:
+        self._session = session
+        self._region = region
+        self._credentials: Any = None
+
+    def get_aws_security_credentials(self, context: Any, request: Any) -> aws.AwsSecurityCredentials:
+        try:
+            if self._credentials is None:
+                self._credentials = self._session.get_credentials()
+            if self._credentials is None:
+                raise LookupError
+            frozen = self._credentials.get_frozen_credentials()
+        except Exception:
+            raise RefreshError("aws_credentials_unavailable") from None
+        return aws.AwsSecurityCredentials(frozen.access_key, frozen.secret_key, frozen.token)
+
+    def get_aws_region(self, context: Any, request: Any) -> str:
+        return self._region
+
+
+def aws_federation_source(
+    audience: str, service_account_email: str, supplier: aws.AwsSecurityCredentialsSupplier
+) -> ImpersonatingCredentialSource:
+    """The ECS adapter: task-role credentials exchanged at Google STS, then impersonation of the service account."""
+
+    def _resolve() -> google_credentials.Credentials:
+        return aws.Credentials(
+            audience=audience,
+            subject_token_type=_AWS4_REQUEST_SUBJECT,
+            aws_security_credentials_supplier=supplier,
+            scopes=[_CLOUD_PLATFORM],
+        )
+
+    return ImpersonatingCredentialSource(service_account_email, _resolve)
+
+
+def application_default_source(service_account_email: str) -> ImpersonatingCredentialSource:
+    """The platform default: whatever google.auth.default finds, impersonating the service account."""
+
+    def _resolve() -> google_credentials.Credentials:
+        credentials, _ = google.auth.default(scopes=[_CLOUD_PLATFORM])
+        return cast(google_credentials.Credentials, credentials)
+
+    return ImpersonatingCredentialSource(service_account_email, _resolve)
+
+
+@lru_cache(maxsize=4)
+def credential_source(tenant: GoogleWorkspaceTenant) -> GoogleCredentialSource:
+    """The tenant's credential source, built once on the first Google call; never a network call."""
+    if tenant.authentication == "aws_federation":
+        return aws_federation_source(
+            str(tenant.federation_audience),
+            str(tenant.service_account_email),
+            BotocoreCredentialsSupplier(botocore.session.get_session(), tenant.aws_region),
+        )
+    if tenant.authentication == "key":
+        return KeyCredentialSource(tenant.credentials)
+    return application_default_source(str(tenant.service_account_email))
 
 
 class GoogleCredentialsRefused(Exception):
     """Google refused the service account's token request; ``cause`` is the OAuth error code."""
 
-    message = (
-        "Google Workspace refused the service account's credentials. An administrator must check the key and its delegation."
-    )
+    message = "Google Workspace refused the bot's credentials. An administrator must check the bot's Google identity and its delegation."
 
     def __init__(self, cause: str) -> None:
         super().__init__(self.message)
@@ -60,11 +213,28 @@ class GoogleCredentialsRefused(Exception):
 
 
 def _token_error_code(error: RefreshError) -> str:
-    """The token endpoint's error code (invalid_grant, unauthorized_client), or unknown."""
+    """The refusal's code, or unknown.
+
+    The token endpoint's OAuth code (invalid_grant, unauthorized_client), IAM Credentials'
+    status lower-cased (permission_denied), STS's code (invalid_grant), or the fixed code of
+    a source that failed before any request (aws_credentials_unavailable).
+    """
     details = error.args[1] if len(error.args) > 1 else None
-    code = details.get("error") if isinstance(details, dict) else None
-    if not isinstance(code, str) and error.args and isinstance(error.args[0], str):
-        code = error.args[0].split(":", 1)[0].strip()
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except ValueError:
+            details = None
+    code: object = None
+    if isinstance(details, dict):
+        code = details.get("error")
+        if isinstance(code, dict):
+            status = code.get("status")
+            code = status.lower() if isinstance(status, str) else None
+    first = error.args[0] if error.args else None
+    if not isinstance(code, str) and isinstance(first, str):
+        sts = _STS_ERROR_CODE.match(first)
+        code = sts.group(1) if sts else first.split(":", 1)[0].strip()
     return code if isinstance(code, str) and _OAUTH_ERROR_CODE.match(code) else "unknown"
 
 
@@ -178,18 +348,20 @@ def _build_service(
     if tenant is None:
         logger.error("google_workspace_not_configured", api_name=api_name, api_version=api_version)
         raise ValueError(
-            "Google Workspace is not configured: set [google_workspace.tenant] customer_id and "
-            "GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"
+            "Google Workspace is not configured: set GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and a credential "
+            "(integrations/google_workspace/README.md, service identity)"
         )
 
-    # Built once at boot by the settings slice; with_subject and with_scopes return copies.
-    creds = tenant.credentials
+    # The source was chosen at boot; a keyless source resolves its source credential here, on
+    # the first call, and reuses one credentials object per subject and scopes.
     delegation_email = delegated_user_email or tenant.delegated_user_email
-    if delegation_email:
-        creds = creds.with_subject(delegation_email)
-
-    if scopes:
-        creds = creds.with_scopes(scopes)
+    try:
+        creds = credential_source(tenant).for_call(scopes, delegation_email or None)
+    except DefaultCredentialsError:
+        # No developer login or credential file: the library's text names local paths.
+        cause = "application_default_credentials_unavailable"
+        logger.error("google_token_refused", cause=cause)
+        raise GoogleCredentialsRefused(cause) from None
 
     # Timeout and retry policy are both fixed here, once per service: the http
     # carries the per-attempt timeout, and resource construction propagates the

@@ -6,13 +6,15 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:09:00Z'
-updated_date: '2026-11-05T00:12:00Z'
+updated_date: '2026-11-05T21:19:00Z'
 labels:
   - security
   - configuration
 milestone: m-7
 dependencies:
   - TASK-180
+  - TASK-180.1
+  - TASK-185
 references:
   - decisions/service-accounts.md
   - decisions/configuration.md

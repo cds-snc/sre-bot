@@ -15,6 +15,7 @@ from googleapiclient.http import HttpRequest
 
 from contracts.operations.status import OperationStatus
 from integrations.google_workspace import client as google_client
+from integrations.google_workspace.client import KeyCredentialSource
 
 
 def _http_error(status: int, reason: str = "boom", retry_after: str | None = None) -> HttpError:
@@ -108,8 +109,8 @@ def test_get_admin_directory_service_builds_with_static_discovery_and_no_cache(
     fake_service = MagicMock()
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    # The slice builds the base credentials once at boot; the client derives from them.
-    settings.tenant.credentials = FakeCredentials()
+    # The slice chooses the credential source once at boot; the client asks it per call.
+    monkeypatch.setattr(google_client_module, "credential_source", lambda tenant: KeyCredentialSource(FakeCredentials()))
 
     def fake_build(api_name: str, api_version: str, **kwargs: Any) -> Any:
         captured["build_api_name"] = api_name
@@ -158,8 +159,8 @@ def _install_fake_build(
     fake_service = MagicMock()
 
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
-    # The slice builds the base credentials once at boot; the client derives from them.
-    settings.tenant.credentials = FakeCredentials()
+    # The slice chooses the credential source once at boot; the client asks it per call.
+    monkeypatch.setattr(google_client_module, "credential_source", lambda tenant: KeyCredentialSource(FakeCredentials()))
 
     def fake_build(api_name: str, api_version: str, **kwargs: Any) -> Any:
         captured["build_api_name"] = api_name
@@ -380,5 +381,5 @@ def test_build_service_without_a_google_tenant_entry_fails_naming_the_keys(
     settings = SimpleNamespace(tenant=None, api_num_retries=3, api_timeout_seconds=10.0)
     monkeypatch.setattr(google_client_module, "get_google_workspace_settings", lambda: settings)
 
-    with pytest.raises(ValueError, match="GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY"):
+    with pytest.raises(ValueError, match="GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID and a credential"):
         google_client_module.get_admin_directory_service(scopes=[])
