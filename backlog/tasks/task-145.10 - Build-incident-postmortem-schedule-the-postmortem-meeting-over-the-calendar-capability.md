@@ -1,19 +1,18 @@
 ---
 id: TASK-145.10
 title: >-
-  Build incident/postmortem: schedule the postmortem meeting over the calendar
-  capability
+  Build incident/postmortem: schedule the postmortem meeting through the
+  incident scheduling port
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-145.6
-  - TASK-138
   - TASK-36.1
   - TASK-111.10
 references:
@@ -45,6 +44,7 @@ THIS SLICE
 - [ ] #4 The pinned schedule flow passes unchanged
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 incident.postmortem reads the retrospective calendar id from [incident_postmortem] calendar_id (features/incident/postmortem/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
+- [ ] #7 Meeting scheduling comes from the incident-owned features/incident/scheduling and features/incident/meet over integrations/google_workspace, not a calendar capability (TASK-138 superseded by TASK-169 ruling, 2026-11-05 (human))
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -82,4 +82,6 @@ One modal flow; revert restores the legacy registration.
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: postmortem/ is shared with TASK-147 (postmortem as records: action items, narrative document, built dark behind a flag); this slice keeps scheduling only and adds nothing gated by that flag.
+
+2026-11-05: TASK-138 superseded (TASK-169 ruling, 2026-11-05 (human), D5): every calendar consumer is incident; a calendar capability waits for a second suite or a non-incident consumer. Dependency on 138 removed.
 <!-- SECTION:NOTES:END -->

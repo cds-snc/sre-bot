@@ -52,6 +52,7 @@ A kind starts provisioned unless its owners need in-flight change, because manag
 | Webhook instances (a channel's endpoint and its sender kind) | managed | TASK-168 |
 | Team playbooks, incident types, per-type document templates | managed, with a provisioned starting set | TASK-165 |
 | Entitlement catalogue | managed | TASK-166 |
+| Products (the product catalogue's default source; an external catalogue is an optional adapter) | provisioned or managed, decided by TASK-165.1 | TASK-165.1 |
 | On-call schedule mappings (a schedule source's schedule to a Slack user group) | provisioned | TASK-146 re-cut |
 | Self-managed rosters (members and cadence) | managed | TASK-146 re-cut |
 | Organisation wording (message overrides by key over the app's generic strings, [i18n.md](i18n.md)) | provisioned | each surface's rebuild |
@@ -80,3 +81,4 @@ Tickets: TASK-165, TASK-166, TASK-168, the TASK-146 re-cut, the incident surface
 **Changes:**
 - 2026-10-28: Draft (TASK-167). Category and source chosen from two tables; content through a consumer-owned port; one source per item, explicit moves; never executable; each source and each kind has its own record (human: the store exists, so in-flight change is designed for, not ruled out; one record per content type).
 - 2026-10-28: Accepted (human review, TASK-167).
+- 2026-11-05: products added to the kinds table: the product catalogue's default source is the bot's own content, an external catalogue an optional adapter (TASK-145.6 re-plan, human).

@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-02 16:59
-updated_date: '2026-10-26T19:32:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -53,6 +53,12 @@ Sequencing: a workplace capability move like TASK-119 to TASK-121, after TASK-11
 - [ ] #4 README states the classification and names the incident consumer; the capability has an entry point and an enablement key; if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages; no new import-linter ignore entry
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05: superseded by the TASK-169 ruling, 2026-11-05 (human) (D5): every calendar consumer is incident (TASK-145.10; TASK-38.6 is archived), and features/incident/scheduling and features/incident/meet are already incident-owned, so no calendar capability is built now. A calendar capability is created, as a new task, when a second suite's calendar (Microsoft 365) or a non-incident consumer is scheduled. TASK-145.10 no longer depends on this task. For a human to archive.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

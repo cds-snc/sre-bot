@@ -1,21 +1,19 @@
 ---
 id: TASK-120
 title: >-
-  Move the drive provider from app/infrastructure/drive/ to the
-  app/capabilities/drive/ workplace capability
+  Dissolve infrastructure/drive/: incident and talent Drive calls in their own
+  adapters over integrations/google_workspace/
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-10-26T19:32:00Z'
+updated_date: '2026-11-05T00:44:00Z'
 labels:
   - plugin-architecture
   - capabilities
   - workplace-systems
 milestone: m-7
 dependencies:
-  - TASK-106
-  - TASK-110
-  - TASK-114
+  - TASK-145.6
   - TASK-169
 references:
   - decisions/workplace-systems.md
@@ -31,26 +29,21 @@ ordinal: 262000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/workplace-systems.md and plugin-architecture.md: workplace systems (directory, documents, files, spreadsheets, calendar, mail) are capabilities, not infrastructure. infrastructure/ is hosting-only. Their public surface is api.py (the Protocol, domain types and provider function) plus an optional hookspecs module; everything else is private. The Google implementation becomes adapters/google.py, the only file importing app.integrations.google_workspace.
+Re-scoped by the TASK-169 ruling, 2026-11-05 (human) (decisions/workplace-systems.md, 2026-10-26 and 2026-11-05). Drive is a vendor product API, not a workplace capability: no second suite is planned for files, so a neutral drive port buys nothing (Hohpe, cited in the ADR). Each consumer owns a purpose-named port, and its adapter calls integrations/google_workspace/ directly, the only feature files that may import integrations/ (decisions/outbound-clients.md).
 
-Today app/infrastructure/drive/ exposes a vendor-neutral Protocol with a single Google implementation behind a cached factory, re-exported through a barrel __init__.py.
+Consumers of app/infrastructure/drive/ today:
+- incident: features/incident/drive (list folder files, list child folders, create folder, create document from template, find document by channel name, appProperties metadata), absorbed into the incident core's Google Docs adapter by TASK-145.6;
+- talent: packages/talent/adapters/google_drive.py (create role folder, copy template into it), through get_drive_provider().
 
-Scope:
-- move the package into the feature-packages shape (api.py, adapters/, settings.py, README.md with its classification and named feature consumers, and a fake);
-- repoint every consumer to api.py;
-- delete app/infrastructure/drive/ with no re-export.
-Behaviour-preserving. migration.md rule 6: the capability is not widened to reproduce legacy conventions, and legacy modules keep calling what they call today until their surface is rebuilt, except for import-path changes. The settings class moves; its configuration-file table and environment variable names do not change.
+Scope: after TASK-145.6, the talent adapter calls the gateway's Drive factory directly; any remaining incident use moves into the core adapter; app/infrastructure/drive/ is deleted with no re-export, its fake and its DriveProvider fake-coverage line. Behaviour-preserving (migration.md rule 6). No capability, entry point or enablement key is created.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/capabilities/drive/ matches the feature-packages layout for a capability (the TASK-114 shape check is green); its README states the classification and at least one feature consumer
-- [ ] #2 Consumers import only app/capabilities/drive/api.py; only its adapters/ import app.integrations
-- [ ] #3 An in-memory fake of the api.py Protocol lives in the package and is exercised by tests, as the cloud-portability.md fake contract requires for externally facing capability Protocols
-- [ ] #4 app/infrastructure/drive/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the DriveProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
-- [ ] #7 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages (app/pyproject.toml:209)
+- [ ] #1 The talent role-folder adapter calls integrations/google_workspace directly and keeps its talent-owned port; its tests use the talent fake
+- [ ] #2 No incident code uses app/infrastructure/drive; the incident core adapter holds its Drive calls (TASK-145.6)
+- [ ] #3 app/infrastructure/drive/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings; the DriveProvider line leaves app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Comments
@@ -61,6 +54,14 @@ created: 2026-10-26T19:32:00Z
 ---
 
 2026-10-26 (human approved): scope under review by TASK-169. decisions/workplace-systems.md now says a vendor product API is not a capability by itself; this task is expected to be re-scoped from a move into app/capabilities/ to purpose-named ports owned by its consumers over integrations/google_workspace/. Do not plan it before TASK-169 lands.
+
+---
+
+created: 2026-11-05T00:44:00Z
+
+---
+
+2026-11-05 (TASK-145.6 plan, approved): TASK-145.6.1 moves every incident Drive call into features/incident/core/adapters/google_docs.py and TASK-145.6.2 moves them off infrastructure.drive onto the gateway's Drive factory, so AC #2 is met there; this task keeps the talent adapter and the deletion of app/infrastructure/drive/.
 
 ---
 <!-- COMMENTS:END -->

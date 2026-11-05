@@ -6,14 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T14:01:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-27.5
-  - TASK-121
   - TASK-145.9
   - TASK-145.5.7
   - TASK-111.10
@@ -45,6 +44,7 @@ THIS SLICE
 - [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from [incident_core] full_read_max_items (features/incident/common/settings.py, added by TASK-145.5.7) (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #5 The projection reads the incident list sheet id from [incident_core] list_sheet_id and every subdomain that writes the projection states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
+- [ ] #6 The list-sheet projection writer is an incident-owned adapter calling integrations/google_workspace directly; nothing in the incident umbrella uses infrastructure/spreadsheets (TASK-169 ruling, 2026-11-05 (human))
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -91,4 +91,6 @@ Sheet consumers see the same rows. Revert restores the sheet reads and the impor
 2026-10-28 (TASK-111.14): new incident list rows hold the channel as Slack's deep link (slack.com/app_redirect?channel=<id>&team=<team_id>), older rows hold gcdigital.slack.com/archives/<id>; modules/incident/incident_folder.channel_id_from_link reads both until the sheet import is removed here.
 
 2026-11-04 (TASK-145.5.7 planning, human): the whole-table cap is the files key [incident_core] full_read_max_items, not an environment name (decisions/cloud-portability.md contract 4 amended); AC3 and step 3 reworded. The rerun of the TASK-145.5.7 job after this task merges is a dry run then apply per environment.
+
+2026-11-05: no longer waits on TASK-121; it owns its sheet port and 121 deletes infrastructure/spreadsheets after it (TASK-169 ruling, 2026-11-05 (human), D5).
 <!-- SECTION:NOTES:END -->
