@@ -42,8 +42,8 @@ import packages.rant as rant_module
 import packages.user_rotations as user_rotations_module
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
+from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from features.incident.drive.adapters import google_drive as incident_drive
 from features.incident.scribe import providers as incident_scribe_providers
 from features.incident.scribe import service as incident_scribe_service
 from features.incident.scribe.adapters.slack import SlackIncidentReportLinkLookup

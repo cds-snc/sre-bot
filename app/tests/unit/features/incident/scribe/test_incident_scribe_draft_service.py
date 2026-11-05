@@ -7,14 +7,9 @@ from datetime import UTC, datetime
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from features.incident.core.api import TranscriptMessage
+from features.incident.core.api import DocumentSection, DraftWriteResult, SectionDraft, TranscriptMessage
 from features.incident.scribe import service
-from features.incident.scribe.domain import (
-    AI_AUTHOR,
-    DocumentSection,
-    DraftWriteResult,
-    SectionDraft,
-)
+from features.incident.scribe.domain import AI_AUTHOR
 from features.incident.scribe.service import (
     CREATE_FAILED_CODE,
     DOCUMENT_UNREADABLE_CODE,

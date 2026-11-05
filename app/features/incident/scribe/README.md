@@ -19,7 +19,7 @@ Paths are relative to `app/features/incident/scribe/` unless they start with
 | Slack handler | `handle_draft_command` in `entrypoints/slack.py` | `handle_summarize_command` in `entrypoints/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
 | Interfaces | `IncidentReportLinkLookup`, `IncidentDocumentStore` (`ports.py`); `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
-| Adapters | `adapters/slack.py` (report link from bookmarks), `adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
+| Adapters | `adapters/slack.py` (report link from bookmarks), `core/adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
 | Wiring | `providers.py`: `get_incident_report_link_lookup`, `get_incident_document_store`; `core/api.py`: `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
 | Settings | `IncidentDraftSettings`, prefix `INCIDENT_DRAFT__` | `IncidentSummarySettings`, prefix `INCIDENT_SUMMARY__` |
 | Locale files | `locales/incident_draft.en-US.yml`, `locales/incident_draft.fr-FR.yml` | `locales/incident_summary.en-US.yml`, `locales/incident_summary.fr-FR.yml` |
@@ -49,7 +49,7 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   │
   │   draft only:
   ├─► IncidentReportLinkLookup ── providers.py ──► adapters/slack.py            (bookmarks)
-  └─► IncidentDocumentStore ───── providers.py ──► adapters/google_docs.py      (Docs read, Drive copy, Docs fill)
+  └─► IncidentDocumentStore ───── providers.py ──► core/adapters/google_docs.py (Docs read, Drive copy, Docs fill)
 ```
 
 ### Files
@@ -70,14 +70,15 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 - `service.py` — the draft and summarize use cases. It imports
   `features/incident/core` through `core/api.py` only. Empty history returns an
   `OperationResult` with `error_code="EMPTY_HISTORY"`.
-- `domain.py` — frozen values of the drafting use case: `DocumentSection`
-  (heading + instructions), `SectionDraft`, `DocumentField`,
-  `DraftWriteResult`, `DraftedDocument`, and `AI_AUTHOR`. `TranscriptMessage`
-  comes from `features/incident/core`.
+- `domain.py` — frozen values of the drafting use case: `DraftedDocument` and
+  `AI_AUTHOR`. `TranscriptMessage` and the document section types
+  (`DocumentSection`, heading + instructions; `SectionDraft`, `DocumentField`,
+  `DraftWriteResult`) come from `features/incident/core` through `core/api.py`.
 - `adapters/slack.py` — the report-link lookup on Slack bookmarks; returns
   plain strings and no links on an API error.
-- `adapters/google_docs.py` — the only file touching **Google**
-  (Docs read + Drive copy + Docs populate). `service.py` imports the
+- `core/adapters/google_docs.py` — the umbrella's Google Docs and Drive
+  adapter (Docs read + Drive copy + Docs populate); the scribe package itself
+  imports no Google code. `service.py` imports the
   `Summarizer` interface and `entrypoints/slack.py` the transport models, both by
   design.
 - `providers.py` — feature-local DI wiring for the document store and the
@@ -130,7 +131,7 @@ shipped with, so nothing deployed has to change:
 - The `incident_draft` and `incident_summary` catalogues are the i18n key
   prefixes the handlers look up (`DRAFT_DOMAIN`, `SUMMARY_DOMAIN` in
   `entrypoints/slack_views.py`).
-- The `incident_draft::` named-range prefix (`adapters/google_docs.py`) is
+- The `incident_draft::` named-range prefix (`core/adapters/google_docs.py`) is
   already written into existing draft documents.
 
 Renaming any of them would be a migration, not a docs change. New use cases are

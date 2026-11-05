@@ -27,11 +27,15 @@ from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_transcript_reader
 from features.incident.core.domain import (
     ConversationReference,
+    DocumentField,
+    DocumentSection,
+    DraftWriteResult,
     ExternalCaseReference,
     Incident,
     MessageReference,
     PostmortemMeetingReference,
     ReportReference,
+    SectionDraft,
     SourceAlertReference,
     StatusUpdate,
     StatusUpdateOrigin,
@@ -53,6 +57,9 @@ from features.incident.core.store import (
 
 __all__ = [
     "ConversationReference",
+    "DocumentField",
+    "DocumentSection",
+    "DraftWriteResult",
     "ExternalCaseReference",
     "Incident",
     "IncidentStore",
@@ -61,6 +68,7 @@ __all__ = [
     "MessageReference",
     "PostmortemMeetingReference",
     "ReportReference",
+    "SectionDraft",
     "SourceAlertReference",
     "StatusUpdate",
     "StatusUpdateOrigin",

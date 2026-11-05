@@ -5,7 +5,7 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from contracts.operations import OperationResult
-from features.incident.drive.adapters import google_drive
+from features.incident.core.adapters import google_docs as google_drive
 from infrastructure.drive.models import DriveFile
 
 
@@ -21,7 +21,7 @@ def _http_error(status: int) -> HttpError:
     return HttpError(resp=FakeResp(), content=b"{}")
 
 
-@patch("features.incident.drive.adapters.google_drive.get_drive_provider")
+@patch("features.incident.core.adapters.google_docs.get_drive_provider")
 def test_list_child_folders_filters_templates_from_results(mock_get_provider):
     provider = MagicMock()
     provider.list_folders.return_value = OperationResult.success(
@@ -39,7 +39,7 @@ def test_list_child_folders_filters_templates_from_results(mock_get_provider):
     provider.list_folders.assert_called_once_with("parent-folder")
 
 
-@patch("features.incident.drive.adapters.google_drive.get_drive_provider")
+@patch("features.incident.core.adapters.google_docs.get_drive_provider")
 def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_get_provider):
     provider = MagicMock()
     provider.find_files_by_name.return_value = OperationResult.success(data=[DriveFile(id="doc-1", name="incident-2024-001")])
@@ -63,7 +63,7 @@ def test_find_document_by_channel_name_enriches_match_with_app_properties(mock_g
     files_resource.get.assert_called_once_with(fileId="doc-1", fields="id, name, appProperties", supportsAllDrives=True)
 
 
-@patch("features.incident.drive.adapters.google_drive.get_drive_provider")
+@patch("features.incident.core.adapters.google_docs.get_drive_provider")
 def test_incident_drive_healthcheck_returns_false_when_metadata_lookup_raises(mock_get_provider):
     provider = MagicMock()
     mock_get_provider.return_value = provider

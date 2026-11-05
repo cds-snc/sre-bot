@@ -7,7 +7,7 @@ from slack_sdk import WebClient
 from structlog import get_logger
 
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.drive.adapters import google_drive as incident_drive
+from features.incident.core.adapters import google_docs as incident_drive
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import (
     channels as slack_channels,

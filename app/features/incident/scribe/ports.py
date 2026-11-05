@@ -7,7 +7,7 @@ adapters, so both import them from here rather than from each other.
 from collections.abc import Mapping, Sequence
 from typing import Protocol, runtime_checkable
 
-from features.incident.scribe.domain import (
+from features.incident.core.api import (
     DocumentField,
     DocumentSection,
     DraftWriteResult,

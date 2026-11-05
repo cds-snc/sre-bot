@@ -451,7 +451,7 @@ def test_handle_images_in_message_empty_text():
 
 
 @patch(
-    "features.incident.documents.utils.extract_google_doc_id",
+    "features.incident.core.adapters.google_docs.extract_google_doc_id",
     return_value="dummy_document_id",
 )
 @patch("modules.incident.incident_conversation.logger")
@@ -472,7 +472,7 @@ def test_get_incident_document_id_found(mock_logger, mock_extract):
 
 
 @patch(
-    "features.incident.documents.utils.extract_google_doc_id",
+    "features.incident.core.adapters.google_docs.extract_google_doc_id",
     return_value="",
 )
 @patch("modules.incident.incident_conversation.logger")
@@ -495,7 +495,7 @@ def test_get_incident_document_id_not_found(mock_logger, mock_extract):
 
 
 @patch(
-    "features.incident.documents.utils.extract_google_doc_id",
+    "features.incident.core.adapters.google_docs.extract_google_doc_id",
     return_value="",
 )
 @patch("modules.incident.incident_conversation.logger")

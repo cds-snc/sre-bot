@@ -16,7 +16,7 @@ from structlog import get_logger
 
 from contracts.operations import OperationStatus
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.drive.adapters import google_drive as incident_drive
+from features.incident.core.adapters import google_docs as incident_drive
 from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
 from modules.incident import db_operations
 

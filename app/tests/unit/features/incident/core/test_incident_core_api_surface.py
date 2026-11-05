@@ -34,6 +34,9 @@ def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
         "ConversationReference",
+        "DocumentField",
+        "DocumentSection",
+        "DraftWriteResult",
         "ExternalCaseReference",
         "Incident",
         "IncidentStore",
@@ -42,6 +45,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "MessageReference",
         "PostmortemMeetingReference",
         "ReportReference",
+        "SectionDraft",
         "SourceAlertReference",
         "StatusUpdate",
         "StatusUpdateOrigin",

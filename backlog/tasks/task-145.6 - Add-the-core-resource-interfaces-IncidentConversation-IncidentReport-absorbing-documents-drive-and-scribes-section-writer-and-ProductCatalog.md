@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T00:44:00Z'
+updated_date: '2026-11-05T15:45:00Z'
 labels:
   - incident
   - features
@@ -182,6 +182,14 @@ created: 2026-11-05T00:43:00Z
 ---
 
 2026-11-05 (human): plan approved. Split approved into three layers (prefer fewer PRs where the rules allow; the move stays separate from the new interfaces per CLAUDE.md). OQ1 approved (report placement in the legacy product folder as an adapter hint). OQ4 approved (template labels move verbatim; per-template label sets with TASK-165's per-type document templates). OQ5 applied: title, description and AC #1 (now AC #7 after renumbering) drop ProductCatalog. ProductCatalog's default source is the bot's own product list (TASK-165.1, ADR amended).
+
+---
+
+created: 2026-11-05T15:45:00Z
+
+---
+
+2026-11-05: 12a (TASK-145.6.1) implemented above #1822, all ACs checked, In Progress. The four section types moved to core/domain.py, pulled forward from 12b step 1 so core does not import scribe.
 
 ---
 <!-- COMMENTS:END -->

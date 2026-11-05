@@ -36,15 +36,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import structlog
 
 from contracts.operations import OperationResult
-from features.incident.core.api import IncidentTranscriptReader, TranscriptMessage, get_incident_transcript_reader
-from features.incident.scribe import providers
-from features.incident.scribe.domain import (
-    AI_AUTHOR,
+from features.incident.core.api import (
     DocumentField,
     DocumentSection,
-    DraftedDocument,
+    IncidentTranscriptReader,
     SectionDraft,
+    TranscriptMessage,
+    get_incident_transcript_reader,
 )
+from features.incident.scribe import providers
+from features.incident.scribe.domain import AI_AUTHOR, DraftedDocument
 from features.incident.scribe.ports import IncidentDocumentStore, IncidentReportLinkLookup
 from features.incident.scribe.settings import (
     IncidentDraftSettings,

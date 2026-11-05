@@ -7,14 +7,14 @@ import pytest
 from googleapiclient.errors import HttpError
 
 from contracts.operations.status import OperationStatus
-from features.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument, _merge_overlapping
-from features.incident.scribe.domain import DocumentField, DocumentSection, SectionDraft
+from features.incident.core.adapters.google_docs import GoogleDocsIncidentDocument, _merge_overlapping
+from features.incident.core.api import DocumentField, DocumentSection, SectionDraft
 from integrations.google_workspace import client as google_workspace_client
 
 pytestmark = pytest.mark.unit
 
-_CLIENT = "features.incident.scribe.adapters.google_docs.google_workspace_client"
-_RESOURCES = "features.incident.scribe.adapters.google_docs.get_incident_core_settings"
+_CLIENT = "features.incident.core.adapters.google_docs.google_workspace_client"
+_RESOURCES = "features.incident.core.adapters.google_docs.get_incident_core_settings"
 
 
 def _utf16_units(text: str) -> int:

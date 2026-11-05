@@ -5,7 +5,7 @@ from slack_bolt import Ack
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from features.incident.documents import utils
+from features.incident.core.adapters import google_docs as incident_documents
 from models.incidents import Incident
 from modules.incident import (
     db_operations,
@@ -308,7 +308,7 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
             return
     if value and value_type:
         if action == "status" and isinstance(value, str):
-            document_id = utils.extract_google_doc_id(report_url)
+            document_id = incident_documents.extract_google_doc_id(report_url)
             incident_document.update_incident_document_status(document_id, value)
             spreadsheet_updated = incident_folder.update_spreadsheet_incident_status(
                 incident_folder.return_channel_name(channel_name), value

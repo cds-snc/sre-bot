@@ -9,7 +9,7 @@ from slack_sdk.web import SlackResponse  # type: ignore
 from structlog import get_logger
 
 from contracts.configuration import host_info
-from features.incident.documents import utils
+from features.incident.core.adapters import google_docs as incident_documents
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from modules.incident import incident_helper, schedule_retro
@@ -248,7 +248,7 @@ def get_incident_document_id(client, channel_id):
     if response["ok"]:
         for item in range(len(response["bookmarks"])):
             if response["bookmarks"][item]["title"] == "Incident report":
-                document_id = utils.extract_google_doc_id(response["bookmarks"][item]["link"])
+                document_id = incident_documents.extract_google_doc_id(response["bookmarks"][item]["link"])
                 if document_id == "":
                     logger.error(
                         "incident_document_bookmark_not_found",
