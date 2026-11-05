@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-28 16:29
-updated_date: '2026-11-04T14:01:00Z'
+updated_date: '2026-11-04T23:00:00Z'
 labels:
   - architecture
   - reliability
@@ -63,6 +63,8 @@ BREAKDOWN GUIDANCE FOR THE PLANNING CODING AGENT: check the single-PR size gate.
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (TASK-145.5.7 planning, human approved): TASK-145.5.7.1 adds the Tier-2 part of AC#1/#2: a lease_ttl: timedelta | None keyword on BackgroundJobRegistry.register_interval and register_daily (None = Tier-1; a value = the host wraps the job in run_if_leased with that TTL, taken from the job's own settings, never the scheduler default). The rest of this task stands: the declarative tier/schedule Protocol, host jobs moved onto it, _tier2 deleted, the default TTL kept for modules jobs (reliability.md 2026-11-04).
+
+2026-11-04 (TASK-145.5.7.3 planning, human approved): (1) when safe_run moves into the registry adapter it keeps logging a failed run once at error with the traceback (logger.exception, added by TASK-145.5.7.3); job bodies never log and re-raise (reliability.md). (2) The widened schedule expression (AC1) states when a job first runs (after one interval, today's schedule-library default, or at registration), so no job relies on the library default; record it in reliability.md.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -5,8 +5,8 @@ title: >-
   delete app/jobs/
 status: To Do
 assignee: []
-created_date: '2026-07-27 15:48'
-updated_date: '2026-09-28 14:36'
+created_date: 2026-07-27 15:48
+updated_date: '2026-11-04T23:00:00Z'
 labels:
   - architecture
   - layers
@@ -21,7 +21,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - decisions/plugins.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1356'
+  - https://github.com/cds-snc/sre-bot/issues/1356
   - decisions/migration.md
   - decisions/plugin-architecture.md
 priority: medium
@@ -54,6 +54,12 @@ After this ticket, no app/jobs/ package remains. Depends on TASK-64, so the wide
 - [ ] #1 Tests pass; PR references decisions/layers.md and cross-references TASK-6
 - [ ] #2 A human-approved implementation plan exists on this task (via task-planner) before any implementation PR opens
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-04 (TASK-145.5.7.3 planning, human approved): the relocated safe_run keeps logging a failed run once at error with the traceback (logger.exception, added by TASK-145.5.7.3); job bodies never log and re-raise (reliability.md).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

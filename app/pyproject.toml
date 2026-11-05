@@ -42,6 +42,7 @@ dependencies = [
 "access.sync" = "packages.access.sync"
 geolocate = "packages.geolocate"
 "incident.comms" = "features.incident.comms"
+"incident.response" = "features.incident.response.plugin"
 "incident.scribe" = "features.incident.scribe"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
@@ -131,7 +132,7 @@ env = [
     'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
     # Likewise the plugins that declare a requirement (scribe, oncall_sync, user_rotations, rant): switched on
     # from app/.env they would abort every lifespan test boot. Each table is pinned whole, as the ci files set it.
-    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.scribe": false, "oncall_sync": false, "user_rotations": false}}',
+    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.response": false, "incident.scribe": false, "oncall_sync": false, "user_rotations": false}}',
     'PLUGINS__WORKPLACE_UTILITIES={{"geolocate": true, "rant": false}}',
     # Likewise the scheduler: SCHEDULER__ENABLED=true in app/.env would start the real
     # jobs thread in every lifespan test. Tests that need it enable it explicitly.
@@ -456,6 +457,7 @@ protected_modules = [
     "packages.access.sync",
     "packages.geolocate",
     "features.incident.comms",
+    "features.incident.response.plugin",
     "features.incident.scribe",
     "packages.oncall_sync",
     "packages.rant",

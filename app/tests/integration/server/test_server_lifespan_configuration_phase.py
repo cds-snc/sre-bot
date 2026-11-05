@@ -154,6 +154,15 @@ async def test_the_lifespan_loads_plugins_with_the_disabled_names_from_the_files
 
     # The files switch off the access plugins; the pytest-env pins also switch off every plugin that declares a requirement.
     assert configuration.disabled_plugins == frozenset(
-        {"access.catalog", "access.request", "access.sync", "incident.scribe", "oncall_sync", "user_rotations", "rant"}
+        {
+            "access.catalog",
+            "access.request",
+            "access.sync",
+            "incident.response",
+            "incident.scribe",
+            "oncall_sync",
+            "user_rotations",
+            "rant",
+        }
     )
     assert load_plugins.call_args.args[1] == configuration.disabled_plugins

@@ -35,6 +35,7 @@ DISABLED_PLUGINS = {
     "access.catalog",
     "access.request",
     "access.sync",
+    "incident.response",
     "incident.scribe",
     "oncall_sync",
     "rant",
