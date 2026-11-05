@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T17:26:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - incident
   - features
@@ -15,7 +15,6 @@ dependencies:
   - TASK-145.5
   - TASK-145.5.8
   - TASK-111.10
-  - TASK-169
 references:
   - https://github.com/cds-snc/sre-bot/issues/1697
 parent_task_id: TASK-145
@@ -45,6 +44,7 @@ THIS SLICE
 - [ ] #4 No user-visible command, reply or log event changes; the legacy_surface suite and the scribe and comms tests pass
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 The core reads the incident folder and report template ids from [incident_core] (folder_id, report_template_id) and each subdomain that uses them states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
+- [ ] #7 Its Google adapters build services through integrations/google_workspace without passing a delegation subject or building credentials; which calls delegate is the gateway's (TASK-181; decisions/service-accounts.md rule 5)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -108,4 +108,6 @@ Behaviour-preserving behind the legacy module; a bad merge of the Docs adapter b
 - 2026-10-28 (TASK-167 accepted): the scribe labels carry CDS wording (cyber.gc.ca, security@cds-snc.ca, 'CDS Staff'); organisation wording is provisioned message overrides by key over generic app strings (decisions/organisation-content.md). The surface that absorbs or rebuilds each label moves it there (this task for scribe's section writer, 145.11 for the rest of scribe).
 
 2026-11-04 (human approved, coordinated-incidents reconciliation): option C: ProductCatalog is out of this task's scope. Drive folders are never a source of products (incident-management.md 2026-11-04); TASK-165.1 builds the ProductCatalog port with its catalogue adapter (Backstage) once the product-catalog ADR defines a product. Listing the incident Drive folders, if declare still needs it, is report-placement configuration of the IncidentReport adapter, not a catalogue. The Opsgenie schedule read from folder metadata belongs to the on-call capability (TASK-146), not here. Re-check the title, description and ACs at re-plan (after layer 11).
+
+2026-11-05: no longer waits on TASK-169 (TASK-169 ruling, 2026-11-05 (human), D6): the credential model is invisible to its ports; AC added instead. Drive and Docs run as the service account itself after TASK-181 (shared-drive member), same account, so the appProperties it reads stay visible.
 <!-- SECTION:NOTES:END -->

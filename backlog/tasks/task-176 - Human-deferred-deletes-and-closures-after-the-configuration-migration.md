@@ -4,7 +4,7 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - configuration
   - human
@@ -44,3 +44,15 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-03: asked at session start; #1, #2 and #4 still open (human).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-05T00:14:00Z
+
+---
+
+2026-11-05 (TASK-169 session): AC #2 must not run yet. The human confirmed that the key in GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_KEY is the old gcp_sre_service_account_key value, so it is the live production key. TASK-182 deletes it after TASK-180's federated cutover and checks this AC with its evidence. ACs #1 and #4 (the SSM blobs, then TASK-54) are still open; nothing waits on TASK-54.
+
+---
+<!-- COMMENTS:END -->

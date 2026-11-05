@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-10-28T20:13:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - phase-5
 dependencies:
@@ -62,6 +62,7 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 - [ ] #5 The packages/aws_platform seam guard retires with the package: app/bin/check_aws_platform_seam.py, app/bin/baselines/aws_platform_seam_consumers.txt and the make check-aws-platform-seam target are deleted once the baseline is empty (TASK-25.2.5.5 created them)
 - [ ] #6 The spending subdomain reads the spending sheet id from [cloud_operations_spending] sheet_id (features/cloud_operations/spending/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #7 modules/permissions and the AWS_ADMIN_GROUPS setting ([cloud_operations] aws_admin_groups, moved onto the files by TASK-111.14; the table is named for the product area because AWS_* environment names are the SDK's) are deleted with the table and infrastructure/configuration/features/aws_ops.py; the rebuilt AWS surfaces declare their permissions per decisions/authorization.md, and any key a rebuilt slice keeps is standardised (lower snake_case, no table-name repeat)
+- [ ] #8 The AWS spending sheet write is a spending-owned adapter calling integrations/google_workspace directly; it no longer uses infrastructure/spreadsheets (TASK-169 ruling, 2026-11-05 (human))
 <!-- AC:END -->
 
 ## Implementation Notes

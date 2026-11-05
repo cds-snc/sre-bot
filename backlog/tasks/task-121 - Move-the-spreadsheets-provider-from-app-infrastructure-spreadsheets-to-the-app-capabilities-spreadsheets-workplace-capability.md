@@ -1,21 +1,20 @@
 ---
 id: TASK-121
 title: >-
-  Move the spreadsheets provider from app/infrastructure/spreadsheets/ to the
-  app/capabilities/spreadsheets/ workplace capability
+  Delete infrastructure/spreadsheets/ once the incident list projection and AWS
+  spending own their sheet ports
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-10-26T19:32:00Z'
+updated_date: '2026-11-05T00:14:00Z'
 labels:
   - plugin-architecture
   - capabilities
   - workplace-systems
 milestone: m-7
 dependencies:
-  - TASK-106
-  - TASK-110
-  - TASK-114
+  - TASK-145.12
+  - TASK-88
   - TASK-169
 references:
   - decisions/workplace-systems.md
@@ -31,26 +30,14 @@ ordinal: 263000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-decisions/workplace-systems.md and plugin-architecture.md: workplace systems (directory, documents, files, spreadsheets, calendar, mail) are capabilities, not infrastructure. infrastructure/ is hosting-only. Their public surface is api.py (the Protocol, domain types and provider function) plus an optional hookspecs module; everything else is private. The Google implementation becomes adapters/google.py, the only file importing app.integrations.google_workspace.
-
-Today app/infrastructure/spreadsheets/ exposes a vendor-neutral Protocol with a single Google implementation behind a cached factory, re-exported through a barrel __init__.py.
-
-Scope:
-- move the package into the feature-packages shape (api.py, adapters/, settings.py, README.md with its classification and named feature consumers, and a fake);
-- repoint every consumer to api.py;
-- delete app/infrastructure/spreadsheets/ with no re-export.
-Behaviour-preserving. migration.md rule 6: the capability is not widened to reproduce legacy conventions, and legacy modules keep calling what they call today until their surface is rebuilt, except for import-path changes. The settings class moves; its configuration-file table and environment variable names do not change.
+Re-scoped by the TASK-169 ruling, 2026-11-05 (human) (decisions/workplace-systems.md, 2026-10-26 and 2026-11-05). Sheets is a vendor product API, not a workplace capability; spreadsheets become projections (workplace-systems.md rule 5). Its two consumers own their ports: the incident list projection (TASK-145.12, AC added) and AWS spending (TASK-88, AC added), each adapter calling integrations/google_workspace/ directly. Once both have landed, app/infrastructure/spreadsheets/ has no consumer and is deleted with its fake and its fake-coverage line. Delete-only.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 app/capabilities/spreadsheets/ matches the feature-packages layout for a capability (the TASK-114 shape check is green); its README states the classification and at least one feature consumer
-- [ ] #2 Consumers import only app/capabilities/spreadsheets/api.py; only its adapters/ import app.integrations
-- [ ] #3 An in-memory fake of the api.py Protocol lives in the package and is exercised by tests, as the cloud-portability.md fake contract requires for externally facing capability Protocols
-- [ ] #4 app/infrastructure/spreadsheets/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the SpreadsheetProvider line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
-- [ ] #7 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages (app/pyproject.toml:209)
+- [ ] #1 No code imports app/infrastructure/spreadsheets; app/infrastructure/spreadsheets/ is deleted with no re-export, including mock patch strings
+- [ ] #2 The SpreadsheetProvider line leaves app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Comments
