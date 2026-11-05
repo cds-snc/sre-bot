@@ -37,7 +37,7 @@ updated_date: '2026-11-05T01:00:00Z'
 | 11b | TASK-145.5.7.2 incident core upgrade runner | `stack-k/task-145.5.7.2-upgrade-runner` | #1821 | in review | Base `main`. Merges once re-reviewed (11c sits above it). |
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | in review | Top of the stack: stays open until 12a is submitted above it. |
 | 12a | TASK-145.6.1 verbatim move of documents/, drive/ and scribe's section writer into core/adapters/google_docs.py; every importer repointed | `stack-k/task-145.6.1-google-docs-move` | - | plan approved | 2026-11-05; ~16 files, mechanical only; full plan in the task. |
-| 12b | TASK-145.6.2 IncidentReport Protocol and adapter on the gateway factories; infrastructure.drive ignores deleted; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | planned | ~8 files, ~320 LOC. No subject, no credentials (AC #7). |
+| 12b | TASK-145.6.2 IncidentReport Protocol and adapter on the gateway factories; infrastructure.drive ignores deleted; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | planned | Full plan proposed 2026-11-05, ~295 LOC, 12 files; corrections C1-C4 await approval; AC #5 waits on the C4 host task. |
 | 12c | TASK-145.6.3 IncidentConversation with is_writable; reader takes a ConversationReference; IncidentReportLinkLookup deleted | `stack-k/task-145.6.3-incident-conversation` | - | planned | ~9 files, ~380 LOC. |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
@@ -61,9 +61,11 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 ## Open decisions
 
 - None open. 2026-11-05 (human): TASK-145.6 plan and split approved, OQ1-OQ5 as recommended; ProductCatalog's default source is the bot's own product list (TASK-165.1).
+- TASK-145.6.2 corrections C1-C4 and the D1 fallback (in its plan), proposed 2026-11-05.
 - Recorded at task level: TASK-145.7 dual-write, source_alert shape and the binding step; TASK-145.8 partial updates of items without record_version; TASK-154 status lifecycle.
 
 ## Planning queue
 
 - TASK-145.6.1 (12a): plan approved.
-- TASK-145.6.2 (12b), TASK-145.6.3 (12c): outlines in the parent plan; full plans at pickup.
+- TASK-145.6.2 (12b): full plan proposed, awaiting approval.
+- TASK-145.6.3 (12c): outline (narrowed by C3); full plan at pickup.

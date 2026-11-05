@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T00:44:00Z'
+updated_date: '2026-11-05T01:03:00Z'
 labels:
   - incident
   - features
@@ -37,5 +37,5 @@ Layer 12c of Stack K (TASK-145.6 plan, approved 2026-11-05). IncidentConversatio
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline from the TASK-145.6 plan approved 2026-11-05 (steps 11-13); full plan at pickup against 12b. Tests: test_incident_core_conversation_{operations,writable,errors,fake_parity}.py; transcript reader tests take references; scribe and comms service tests pass a reference.
+Outline from the TASK-145.6 plan approved 2026-11-05 (steps 11-13), narrowed by TASK-145.6.2 C3 (proposed): the report link from the record and the IncidentReportLinkLookup deletion move to 145.6.2; this layer keeps IncidentConversation with is_writable and the transcript reader by ConversationReference. Full plan at pickup against 12b. Tests: test_incident_core_conversation_{operations,writable,errors,fake_parity}.py; transcript reader tests take references; scribe and comms service tests pass a reference.
 <!-- SECTION:PLAN:END -->
