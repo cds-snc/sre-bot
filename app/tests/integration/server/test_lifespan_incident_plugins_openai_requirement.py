@@ -5,7 +5,7 @@ core services, security, the directory, the Slack provider, translation and feat
 registration are stubbed, since requirements are resolved before any of them. The
 ci files configure no tenant. With incident.scribe enabled (the
 configuration's disabled set replaced by the access plugins and the other plugins that declare requirements) startup must stop
-before the lifespan yields, naming each tenant scribe declares: it has no fallback. With the ci
+before the lifespan yields, naming each tenant and incident document id scribe declares: it has no fallback. With the ci
 files as they are (scribe off, comms on) startup must reach the yield and comms must
 report text generation unavailable, its designed fallback.
 """
@@ -70,6 +70,8 @@ async def test_lifespan_aborts_naming_every_tenant_scribe_lacks_when_it_is_enabl
         ("incident.scribe", "openai.tenant"),
         ("incident.scribe", "slack.tenant"),
         ("incident.scribe", "google_workspace.tenant"),
+        ("incident.scribe", "incident_core.folder_id"),
+        ("incident.scribe", "incident_core.report_template_id"),
     ]
 
 

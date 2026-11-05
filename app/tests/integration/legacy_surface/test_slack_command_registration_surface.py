@@ -25,6 +25,7 @@ from packages.geolocate.platforms import slack as geolocate_slack
 from packages.rant.service import format_rant
 from packages.user_rotations.platforms import slack as user_rotations_slack
 from packages.user_rotations.service import UserRotationShift
+from tests.factories.incident import seed_legacy_incident
 
 from .conftest import CHANNEL_ID, RESPONSE_URL, TRIGGER_ID, USER_ID, SlackCommandHarness, build_harness
 
@@ -383,22 +384,18 @@ CHANNEL_HISTORY = {
 
 @pytest.fixture
 def incident_channel(slack_command_harness: SlackCommandHarness) -> SlackCommandHarness:
-    """An incident channel with history, bookmarked incident doc and a known responder."""
+    """An incident channel with history and a known responder; its incident record links the report doc-source."""
     slack_command_harness.client.replies.update(
         {
             "conversations_info": {"ok": True, "channel": {"created": 1789990000}},
             "conversations_history": CHANNEL_HISTORY,
             "users_info": {"ok": True, "user": {"profile": {"display_name": "Grace"}}},
-            "bookmarks_list": {
-                "ok": True,
-                "bookmarks": [{"title": "Incident report", "link": "https://docs.google.com/document/d/doc-source/edit"}],
-            },
         }
     )
     return slack_command_harness
 
 
-def test_incident_draft_drafts_from_the_bookmarked_document(
+def test_incident_draft_drafts_from_the_records_report(
     incident_channel: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """/sre incident draft drafts once from the channel transcript and links the new document."""
@@ -413,19 +410,19 @@ def test_incident_draft_drafts_from_the_bookmarked_document(
 
     assert response.status == 200
     assert len(drafter.calls) == 1
-    source_document_id, transcript = drafter.calls[0]["args"]
-    assert source_document_id == "doc-source"
+    report, transcript = drafter.calls[0]["args"]
+    assert report.vendor_id == "doc-source"
     assert [message.text for message in transcript] == ["Rolled back the deploy"]
     reply = only_response(incident_channel)
     assert reply["response_type"] == "ephemeral"
     assert "https://docs.google.com/document/d/doc-draft/edit" in reply["text"]
 
 
-def test_incident_draft_without_bookmarked_document_does_not_draft(
+def test_incident_draft_without_a_report_on_the_record_does_not_draft(
     incident_channel: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Without an "Incident report" bookmark the command explains and never calls the drafter."""
-    incident_channel.client.replies["bookmarks_list"] = {"ok": True, "bookmarks": []}
+    """When the channel's incident has no report the command explains as before and never calls the drafter."""
+    seed_legacy_incident(incident_channel.records, CHANNEL_ID)
     drafter = AsyncRecorder()
     monkeypatch.setattr(incident_scribe_service, "draft_incident_document", drafter)
 

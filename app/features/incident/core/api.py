@@ -11,9 +11,11 @@ the incident id; entry points build both per service scope with
 the conversation reference they build, to the subdomain services.
 ``build_legacy_upgrade`` builds the incident legacy upgrade (``LegacyUpgrade``,
 reporting an ``UpgradeReport``) from the services its job resolves per run.
+``IncidentReport`` works on the incident report the record references
+(``ReportReference``); ``get_incident_report`` provides the Google Docs one.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
@@ -23,6 +25,7 @@ from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
+from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_transcript_reader
 from features.incident.core.domain import (
@@ -62,6 +65,7 @@ __all__ = [
     "DraftWriteResult",
     "ExternalCaseReference",
     "Incident",
+    "IncidentReport",
     "IncidentStore",
     "IncidentTranscriptReader",
     "LegacyUpgrade",
@@ -84,6 +88,7 @@ __all__ = [
     "build_legacy_upgrade",
     "build_status_update_store",
     "find_incident_for_conversation",
+    "get_incident_report",
     "get_incident_transcript_reader",
     "translate",
 ]
@@ -133,6 +138,57 @@ class IncidentTranscriptReader(Protocol):
         ...
 
 
+@runtime_checkable
+class IncidentReport(Protocol):
+    """Interface working on an incident's report document, named by the record's ``ReportReference``.
+
+    Who the calls run as and how the vendor is reached stay behind the interface;
+    no method takes a delegation subject or credentials. A reference of a system
+    the implementation does not serve is a PERMANENT_ERROR with
+    ``UNSUPPORTED_OPERATION``. Platform failures are classified results, never
+    exceptions.
+    """
+
+    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
+        """Create a new report titled ``title`` from the configured template, filed in the configured folder.
+
+        Returns the new report's reference, link included. An empty
+        [incident_core] ``folder_id`` or ``report_template_id``, or no tenant to
+        name the reference with, is a PERMANENT_ERROR with ``CONFIG_NOT_CONFIGURED``
+        whose message names the key.
+        """
+        ...
+
+    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+        """Replace every occurrence of each key in the report with its value (case-sensitive).
+
+        Success whether or not a key occurred; a report that cannot be found is NOT_FOUND.
+        """
+        ...
+
+    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+        """Return the report's heading-delimited sections in document order; the report is only read."""
+        ...
+
+    def write_draft_copy(
+        self,
+        report: ReportReference,
+        drafts: Sequence[SectionDraft],
+        fields: Sequence[DocumentField],
+        links: Mapping[str, str],
+    ) -> OperationResult[DraftWriteResult]:
+        """Write a new copy of the report filled in with the drafted sections, fields and pull-request links.
+
+        Each call creates a new copy beside the report; the report itself is never
+        written to. Nothing to write (no drafts and no fields) is a failure.
+        """
+        ...
+
+    def link(self, report: ReportReference) -> str | None:
+        """Return the report's stored link, unformatted; ``None`` when the reference holds none."""
+        ...
+
+
 def build_incident_store(records: RecordStore, systems: ConfiguredSystems, settings: IncidentCoreSettings) -> IncidentStore:
     """Return the ``IncidentStore`` over the resolved ``RecordStore``.
 
@@ -174,6 +230,12 @@ def build_legacy_upgrade(
         verifier,
         settings.full_read_max_items,
     )
+
+
+@lru_cache(maxsize=1)
+def get_incident_report() -> IncidentReport:
+    """Return the process-wide Google-Docs-backed ``IncidentReport``."""
+    return GoogleDocsIncidentReport()
 
 
 @lru_cache(maxsize=1)

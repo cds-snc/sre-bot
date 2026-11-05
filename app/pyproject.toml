@@ -301,9 +301,6 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.records",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
     "features.incident.core.adapters.i18n -> infrastructure.i18n",
-    "features.incident.core.adapters.google_docs -> infrastructure.drive",
-    "features.incident.core.adapters.google_docs -> infrastructure.drive.factory",
-    "features.incident.core.adapters.google_docs -> infrastructure.drive.models",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]
 

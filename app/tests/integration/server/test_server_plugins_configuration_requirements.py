@@ -3,8 +3,10 @@
 For each environment the real base file and environment file are installed, the
 plugin switches they set are read (the pytest-env pins, the scheduler pin and every
 environment name the settings declare are removed first, and the working directory
-holds no ``.env``), the enabled plugins are loaded on a fresh plugin manager with the
-disabled names blocked, and only ``register_requirements`` is fired. Each declaration
+holds no ``.env``), the feature slices the configuration phase builds before plugin
+boot are built (the [incident_core] slice; a feature requirement resolves only
+against a built slice), the enabled plugins are loaded on a fresh plugin manager with
+the disabled names blocked, and only ``register_requirements`` is fired. Each declaration
 must resolve against the configured-systems read and the validated slices. Secrets get
 placeholder values only here, and only for the environment-only names the environment
 is known to supply, derived from the settings classes' ``env_only`` declarations:
@@ -27,6 +29,7 @@ from contracts.configuration import ConfigurationError, install_configuration_fi
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.plugins.requirements import Requirement
+from features.incident.common.settings import get_incident_core_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.openai.settings import get_openai_settings
 from integrations.opsgenie.settings import get_opsgenie_settings
@@ -47,7 +50,10 @@ SETTINGS_GETTERS = (
     get_google_workspace_settings,
     get_openai_settings,
     get_opsgenie_settings,
+    get_incident_core_settings,
 )
+# The feature slices server/configuration/host_configuration.py builds before plugin boot.
+FEATURE_SLICE_GETTERS = (get_incident_core_settings,)
 PLUGIN_AREAS = ("INCIDENT_RESPONSE", "CLOUD_OPERATIONS", "PLATFORM_ACCESS", "WORKPLACE_UTILITIES")
 
 
@@ -80,6 +86,8 @@ def _problems(
             monkeypatch.setenv(entry.name, _placeholder(entry.name))
     monkeypatch.setenv("ENVIRONMENT", environment)
     install_configuration_files(load_configuration_files(environment))
+    for build in FEATURE_SLICE_GETTERS:
+        build()
 
     logger = structlog.get_logger()
     pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
@@ -130,6 +138,20 @@ def test_production_fails_when_a_required_secret_is_not_in_the_parameter_store(
     problems = _problems("production", supplied, entries, monkeypatch, tmp_path)
 
     assert any("oncall_sync requires slack.user_token" in problem for problem in problems)
+
+
+@pytest.mark.parametrize("name", ["INCIDENT_CORE__FOLDER_ID", "INCIDENT_CORE__REPORT_TEMPLATE_ID"])
+def test_production_fails_when_an_incident_document_id_is_not_in_the_parameter_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, name: str
+) -> None:
+    """scribe requires its own [incident_core] ids; the check reads them through the slice the configuration phase built."""
+    entries, _ = collect()
+    supplied = ({entry.name for entry in entries} & terraform_parameters()) - {name}
+
+    problems = _problems("production", supplied, entries, monkeypatch, tmp_path)
+
+    setting = name.lower().replace("__", ".")
+    assert f"incident.scribe requires {setting}, which does not resolve" in problems
 
 
 def test_local_fails_when_a_required_secret_has_no_codespaces_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

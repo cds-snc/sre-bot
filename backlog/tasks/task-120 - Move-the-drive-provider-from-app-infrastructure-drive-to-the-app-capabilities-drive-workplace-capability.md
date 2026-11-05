@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-11-05T00:44:00Z'
+updated_date: '2026-11-05T19:11:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -45,6 +45,12 @@ Scope: after TASK-145.6, the talent adapter calls the gateway's Drive factory di
 - [ ] #3 app/infrastructure/drive/ is deleted with no re-export; grep finds no import of the old path, including mock patch strings; the DriveProvider line leaves app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 (TASK-145.6.2, layer 12b, uncommitted on stack-k/task-145.6.2-incident-report): no incident code imports infrastructure.drive any more; core/adapters/google_docs.py holds its Drive calls over integrations.google_workspace (scopes only) and the three incident ignore entries are deleted. AC #2 is met once 12b merges; packages.talent.adapters.google_drive is the last importer (AC #1).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

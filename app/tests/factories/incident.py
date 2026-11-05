@@ -17,10 +17,12 @@ from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.api import StatusUpdateStore, build_status_update_store
 from features.incident.core.domain import ConversationReference, Incident
+from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 from tests.factories.services import FakeServiceScopeOpener
 
 SLACK_TENANT = "T0SLACK"
+GOOGLE_TENANT = "C0GOOGLE"
 DECLARED_AT = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
 
@@ -92,6 +94,29 @@ def status_update_store_in(records: RecordStore) -> StatusUpdateStore:
     when they are given ``incident_scopes(records)``.
     """
     return build_status_update_store(records, get_incident_core_settings())
+
+
+def seed_legacy_incident(
+    records: RecordStore, channel_id: str, *, incident_id: str = "inc-legacy", report_url: str | None = None
+) -> None:
+    """Store a legacy incident item on ``channel_id`` in the configured incidents table, as the legacy declare wrote it.
+
+    The read path upgrades it through the legacy item bridge, so ``report_url`` becomes
+    the record's report reference only when the Google tenant is configured. Storing
+    again under the same ``incident_id`` replaces the item.
+    """
+    item: dict[str, Any] = {
+        "id": incident_id,
+        "channel_id": channel_id,
+        "name": f"Incident {incident_id}",
+        "user_id": "U0DECLARER",
+        "teams": ["Platform"],
+        "status": "Open",
+        "created_at": "1760536800.0",
+    }
+    if report_url is not None:
+        item["report_url"] = report_url
+    assert records.put(incidents_table(get_incident_core_settings().incidents_table), item).is_success
 
 
 class CountingRecordStore(InMemoryRecordStore):

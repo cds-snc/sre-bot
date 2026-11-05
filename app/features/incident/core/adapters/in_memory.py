@@ -1,17 +1,31 @@
-"""In-memory incident core stores with the real stores' observable rules.
+"""In-memory incident core stores and report with the real implementations' observable rules.
 
 For tests and local runs. ``InMemoryStatusUpdateStore``: appends only where
 nothing is stored, state changes only from the expected state, a repeat of a
 write that landed is a conflict, newest first. ``InMemoryIncidentStore``: the incident reads
-with the same classifications as ``RecordIncidentStore``.
+with the same classifications as ``RecordIncidentStore``. ``InMemoryIncidentReport``:
+the ``GoogleDocsIncidentReport`` rules (Google references only, unknown reports not
+found, empty document ids refused naming the key, no draft copy without content).
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
 
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
-from features.incident.core.domain import ConversationReference, Incident, StatusUpdate, StatusUpdateState
+from contracts.workplace import WorkplaceSystem
+from features.incident.core.domain import (
+    ConversationReference,
+    DocumentField,
+    DocumentSection,
+    DraftWriteResult,
+    Incident,
+    ReportReference,
+    SectionDraft,
+    StatusUpdate,
+    StatusUpdateState,
+)
 from features.incident.core.store import (
     IncidentStore,
     StatusUpdateStore,
@@ -118,3 +132,134 @@ class InMemoryIncidentStore(IncidentStore):
         """Return the seeded incident's security flag."""
         incident = self._incidents.get(incident_id)
         return OperationResult.success(data=incident.security_incident) if incident is not None else no_such_incident()
+
+
+@dataclass
+class _StoredReport:
+    title: str
+    folder_id: str
+    sections: list[DocumentSection] = field(default_factory=list)
+    placeholders: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class DraftCopy:
+    """One draft copy the fake was asked to write."""
+
+    report: ReportReference
+    drafts: tuple[SectionDraft, ...]
+    fields: tuple[DocumentField, ...]
+    links: Mapping[str, str]
+
+
+class InMemoryIncidentReport:
+    """Hold incident reports in a dict keyed by document id; every call is recorded for assertions.
+
+    Built with the Google tenant and the [incident_core] document ids it stands in
+    for. ``next_ids`` fixes the ids of the reports it creates, in order; past them
+    ids are ``report-<n>``. ``seed_sections`` makes an existing report known.
+    """
+
+    def __init__(
+        self,
+        *,
+        tenant: str = "C0GOOGLE",
+        folder_id: str = "F0INCIDENTS",
+        report_template_id: str = "T0TEMPLATE",
+        next_ids: Sequence[str] = (),
+    ) -> None:
+        self._tenant = tenant
+        self._folder_id = folder_id
+        self._report_template_id = report_template_id
+        self._next_ids = list(next_ids)
+        self._reports: dict[str, _StoredReport] = {}
+        self.read_from: list[ReportReference] = []
+        self.draft_copies: list[DraftCopy] = []
+
+    def seed_sections(self, report: ReportReference, sections: Sequence[DocumentSection]) -> None:
+        """Make ``report`` known with ``sections``, as if its template had them."""
+        stored = self._reports.setdefault(report.vendor_id, _StoredReport(title="", folder_id=self._folder_id))
+        stored.sections = list(sections)
+
+    def filed_in(self, report: ReportReference) -> str:
+        """Return the folder a created report was filed in."""
+        return self._reports[report.vendor_id].folder_id
+
+    def placeholders_of(self, report: ReportReference) -> Mapping[str, str]:
+        """Return the placeholder values applied to ``report`` so far."""
+        return dict(self._reports[report.vendor_id].placeholders)
+
+    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
+        """Create a known report filed in the configured folder; an empty document id refuses naming its key."""
+        if not self._folder_id:
+            return _report_not_configured("incident_core.folder_id")
+        if not self._report_template_id:
+            return _report_not_configured("incident_core.report_template_id")
+        document_id = self._next_ids.pop(0) if self._next_ids else f"report-{len(self._reports) + 1}"
+        self._reports[document_id] = _StoredReport(title=title, folder_id=self._folder_id)
+        return OperationResult.success(
+            data=ReportReference(
+                system=WorkplaceSystem.GOOGLE,
+                tenant=self._tenant,
+                vendor_id=document_id,
+                url=f"https://docs.google.com/document/d/{document_id}/edit",
+            )
+        )
+
+    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+        """Record the values on a known report."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _no_such_report()
+        stored.placeholders.update(values)
+        return OperationResult.success()
+
+    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+        """Return a known report's sections in order."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _no_such_report()
+        self.read_from.append(report)
+        return OperationResult.success(data=tuple(stored.sections))
+
+    def write_draft_copy(
+        self,
+        report: ReportReference,
+        drafts: Sequence[SectionDraft],
+        fields: Sequence[DocumentField],
+        links: Mapping[str, str],
+    ) -> OperationResult[DraftWriteResult]:
+        """Record a draft copy of a known report; nothing to write is a transient failure, as the writer returns."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _no_such_report()
+        if not drafts and not fields:
+            return OperationResult.transient_error(message="The draft copy could not be written")
+        self.draft_copies.append(DraftCopy(report, tuple(drafts), tuple(fields), dict(links)))
+        return OperationResult.success(
+            data=DraftWriteResult(document_id=f"{report.vendor_id}-draft-{len(self.draft_copies)}", created=True)
+        )
+
+    def link(self, report: ReportReference) -> str | None:
+        """Return the stored link of the report."""
+        return report.url
+
+
+def _report_unsupported[T](report: ReportReference) -> OperationResult[T]:
+    return OperationResult.permanent_error(
+        f"Google Docs cannot reach a report on {report.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _no_such_report[T]() -> OperationResult[T]:
+    return OperationResult.error(OperationStatus.NOT_FOUND, message="No such report")
+
+
+def _report_not_configured[T](key: str) -> OperationResult[T]:
+    return OperationResult.permanent_error(f"{key} is not configured", ErrorCode.CONFIG_NOT_CONFIGURED)
