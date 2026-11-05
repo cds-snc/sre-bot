@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-11-05T00:14:00Z'
+updated_date: '2026-11-05T00:44:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -54,6 +54,14 @@ created: 2026-10-26T19:32:00Z
 ---
 
 2026-10-26 (human approved): scope under review by TASK-169. decisions/workplace-systems.md now says a vendor product API is not a capability by itself; this task is expected to be re-scoped from a move into app/capabilities/ to purpose-named ports owned by its consumers over integrations/google_workspace/. Do not plan it before TASK-169 lands.
+
+---
+
+created: 2026-11-05T00:44:00Z
+
+---
+
+2026-11-05 (TASK-145.6 plan, approved): TASK-145.6.1 moves every incident Drive call into features/incident/core/adapters/google_docs.py and TASK-145.6.2 moves them off infrastructure.drive onto the gateway's Drive factory, so AC #2 is met there; this task keeps the talent adapter and the deletion of app/infrastructure/drive/.
 
 ---
 <!-- COMMENTS:END -->
