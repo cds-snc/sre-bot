@@ -1,10 +1,10 @@
 ---
 id: TASK-145.5.7.3
 title: incident.response becomes a plugin and registers the upgrade job
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:04:00Z'
-updated_date: '2026-11-04T23:10:00Z'
+updated_date: '2026-11-05T20:18:00Z'
 labels:
   - incident
   - features
