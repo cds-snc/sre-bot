@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-05T20:17:00Z'
+updated_date: '2026-11-05T20:26:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -38,31 +38,29 @@ updated_date: '2026-11-05T20:17:00Z'
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | merged | 2026-11-05. Task still In Progress: the human sets Done (edit rides in 12c's commit).
 | 12a | TASK-145.6.1 verbatim move of documents/, drive/ and scribe's section writer into core/adapters/google_docs.py; every importer repointed | `stack-k/task-145.6.1-google-docs-move` | #1825 | in review | Base `main` since #1822 merged (GitHub retarget); the local branches were not yet synced with main at 2026-11-05 (12c session). ACs #1-#5 checked, In Progress. The four document section types moved to core/domain.py (pulled forward from 12b). |
 | 12b | TASK-145.6.2 IncidentReport Protocol, Google Docs adapter and fake; Drive on the gateway (infrastructure.drive ignores deleted); scribe drafts from the record's report; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | #1826 | in review | Committed 8704abdd, submitted above #1825. ACs #1-#10 checked, In Progress. Production SSM INCIDENT_CORE folder and template ids confirmed non-empty (human, 2026-11-05). |
-| 12c | TASK-145.6.3 IncidentConversation with is_writable (and create, OQ1); conversation_is_writable; the transcript reader takes a ConversationReference | `stack-k/task-145.6.3-incident-conversation` | - | planned | 2026-11-05: branch added above 12b (no commits). Full plan written, proposed, awaiting approval (OQ1-OQ6): 6 production files, ~390 LOC (~410 with create). |
+| 12c | TASK-145.6.3 IncidentConversation with is_writable; conversation_is_writable; the transcript reader takes a ConversationReference | `stack-k/task-145.6.3-incident-conversation` | #1827 | plan approved | 2026-11-05: plan commit 4d61cb56 submitted as #1827 (stack synced onto main). Plan revised after the program-scope assessment and approved (human, 2026-11-05): ~9 production files, ~410 LOC. Next: TDD. |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
 
 ## Position
 
-- Branch `stack-k/task-145.6.3-incident-conversation` (12c) checked out, on top of 12b (8704abdd) per `gh stack view`; no rebase in progress; no commits of its own yet.
-- Uncommitted on it: the TASK-145.6.3 plan (task file) and this doc. Both ride in 12c's implementation commit.
-- Open stack PRs: #1825 (12a, base `main`), #1826 (12b, above #1825). #1822 merged.
-- The stack was not synced after #1822 merged: 12a's branch does not contain origin/main. Sync before implementing 12c.
+- Branch `stack-k/task-145.6.3-incident-conversation` (12c) checked out, on top of 12b (9c3b4389) per `gh stack view`; no rebase in progress; synced onto main (contains origin/main); one commit, the plan (4d61cb56), submitted as #1827.
+- Uncommitted on it: the revised and approved TASK-145.6.3 plan, ACs and comment; comments on TASK-145.7 and 145.9 (145.9 AC #8); decisions/incident-management.md, outbound-clients.md and transport-slack.md; this doc. Commit them as a planning commit on 12c (commands in the session hand-off). The untracked planning docs were restored from the stash by the human.
+- Open stack PRs: #1825 (12a, base `main`), #1826 (12b), #1827 (12c, plan only). #1822 merged; TASK-145.5.7.3 Done.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. 2026-11-05: 2 of 330 items have no report_url, both open test incidents (D1 accepted). Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
 - No background agents.
 
 ## Next actions
 
-1. **human**: review the TASK-145.6.3 plan (`backlog task view 145.6.3 --plain`) and answer OQ1-OQ6; record the approval as a task comment.
-2. **human**: `backlog task edit 145.5.7.3 --status Done` (#1822 merged), then `gh stack sync` and `gh stack submit` (12a and 12b onto main with #1822). On a doc-13 conflict take main's version and re-apply this session's edits.
-3. **agent**: after approval, apply the approved AC rewording (AC #3 per OQ5; AC for create per OQ1), the ADR change (incident-management.md core list gains create if OQ1), then implement 12c with TDD on its branch.
-4. **human**: #1825 (12a) may merge now that #1826 is above it; then `gh stack sync`. 12b stays open until 12c is submitted above it.
-5. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
+1. **human**: commit the approved planning edits on 12c and `gh stack submit` (commands in the session hand-off).
+2. **agent**: implement TASK-145.6.3 (12c) with TDD per the approved plan (steps 1-10), then the gates (ruff and targeted tests during; full mypy then full pytest once at the end), check ACs one by one, keep In Progress.
+3. **human**: #1825 (12a) may merge now that two layers are above it; then `gh stack sync`. 12b merges once 12c is submitted with its implementation.
+4. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
 
 ## Open decisions
 
-- TASK-145.6.3 (12c) plan, 2026-11-05, awaiting the human: OQ1 create on IncidentConversation (rec. yes, two consumers 145.7 and 145.8); OQ2 adapter-local Slack error mapping, never raises (rec.); OQ3 invite takes vendor user ids (rec.); OQ4 conversation_is_writable takes the record and readers get incident.conversation (rec.); OQ5 reader keeps its empty-value contract, other system -> empty plus a log event, AC #3 reworded (rec.); OQ6 summarize builds the reference without the incident lookup (rec.; 145.9 decides).
+- TASK-145.6.3 (12c) plan, revised 2026-11-05 after a program-scope assessment (ADRs, doc-11, doc-15), approved (human, 2026-11-05): OQ1 no create here, 145.7 adds it with the first working-surface binding (E1); OQ2 not-writable codes join the Slack classification table, unknown codes propagate (outbound-clients.md); OQ3 invite takes chat account ids (people-and-accounts.md); OQ4 conversation_is_writable(conversations, conversation | None), callers pass incident.conversation now, the primary binding after E1; OQ5 the reader returns OperationResult (operation-result.md), callers keep today's replies; OQ6 summarize keeps behaviour, 145.9 gains the command-check AC; G1 rate-limit-only Slack write handle (non-idempotent write rule); G2 IncidentConversation async (transport-slack.md), reader sync tolerated. ~9 production files, ~410 LOC.
 - None open for the stack. 2026-11-05 (human): TASK-145.6 plan and split approved (OQ1-OQ5); TASK-145.6.2 C1-C4 and D1 approved; TASK-184 plan approved (OQ1-OQ3), merged as #1824 and deployed 2026-11-05.
 - 2026-11-05 (12b, agent, within the approved plan): the section reader and draft writer stay module functions in core/adapters/google_docs.py behind GoogleDocsIncidentReport (the writer's tests stay as pinned); a new report's tenant is read at call time from the Google Workspace entry, so get_incident_report() takes no argument; scribe's two bookmark-lookup log events go with the lookup (C3). Recorded in TASK-145.6.2 notes and decisions/incident-management.md.
 - 2026-11-05 (12a, agent, within the approved plans): the four document section types moved to core in 12a instead of 12b, because core cannot import scribe. Recorded on TASK-145.6.1 notes, TASK-145.6.2 and in decisions/incident-management.md.
@@ -71,4 +69,4 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Planning queue
 
-- TASK-145.6.3 (12c): full plan proposed 2026-11-05, awaiting approval. Last planned layer of TASK-145.6; Stack K's next layers come from TASK-145.7 onward (doc-11).
+- None: 12c's plan is approved and 12c is Stack K's last planned layer. TASK-145.7 onward is Stack L (doc-11 row 18, re-planned with the E1 bindings after A1, row 17a).

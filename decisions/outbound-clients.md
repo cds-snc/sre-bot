@@ -67,6 +67,7 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - a replayed Directory `members.insert` that returns 409 is not treated as success;
 - `MaxMindClient` classifies and returns `OperationResult` inside the vendor package;
 - Slack's transport modules still live in `integrations/slack/` (TASK-26);
+- Slack writes in the legacy `modules/` on the retrying handle (`get_slack_web_client` replays connection and server errors), until each module is rebuilt (incident: TASK-145.13); feature code writes through the rate-limit-only write handle;
 - Opsgenie: business operations in the vendor package, no classifier, no explicit timeout;
 - Sentinel: the audit sink lives in the vendor package, which has no classifier and imports `infrastructure.audit`;
 - Notify: `revoke_api_key` lives in the vendor package, which has no classifier;
@@ -84,3 +85,4 @@ Tickets: TASK-25 (per-vendor contract), TASK-87 (Google write replay safety) and
 - 2026-09-29: Slack has `classify_slack_error` and one Web client factory carrying the SDK retry handlers (TASK-25.4); only its transport-module placement (TASK-26) remains open.
 - 2026-10-01: the OpenAI `Summarizer` port and implementation are destined for the text-generation capability.
 - 2026-10-20: Google and Slack settings each have one home under `integrations/`, so the settings divergence is closed and `integrations.google_workspace.client` no longer imports `infrastructure` (TASK-24.3, TASK-24.4).
+- 2026-11-05: Slack follows the non-idempotent write rule: `integrations/slack/` gains a write handle that retries only rate-limited requests (a 429 was not processed; Slack documents that `internal_error` and `fatal_error` may follow partial success), and the classification table gains the not-writable conversation codes; unknown codes still propagate (TASK-145.6.3). Legacy Slack writes on the retrying handle are listed as tolerated.

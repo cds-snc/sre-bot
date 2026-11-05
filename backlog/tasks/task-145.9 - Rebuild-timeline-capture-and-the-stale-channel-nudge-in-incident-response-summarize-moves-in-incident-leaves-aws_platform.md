@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T15:54:00Z'
+updated_date: '2026-11-05T20:31:00Z'
 labels:
   - incident
   - features
@@ -47,6 +47,7 @@ THIS SLICE
 - [ ] #5 core/store.py has timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, captured_entry_id (uuid5 over system, tenant, conversation and message id; a re-capture yields the same key) and a uuid4 manual entry id, each tested
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 IncidentReport gains append_timeline_entry(ReportReference, entry) in core/api.py with its Google Docs adapter and fake (parity test); the legacy timeline rewrite in modules/incident/incident_document.py (lines 82-302 at main 5deb8406, build_timeline_replacement included) moves into core/adapters/google_docs.py, and incident_document.py is deleted with its legacy test once 145.8 has moved the status mapping and no caller remains
+- [ ] #8 /sre incident summarize resolves its incident through find_incident_for_conversation (a channel that is not an incident gets the not-an-incident reply) and reads the incident's conversation (the primary binding once TASK-145.7 adds bindings); a behaviour change, so not in the mechanical summarize move
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -111,6 +112,14 @@ created: 2026-11-05T15:54:00Z
 ---
 
 2026-11-05: _SRE_BOT_GENERATED_TIMELINE in core/adapters/google_docs.py (the section writer) and START_HEADING in modules/incident/incident_document.py are the same template marker. When the timeline is rebuilt here, keep one definition, with the report's timeline in the adapter. TASK-145.11 leaves it in the adapter.
+
+---
+
+created: 2026-11-05T20:31:00Z
+
+---
+
+2026-11-05 (TASK-145.6.3 approval, OQ6): AC #8 added. incident-management.md Checks require every incident command to resolve its incident through find_incident_for_conversation; summarize skips it today and 145.6.3 keeps that behaviour. The layer that carries it is chosen at this task's split approval (not 145.9.2, the mechanical move). 145.6.3 also makes the transcript reader take a ConversationReference and return OperationResult (synchronous on WebClient, tolerated in transport-slack.md until its last caller moves).
 
 ---
 <!-- COMMENTS:END -->
