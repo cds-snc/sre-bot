@@ -6,10 +6,15 @@ write that landed is a conflict, newest first. ``InMemoryIncidentStore``: the in
 with the same classifications as ``RecordIncidentStore``. ``InMemoryIncidentReport``:
 the ``GoogleDocsIncidentReport`` rules (Google references only, unknown reports not
 found, empty document ids refused naming the key, no draft copy without content).
+``InMemoryIncidentConversation``: the ``SlackIncidentConversation`` rules (Slack
+references only, unknown conversations not found, archived or non-member
+conversations not writable and refusing writes, repeated archives and empty
+invites succeeding).
 """
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Any
 
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
@@ -21,6 +26,7 @@ from features.incident.core.domain import (
     DocumentSection,
     DraftWriteResult,
     Incident,
+    MessageReference,
     ReportReference,
     SectionDraft,
     StatusUpdate,
@@ -263,3 +269,152 @@ def _no_such_report[T]() -> OperationResult[T]:
 
 def _report_not_configured[T](key: str) -> OperationResult[T]:
     return OperationResult.permanent_error(f"{key} is not configured", ErrorCode.CONFIG_NOT_CONFIGURED)
+
+
+@dataclass
+class _StoredConversation:
+    archived: bool
+    member: bool
+    purpose: str | None = None
+    posts: list[str] = field(default_factory=list)
+    bookmarks: list[tuple[str, str]] = field(default_factory=list)
+    invited: list[str] = field(default_factory=list)
+
+
+class InMemoryIncidentConversation:
+    """Hold Slack conversations in a dict keyed by channel id; every write is recorded for assertions.
+
+    Built with the Slack tenant it stands in for and the ids of open, archived and
+    non-member conversations; any other id is not found. Posts get ``ts`` values
+    ``1700000000.00000<n>`` in order. ``checked`` lists the conversations whose
+    writability was asked.
+    """
+
+    def __init__(
+        self,
+        *,
+        tenant: str = "T0SLACK",
+        open_ids: Sequence[str] = (),
+        archived_ids: Sequence[str] = (),
+        non_member_ids: Sequence[str] = (),
+    ) -> None:
+        self._tenant = tenant
+        self._conversations: dict[str, _StoredConversation] = {}
+        for vendor_id in open_ids:
+            self._conversations[vendor_id] = _StoredConversation(archived=False, member=True)
+        for vendor_id in archived_ids:
+            self._conversations[vendor_id] = _StoredConversation(archived=True, member=True)
+        for vendor_id in non_member_ids:
+            self._conversations[vendor_id] = _StoredConversation(archived=False, member=False)
+        self._posted = 0
+        self.checked: list[ConversationReference] = []
+
+    def posts_in(self, conversation: ConversationReference) -> Sequence[str]:
+        """Return the texts posted to ``conversation``, in order."""
+        return tuple(self._conversations[conversation.vendor_id].posts)
+
+    def purpose_of(self, conversation: ConversationReference) -> str | None:
+        """Return the purpose last set on ``conversation``."""
+        return self._conversations[conversation.vendor_id].purpose
+
+    def bookmarks_of(self, conversation: ConversationReference) -> Sequence[tuple[str, str]]:
+        """Return the (title, link) bookmarks added to ``conversation``."""
+        return tuple(self._conversations[conversation.vendor_id].bookmarks)
+
+    def invited_to(self, conversation: ConversationReference) -> Sequence[str]:
+        """Return the account ids invited to ``conversation``, in order."""
+        return tuple(self._conversations[conversation.vendor_id].invited)
+
+    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
+        """Record ``text`` and return its reference; refused where the bot cannot write."""
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        self._posted += 1
+        stored.posts.append(text)
+        return OperationResult.success(
+            MessageReference(
+                system=WorkplaceSystem.SLACK,
+                tenant=conversation.tenant,
+                conversation_id=conversation.vendor_id,
+                message_id=f"1700000000.{self._posted:06d}",
+            )
+        )
+
+    async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Record the purpose; refused where the bot cannot write."""
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        stored.purpose = text
+        return OperationResult.success()
+
+    async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
+        """Record the bookmark; refused where the bot cannot write."""
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        stored.bookmarks.append((title, link))
+        return OperationResult.success()
+
+    async def invite(self, conversation: ConversationReference, account_ids: Sequence[str]) -> OperationResult[None]:
+        """Record the accounts not yet invited; no accounts succeeds without touching the conversation."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        if not account_ids:
+            return OperationResult.success()
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        stored.invited.extend(account for account in account_ids if account not in stored.invited)
+        return OperationResult.success()
+
+    async def archive(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Archive the conversation; an archived one stays archived and succeeds."""
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        if stored.archived:
+            return OperationResult.success()
+        if not stored.member:
+            return _not_writable("not_in_channel")
+        stored.archived = True
+        return OperationResult.success()
+
+    async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
+        """Answer whether the conversation is open and the bot a member."""
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        self.checked.append(conversation)
+        return OperationResult.success(not stored.archived and stored.member)
+
+    def _known(self, conversation: ConversationReference) -> _StoredConversation | OperationResult[Any]:
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        stored = self._conversations.get(conversation.vendor_id)
+        if stored is None:
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND, "Slack conversation not found: channel_not_found", "channel_not_found"
+            )
+        return stored
+
+    def _writable(self, conversation: ConversationReference) -> _StoredConversation | OperationResult[Any]:
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        if stored.archived:
+            return _not_writable("is_archived")
+        if not stored.member:
+            return _not_writable("not_in_channel")
+        return stored
+
+
+def _conversation_unsupported[T](conversation: ConversationReference) -> OperationResult[T]:
+    return OperationResult.permanent_error(
+        f"Slack cannot reach a conversation on {conversation.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _not_writable[T](slack_code: str) -> OperationResult[T]:
+    return OperationResult.permanent_error(f"Slack write failed: {slack_code}", ErrorCode.CONVERSATION_NOT_WRITABLE)

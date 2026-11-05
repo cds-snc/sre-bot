@@ -3,10 +3,10 @@ id: TASK-145.6.3
 title: >-
   IncidentConversation with writability; the transcript reader takes a
   ConversationReference
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T20:31:00Z'
+updated_date: '2026-11-05T20:50:00Z'
 labels:
   - incident
   - features
@@ -26,12 +26,12 @@ Layer 12c of Stack K (TASK-145.6 plan, approved 2026-11-05). IncidentConversatio
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 IncidentConversation is an async Protocol in core/api.py (post, set_purpose, add_bookmark, invite, archive, is_writable; no create, which TASK-145.7 adds); SlackIncidentConversation implements it in core/adapters/slack.py and InMemoryIncidentConversation is its fake, with a parity test
-- [ ] #2 is_writable is false for an archived channel and when the bot is not a member, true for an open one; conversation_is_writable(conversations, conversation | None) is exported beside find_incident_for_conversation and answers false for None without a call
-- [ ] #3 read_transcript and conversation_started_at take a ConversationReference and return OperationResult; a reference of another system returns UNSUPPORTED_OPERATION without a Slack call; unknown Slack errors propagate
-- [ ] #4 No user-visible command or reply changes (a failed transcript read gives today's reply); existing log events are kept; the legacy_surface, scribe and comms suites pass
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
-- [ ] #6 Non-idempotent Slack writes go through a handle that retries only rate-limited requests; the not-writable Slack codes are in the Slack classification table and map to CONVERSATION_NOT_WRITABLE
+- [x] #1 IncidentConversation is an async Protocol in core/api.py (post, set_purpose, add_bookmark, invite, archive, is_writable; no create, which TASK-145.7 adds); SlackIncidentConversation implements it in core/adapters/slack.py and InMemoryIncidentConversation is its fake, with a parity test
+- [x] #2 is_writable is false for an archived channel and when the bot is not a member, true for an open one; conversation_is_writable(conversations, conversation | None) is exported beside find_incident_for_conversation and answers false for None without a call
+- [x] #3 read_transcript and conversation_started_at take a ConversationReference and return OperationResult; a reference of another system returns UNSUPPORTED_OPERATION without a Slack call; unknown Slack errors propagate
+- [x] #4 No user-visible command or reply changes (a failed transcript read gives today's reply); existing log events are kept; the legacy_surface, scribe and comms suites pass
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
+- [x] #6 Non-idempotent Slack writes go through a handle that retries only rate-limited requests; the not-writable Slack codes are in the Slack classification table and map to CONVERSATION_NOT_WRITABLE
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -140,6 +140,8 @@ Sources: outbound-clients.md, operation-result.md, transport-slack.md, people-an
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05 (human): TASK-145.6.2 C3 approved; the report-link AC (old #4: no IncidentReportLinkLookup or scribe/adapters/slack.py; report from the record) moved to TASK-145.6.2 and was removed here; title and description narrowed.
+
+2026-11-05 (12c session): implemented with TDD on stack-k/task-145.6.3-incident-conversation above the plan commits (94d43ef2), uncommitted, In Progress. Steps 1-10 done: get_async_slack_write_client (AsyncRateLimitErrorRetryHandler only; built per call like the other Slack factories, cached by get_incident_conversation) and not_writable_errors in the Slack table -> PERMANENT_ERROR, mapped by the adapter to ErrorCode.CONVERSATION_NOT_WRITABLE; IncidentConversation (async; post, set_purpose, add_bookmark, invite, archive, is_writable; no create), SlackIncidentConversation, InMemoryIncidentConversation, conversation_is_writable(conversations, conversation | None), get_incident_conversation; the reader takes a ConversationReference and returns OperationResult (bare excepts gone; later pages, threads, name and identity lookups degrade only on classified Slack errors); scribe draft and comms read the record's conversation, summarize builds the reference in its handler (scopes passed like draft); a failed read gives today's reply. Within the plan, recorded in incident-management.md and outbound-clients.md: ekm_access_denied stays UNAUTHORIZED (a code sits in one catalogue; it was already there); restricted_action_thread_only_channel added (the port posts top-level only); invite sends force=True so one present account does not block the rest (Slack conversations.invite); is_member must be true for writable. Behaviour note: errors the Slack table does not name, connection errors included, now reach the command error boundary ("Error executing ...") instead of an empty transcript. Size: 9 production code files, +558/-90 incl. the fake (155) and docstrings, over the ~410 estimate. Tests: 4 new conversation files and a core conftest StubSlack, test_slack_client_write_handle.py; reader, api surface, scribe and comms stubs updated. Gates: ruff OK; make check-import-contracts 13 kept; make check-settings-key-ownership OK; mypy 41 errors, all pre-existing, none in touched files; pytest tests --ignore=tests/smoke 6396 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

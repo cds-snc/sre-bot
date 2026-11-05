@@ -85,18 +85,20 @@ _DRAFT = StatusUpdate(
 
 
 class _StubReader:
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return _NOW - timedelta(hours=2)
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(_NOW - timedelta(hours=2))
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
-        return (TranscriptMessage(author="Ada", text="DNS is failing", posted_at=_NOW - timedelta(minutes=5)),)
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
+        return OperationResult.success(
+            (TranscriptMessage(author="Ada", text="DNS is failing", posted_at=_NOW - timedelta(minutes=5)),)
+        )
 
 
 def _body() -> dict[str, Any]:

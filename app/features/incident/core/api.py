@@ -13,6 +13,10 @@ the conversation reference they build, to the subdomain services.
 reporting an ``UpgradeReport``) from the services its job resolves per run.
 ``IncidentReport`` works on the incident report the record references
 (``ReportReference``); ``get_incident_report`` provides the Google Docs one.
+``IncidentConversation`` writes to the incident's conversation
+(``ConversationReference``); ``get_incident_conversation`` provides the Slack one,
+and ``conversation_is_writable`` is the check every caller applies before a write.
+``IncidentTranscriptReader`` reads what was said in a conversation.
 """
 
 from collections.abc import Mapping, Sequence
@@ -27,7 +31,7 @@ from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.i18n import translate
-from features.incident.core.adapters.slack import build_incident_transcript_reader
+from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
     ConversationReference,
     DocumentField,
@@ -65,6 +69,7 @@ __all__ = [
     "DraftWriteResult",
     "ExternalCaseReference",
     "Incident",
+    "IncidentConversation",
     "IncidentReport",
     "IncidentStore",
     "IncidentTranscriptReader",
@@ -87,7 +92,9 @@ __all__ = [
     "build_incident_store",
     "build_legacy_upgrade",
     "build_status_update_store",
+    "conversation_is_writable",
     "find_incident_for_conversation",
+    "get_incident_conversation",
     "get_incident_report",
     "get_incident_transcript_reader",
     "translate",
@@ -96,36 +103,36 @@ __all__ = [
 
 @runtime_checkable
 class IncidentTranscriptReader(Protocol):
-    """Interface reading what was said in an incident's conversation.
+    """Interface reading what was said in an incident's conversation, named by its ``ConversationReference``.
 
     Name resolution, ordering, time conversion and filtering happen behind the
-    interface. Implementations never raise for a platform failure: they log it
-    and return the documented empty value.
+    interface. A reference of a system the implementation does not serve is a
+    PERMANENT_ERROR with ``UNSUPPORTED_OPERATION``; platform failures are
+    classified results, and an error the platform's table does not name raises.
     """
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         """Return when the conversation started, timezone-aware UTC.
 
-        Returns ``None`` when the platform cannot say (the lookup failed or the
-        conversation carries no creation time); the caller applies its own
-        fallback window.
+        The data is ``None`` when the conversation carries no creation time; on a
+        non-success the caller applies its own fallback window.
         """
         ...
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         """Return the conversation's messages posted since ``since``, oldest first.
 
         Thread replies are included, interleaved by time, each message once.
 
         Args:
-            conversation_id: The conversation to read.
+            conversation: The conversation to read.
             since: Timezone-aware start of the window.
             limit: Maximum number of messages in the transcript, replies
                 included; the newest are kept.
@@ -133,8 +140,53 @@ class IncidentTranscriptReader(Protocol):
                 platform's system events (joins, topic changes and the like).
 
         Returns:
-            The messages in chronological order; empty on a platform failure.
+            The messages in chronological order, or the classified failure of
+            the first read; a failure after it keeps what was read.
         """
+        ...
+
+
+@runtime_checkable
+class IncidentConversation(Protocol):
+    """Interface writing to an incident's conversation, named by its ``ConversationReference``.
+
+    Callers check ``conversation_is_writable`` before a write. Who the calls run
+    as and how the vendor is reached stay behind the interface. A reference of a
+    system the implementation does not serve is a PERMANENT_ERROR with
+    ``UNSUPPORTED_OPERATION``; a conversation the bot cannot write to (archived,
+    not a member, read-only) refuses writes with ``CONVERSATION_NOT_WRITABLE``;
+    other platform failures are classified results, and an error the platform's
+    table does not name raises. Writes are not replayed after a failure that
+    may have been applied. Creating a conversation is not part of the interface
+    yet: it arrives with declare's first working-surface binding.
+    """
+
+    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
+        """Post ``text`` as the bot and return the posted message's reference."""
+        ...
+
+    async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Set the conversation's purpose (its description) to ``text``."""
+        ...
+
+    async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
+        """Add a link titled ``title`` to the conversation's bookmarks."""
+        ...
+
+    async def invite(self, conversation: ConversationReference, account_ids: Sequence[str]) -> OperationResult[None]:
+        """Invite chat accounts, ids in the conversation's system and tenant.
+
+        Accounts already in the conversation count as invited; no accounts is a
+        success without a call.
+        """
+        ...
+
+    async def archive(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Archive the conversation; one already archived is a success."""
+        ...
+
+    async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
+        """Say whether the bot can write to the conversation (not archived, a member), without changing it."""
         ...
 
 
@@ -239,6 +291,12 @@ def get_incident_report() -> IncidentReport:
 
 
 @lru_cache(maxsize=1)
+def get_incident_conversation() -> IncidentConversation:
+    """Return the process-wide Slack-backed ``IncidentConversation``."""
+    return build_incident_conversation()
+
+
+@lru_cache(maxsize=1)
 def get_incident_transcript_reader() -> IncidentTranscriptReader:
     """Return the process-wide Slack-backed ``IncidentTranscriptReader``."""
     return build_incident_transcript_reader()
@@ -253,3 +311,17 @@ def find_incident_for_conversation(store: IncidentStore, conversation: Conversat
     store failure is a classified error result, never an exception.
     """
     return store.find_by_conversation(conversation)
+
+
+async def conversation_is_writable(
+    conversations: IncidentConversation, conversation: ConversationReference | None
+) -> OperationResult[bool]:
+    """Say whether the bot can write to the incident's conversation; the check before every write.
+
+    ``None`` (an incident without a conversation) is not writable and makes no
+    call. A failed check is the classified result, for the caller to skip the
+    write or report it.
+    """
+    if conversation is None:
+        return OperationResult.success(False)
+    return await conversations.is_writable(conversation)

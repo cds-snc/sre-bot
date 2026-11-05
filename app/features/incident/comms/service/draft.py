@@ -131,7 +131,7 @@ def start_status_update_draft(
     last_public = latest
 
     reader = reader or get_incident_transcript_reader()
-    messages = _read_window(reader, conversation.vendor_id, last_public, settings, now, log)
+    messages = _read_window(reader, incident.data.conversation, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     if last_public is None and not people:
         log.info("incident_status_update_empty_history")
@@ -313,7 +313,7 @@ async def generate_status_update_draft(
     last_public = next((record for record in records if record.state is not StatusUpdateState.DRAFT), None)
 
     reader = reader or get_incident_transcript_reader()
-    messages = _read_window(reader, conversation.vendor_id, last_public, settings, now, log)
+    messages = _read_window(reader, incident.data.conversation, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     new_from_people = [
         message for message in people if last_public is None or _posted_at(message) > last_public.transcript_cutoff
@@ -441,27 +441,36 @@ def _security_gate(
 
 def _read_window(
     reader: IncidentTranscriptReader,
-    conversation_id: str,
+    conversation: ConversationReference | None,
     last_public: StatusUpdate | None,
     settings: IncidentStatusUpdateSettings,
     now: datetime,
     log: structlog.stdlib.BoundLogger,
 ) -> Sequence[TranscriptMessage]:
-    """Read the conversation since the latest approved update, or since it started.
+    """Read the incident's conversation since the latest approved update, or since it started.
 
     A newer draft that was never approved does not narrow the window, so its
-    content is drafted again with whatever followed.
+    content is drafted again with whatever followed. The conversation read is the
+    record's; an incident without one, or a failed read, is an empty window.
     """
+    if conversation is None:
+        return ()
     if last_public is not None:
         since = last_public.transcript_cutoff
     else:
-        since = reader.conversation_started_at(conversation_id) or now - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
-    messages = reader.read_transcript(
-        conversation_id,
+        started = reader.conversation_started_at(conversation)
+        since = (
+            started.data
+            if started.is_success and started.data is not None
+            else now - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
+        )
+    read = reader.read_transcript(
+        conversation,
         since=since,
         limit=settings.MAX_HISTORY_LIMIT,
         exclude_own_and_system_messages=True,
     )
+    messages = read.data if read.is_success and read.data is not None else ()
     if len(messages) >= settings.MAX_HISTORY_LIMIT:
         # One history page is read; older messages in the window may be missing.
         log.warning("incident_status_update_history_truncated", limit=settings.MAX_HISTORY_LIMIT)

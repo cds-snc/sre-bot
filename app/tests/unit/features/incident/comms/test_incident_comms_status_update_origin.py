@@ -20,6 +20,7 @@ from features.incident.comms.domain import NoNewInformationWording, StatusUpdate
 from features.incident.comms.service.draft import generate_status_update_draft, start_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -77,18 +78,18 @@ class _StubReader:
     def __init__(self, messages: Sequence[TranscriptMessage]) -> None:
         self._messages = list(messages)
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return _NOW - timedelta(hours=10)
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(_NOW - timedelta(hours=10))
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
-        return self._messages
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
+        return OperationResult.success(self._messages)
 
 
 class _StubGenerator:

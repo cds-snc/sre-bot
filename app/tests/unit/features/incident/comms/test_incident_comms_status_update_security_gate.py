@@ -12,6 +12,7 @@ generator.
 """
 
 import json
+from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -26,6 +27,7 @@ from features.incident.comms.domain import NoNewInformationWording, StatusUpdate
 from features.incident.comms.service.draft import generate_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
     IncidentStore,
     StatusUpdate,
     StatusUpdateStage,
@@ -84,18 +86,18 @@ class _StubReader:
     def __init__(self, messages: list[TranscriptMessage] | None = None) -> None:
         self._messages = messages or [_human("activity", 20)]
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return _at(600)
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(_at(600))
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> list[TranscriptMessage]:
-        return self._messages
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
+        return OperationResult.success(self._messages)
 
 
 class _StubGenerator:
