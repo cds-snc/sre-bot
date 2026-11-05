@@ -1,6 +1,13 @@
-"""Unit tests for drafting from an incident conversation: report lookup, start signal, window, limit and transcript gathering."""
+"""Unit tests for drafting from an incident conversation: report lookup, start signal, window, limit and transcript gathering.
+
+The conversation is resolved to its incident through an in-memory incident store
+seeded with one incident on Slack channel C123; the report drafted from is the
+one the record holds. The store, the transcript reader and the start signal
+record what they were asked in one shared event list, so order is observable.
+"""
 
 from collections.abc import Iterator, Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -8,16 +15,24 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from features.incident.core.api import DocumentSection, IncidentTranscriptReader, TranscriptMessage
-from features.incident.scribe import providers, service
+from contracts.workplace import WorkplaceSystem
+from features.incident.core.adapters.in_memory import InMemoryIncidentReport, InMemoryIncidentStore
+from features.incident.core.api import (
+    ConversationReference,
+    DocumentSection,
+    IncidentTranscriptReader,
+    ReportReference,
+    TranscriptMessage,
+)
+from features.incident.scribe import service
 from features.incident.scribe.domain import DraftedDocument
-from features.incident.scribe.ports import IncidentReportLinkLookup
 from features.incident.scribe.service import (
     EMPTY_HISTORY_CODE,
     NO_DOCUMENT_CODE,
     draft_incident_document_from_conversation,
 )
 from features.incident.scribe.settings import IncidentDraftSettings
+from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -27,7 +42,10 @@ _MESSAGES = (
     TranscriptMessage(author="Ada", text="prod is down", posted_at=_STARTED),
     TranscriptMessage(author="Bob", text="on it, rolling back"),
 )
-_REPORT_LINK = "https://docs.google.com/document/d/DOC123/edit"
+_REPORT = ReportReference(
+    system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="DOC123", url="https://docs.google.com/document/d/DOC123/edit"
+)
+_CONVERSATION = slack_conversation("C123")
 
 
 class FakeTranscriptReader:
@@ -68,18 +86,20 @@ class FakeTranscriptReader:
         return self._messages
 
 
-class FakeReportLinkLookup:
-    """In-memory ``IncidentReportLinkLookup`` answering with fixed links, recording in a shared event list."""
+class RecordingIncidentStore(InMemoryIncidentStore):
+    """In-memory incident store recording each conversation lookup in a shared event list."""
 
-    def __init__(self, events: list[str], links: Sequence[str] = (_REPORT_LINK,)) -> None:
+    def __init__(self, events: list[str], *, report: ReportReference | None = _REPORT, seeded: bool = True) -> None:
+        super().__init__()
         self._events = events
-        self._links = links
-        self.lookups: list[str] = []
+        self.lookups: list[ConversationReference] = []
+        if seeded:
+            self.seed(replace(incident_on("C123", "inc-1"), report=report))
 
-    def find_report_links(self, conversation_id: str) -> Sequence[str]:
-        self._events.append("find_report_links")
-        self.lookups.append(conversation_id)
-        return self._links
+    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult:
+        self._events.append("find_incident")
+        self.lookups.append(conversation)
+        return super().find_by_conversation(conversation)
 
 
 @pytest.fixture(autouse=True)
@@ -114,81 +134,54 @@ def draft(monkeypatch: pytest.MonkeyPatch) -> Iterator[AsyncMock]:
 def test_fakes_satisfy_the_interfaces() -> None:
     """The fakes stand in for the real implementations only if they match the interfaces."""
     assert isinstance(FakeTranscriptReader([]), IncidentTranscriptReader)
-    assert isinstance(FakeReportLinkLookup([]), IncidentReportLinkLookup)
 
 
 class TestReportDocument:
-    async def test_document_id_and_transcript_reach_draft_incident_document(self, draft: AsyncMock, events: list[str]) -> None:
-        """The report's document id and the messages read are passed on positionally and untouched."""
-        lookup = FakeReportLinkLookup(events)
+    async def test_the_records_report_and_transcript_reach_draft_incident_document(
+        self, draft: AsyncMock, events: list[str]
+    ) -> None:
+        """The incident's report reference and the messages read are passed on positionally and untouched."""
+        store = RecordingIncidentStore(events)
 
-        result = await draft_incident_document_from_conversation("C123", reader=FakeTranscriptReader(events), report_links=lookup)
+        result = await draft_incident_document_from_conversation(store, _CONVERSATION, reader=FakeTranscriptReader(events))
 
-        assert lookup.lookups == ["C123"]
-        draft.assert_awaited_once_with("DOC123", _MESSAGES)
+        assert store.lookups == [_CONVERSATION]
+        draft.assert_awaited_once_with(_REPORT, _MESSAGES)
         assert result is draft.return_value
 
-    @pytest.mark.parametrize("links", [(), ("https://example.com/not-a-doc",), ("",)])
-    async def test_no_usable_report_link_gives_the_no_document_error(
-        self, draft: AsyncMock, events: list[str], links: Sequence[str]
+    @pytest.mark.parametrize(
+        "store_args",
+        [pytest.param({"report": None}, id="record-without-report"), pytest.param({"seeded": False}, id="not-an-incident")],
+    )
+    async def test_no_report_gives_the_no_document_error(
+        self, draft: AsyncMock, events: list[str], store_args: dict[str, Any]
     ) -> None:
-        """No link, or only links without a document id, ends the run before anything slow: no start signal, no read."""
+        """A channel that is no incident, or an incident without a report, ends the run before anything slow."""
         started: list[int] = []
         reader = FakeTranscriptReader(events)
 
         result = await draft_incident_document_from_conversation(
-            "C123", on_started=lambda: started.append(1), reader=reader, report_links=FakeReportLinkLookup(events, links)
+            RecordingIncidentStore(events, **store_args), _CONVERSATION, on_started=lambda: started.append(1), reader=reader
         )
 
         assert result.status == OperationStatus.PERMANENT_ERROR
         assert result.error_code == NO_DOCUMENT_CODE
         assert started == []
-        assert events == ["find_report_links"]
+        assert events == ["find_incident"]
         draft.assert_not_awaited()
 
-    async def test_a_link_without_a_document_id_is_logged(
-        self, draft: AsyncMock, events: list[str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """A report link that is not a Google Docs URL is reported, so a broken bookmark can be found.
+    async def test_another_incident_lookup_failure_is_returned_unchanged(self, draft: AsyncMock, events: list[str]) -> None:
+        """A store failure other than not-an-incident keeps its classification; nothing is read or drafted."""
+        failure: OperationResult[Any] = OperationResult.transient_error(message="store down", error_code="STORE")
+        store = MagicMock()
+        store.find_by_conversation.return_value = failure
 
-        The service's logger is replaced by a mock, so the assertion does not
-        depend on the process-wide structlog configuration.
-        """
-        logger = MagicMock()
-        monkeypatch.setattr(service, "logger", logger)
-        lookup = FakeReportLinkLookup(events, ("https://example.com/not-a-doc",))
+        result = await draft_incident_document_from_conversation(store, _CONVERSATION, reader=FakeTranscriptReader(events))
 
-        await draft_incident_document_from_conversation("C123", reader=FakeTranscriptReader(events), report_links=lookup)
-
-        logger.bind.return_value.warning.assert_called_once_with(
-            "incident_draft_bookmark_link_invalid", link="https://example.com/not-a-doc"
-        )
-
-    async def test_an_invalid_link_is_skipped_for_the_next_valid_one(self, draft: AsyncMock, events: list[str]) -> None:
-        """The first link carrying a document id wins, whatever precedes it."""
-        lookup = FakeReportLinkLookup(
-            events,
-            (
-                "https://example.com/not-a-doc",
-                "https://docs.google.com/document/d/DOC-second/edit",
-                "https://docs.google.com/document/d/DOC-third/edit",
-            ),
-        )
-
-        await draft_incident_document_from_conversation("C123", reader=FakeTranscriptReader(events), report_links=lookup)
-
-        assert draft.await_args.args[0] == "DOC-second"
-
-    async def test_lookup_defaults_to_the_package_provider(
-        self, draft: AsyncMock, events: list[str], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """With no lookup passed, the one the package provider resolves is used."""
-        lookup = FakeReportLinkLookup(events)
-        monkeypatch.setattr(providers, "get_incident_report_link_lookup", lambda: lookup)
-
-        await draft_incident_document_from_conversation("C123", reader=FakeTranscriptReader(events))
-
-        assert lookup.lookups == ["C123"]
+        assert result.status is OperationStatus.TRANSIENT_ERROR
+        assert result.error_code == "STORE"
+        assert events == []
+        draft.assert_not_awaited()
 
 
 class TestStartSignal:
@@ -197,18 +190,18 @@ class TestStartSignal:
     ) -> None:
         """The signal marks the start of the slow work: the report is known, nothing has been read yet."""
         await draft_incident_document_from_conversation(
-            "C123",
+            RecordingIncidentStore(events),
+            _CONVERSATION,
             on_started=lambda: events.append("on_started"),
             reader=FakeTranscriptReader(events),
-            report_links=FakeReportLinkLookup(events),
         )
 
-        assert events == ["find_report_links", "on_started", "conversation_started_at", "read_transcript"]
+        assert events == ["find_incident", "on_started", "conversation_started_at", "read_transcript"]
 
     async def test_on_started_may_be_omitted(self, draft: AsyncMock, events: list[str]) -> None:
         """A caller with nothing to signal still gets its draft."""
         result = await draft_incident_document_from_conversation(
-            "C123", reader=FakeTranscriptReader(events), report_links=FakeReportLinkLookup(events)
+            RecordingIncidentStore(events), _CONVERSATION, reader=FakeTranscriptReader(events)
         )
 
         assert result.is_success
@@ -219,7 +212,7 @@ class TestWindowAndLimit:
         """A draft covers the whole incident, from the conversation's start."""
         reader = FakeTranscriptReader(events)
 
-        await draft_incident_document_from_conversation("C123", reader=reader, report_links=FakeReportLinkLookup(events))
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, reader=reader)
 
         assert reader.reads[0]["since"] == _STARTED
 
@@ -227,7 +220,7 @@ class TestWindowAndLimit:
         """When the reader cannot say when the conversation started, the configured default look-back applies."""
         reader = FakeTranscriptReader(events, started_at=None)
 
-        await draft_incident_document_from_conversation("C123", reader=reader, report_links=FakeReportLinkLookup(events))
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, reader=reader)
 
         assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
 
@@ -241,9 +234,7 @@ class TestWindowAndLimit:
         """A missing, zero or negative limit means the default; a larger one is capped at the maximum."""
         reader = FakeTranscriptReader(events)
 
-        await draft_incident_document_from_conversation(
-            "C123", limit=limit, reader=reader, report_links=FakeReportLinkLookup(events)
-        )
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, limit=limit, reader=reader)
 
         assert reader.reads[0]["limit"] == expected
 
@@ -253,7 +244,7 @@ class TestWindowAndLimit:
         """Drafts leave out the bot's own posts and system events: the read asks for them to be excluded."""
         reader = FakeTranscriptReader(events)
 
-        await draft_incident_document_from_conversation("C123", reader=reader, report_links=FakeReportLinkLookup(events))
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, reader=reader)
 
         assert len(reader.reads) == 1
         assert reader.reads[0]["conversation_id"] == "C123"
@@ -266,16 +257,16 @@ class TestWindowAndLimit:
         reader = FakeTranscriptReader(events)
         monkeypatch.setattr(service, "get_incident_transcript_reader", lambda: reader)
 
-        await draft_incident_document_from_conversation("C123", report_links=FakeReportLinkLookup(events))
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION)
 
         assert len(reader.reads) == 1
 
 
-class _ReadableDocument:
-    """Document store with one draftable section and no write path, for runs that end before the model call."""
-
-    def read_sections(self, document_id: str) -> list[DocumentSection]:
-        return [DocumentSection(heading="Trigger", instructions="What set it off?")]
+def _readable_report() -> InMemoryIncidentReport:
+    """A report interface holding one draftable section for the record's report, for runs that end before the model call."""
+    reports = InMemoryIncidentReport()
+    reports.seed_sections(_REPORT, [DocumentSection(heading="Trigger", instructions="What set it off?")])
+    return reports
 
 
 class TestFailures:
@@ -283,10 +274,10 @@ class TestFailures:
         self, events: list[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Nothing read (no messages, or a platform failure behind the reader) is the empty-history outcome."""
-        monkeypatch.setattr(providers, "get_incident_document_store", _ReadableDocument)
+        monkeypatch.setattr(service, "get_incident_report", _readable_report)
 
         result = await draft_incident_document_from_conversation(
-            "C123", reader=FakeTranscriptReader(events, messages=()), report_links=FakeReportLinkLookup(events)
+            RecordingIncidentStore(events), _CONVERSATION, reader=FakeTranscriptReader(events, messages=())
         )
 
         assert result.status == OperationStatus.PERMANENT_ERROR
@@ -298,7 +289,7 @@ class TestFailures:
         draft.return_value = error
 
         result = await draft_incident_document_from_conversation(
-            "C123", reader=FakeTranscriptReader(events), report_links=FakeReportLinkLookup(events)
+            RecordingIncidentStore(events), _CONVERSATION, reader=FakeTranscriptReader(events)
         )
 
         assert result is error

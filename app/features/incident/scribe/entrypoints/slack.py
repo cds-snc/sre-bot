@@ -7,11 +7,15 @@ handler translates its arguments, makes one call to the platform-agnostic
 Wording and views come from ``entrypoints/slack_views.py``, the only module
 that translates.
 
-Draft: the service finds the incident report, reads the channel's transcript,
-answers each heading's template instructions from it and writes the result into
-a new draft document. The in-request progress notice goes through the
-registrar's reply interface, posted when the service signals that the report
-was found and the slow work is starting.
+Draft: the handler opens one service scope, builds the ``IncidentStore`` there
+from the resolved ``RecordStore`` and the configured systems, builds the
+channel's ``ConversationReference`` under the configured Slack tenant (present:
+the plugin requires ``slack.tenant``), and calls the service inside the scope.
+The service resolves the channel's incident, reads its report and the channel's
+transcript, answers each heading's template instructions from it and writes the
+result into a new draft document. The in-request progress notice goes through
+the registrar's reply interface, posted when the service signals that the
+report was found and the slow work is starting.
 
 Summarize: the service reads the conversation's transcript through the incident
 core's ``IncidentTranscriptReader`` interface and the result is rendered as
@@ -26,9 +30,14 @@ from typing import Any
 
 import structlog
 
+from contracts.records import RecordStore
+from contracts.services import ServiceScopeOpener
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
+from contracts.workplace import ConfiguredSystems, WorkplaceSystem
+from features.incident.common.settings import get_incident_core_settings
+from features.incident.core.api import ConversationReference, build_incident_store
 from features.incident.scribe.entrypoints.slack_views import (
     DRAFT_DOMAIN,
     SUMMARY_DOMAIN,
@@ -64,11 +73,13 @@ def register(registrar: SlackCommandRegistrar) -> None:
         registrar: Slack command registrar.
     """
 
+    scopes = registrar.service_scopes
+
     def _dispatch_draft(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_draft_command(payload, parsed_args, registrar.reply)
+        return handle_draft_command(payload, parsed_args, registrar.reply, scopes)
 
     def _dispatch_draft_default(payload: CommandPayload) -> CommandResponse:
-        return handle_draft_command(payload, {}, registrar.reply)
+        return handle_draft_command(payload, {}, registrar.reply, scopes)
 
     def _dispatch_summarize(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
         return handle_summarize_command(payload, parsed_args)
@@ -126,6 +137,7 @@ def handle_draft_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
     reply: SlackReplySender,
+    scopes: ServiceScopeOpener,
 ) -> CommandResponse:
     """Handle ``/sre incident draft`` and report the outcome ephemerally.
 
@@ -140,6 +152,7 @@ def handle_draft_command(
             invocation). History always starts at the channel's creation so the
             draft covers the whole incident.
         reply: Interface used to post the progress notice.
+        scopes: Opens the service scope the incident store is built in.
 
     Returns:
         An ephemeral ``CommandResponse`` linking the new draft document, or a
@@ -166,13 +179,19 @@ def handle_draft_command(
     def _on_started() -> None:
         notify_working(reply, channel_id, payload, locale, log)
 
-    result = asyncio.run(
-        draft_incident_document_from_conversation(
-            channel_id,
-            limit=_parse_limit(parsed_args.get("--limit")),
-            on_started=_on_started,
+    with scopes.create_scope() as services:
+        systems = services.get(ConfiguredSystems)
+        incidents = build_incident_store(services.get(RecordStore), systems, get_incident_core_settings())
+        tenant = systems.tenants()[WorkplaceSystem.SLACK]
+        conversation = ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=channel_id)
+        result = asyncio.run(
+            draft_incident_document_from_conversation(
+                incidents,
+                conversation,
+                limit=_parse_limit(parsed_args.get("--limit")),
+                on_started=_on_started,
+            )
         )
-    )
 
     if result.is_success:
         return draft_success_response(result.data, locale)

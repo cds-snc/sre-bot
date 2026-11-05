@@ -9,6 +9,7 @@ import features.incident.scribe as scribe_pkg
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from infrastructure.i18n.loader import YAMLTranslationLoader
 from infrastructure.i18n.resources import I18nResourceRegistry
+from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
@@ -33,7 +34,7 @@ def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
     A recording fake registrar stands in for the Slack provider, so the
     assertion is on what the hookimpl asked to be registered.
     """
-    registrar = FakeSlackRegistrar()
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     scribe_pkg.register_slack_commands(registrar=registrar)
 
@@ -43,7 +44,7 @@ def test_one_hookimpl_registers_both_commands_under_sre_incident() -> None:
 
 def test_hookimpl_registers_no_block_action_or_view_submission() -> None:
     """The scribe commands reply ephemerally, so the package registers no modal listener."""
-    registrar = FakeSlackRegistrar()
+    registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     scribe_pkg.register_slack_commands(registrar=registrar)
 

@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-05T21:00:00Z'
+updated_date: '2026-11-05T19:12:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -37,35 +37,37 @@ updated_date: '2026-11-05T21:00:00Z'
 | 11b | TASK-145.5.7.2 incident core upgrade runner | `stack-k/task-145.5.7.2-upgrade-runner` | #1821 | merged | 2026-11-05 (33511c15), deployed (new task started; `/sre help` and the alert buttons work; the deploy script was not run, none required). |
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | in review | Base `main`. Rebased 2026-11-05 onto main 85c0aa74 (one commit, d170e2f5). 12a (#1825) is above it, so it may merge once re-reviewed. |
 | 12a | TASK-145.6.1 verbatim move of documents/, drive/ and scribe's section writer into core/adapters/google_docs.py; every importer repointed | `stack-k/task-145.6.1-google-docs-move` | #1825 | in review | 2026-11-05: ACs #1-#5 checked, In Progress. Two commits: the move, and the planning edits (TASK-145.11 step 3a and AC #6, notes on 145.9 and 165). The four document section types moved to core/domain.py (pulled forward from 12b step 1). Gates before the rebase: contracts 13 kept, key ownership OK, mypy 41 pre-existing, pytest 6248 passed. |
-| 12b | TASK-145.6.2 IncidentReport Protocol and adapter on the gateway factories; infrastructure.drive ignores deleted; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | plan approved | 2026-11-05 (human): ~295 LOC, 12 files; C1-C4 as recommended, D1 accept (AC #9 checked); AC #10 (report from the record, link lookup deleted) moved in from 12c; the step 1 type move is already done in 12a (task comment). TASK-184 (#1824) merged 2026-11-05 (85c0aa74), so AC #5 is unblocked; step 7 also extends the CI configuration check (TASK-184 OQ1). |
+| 12b | TASK-145.6.2 IncidentReport Protocol, Google Docs adapter and fake; Drive on the gateway (infrastructure.drive ignores deleted); scribe drafts from the record's report; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | in progress | 2026-11-05: implemented with TDD, uncommitted, gates green; ACs #1-#10 checked, In Progress. 12 production files changed, 3 deleted (scribe ports.py, providers.py, adapters/). Gates: contracts 13 kept, key ownership OK, mypy 41 pre-existing (none in touched files), pytest 6316 passed. Next: commit, then gh stack submit opens its PR above #1825. |
 | 12c | TASK-145.6.3 IncidentConversation with is_writable; reader takes a ConversationReference (link lookup deletion moved to 12b, 2026-11-05) | `stack-k/task-145.6.3-incident-conversation` | - | planned | ~9 files, ~380 LOC. |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
 
 ## Position
 
-- Rebase of 2026-11-05 evening (human, `gh stack rebase` after #1821 and #1824 merged onto main 85c0aa74): 12a's commit conflicted on docs only. doc-13 took main's version, and the 12a session's edits were re-applied (this doc). TASK-145.6.2 conflicted only on `updated_date`; the later one was kept and both sides' notes are present. Run `git rebase --continue` to finish; the planning commit (73e10ea2) is applied after it.
-- Open stack PRs: #1822 (11c, base `main`), #1825 (12a, above #1822).
+- Branch `stack-k/task-145.6.2-incident-report` (12b) checked out, on top of 12a (dfe085c2) per `gh stack view`; no rebase in progress.
+- Uncommitted on it, all 12b's: the app changes (core api, adapters, in-memory fake, scribe, pyproject ignores, tests, both READMEs), the TASK-145.6.2 and TASK-120 notes, the decisions/incident-management.md and decisions/plugins.md log lines, and this doc.
+- Open stack PRs: #1822 (11c, base `main`), #1825 (12a, above #1822; carries the TASK-145.5.7.2 and TASK-184 Done edits in dfe085c2).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`.
-- Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
+- Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. 2026-11-05: 2 of 330 items have no report_url, both open test incidents (D1 accepted: /incident draft there answers no-document). Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
 - No background agents.
 
 ## Next actions
 
-1. **human**: finish the rebase (`git rebase --continue` on each stop), run `gh stack push`, and close the merged tasks: `backlog task edit TASK-145.5.7.2 --status Done`, `backlog task edit TASK-184 --status Done` (the task-file edits are committed with 12b).
-2. **human**: re-review and merge #1822 (11c); then `gh stack sync`, `gh stack submit`. #1825 (12a) stays open until 12b is submitted above it.
-3. **human**: `gh stack checkout stack-k/task-145.6.1-google-docs-move`, `gh stack add stack-k/task-145.6.2-incident-report`.
-4. **agent**: implement TASK-145.6.2 (12b) with TDD; step 1 is the Protocol and the provider only (the types are already in core).
-5. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
+1. **human**: commit 12b on its branch and `gh stack submit` (opens the 12b PR above #1825). Commands in the session hand-off.
+2. **human**: before 12b merges, confirm `/sre-bot/INCIDENT_CORE__FOLDER_ID` and `/sre-bot/INCIDENT_CORE__REPORT_TEMPLATE_ID` are non-empty in production SSM (read-only; scribe now stops boot naming an empty one). No terraform, IAM, SSM or env change in 12b, so no deploy-checks.
+3. **human**: re-review and merge #1822 (11c), then `gh stack sync` and `gh stack submit`; #1825 (12a) may merge once 12b is submitted above it, then sync again. 12b stays open until 12c is added above it.
+4. **human**: `gh stack checkout stack-k/task-145.6.2-incident-report`, then `gh stack add stack-k/task-145.6.3-incident-conversation`.
+5. **agent**: plan TASK-145.6.3 (12c) in full (outline only today; narrowed by C3: IncidentConversation with is_writable, the transcript reader takes a ConversationReference) and stop for approval.
+6. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
 
 ## Open decisions
 
 - None open for the stack. 2026-11-05 (human): TASK-145.6 plan and split approved (OQ1-OQ5); TASK-145.6.2 C1-C4 and D1 approved; TASK-184 plan approved (OQ1-OQ3), merged as #1824 and deployed 2026-11-05.
+- 2026-11-05 (12b, agent, within the approved plan): the section reader and draft writer stay module functions in core/adapters/google_docs.py behind GoogleDocsIncidentReport (the writer's tests stay as pinned); a new report's tenant is read at call time from the Google Workspace entry, so get_incident_report() takes no argument; scribe's two bookmark-lookup log events go with the lookup (C3). Recorded in TASK-145.6.2 notes and decisions/incident-management.md.
 - 2026-11-05 (12a, agent, within the approved plans): the four document section types moved to core in 12a instead of 12b, because core cannot import scribe. Recorded on TASK-145.6.1 notes, TASK-145.6.2 and in decisions/incident-management.md.
 - 2026-11-05 (human, 12a review): the section writer's draft rules leave core/adapters/google_docs.py for postmortem in TASK-145.11 (step 3a, AC #6). 12a stays a pure move; 12b keeps its write_draft_copy signature.
 - Recorded at task level: TASK-145.7 dual-write, source_alert shape and the binding step; TASK-145.8 partial updates of items without record_version; TASK-154 status lifecycle.
 
 ## Planning queue
 
-- TASK-145.6.2 (12b): plan approved 2026-11-05; unblocked (#1824 merged).
-- TASK-145.6.3 (12c): outline (narrowed by C3); full plan at pickup.
+- TASK-145.6.3 (12c): outline (narrowed by C3); full plan at pickup, after 12b is submitted.

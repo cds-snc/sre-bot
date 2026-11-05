@@ -9,21 +9,26 @@ Sections, in order:
   documents().get/.batchUpdate, each owning its try/except and
   classify_google_error, exposing incident-domain operations rather than
   SDK-shaped passthroughs;
-- Drive: generic file and folder operations through the configured
-  DriveProvider; metadata (Drive appProperties) is Google-specific code
-  implemented here, since appProperties is deliberately not part of the
-  vendor-neutral DriveProvider; the Drive healthcheck;
+- Drive: file and folder operations and metadata (Drive appProperties) through
+  the gateway's Drive service, shared drives included and list results paged
+  to the end; the Drive healthcheck;
 - section writer: walks the source document body to turn heading-styled
   paragraphs into DocumentSection values (the heading plus the template
   guidance written under it), and writes the draft document -- in the source
   document's Drive folder -- populated with the drafted sections. Each run
   creates a fresh Drive copy of the source document, so repeated invocations
   produce new draft documents rather than rewriting one in place. The source
-  incident report is only ever read.
+  incident report is only ever read;
+- GoogleDocsIncidentReport: the core ``IncidentReport`` over the functions
+  above, for references of the Google system.
+
+Every service is built through the gateway factories with scopes only: no
+function passes a delegation subject or builds credentials, so who the calls
+run as stays the gateway's decision.
 """
 
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
@@ -32,18 +37,19 @@ import structlog
 from googleapiclient.errors import HttpError
 
 from contracts.operations import OperationResult
+from contracts.operations.codes import ErrorCode
+from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.domain import (
     DocumentField,
     DocumentSection,
     DraftWriteResult,
+    ReportReference,
     SectionDraft,
 )
-from infrastructure.drive import DRIVE_SCOPES
-from infrastructure.drive.factory import get_drive_provider
-from infrastructure.drive.models import DriveFile
 from integrations.google_workspace import client as google_workspace_client
 from integrations.google_workspace.client import classify_google_error, get_docs_service
+from integrations.google_workspace.settings import get_google_workspace_settings
 
 if TYPE_CHECKING:
     from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]
@@ -101,6 +107,12 @@ class DocumentSnapshot:
 
 def replace_placeholders(document_id: str, replacements: Mapping[str, str], match_case: bool = True) -> bool:
     """Replace each key with its value via replaceAllText. Returns whether any occurrence changed."""
+    replaced = _replace_all_text(document_id, replacements, match_case=match_case)
+    return bool(replaced.is_success and replaced.data)
+
+
+def _replace_all_text(document_id: str, replacements: Mapping[str, str], *, match_case: bool) -> OperationResult[bool]:
+    """Send one replaceAllText per key; success carries whether any occurrence changed, a refusal is logged and classified."""
     requests = [
         {
             "replaceAllText": {
@@ -123,9 +135,11 @@ def replace_placeholders(document_id: str, replacements: Mapping[str, str], matc
             error_code=error_code,
             retry_after=retry_after,
         )
-        return False
+        return OperationResult.error(status=status, message=str(exc), error_code=error_code, retry_after=retry_after)
     replies = result.get("replies", []) if isinstance(result, dict) else []
-    return any(reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0 for reply in replies)
+    return OperationResult.success(
+        data=any(reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0 for reply in replies)
+    )
 
 
 def fetch_document_snapshot(document_id: str) -> DocumentSnapshot | None:
@@ -188,13 +202,47 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]], requi
 
 # --- Drive ---
 
+_DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
+_FOLDER_MIME_TYPE = "application/vnd.google-apps.folder"
+
 
 def _drive_service() -> DriveResource:
-    return google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
+    return google_workspace_client.get_drive_service(scopes=_DRIVE_SCOPES)
 
 
-def _to_dict(file: DriveFile) -> dict[str, Any]:
-    return {"id": file.id, "name": file.name}
+def _file_dict(payload: Mapping[str, Any]) -> dict[str, Any]:
+    name = payload.get("name")
+    return {"id": str(payload.get("id") or ""), "name": str(name) if name is not None else None}
+
+
+def _drive_call(operation: str, run: Callable[[], Any]) -> OperationResult[Any]:
+    """Run one Drive operation; a classified HttpError is logged by operation and returned, any other error raises."""
+    try:
+        return OperationResult.success(data=run())
+    except HttpError as exc:
+        status, error_code, retry_after = classify_google_error(exc)
+        logger.warning("google_drive_operation_failed", operation=operation, status=status.value, error_code=error_code)
+        return OperationResult.error(status=status, message=str(exc), error_code=error_code, retry_after=retry_after)
+
+
+def _list_all(query: str, operation: str) -> OperationResult[list[dict[str, Any]]]:
+    """List every file matching ``query``, page after page, across the user's and shared drives."""
+
+    def run() -> list[dict[str, Any]]:
+        files = _drive_service().files()
+        request: Any = files.list(q=query, pageSize=100, supportsAllDrives=True, includeItemsFromAllDrives=True, corpora="user")
+        found: list[dict[str, Any]] = []
+        while request is not None:
+            response = request.execute()
+            found.extend(_file_dict(item) for item in response.get("files", []) if isinstance(item, dict))
+            request = files.list_next(request, response)
+        return found
+
+    return _drive_call(operation, run)
+
+
+def _create_from(operation: str, request: Callable[[], Any]) -> OperationResult[dict[str, Any]]:
+    return _drive_call(operation, lambda: _file_dict(request().execute()))
 
 
 def _log_failure(event: str, result: OperationResult[Any]) -> None:
@@ -218,43 +266,61 @@ def _log_http_failure(event: str, file_id: str, exc: HttpError) -> None:
 
 
 def list_folder_files(parent_folder_id: str) -> list[dict[str, Any]]:
-    result = get_drive_provider().list_files(parent_folder_id)
+    result = _list_all(f"parents in '{parent_folder_id}' and mimeType != '{_FOLDER_MIME_TYPE}' and trashed=false", "list_files")
     if not result.is_success:
         _log_failure("incident_drive_list_files_failed", result)
         return []
-    return [_to_dict(file) for file in result.data or []]
+    return result.data or []
 
 
 def list_child_folders(parent_folder_id: str) -> list[dict[str, Any]]:
-    result = get_drive_provider().list_folders(parent_folder_id)
+    result = _list_all(f"parents in '{parent_folder_id}' and mimeType = '{_FOLDER_MIME_TYPE}' and trashed=false", "list_folders")
     if not result.is_success:
         _log_failure("incident_drive_list_folders_failed", result)
         return []
-    return [_to_dict(file) for file in result.data or [] if file.name and "Templates" not in file.name]
+    return [file for file in result.data or [] if file["name"] and "Templates" not in file["name"]]
 
 
 def create_folder(name: str, parent_folder_id: str) -> dict[str, Any] | None:
-    result = get_drive_provider().create_folder(name, parent_folder_id)
+    result = _create_from(
+        "create_folder",
+        lambda: (
+            _drive_service()
+            .files()
+            .create(
+                body=cast("File", {"name": name, "parents": [parent_folder_id], "mimeType": _FOLDER_MIME_TYPE}),
+                supportsAllDrives=True,
+            )
+        ),
+    )
     if not result.is_success:
         _log_failure("incident_drive_create_folder_failed", result)
         return None
-    if result.data is None:
-        return None
-    return _to_dict(result.data)
+    return result.data
+
+
+def _copy_template(name: str, parent_folder_id: str, template_id: str) -> OperationResult[dict[str, Any]]:
+    return _create_from(
+        "create_file_from_template",
+        lambda: (
+            _drive_service()
+            .files()
+            .copy(fileId=template_id, body=cast("File", {"name": name, "parents": [parent_folder_id]}), supportsAllDrives=True)
+        ),
+    )
 
 
 def create_document_from_template(name: str, parent_folder_id: str, template_id: str) -> dict[str, Any] | None:
-    result = get_drive_provider().create_file_from_template(name, parent_folder_id, template_id)
+    result = _copy_template(name, parent_folder_id, template_id)
     if not result.is_success:
         _log_failure("incident_drive_create_document_failed", result)
         return None
-    if result.data is None:
-        return None
-    return _to_dict(result.data)
+    return result.data
 
 
 def find_document_by_channel_name(channel_name: str) -> dict[str, Any] | None:
-    result = get_drive_provider().find_files_by_name(channel_name)
+    # The name is not escaped, as before: a quote in a channel name fails the query.
+    result = _list_all(f"trashed=false and name='{channel_name}'", "find_files_by_name")
     if not result.is_success:
         _log_failure("incident_drive_find_document_failed", result)
         return None
@@ -263,9 +329,9 @@ def find_document_by_channel_name(channel_name: str) -> dict[str, Any] | None:
     if not matches:
         return None
 
-    document = matches[0]
-    metadata = get_metadata(document.id, fields="id, name, appProperties")
-    return {"id": document.id, "appProperties": metadata.get("appProperties", {})}
+    document_id = matches[0]["id"]
+    metadata = get_metadata(document_id, fields="id, name, appProperties")
+    return {"id": document_id, "appProperties": metadata.get("appProperties", {})}
 
 
 def add_metadata(file_id: str, key: str, value: str) -> dict[str, Any]:
@@ -412,145 +478,252 @@ _REMOVE_WHEN_EMPTY_KEYS = frozenset(re.sub(r"[^a-z0-9]+", "", label) for label i
 _KNOWN_LABEL_KEYS = _REGULAR_TEXT_LABEL_KEYS | frozenset(re.sub(r"[^a-z0-9]+", "", label) for label in _METADATA_LABELS)
 
 
-class GoogleDocsIncidentDocument:
-    """``IncidentDocumentStore`` implementation backed by Google Docs and Drive."""
+def read_document_sections(document_id: str) -> OperationResult[list[DocumentSection]]:
+    """Return the document's heading-delimited sections in document order.
 
-    def read_sections(self, document_id: str) -> list[DocumentSection]:
-        """Return the document's heading-delimited sections in document order.
-
-        A paragraph styled ``HEADING_*`` starts a new section; every following
-        paragraph's text accumulates as that section's instructions until the
-        next heading. Text before the first heading is ignored (template
-        boilerplate: title, status, metadata table). Returns an empty list when
-        the document cannot be fetched.
-        """
-        service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
-        try:
-            document: Document = service.documents().get(documentId=document_id).execute()
-        except HttpError as exc:
-            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
-            logger.warning(
-                "incident_draft_document_fetch_failed",
-                document_id=document_id,
-                status=status.value,
-                error_code=error_code,
-                retry_after=retry_after,
-            )
-            return []
-        if not isinstance(document, dict):
-            logger.warning("incident_draft_document_fetch_failed", document_id=document_id)
-            return []
-        document_data = cast("dict[str, Any]", document)
-
-        sections: list[DocumentSection] = []
-        heading: str | None = None
-        instruction_parts: list[str] = []
-
-        for element in _body_content(document_data):
-            paragraph = element.get("paragraph")
-            if not paragraph:
-                continue
-            text = _paragraph_text(paragraph)
-            if _is_section_heading(paragraph) and text.strip():
-                if heading is not None:
-                    sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
-                heading = text.strip()
-                instruction_parts = []
-            elif heading is not None:
-                instruction_parts.append(text)
-
-        if heading is not None:
-            sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
-        return sections
-
-    def write_draft_document(
-        self,
-        source_document_id: str,
-        drafts: Sequence[SectionDraft],
-        fields: Sequence[DocumentField] = (),
-        links: Mapping[str, str] = {},
-    ) -> DraftWriteResult | None:
-        """Write the draft as a filled-in copy of the incident report.
-
-        The draft is a Drive copy of the source document, so it keeps the
-        template's exact formatting -- the metadata block, the blameless
-        statement, each section's italic guidance, and the Action Items table.
-        Only the bodies of sections the transcript answered are replaced;
-        unanswered sections keep the template's guidance untouched, which is
-        both simpler and more faithful than rebuilding the layout in code.
-
-        Each run creates a new draft document rather than rewriting one in place.
-        Returns ``None`` on any failure; the source report is never written to.
-        """
-        if not drafts and not fields:
-            return None
-
-        # One Drive metadata call yields both the name and the parent folder;
-        # fetching the document itself just to read its title meant pulling the
-        # whole body over the wire for one string.
-        title, folder = _source_name_and_folder(source_document_id)
-
-        stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
-        draft_title = f"{title}{_DRAFT_TITLE_SUFFIX} {stamp}"
-
-        # Every run starts from a pristine copy of the report. Editing a
-        # long-lived draft in place meant each run inherited the last one's
-        # output and had to identify it by heuristics -- the source of
-        # duplicated sections, stacked banners and, when two of those analyses
-        # proposed overlapping deletions, shredded text. A fresh document
-        # cannot accumulate any of it.
-        document_id = _copy_source_document(source_document_id, draft_title, folder)
-        if not document_id:
-            return None
-
-        service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
-        try:
-            document: Document = service.documents().get(documentId=document_id).execute()
-        except HttpError as exc:
-            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
-            logger.warning(
-                "incident_draft_draft_fetch_failed",
-                document_id=document_id,
-                status=status.value,
-                error_code=error_code,
-                retry_after=retry_after,
-            )
-            return None
-        if not isinstance(document, dict):
-            logger.warning("incident_draft_draft_fetch_failed", document_id=document_id)
-            return None
-        document_data = cast("dict[str, Any]", document)
-
-        requests = _fill_section_requests(document_data, drafts, fields, links)
-        if not requests:
-            logger.warning("incident_draft_no_sections_filled", document_id=document_id)
-            return None
-
-        body = cast("BatchUpdateDocumentRequest", {"requests": requests})
-        try:
-            # Index-based insert/delete requests corrupt the document on replay, so retries
-            # stay off until a retries-disabled handle exists at construction.
-            result = service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
-        except HttpError as exc:
-            status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
-            logger.warning(
-                "incident_draft_populate_failed",
-                document_id=document_id,
-                status=status.value,
-                error_code=error_code,
-                retry_after=retry_after,
-            )
-            return None
-        if not isinstance(result, dict):
-            logger.warning("incident_draft_populate_failed", document_id=document_id)
-            return None
-
-        logger.info(
-            "incident_draft_document_written",
+    A paragraph styled ``HEADING_*`` starts a new section; every following
+    paragraph's text accumulates as that section's instructions until the
+    next heading. Text before the first heading is ignored (template
+    boilerplate: title, status, metadata table). A fetch the Docs API refuses
+    is its classified failure; an unusable response is a transient failure.
+    Both are logged.
+    """
+    service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
+    try:
+        document: Document = service.documents().get(documentId=document_id).execute()
+    except HttpError as exc:
+        status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+        logger.warning(
+            "incident_draft_document_fetch_failed",
             document_id=document_id,
-            filled_sections=sum(1 for d in drafts if d.is_drafted),
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
         )
-        return DraftWriteResult(document_id=document_id, created=True)
+        return OperationResult.error(status=status, message=str(exc), error_code=error_code, retry_after=retry_after)
+    if not isinstance(document, dict):
+        logger.warning("incident_draft_document_fetch_failed", document_id=document_id)
+        return OperationResult.transient_error(message="The Docs API returned no document")
+    document_data = cast("dict[str, Any]", document)
+
+    sections: list[DocumentSection] = []
+    heading: str | None = None
+    instruction_parts: list[str] = []
+
+    for element in _body_content(document_data):
+        paragraph = element.get("paragraph")
+        if not paragraph:
+            continue
+        text = _paragraph_text(paragraph)
+        if _is_section_heading(paragraph) and text.strip():
+            if heading is not None:
+                sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
+            heading = text.strip()
+            instruction_parts = []
+        elif heading is not None:
+            instruction_parts.append(text)
+
+    if heading is not None:
+        sections.append(DocumentSection(heading=heading, instructions="".join(instruction_parts)))
+    return OperationResult.success(data=sections)
+
+
+def write_draft_document(
+    source_document_id: str,
+    drafts: Sequence[SectionDraft],
+    fields: Sequence[DocumentField] = (),
+    links: Mapping[str, str] = {},
+) -> DraftWriteResult | None:
+    """Write the draft as a filled-in copy of the incident report.
+
+    The draft is a Drive copy of the source document, so it keeps the
+    template's exact formatting -- the metadata block, the blameless
+    statement, each section's italic guidance, and the Action Items table.
+    Only the bodies of sections the transcript answered are replaced;
+    unanswered sections keep the template's guidance untouched, which is
+    both simpler and more faithful than rebuilding the layout in code.
+
+    Each run creates a new draft document rather than rewriting one in place.
+    Returns ``None`` on any failure; the source report is never written to.
+    """
+    if not drafts and not fields:
+        return None
+
+    # One Drive metadata call yields both the name and the parent folder;
+    # fetching the document itself just to read its title meant pulling the
+    # whole body over the wire for one string.
+    title, folder = _source_name_and_folder(source_document_id)
+
+    stamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M")
+    draft_title = f"{title}{_DRAFT_TITLE_SUFFIX} {stamp}"
+
+    # Every run starts from a pristine copy of the report. Editing a
+    # long-lived draft in place meant each run inherited the last one's
+    # output and had to identify it by heuristics -- the source of
+    # duplicated sections, stacked banners and, when two of those analyses
+    # proposed overlapping deletions, shredded text. A fresh document
+    # cannot accumulate any of it.
+    document_id = _copy_source_document(source_document_id, draft_title, folder)
+    if not document_id:
+        return None
+
+    service = google_workspace_client.get_docs_service(scopes=_DOCS_SCOPES)
+    try:
+        document: Document = service.documents().get(documentId=document_id).execute()
+    except HttpError as exc:
+        status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+        logger.warning(
+            "incident_draft_draft_fetch_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return None
+    if not isinstance(document, dict):
+        logger.warning("incident_draft_draft_fetch_failed", document_id=document_id)
+        return None
+    document_data = cast("dict[str, Any]", document)
+
+    requests = _fill_section_requests(document_data, drafts, fields, links)
+    if not requests:
+        logger.warning("incident_draft_no_sections_filled", document_id=document_id)
+        return None
+
+    body = cast("BatchUpdateDocumentRequest", {"requests": requests})
+    try:
+        # Index-based insert/delete requests corrupt the document on replay, so retries
+        # stay off until a retries-disabled handle exists at construction.
+        result = service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
+    except HttpError as exc:
+        status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+        logger.warning(
+            "incident_draft_populate_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return None
+    if not isinstance(result, dict):
+        logger.warning("incident_draft_populate_failed", document_id=document_id)
+        return None
+
+    logger.info(
+        "incident_draft_document_written",
+        document_id=document_id,
+        filled_sections=sum(1 for d in drafts if d.is_drafted),
+    )
+    return DraftWriteResult(document_id=document_id, created=True)
+
+
+_DOCS_LINK = "https://docs.google.com/document/d/{}/edit"
+
+
+class GoogleDocsIncidentReport:
+    """``IncidentReport`` on Google Docs and Drive, for references of the Google system.
+
+    The document ids are read from [incident_core] at call time, and the tenant
+    that names a new report from the Google Workspace entry, the same value the
+    configured-systems read reports for Google.
+    """
+
+    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
+        """Copy the configured template into the configured folder as a new report titled ``title``."""
+        settings = get_incident_core_settings()
+        missing = _missing_key(
+            ("incident_core.folder_id", settings.folder_id), ("incident_core.report_template_id", settings.report_template_id)
+        )
+        tenant = _google_tenant()
+        if missing is None and tenant is None:
+            missing = "google_workspace.tenant"
+        if missing is not None:
+            return _not_configured(missing)
+        created = _copy_template(title, settings.folder_id, settings.report_template_id)
+        if not created.is_success or not created.data or not created.data["id"]:
+            _log_failure("incident_drive_create_document_failed", created)
+            return OperationResult.error(
+                status=created.status,
+                message=created.message or "The report could not be created",
+                error_code=created.error_code,
+                retry_after=created.retry_after,
+            )
+        document_id = created.data["id"]
+        return OperationResult.success(
+            data=ReportReference(
+                system=WorkplaceSystem.GOOGLE,
+                tenant=cast("str", tenant),
+                vendor_id=document_id,
+                url=_DOCS_LINK.format(document_id),
+            )
+        )
+
+    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+        """Replace each key with its value in the report, case-sensitive."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _unsupported(report)
+        replaced = _replace_all_text(report.vendor_id, values, match_case=True)
+        if not replaced.is_success:
+            return OperationResult.error(
+                status=replaced.status,
+                message=replaced.message or "The placeholders could not be replaced",
+                error_code=replaced.error_code,
+                retry_after=replaced.retry_after,
+            )
+        return OperationResult.success()
+
+    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+        """Return the report's sections in document order."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _unsupported(report)
+        read = read_document_sections(report.vendor_id)
+        if not read.is_success:
+            return OperationResult.error(
+                status=read.status,
+                message=read.message or "The report could not be read",
+                error_code=read.error_code,
+                retry_after=read.retry_after,
+            )
+        return OperationResult.success(data=tuple(read.data or ()))
+
+    def write_draft_copy(
+        self,
+        report: ReportReference,
+        drafts: Sequence[SectionDraft],
+        fields: Sequence[DocumentField],
+        links: Mapping[str, str],
+    ) -> OperationResult[DraftWriteResult]:
+        """Write a new filled-in copy of the report beside it; failures are logged by the writer."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _unsupported(report)
+        written = write_draft_document(report.vendor_id, drafts, fields, links)
+        if written is None:
+            return OperationResult.transient_error(message="The draft copy could not be written")
+        return OperationResult.success(data=written)
+
+    def link(self, report: ReportReference) -> str | None:
+        """Return the stored link of the report."""
+        return report.url
+
+
+def _unsupported[T](report: ReportReference) -> OperationResult[T]:
+    logger.warning("incident_report_system_unsupported", system=report.system.value)
+    return OperationResult.permanent_error(
+        f"Google Docs cannot reach a report on {report.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _missing_key(*keys: tuple[str, str]) -> str | None:
+    return next((key for key, value in keys if not value), None)
+
+
+def _not_configured[T](key: str) -> OperationResult[T]:
+    return OperationResult.permanent_error(f"{key} is not configured", ErrorCode.CONFIG_NOT_CONFIGURED)
+
+
+def _google_tenant() -> str | None:
+    tenant = get_google_workspace_settings().tenant
+    return tenant.customer_id if tenant is not None else None
 
 
 def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
@@ -592,7 +765,7 @@ def _regular_label_requests(document: dict) -> list[dict[str, Any]]:
 
 def _copy_source_document(source_document_id: str, draft_title: str, folder: str) -> str | None:
     """Copy the incident report into ``folder`` as the draft; return its id."""
-    service = google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
+    service = google_workspace_client.get_drive_service(scopes=_DRIVE_SCOPES)
     body = cast("File", {"name": draft_title, "parents": [folder]})
     try:
         # Workspace file copies can't use a pre-generated id, so a replay would duplicate the
@@ -1596,7 +1769,7 @@ def _source_name_and_folder(document_id: str) -> tuple[str, str]:
     Falls back to the configured incident folder when the metadata lookup
     fails, so a draft still lands somewhere responders can find it.
     """
-    service = google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
+    service = google_workspace_client.get_drive_service(scopes=_DRIVE_SCOPES)
     metadata: Any = None
     try:
         metadata = service.files().get(fileId=document_id, fields="id, name, parents", supportsAllDrives=True).execute()

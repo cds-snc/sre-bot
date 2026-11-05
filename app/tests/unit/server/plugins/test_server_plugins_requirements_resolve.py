@@ -113,7 +113,17 @@ def _manager(**plugins: ModuleType) -> pluggy.PluginManager:
 
 
 PLUGIN_DECLARATIONS = [
-    pytest.param(scribe, ("openai.tenant", "slack.tenant", "google_workspace.tenant"), id="incident.scribe"),
+    pytest.param(
+        scribe,
+        (
+            "openai.tenant",
+            "slack.tenant",
+            "google_workspace.tenant",
+            "incident_core.folder_id",
+            "incident_core.report_template_id",
+        ),
+        id="incident.scribe",
+    ),
     pytest.param(oncall_sync, ("slack.tenant", "slack.user_token", "opsgenie.tenant"), id="oncall_sync"),
     pytest.param(rant, ("slack.tenant",), id="rant"),
     pytest.param(user_rotations, ("slack.tenant",), id="user_rotations"),
@@ -127,15 +137,18 @@ def test_plugin_declares_exactly_its_requirements(module: ModuleType, settings: 
 
 @pytest.mark.parametrize(("module", "settings"), PLUGIN_DECLARATIONS)
 def test_plugin_requirements_are_met_when_everything_is_configured(
-    module: ModuleType, settings: tuple[str, ...], slices: dict[str, object]
+    module: ModuleType, settings: tuple[str, ...], slices: dict[str, object], built: list[object]
 ) -> None:
+    built.append(_built_on("incident_core", folder_id="F0", report_template_id="T0"))
+
     assert unmet_requirements({"plugin": module.register_requirements()}, _Systems(ALL_SYSTEMS)) == []
 
 
 @pytest.mark.parametrize(("module", "settings"), PLUGIN_DECLARATIONS)
 def test_plugin_requirements_fail_naming_each_setting_that_is_not_configured(
-    module: ModuleType, settings: tuple[str, ...], slices: dict[str, object]
+    module: ModuleType, settings: tuple[str, ...], slices: dict[str, object], built: list[object]
 ) -> None:
+    built.append(_built_on("incident_core", folder_id="", report_template_id=""))
     slices["openai"] = SimpleNamespace(tenant=None)
     slices["opsgenie"] = SimpleNamespace(tenant=None)
     slices["slack"] = SimpleNamespace(user_token=SecretStr(""))
