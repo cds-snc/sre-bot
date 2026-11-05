@@ -1,10 +1,22 @@
-"""Slack adapter implementing ``IncidentTranscriptReader`` on the Slack Web API.
+"""Slack adapters implementing ``IncidentTranscriptReader`` and ``IncidentConversation`` on the Slack Web API.
 
-The adapter owns everything Slack-shaped about a transcript: the history and
-thread-replies calls, their cursor paging and timestamp format, display-name
-resolution, chronological ordering, and
-the optional filtering of this bot's own posts and Slack system events. It also
-owns every degradation: a Web API failure is logged here and never raised.
+``SlackIncidentTranscriptReader`` owns everything Slack-shaped about a
+transcript: the history and thread-replies calls, their cursor paging and
+timestamp format, display-name resolution, chronological ordering, and the
+optional filtering of this bot's own posts and Slack system events. It reads on
+the synchronous Web client its callers still use.
+
+``SlackIncidentConversation`` writes to an incident's conversation on the async
+write handle, which retries only rate-limited requests, and checks writability
+on the async read client.
+
+Both take the incident's ``ConversationReference``; a reference of another
+system is refused as ``UNSUPPORTED_OPERATION`` before any call. Slack errors are
+classified through the Slack vendor table (``classify_slack_error``): the codes
+for a conversation the bot cannot write to become ``CONVERSATION_NOT_WRITABLE``,
+and a code the table does not name propagates. A failure after a transcript's
+first page (a later page, a thread, a name or identity lookup) is logged and the
+read keeps what it has.
 """
 
 import re
@@ -14,10 +26,21 @@ from typing import Any
 
 import structlog
 from slack_sdk import WebClient
+from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
+from slack_sdk.web.async_client import AsyncWebClient
 
-from features.incident.core.domain import TranscriptMessage
-from integrations.slack.client import get_slack_web_client
+from contracts.operations.codes import ErrorCode
+from contracts.operations.result import OperationResult
+from contracts.workplace import WorkplaceSystem
+from features.incident.core.domain import ConversationReference, MessageReference, TranscriptMessage
+from integrations.slack.client import (
+    classify_slack_error,
+    get_async_slack_web_client,
+    get_async_slack_write_client,
+    get_slack_web_client,
+)
+from integrations.slack.settings import get_slack_settings
 
 logger = structlog.get_logger()
 
@@ -45,45 +68,48 @@ class SlackIncidentTranscriptReader:
     def __init__(self, client: WebClient) -> None:
         self._client = client
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        """Return the channel's creation time, or ``None`` when Slack cannot say.
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        """Return the channel's creation time; ``None`` when Slack gives none.
 
         A failed ``conversations.info`` call (a missing ``channels:read`` or
-        ``groups:read`` scope, for one) degrades to ``None``.
+        ``groups:read`` scope, for one) is the classified result.
         """
-        log = logger.bind(conversation_id=conversation_id)
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _transcript_unsupported(conversation)
+        log = logger.bind(conversation_id=conversation.vendor_id)
         try:
-            response = self._client.conversations_info(channel=conversation_id)
-            created = (response.get("channel") or {}).get("created")
-            if created is None:
-                return None
-            return datetime.fromtimestamp(float(created), tz=UTC)
-        except Exception as exc:  # noqa: BLE001 - degrade to "unknown" on any API error
-            log.warning("incident_transcript_conversation_info_failed", error=str(exc))
-            return None
+            response = self._client.conversations_info(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            return _transcript_failure(exc, "incident_transcript_conversation_info_failed", log)
+        created = (response.get("channel") or {}).get("created")
+        try:
+            return OperationResult.success(None if created is None else datetime.fromtimestamp(float(created), tz=UTC))
+        except TypeError, ValueError:
+            return OperationResult.success(None)
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         """Return the channel's messages since ``since``, thread replies included, oldest first.
 
         Decisive facts often land in threads, so every message Slack reports
         replies for is expanded with them. ``limit`` caps the whole transcript
-        and the newest messages are kept. A failed first history page returns
-        an empty sequence, so the caller renders its empty-history path; a
-        failed later page or thread is logged and skipped.
+        and the newest messages are kept. A failed first history page is the
+        classified result; a failed later page or thread is logged and skipped.
         """
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _transcript_unsupported(conversation)
+        conversation_id = conversation.vendor_id
         log = logger.bind(conversation_id=conversation_id)
         try:
             top_level = self._read_history(conversation_id, since=since, limit=limit, log=log)
-        except Exception as exc:  # noqa: BLE001 - degrade to empty history on any API error
-            log.warning("incident_transcript_history_fetch_failed", error=str(exc))
-            return []
+        except SlackApiError as exc:
+            return _transcript_failure(exc, "incident_transcript_history_fetch_failed", log)
 
         raw_messages = _merge_chronologically(top_level, self._read_thread_replies(conversation_id, top_level, limit, log))[
             -limit:
@@ -123,7 +149,7 @@ class SlackIncidentTranscriptReader:
             kept_count=len(messages),
             skipped_own_and_system_messages=skipped,
         )
-        return messages
+        return OperationResult.success(messages)
 
     def _read_history(
         self,
@@ -136,7 +162,7 @@ class SlackIncidentTranscriptReader:
         """Return up to ``limit`` top-level messages since ``since``, oldest first.
 
         Follows Slack's cursor across pages. The first page's failure is raised
-        for the caller to degrade; a later page's failure keeps what was read.
+        for the caller to classify; a later page's classified failure keeps what was read.
         """
         newest_first: list[Mapping[str, Any]] = []
         cursor = ""
@@ -150,9 +176,10 @@ class SlackIncidentTranscriptReader:
                 kwargs["cursor"] = cursor
             try:
                 response = self._client.conversations_history(**kwargs)
-            except Exception as exc:
+            except SlackApiError as exc:
                 if not cursor:
                     raise
+                _raise_if_unclassified(exc)
                 log.warning("incident_transcript_history_page_failed", error=str(exc), read_so_far=len(newest_first))
                 break
             newest_first.extend(response.get("messages") or [])
@@ -171,7 +198,7 @@ class SlackIncidentTranscriptReader:
     ) -> list[Mapping[str, Any]]:
         """Return the replies of every threaded top-level message, without the parents.
 
-        A thread whose replies cannot be read is logged and skipped.
+        A thread whose replies fail with a classified Slack error is logged and skipped.
         """
         replies: list[Mapping[str, Any]] = []
         for parent in top_level:
@@ -190,7 +217,8 @@ class SlackIncidentTranscriptReader:
                     cursor = _next_cursor(response)
                     if not cursor:
                         break
-            except Exception as exc:  # noqa: BLE001 - one unreadable thread must not fail the read
+            except SlackApiError as exc:
+                _raise_if_unclassified(exc)
                 log.warning("incident_transcript_replies_fetch_failed", thread_ts=thread_ts, error=str(exc))
         return replies
 
@@ -201,11 +229,13 @@ class SlackIncidentTranscriptReader:
         message was posted it may carry only a ``bot_id``, or a display name that
         differs from the authenticated user. All three signals are collected so
         ``_is_own_message`` can match on any of them. Returns an empty mapping if
-        the lookup fails, which disables the filter rather than failing the read.
+        the lookup fails with a classified Slack error, which disables the filter
+        rather than failing the read.
         """
         try:
             response = self._client.auth_test()
-        except Exception as exc:  # noqa: BLE001 - a failed lookup must not fail the read
+        except SlackApiError as exc:
+            _raise_if_unclassified(exc)
             log.warning("incident_transcript_auth_test_failed", error=str(exc))
             return {}
 
@@ -232,7 +262,8 @@ class SlackIncidentTranscriptReader:
             user: Mapping[str, Any] = self._client.users_info(user=user_id).get("user") or {}
             profile: Mapping[str, Any] = user.get("profile") or {}
             name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
-        except Exception as exc:  # noqa: BLE001 - a missing name must not drop the message
+        except SlackApiError as exc:
+            _raise_if_unclassified(exc)
             log.warning("incident_transcript_user_lookup_failed", user_id=user_id, error=str(exc))
 
         cache[user_id] = name
@@ -242,6 +273,159 @@ class SlackIncidentTranscriptReader:
 def build_incident_transcript_reader() -> SlackIncidentTranscriptReader:
     """Build the adapter on the bot's Web client."""
     return SlackIncidentTranscriptReader(get_slack_web_client())
+
+
+# Slack answers an invite of someone already there, or of the bot itself, with an
+# error; for the incident the invite is done.
+_INVITE_DONE = frozenset({"already_in_channel", "cant_invite_self"})
+_ARCHIVE_DONE = frozenset({"already_archived"})
+
+
+class SlackIncidentConversation:
+    """Write to an incident's Slack channel and say whether the bot can.
+
+    ``reads`` is the async bot client (``conversations.info``); ``writes`` is the
+    write handle, which retries only rate-limited requests, so a post is never
+    replayed after Slack may already have applied it.
+    """
+
+    def __init__(self, reads: AsyncWebClient, writes: AsyncWebClient) -> None:
+        self._reads = reads
+        self._writes = writes
+
+    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
+        """Post ``text`` to the channel and return the message's reference (its ``ts``)."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            response = await self._writes.chat_postMessage(channel=conversation.vendor_id, text=text)
+        except SlackApiError as exc:
+            return _conversation_failure("post", conversation, exc)
+        return OperationResult.success(
+            MessageReference(
+                system=WorkplaceSystem.SLACK,
+                tenant=conversation.tenant,
+                conversation_id=str(response.get("channel") or conversation.vendor_id),
+                message_id=str(response.get("ts")),
+            )
+        )
+
+    async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Set the channel's purpose to ``text``."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            await self._writes.conversations_setPurpose(channel=conversation.vendor_id, purpose=text)
+        except SlackApiError as exc:
+            return _conversation_failure("set_purpose", conversation, exc)
+        return OperationResult.success()
+
+    async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
+        """Add a link bookmark titled ``title`` to the channel."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            await self._writes.bookmarks_add(channel_id=conversation.vendor_id, title=title, type="link", link=link)
+        except SlackApiError as exc:
+            return _conversation_failure("add_bookmark", conversation, exc)
+        return OperationResult.success()
+
+    async def invite(self, conversation: ConversationReference, account_ids: Sequence[str]) -> OperationResult[None]:
+        """Invite the Slack accounts in one call; members already there and the bot itself count as invited.
+
+        ``force`` lets the other accounts in when one of them cannot be invited.
+        No accounts makes no call.
+        """
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        if not account_ids:
+            return OperationResult.success()
+        try:
+            await self._writes.conversations_invite(channel=conversation.vendor_id, users=list(account_ids), force=True)
+        except SlackApiError as exc:
+            if exc.response.get("error") in _INVITE_DONE:
+                return OperationResult.success()
+            return _conversation_failure("invite", conversation, exc)
+        return OperationResult.success()
+
+    async def archive(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Archive the channel; a channel already archived counts as archived."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            await self._writes.conversations_archive(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            if exc.response.get("error") in _ARCHIVE_DONE:
+                return OperationResult.success()
+            return _conversation_failure("archive", conversation, exc)
+        return OperationResult.success()
+
+    async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
+        """Say whether the bot can write to the channel: not archived and a member. Never joins."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            response = await self._reads.conversations_info(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            return _conversation_failure("is_writable", conversation, exc)
+        channel: Mapping[str, Any] = response.get("channel") or {}
+        return OperationResult.success(not channel.get("is_archived") and channel.get("is_member") is True)
+
+
+def build_incident_conversation() -> SlackIncidentConversation:
+    """Build the adapter on the bot's async read client and its rate-limit-only write handle."""
+    return SlackIncidentConversation(get_async_slack_web_client(), get_async_slack_write_client())
+
+
+def _conversation_unsupported[T](conversation: ConversationReference) -> OperationResult[T]:
+    logger.warning("incident_conversation_system_unsupported", system=conversation.system.value)
+    return OperationResult.permanent_error(
+        f"Slack cannot reach a conversation on {conversation.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _conversation_failure[T](operation: str, conversation: ConversationReference, exc: SlackApiError) -> OperationResult[T]:
+    """Classify a Slack error on ``operation``; a code the Slack table does not name propagates."""
+    status, code, retry_after = classify_slack_error(exc)
+    logger.warning(
+        f"incident_conversation_{operation}_failed",
+        conversation_id=conversation.vendor_id,
+        slack_error=code,
+        status=status.value,
+    )
+    not_writable = code in get_slack_settings().not_writable_errors
+    return OperationResult(
+        status=status,
+        message=f"Slack {operation} failed: {code}",
+        error_code=ErrorCode.CONVERSATION_NOT_WRITABLE if not_writable else code,
+        retry_after=retry_after,
+        cause=exc,
+    )
+
+
+def _raise_if_unclassified(exc: SlackApiError) -> None:
+    """Re-raise a Slack error whose code the Slack table does not name; a classified one is only logged by the caller."""
+    classify_slack_error(exc)
+
+
+def _transcript_unsupported[T](conversation: ConversationReference) -> OperationResult[T]:
+    logger.warning("incident_transcript_system_unsupported", system=conversation.system.value)
+    return OperationResult.permanent_error(
+        f"Slack cannot read a conversation on {conversation.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _transcript_failure[T](exc: SlackApiError, event: str, log: structlog.stdlib.BoundLogger) -> OperationResult[T]:
+    """Classify a failed transcript read; a code the Slack table does not name propagates."""
+    status, code, retry_after = classify_slack_error(exc)
+    log.warning(event, error=str(exc), slack_error=code, status=status.value)
+    return OperationResult(
+        status=status,
+        message=f"Slack transcript read failed: {code}",
+        error_code=code,
+        retry_after=retry_after,
+        cause=exc,
+    )
 
 
 def _is_own_message(raw: Mapping[str, Any], author: str, identity: dict[str, str]) -> bool:

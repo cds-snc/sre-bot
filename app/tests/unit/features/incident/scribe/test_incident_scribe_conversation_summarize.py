@@ -1,4 +1,11 @@
-"""Unit tests for summarizing an incident conversation: window, limit and transcript gathering in the service."""
+"""Unit tests for summarizing an incident conversation: window, limit and transcript gathering in the service.
+
+The service is given the conversation's reference and reads it through an
+in-memory reader that records what it was asked. A reader failure is a
+classified ``OperationResult`` the fake returns on request: a failed start
+lookup gives the default window and a failed read the empty-history outcome,
+as an unknown start and an empty transcript do.
+"""
 
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime, timedelta
@@ -8,10 +15,11 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from features.incident.core.api import IncidentTranscriptReader, TranscriptMessage
+from features.incident.core.api import ConversationReference, IncidentTranscriptReader, TranscriptMessage
 from features.incident.scribe import service
 from features.incident.scribe.service import EMPTY_HISTORY_CODE, summarize_incident_conversation
 from features.incident.scribe.settings import IncidentSummarySettings
+from tests.factories.incident import slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -21,38 +29,56 @@ _MESSAGES = (
     TranscriptMessage(author="Ada", text="prod is down", posted_at=_STARTED),
     TranscriptMessage(author="Bob", text="on it, rolling back"),
 )
+_CONVERSATION = slack_conversation("C123")
 
 
 class FakeTranscriptReader:
-    """In-memory ``IncidentTranscriptReader`` that records how it was asked."""
+    """In-memory ``IncidentTranscriptReader`` that records how it was asked.
 
-    def __init__(self, messages: Sequence[TranscriptMessage] = _MESSAGES, started_at: datetime | None = _STARTED) -> None:
+    ``read_fails`` and ``start_fails`` make the read or the start lookup return a
+    classified transient failure.
+    """
+
+    def __init__(
+        self,
+        messages: Sequence[TranscriptMessage] = _MESSAGES,
+        started_at: datetime | None = _STARTED,
+        *,
+        read_fails: bool = False,
+        start_fails: bool = False,
+    ) -> None:
         self._messages = messages
         self._started_at = started_at
-        self.start_lookups: list[str] = []
+        self._read_fails = read_fails
+        self._start_fails = start_fails
+        self.start_lookups: list[ConversationReference] = []
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        self.start_lookups.append(conversation_id)
-        return self._started_at
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        self.start_lookups.append(conversation)
+        if self._start_fails:
+            return OperationResult.transient_error("Slack transcript read failed: ratelimited", "ratelimited")
+        return OperationResult.success(self._started_at)
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         self.reads.append(
             {
-                "conversation_id": conversation_id,
+                "conversation": conversation,
                 "since": since,
                 "limit": limit,
                 "exclude_own_and_system_messages": exclude_own_and_system_messages,
             }
         )
-        return self._messages
+        if self._read_fails:
+            return OperationResult.transient_error("Slack transcript read failed: ratelimited", "ratelimited")
+        return OperationResult.success(self._messages)
 
 
 @pytest.fixture(autouse=True)
@@ -88,7 +114,7 @@ class TestWindow:
         """An explicit look-back is measured from now, and the conversation's start is never looked up."""
         reader = FakeTranscriptReader()
 
-        await summarize_incident_conversation("C123", since=timedelta(hours=2), reader=reader)
+        await summarize_incident_conversation(_CONVERSATION, since=timedelta(hours=2), reader=reader)
 
         assert reader.reads[0]["since"] == _NOW - timedelta(hours=2)
         assert reader.start_lookups == []
@@ -97,16 +123,24 @@ class TestWindow:
         """With no look-back the summary covers the whole incident, from the conversation's start."""
         reader = FakeTranscriptReader()
 
-        await summarize_incident_conversation("C123", reader=reader)
+        await summarize_incident_conversation(_CONVERSATION, reader=reader)
 
-        assert reader.start_lookups == ["C123"]
+        assert reader.start_lookups == [_CONVERSATION]
         assert reader.reads[0]["since"] == _STARTED
 
     async def test_unknown_start_falls_back_to_the_default_window(self, summarize: AsyncMock) -> None:
         """When the reader cannot say when the conversation started, the configured default look-back applies."""
         reader = FakeTranscriptReader(started_at=None)
 
-        await summarize_incident_conversation("C123", reader=reader)
+        await summarize_incident_conversation(_CONVERSATION, reader=reader)
+
+        assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
+
+    async def test_a_failed_start_lookup_falls_back_to_the_default_window(self, summarize: AsyncMock) -> None:
+        """A classified failure of the start lookup is treated like an unknown start."""
+        reader = FakeTranscriptReader(start_fails=True)
+
+        await summarize_incident_conversation(_CONVERSATION, reader=reader)
 
         assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
 
@@ -122,7 +156,7 @@ class TestLimit:
         """A missing, zero or negative limit means the default; a larger one is capped at the maximum."""
         reader = FakeTranscriptReader()
 
-        await summarize_incident_conversation("C123", limit=limit, reader=reader)
+        await summarize_incident_conversation(_CONVERSATION, limit=limit, reader=reader)
 
         assert reader.reads[0]["limit"] == expected
 
@@ -132,7 +166,7 @@ class TestGathering:
         """The messages the reader returned are passed on positionally and untouched, with the caller's instructions."""
         reader = FakeTranscriptReader()
 
-        result = await summarize_incident_conversation("C123", instructions="use mrkdwn", reader=reader)
+        result = await summarize_incident_conversation(_CONVERSATION, instructions="use mrkdwn", reader=reader)
 
         summarize.assert_awaited_once_with(_MESSAGES, instructions="use mrkdwn")
         assert result is summarize.return_value
@@ -143,10 +177,10 @@ class TestGathering:
         """The bot's own scaffolding posts and channel system events are excluded, as for draft and status update."""
         reader = FakeTranscriptReader()
 
-        await summarize_incident_conversation("C123", reader=reader)
+        await summarize_incident_conversation(_CONVERSATION, reader=reader)
 
         assert len(reader.reads) == 1
-        assert reader.reads[0]["conversation_id"] == "C123"
+        assert reader.reads[0]["conversation"] == _CONVERSATION
         assert reader.reads[0]["exclude_own_and_system_messages"] is True
 
     async def test_reader_defaults_to_the_core_provider(self, summarize: AsyncMock, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -154,7 +188,7 @@ class TestGathering:
         reader = FakeTranscriptReader()
         monkeypatch.setattr(service, "get_incident_transcript_reader", lambda: reader)
 
-        await summarize_incident_conversation("C123")
+        await summarize_incident_conversation(_CONVERSATION)
 
         assert len(reader.reads) == 1
 
@@ -164,7 +198,7 @@ class TestGathering:
         summarizer.summarize = AsyncMock(return_value=OperationResult.success(data="ok"))
         monkeypatch.setattr(service, "get_summarizer", lambda: summarizer)
 
-        await summarize_incident_conversation("C123", reader=FakeTranscriptReader())
+        await summarize_incident_conversation(_CONVERSATION, reader=FakeTranscriptReader())
 
         assert summarizer.summarize.await_args.args[0] == (
             "Current time: 2026-03-01 07:00 EST\n"
@@ -177,8 +211,15 @@ class TestGathering:
 
 class TestFailures:
     async def test_empty_transcript_gives_the_empty_history_error(self) -> None:
-        """Nothing read (no messages, or a platform failure behind the reader) is the empty-history outcome."""
-        result = await summarize_incident_conversation("C123", reader=FakeTranscriptReader(messages=()))
+        """Nothing read is the empty-history outcome."""
+        result = await summarize_incident_conversation(_CONVERSATION, reader=FakeTranscriptReader(messages=()))
+
+        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.error_code == EMPTY_HISTORY_CODE
+
+    async def test_a_failed_read_gives_the_empty_history_error(self) -> None:
+        """A classified read failure keeps today's reply: the same empty-history outcome as no messages."""
+        result = await summarize_incident_conversation(_CONVERSATION, reader=FakeTranscriptReader(read_fails=True))
 
         assert result.status == OperationStatus.PERMANENT_ERROR
         assert result.error_code == EMPTY_HISTORY_CODE
@@ -188,4 +229,4 @@ class TestFailures:
         error: OperationResult[str] = OperationResult.transient_error(message="boom", error_code="SERVER_ERROR")
         summarize.return_value = error
 
-        assert await summarize_incident_conversation("C123", reader=FakeTranscriptReader()) is error
+        assert await summarize_incident_conversation(_CONVERSATION, reader=FakeTranscriptReader()) is error

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T17:26:00Z'
+updated_date: '2026-11-05T20:31:00Z'
 labels:
   - incident
   - features
@@ -123,6 +123,14 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Coordinated incidents target-shape note (doc-11 row 18): after the A1 incident-management ADR amendment, re-plan declare to create incident_surface_bindings and use binding-based lookup. E1.1/E1.2 are the first slices; retain the by_channel fallback only until legacy bindings are backfilled, then retire it in the existing contract task.
+
+---
+
+created: 2026-11-05T20:31:00Z
+
+---
+
+2026-11-05 (TASK-145.6.3 approval, OQ1, G1): IncidentConversation ships in 145.6.3 without create. 145.7 adds create(name, *, private) -> OperationResult[ConversationReference] to it, designed with the first working-surface binding (E1.1/E1.2, after A1): declare's record plus first binding is one durable operation, and a replayed Slack conversations.create answers name_taken, so create must converge on retry instead of failing or duplicating. Its Slack call goes through the rate-limit-only write handle (outbound-clients.md non-idempotent write rule). Every conversation write calls conversation_is_writable(conversations, conversation | None) first; pass the record's conversation (the primary binding once bindings exist). invite takes chat account ids in the conversation's tenant (people-and-accounts.md). The port is async (transport-slack.md).
 
 ---
 <!-- COMMENTS:END -->

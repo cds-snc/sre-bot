@@ -78,7 +78,7 @@ class SlackSettings(ConfigurationSlice):
 
     Keys of [slack]:
         request_timeout_seconds, retry_max_attempts, transient_retry_after_seconds,
-        unauthorized_errors, not_found_errors, transient_errors.
+        unauthorized_errors, not_found_errors, not_writable_errors, transient_errors.
         [slack.tenant] team_id and enterprise_id: the workspace and Enterprise org this instance
         works with, at least one; each is verified on every inbound request. Default: none.
 
@@ -125,6 +125,16 @@ class SlackSettings(ConfigurationSlice):
     not_found_errors: list[str] = Field(
         default=["channel_not_found", "user_not_found", "users_not_found", "message_not_found", "no_such_subteam"],
         description="Slack Web API error codes classified as NOT_FOUND.",
+    )
+    not_writable_errors: list[str] = Field(
+        default=[
+            "is_archived",
+            "not_in_channel",
+            "restricted_action",
+            "restricted_action_read_only_channel",
+            "restricted_action_thread_only_channel",
+        ],
+        description=("Slack Web API error codes for a conversation the bot cannot write to, classified as PERMANENT_ERROR."),
     )
     transient_errors: list[str] = Field(
         default=["ratelimited", "internal_error", "fatal_error", "service_unavailable", "request_timeout"],

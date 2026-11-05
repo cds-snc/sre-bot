@@ -82,10 +82,10 @@ def register(registrar: SlackCommandRegistrar) -> None:
         return handle_draft_command(payload, {}, registrar.reply, scopes)
 
     def _dispatch_summarize(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_summarize_command(payload, parsed_args)
+        return handle_summarize_command(payload, parsed_args, scopes)
 
     def _dispatch_summarize_default(payload: CommandPayload) -> CommandResponse:
-        return handle_summarize_command(payload, {})
+        return handle_summarize_command(payload, {}, scopes)
 
     registrar.register_command(
         command="draft",
@@ -211,6 +211,7 @@ def _parse_limit(raw: Any) -> int | None:
 def handle_summarize_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
+    scopes: ServiceScopeOpener,
 ) -> CommandResponse:
     """Handle ``/sre incident summarize`` and return an ephemeral summary.
 
@@ -223,6 +224,8 @@ def handle_summarize_command(
         parsed_args: Parsed ``--since``/``--limit`` arguments (empty for the
             no-argument invocation). When ``--since`` is omitted the summary
             covers the whole incident, starting from channel creation.
+        scopes: Opens the service scope the configured Slack tenant is read in,
+            to name the command's channel by its conversation reference.
 
     Returns:
         An ephemeral ``CommandResponse`` carrying the summary, an
@@ -239,9 +242,12 @@ def handle_summarize_command(
         log.warning("incident_summary_no_channel")
         return summary_error_response(locale)
 
+    with scopes.create_scope() as services:
+        tenant = services.get(ConfiguredSystems).tenants()[WorkplaceSystem.SLACK]
+    conversation = ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=payload.channel_id)
     result = asyncio.run(
         summarize_incident_conversation(
-            payload.channel_id,
+            conversation,
             since=_parse_since(parsed_args.get("--since")),
             limit=_parse_limit(parsed_args.get("--limit")),
         )

@@ -43,6 +43,7 @@ from features.incident.comms.entrypoints.slack_views import (
 from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from features.incident.comms.service import generate_status_update_draft
 from features.incident.core.api import (
+    ConversationReference,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -149,18 +150,18 @@ def _records() -> InMemoryRecordStore:
 
 
 class _StubReader:
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return _NOW - timedelta(hours=10)
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(_NOW - timedelta(hours=10))
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
-        return _MESSAGES
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
+        return OperationResult.success(_MESSAGES)
 
 
 @dataclass
@@ -292,7 +293,7 @@ def test_nothing_new_carries_the_typed_values_forward_without_a_model_call(
     harness: Harness, generator: _StubGenerator, store: StatusUpdateStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With only messages from before the approved cutoff, the new draft repeats the typed values with the wording."""
-    monkeypatch.setattr(_StubReader, "read_transcript", lambda self, conversation_id, **kwargs: ())
+    monkeypatch.setattr(_StubReader, "read_transcript", lambda self, conversation, **kwargs: OperationResult.success(()))
 
     harness.dispatch(_generate_action(""))
 
