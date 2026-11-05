@@ -425,7 +425,7 @@ def test_handle_update_field_submission_text_type(
 
 
 @patch("modules.incident.information_update.logger")
-@patch("modules.incident.information_update.utils")
+@patch("modules.incident.information_update.incident_documents")
 @patch("modules.incident.information_update.incident_document")
 @patch("modules.incident.information_update.incident_folder")
 @patch("modules.incident.information_update.information_display")

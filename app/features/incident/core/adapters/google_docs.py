@@ -1,47 +1,321 @@
-"""Google-backed adapter for the ``IncidentDocumentStore``.
+"""Google adapter of the incident umbrella: the incident report in Google Docs and its Drive folder.
 
-Owns every Google structural detail: walking the source document body to turn
-heading-styled paragraphs into ``DocumentSection`` values (the heading plus the
-template guidance written under it), and writing the draft document -- in the
-source document's Drive folder -- populated with the drafted sections. Each run
-creates a fresh Drive copy of the source document, so repeated invocations
-produce new draft documents rather than rewriting one in place. The source
-incident report is only ever read; the sole content-removing operation here is guarded to fire only on a
+The only module in features/incident/ that reaches Google Docs and Drive, under
+decisions/feature-packages.md (integrations are imported from adapters/ only).
+Sections, in order:
 
-Per ``decisions/feature-packages.md`` this is the only place in the package
-allowed to import ``integrations``.
+- document ids: Google-Docs-URL id extraction;
+- report edits: placeholders, revision-guarded edits and snapshots through
+  documents().get/.batchUpdate, each owning its try/except and
+  classify_google_error, exposing incident-domain operations rather than
+  SDK-shaped passthroughs;
+- Drive: generic file and folder operations through the configured
+  DriveProvider; metadata (Drive appProperties) is Google-specific code
+  implemented here, since appProperties is deliberately not part of the
+  vendor-neutral DriveProvider; the Drive healthcheck;
+- section writer: walks the source document body to turn heading-styled
+  paragraphs into DocumentSection values (the heading plus the template
+  guidance written under it), and writes the draft document -- in the source
+  document's Drive folder -- populated with the drafted sections. Each run
+  creates a fresh Drive copy of the source document, so repeated invocations
+  produce new draft documents rather than rewriting one in place. The source
+  incident report is only ever read.
 """
 
 import re
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
 import structlog
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationResult
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.scribe.domain import (
+from features.incident.core.domain import (
     DocumentField,
     DocumentSection,
     DraftWriteResult,
     SectionDraft,
 )
 from infrastructure.drive import DRIVE_SCOPES
+from infrastructure.drive.factory import get_drive_provider
+from infrastructure.drive.models import DriveFile
 from integrations.google_workspace import client as google_workspace_client
+from integrations.google_workspace.client import classify_google_error, get_docs_service
 
 if TYPE_CHECKING:
     from googleapiclient._apis.docs.v1 import (  # pyright: ignore[reportMissingModuleSource]
         BatchUpdateDocumentRequest,
         Document,
     )
-    from googleapiclient._apis.drive.v3 import File  # pyright: ignore[reportMissingModuleSource]
+    from googleapiclient._apis.drive.v3 import DriveResource, File  # pyright: ignore[reportMissingModuleSource]
 
 logger = structlog.get_logger()
 
-_DRAFT_TITLE_SUFFIX = " - AI draft"
-# Kept local because this adapter must not import the legacy google_docs module.
+# --- Document ids ---
+
+
+def extract_google_doc_id(url):
+    """
+    Extracts the Google Docs ID from a Google Docs URL.
+
+    Args:
+        url (str): The URL of the Google Docs document.
+
+    Returns:
+        str: The Google Docs ID extracted from the URL.
+    """
+    logger.debug(
+        "extracting_google_doc_id",
+        url=url,
+    )
+    if not url:
+        return None
+
+    # Regular expression pattern to match Google Docs ID
+    pattern = r"https://docs.google.com/document/d/([a-zA-Z0-9_-]+)/"
+
+    # Search in the given text for all occurences of pattern
+    match = re.search(pattern, url)
+    if match:
+        return match.group(1)
+    else:
+        return None
+
+
+# --- Report edits ---
+
 _DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
+_STALE_REVISION_STATUS = 400
+
+
+@dataclass(frozen=True)
+class DocumentSnapshot:
+    """A document body together with the revision it was read at."""
+
+    content: list[dict[str, Any]]
+    revision_id: str
+
+
+def replace_placeholders(document_id: str, replacements: Mapping[str, str], match_case: bool = True) -> bool:
+    """Replace each key with its value via replaceAllText. Returns whether any occurrence changed."""
+    requests = [
+        {
+            "replaceAllText": {
+                "containsText": {"text": text, "matchCase": match_case},
+                "replaceText": replacement,
+            }
+        }
+        for text, replacement in replacements.items()
+    ]
+    service = get_docs_service(scopes=_DOCS_SCOPES)
+    body = cast("Any", {"requests": requests})
+    try:
+        result = service.documents().batchUpdate(documentId=document_id, body=body).execute()
+    except HttpError as exc:
+        status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "incident_document_placeholder_replace_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return False
+    replies = result.get("replies", []) if isinstance(result, dict) else []
+    return any(reply.get("replaceAllText", {}).get("occurrencesChanged", 0) > 0 for reply in replies)
+
+
+def fetch_document_snapshot(document_id: str) -> DocumentSnapshot | None:
+    """Return the document body's structural elements and revision, or None on failure/not-found."""
+    service = get_docs_service(scopes=_DOCS_SCOPES)
+    try:
+        document = service.documents().get(documentId=document_id).execute()
+    except HttpError as exc:
+        status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "incident_document_fetch_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return None
+    if not isinstance(document, dict):
+        return None
+    content = document.get("body", {}).get("content")
+    revision_id = document.get("revisionId")
+    if content is None or not revision_id:
+        return None
+    return DocumentSnapshot(content=cast("list[dict[str, Any]]", content), revision_id=revision_id)
+
+
+def apply_document_edits(document_id: str, requests: list[dict[str, Any]], required_revision_id: str) -> bool:
+    """Apply a batchUpdate only if the document is still at required_revision_id.
+
+    Callers send index-based edits computed from a snapshot, so applying them to any other
+    revision corrupts the document. Returns True once Google confirms the edit. False means
+    it was rejected or its outcome is unknown (a timeout can still land later); the caller
+    must take a new snapshot before deciding to send anything again.
+    """
+    service = get_docs_service(scopes=_DOCS_SCOPES)
+    body = cast("Any", {"requests": requests, "writeControl": {"requiredRevisionId": required_revision_id}})
+    try:
+        # The revision guard makes a second send harmless, but retries stay off: a replay of a
+        # landed edit would only come back as a stale-revision rejection of a successful write.
+        service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
+    except TimeoutError:
+        logger.warning("incident_document_edit_unconfirmed", document_id=document_id)
+        return False
+    except HttpError as exc:
+        if int(exc.resp.status) == _STALE_REVISION_STATUS:
+            # Google answers 400 when the document moved past the required revision.
+            logger.warning("incident_document_edit_rejected", document_id=document_id, reason=exc.reason)
+            return False
+        status, error_code, retry_after = classify_google_error(exc)
+        logger.warning(
+            "incident_document_edit_failed",
+            document_id=document_id,
+            status=status.value,
+            error_code=error_code,
+            retry_after=retry_after,
+        )
+        return False
+    return True
+
+
+# --- Drive ---
+
+
+def _drive_service() -> DriveResource:
+    return google_workspace_client.get_drive_service(scopes=DRIVE_SCOPES)
+
+
+def _to_dict(file: DriveFile) -> dict[str, Any]:
+    return {"id": file.id, "name": file.name}
+
+
+def _log_failure(event: str, result: OperationResult[Any]) -> None:
+    logger.warning(
+        event,
+        status=result.status.value,
+        error_code=result.error_code,
+        retry_after=result.retry_after,
+    )
+
+
+def _log_http_failure(event: str, file_id: str, exc: HttpError) -> None:
+    status, error_code, retry_after = google_workspace_client.classify_google_error(exc)
+    logger.warning(
+        event,
+        file_id=file_id,
+        status=status.value,
+        error_code=error_code,
+        retry_after=retry_after,
+    )
+
+
+def list_folder_files(parent_folder_id: str) -> list[dict[str, Any]]:
+    result = get_drive_provider().list_files(parent_folder_id)
+    if not result.is_success:
+        _log_failure("incident_drive_list_files_failed", result)
+        return []
+    return [_to_dict(file) for file in result.data or []]
+
+
+def list_child_folders(parent_folder_id: str) -> list[dict[str, Any]]:
+    result = get_drive_provider().list_folders(parent_folder_id)
+    if not result.is_success:
+        _log_failure("incident_drive_list_folders_failed", result)
+        return []
+    return [_to_dict(file) for file in result.data or [] if file.name and "Templates" not in file.name]
+
+
+def create_folder(name: str, parent_folder_id: str) -> dict[str, Any] | None:
+    result = get_drive_provider().create_folder(name, parent_folder_id)
+    if not result.is_success:
+        _log_failure("incident_drive_create_folder_failed", result)
+        return None
+    if result.data is None:
+        return None
+    return _to_dict(result.data)
+
+
+def create_document_from_template(name: str, parent_folder_id: str, template_id: str) -> dict[str, Any] | None:
+    result = get_drive_provider().create_file_from_template(name, parent_folder_id, template_id)
+    if not result.is_success:
+        _log_failure("incident_drive_create_document_failed", result)
+        return None
+    if result.data is None:
+        return None
+    return _to_dict(result.data)
+
+
+def find_document_by_channel_name(channel_name: str) -> dict[str, Any] | None:
+    result = get_drive_provider().find_files_by_name(channel_name)
+    if not result.is_success:
+        _log_failure("incident_drive_find_document_failed", result)
+        return None
+
+    matches = result.data or []
+    if not matches:
+        return None
+
+    document = matches[0]
+    metadata = get_metadata(document.id, fields="id, name, appProperties")
+    return {"id": document.id, "appProperties": metadata.get("appProperties", {})}
+
+
+def add_metadata(file_id: str, key: str, value: str) -> dict[str, Any]:
+    body = cast("File", {"appProperties": {key: value}})
+    try:
+        file = _drive_service().files().update(fileId=file_id, body=body, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_add_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
+
+
+def delete_metadata(file_id: str, key: str) -> dict[str, Any]:
+    body = cast("File", {"appProperties": {key: None}})
+    try:
+        file = _drive_service().files().update(fileId=file_id, body=body, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_delete_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
+
+
+def get_metadata(file_id: str, fields: str | None = None) -> dict[str, Any]:
+    try:
+        file = _drive_service().files().get(fileId=file_id, fields=fields, supportsAllDrives=True).execute()
+    except HttpError as exc:
+        _log_http_failure("incident_drive_get_metadata_failed", file_id, exc)
+        raise
+    return cast("dict[str, Any]", file)
+
+
+def incident_drive_healthcheck() -> bool:
+    healthy = False
+    try:
+        metadata = get_metadata(get_incident_core_settings().report_template_id)
+        if metadata is not None:
+            healthy = "id" in metadata
+        logger.info(
+            "google_drive_healthcheck_success",
+            status="healthy" if healthy else "unhealthy",
+        )
+    except Exception as error:
+        logger.exception("google_drive_healthcheck_failed", error=str(error))
+
+    return healthy
+
+
+# --- Section writer ---
+
+_DRAFT_TITLE_SUFFIX = " - AI draft"
 _SUBHEADING_STYLE = "HEADING_3"
 # The line marking where the SRE bot's generated timeline begins.
 # ``modules.incident`` locates the timeline by this exact string to append

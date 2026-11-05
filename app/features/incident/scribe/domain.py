@@ -1,7 +1,8 @@
 """Domain values for the incident scribe use cases.
 
-Frozen, platform-neutral dataclasses shared by the services, the document
-adapter, and the platform adapters. This module depends only on the stdlib.
+Frozen, platform-neutral values of the drafting use case. The document section
+types the report adapter reads and writes come from features/incident/core.
+This module depends only on the stdlib.
 """
 
 from dataclasses import dataclass
@@ -9,69 +10,6 @@ from dataclasses import dataclass
 # Written into Author(s). The responders who spoke in the channel did not author
 # this document, and a reader needs to know it was machine-written.
 AI_AUTHOR = "SRE Bot (AI generated)"
-
-
-@dataclass(frozen=True)
-class DocumentSection:
-    """A section of the incident document template.
-
-    In the incident template each heading is followed by guidance describing
-    what belongs in that section. That guidance is the section's drafting
-    instruction: the AI answers it from the incident channel transcript, and
-    the answer replaces the guidance in the drafted document.
-    """
-
-    heading: str
-    instructions: str
-
-    @property
-    def has_instructions(self) -> bool:
-        """Whether any guidance text is written under this heading."""
-        return bool(self.instructions.strip())
-
-
-@dataclass(frozen=True)
-class SectionDraft:
-    """A section of the drafted document: a heading and the text beneath it.
-
-    ``content`` is the AI-written answer when ``is_drafted`` is true; otherwise
-    it carries the source document's original guidance forward so a human
-    still sees what that section is asking for.
-
-    ``as_list`` marks sections that read as lists rather than prose -- action
-    items, follow-ups, timelines -- so the renderer bullets every line even
-    when the model returned them unmarked.
-    """
-
-    heading: str
-    content: str
-    is_drafted: bool
-    as_list: bool = False
-
-
-@dataclass(frozen=True)
-class DocumentField:
-    """A ``Label: value`` line in the report's metadata block.
-
-    These sit above the first heading, so they are addressed by label rather
-    than by section.
-    """
-
-    label: str
-    value: str
-
-
-@dataclass(frozen=True)
-class DraftWriteResult:
-    """Where a drafting run's output landed.
-
-    ``created`` distinguishes the first run for an incident (a new draft
-    document) from a re-run (the same document rewritten in place), so the
-    caller can say which happened.
-    """
-
-    document_id: str
-    created: bool
 
 
 @dataclass(frozen=True)

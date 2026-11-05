@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-11-05T00:44:00Z'
+updated_date: '2026-11-05T15:54:00Z'
 labels:
   - incident
 milestone: m-7
@@ -54,6 +54,14 @@ created: 2026-11-05T00:44:00Z
 ---
 
 2026-11-05 (TASK-145.6 OQ4, human): the report section writer matches the CDS postmortem template's Impact labels (end-users, cds staff, other government department(s), other) to drop empty groups and normalise heading styling (core/adapters/google_docs.py after TASK-145.6.1). These describe the template, not app wording: the label set belongs with the per-type document templates this epic manages; until then they stay adapter constants, and a template without them is left untouched.
+
+---
+
+created: 2026-11-05T15:54:00Z
+
+---
+
+2026-11-05 (human): TASK-145.11 turns the report section writer's template facts into a template profile that postmortem passes as data: groups dropped when empty, labels styled as body text, metadata labels, and guidance restored under named headings. Until then it is a postmortem constant. The per-type document templates this epic manages supply the profile per template; the configured Google template's profile stays the default.
 
 ---
 <!-- COMMENTS:END -->

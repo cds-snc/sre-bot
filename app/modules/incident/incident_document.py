@@ -8,12 +8,12 @@ from typing import Any
 from structlog import get_logger
 
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.documents.adapters.google_docs import (
+from features.incident.core.adapters import google_docs as incident_drive
+from features.incident.core.adapters.google_docs import (
     apply_document_edits,
     fetch_document_snapshot,
     replace_placeholders,
 )
-from features.incident.drive.adapters import google_drive as incident_drive
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"

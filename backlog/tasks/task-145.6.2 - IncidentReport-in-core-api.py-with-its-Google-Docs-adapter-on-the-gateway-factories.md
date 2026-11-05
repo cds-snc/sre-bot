@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T14:53:00Z'
+updated_date: '2026-11-05T15:54:00Z'
 labels:
   - incident
   - features
@@ -120,6 +120,22 @@ created: 2026-11-05T01:03:00Z
 ---
 
 2026-11-05 full plan, proposed: corrections C1 (status text and timeline entry join with 145.8/145.9), C2 (no placement on the Protocol; legacy filing unchanged), C3 (the report from the record and IncidentReportLinkLookup deletion move here from 145.6.3), C4 (new host task: requirements resolve a feature's own settings table; AC #6 waits on it). AC #4 (product-folder placement) replaced by the new AC on folder_id (renumbered), AC for the D1 count added. Awaiting approval.
+
+---
+
+created: 2026-11-05T15:45:00Z
+
+---
+
+2026-11-05 (12a, TASK-145.6.1): step 1's type move is done. DocumentSection, SectionDraft, DocumentField and DraftWriteResult now live in core/domain.py and are exported by core/api.py; scribe ports.py and service.py import them from core.api. 12a needed the move because the section writer is now in core, and core may not import scribe (incident-umbrella contract). In 12b, step 1 only adds the Protocol and the provider. Scope drops by about 4 lines; file count unchanged (core/domain.py and scribe/domain.py are no longer touched; core/api.py still is).
+
+---
+
+created: 2026-11-05T15:54:00Z
+
+---
+
+2026-11-05 (human): write_draft_copy keeps its planned signature (drafts, fields, links) here. TASK-145.11 (step 3a, AC #6) changes it to a neutral block body plus a template profile when the draft rules leave the adapter for postmortem. One consumer, so the change is local, and 12b's scope is unchanged.
 
 ---
 <!-- COMMENTS:END -->

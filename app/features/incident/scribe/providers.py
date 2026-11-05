@@ -7,7 +7,7 @@ keeping ``service.py`` and ``entrypoints/`` free of adapter (and therefore
 
 from functools import lru_cache
 
-from features.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
+from features.incident.core.adapters.google_docs import GoogleDocsIncidentDocument
 from features.incident.scribe.adapters.slack import build_incident_report_link_lookup
 from features.incident.scribe.ports import IncidentReportLinkLookup
 

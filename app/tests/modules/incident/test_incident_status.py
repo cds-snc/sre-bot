@@ -9,7 +9,7 @@ from modules.incident import incident_status
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 def test_update_status_success(
     mock_utils,
     mock_incident_document,
@@ -59,7 +59,7 @@ def test_update_status_success(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_folder")
 @patch("modules.incident.incident_status.incident_document")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 def test_update_status_success_with_incident_id(
     mock_utils,
     mock_incident_document,
@@ -108,7 +108,7 @@ def test_update_status_success_with_incident_id(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_bookmarks_list_errors(
     mock_logger,
@@ -155,7 +155,7 @@ def test_update_status_handles_bookmarks_list_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_update_document_errors(
     mock_logger,
@@ -204,7 +204,7 @@ def test_update_status_handles_update_document_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_update_spreadsheet_errors(
     mock_logger,
@@ -257,7 +257,7 @@ def test_update_status_handles_update_spreadsheet_errors(
 @patch("modules.incident.incident_status.db_operations")
 @patch("modules.incident.incident_status.incident_document")
 @patch("modules.incident.incident_status.incident_folder")
-@patch("modules.incident.incident_status.utils")
+@patch("modules.incident.incident_status.incident_documents")
 @patch("modules.incident.incident_status.logger")
 def test_update_status_handles_chat_postMessage_errors(
     mock_logger,

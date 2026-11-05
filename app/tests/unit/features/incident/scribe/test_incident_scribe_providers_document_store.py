@@ -5,10 +5,9 @@ from collections.abc import Iterator
 import pytest
 
 from contracts.operations import OperationStatus
-from features.incident.core.api import TranscriptMessage
+from features.incident.core.adapters.google_docs import GoogleDocsIncidentDocument
+from features.incident.core.api import DocumentSection, DraftWriteResult, TranscriptMessage
 from features.incident.scribe import providers
-from features.incident.scribe.adapters.google_docs import GoogleDocsIncidentDocument
-from features.incident.scribe.domain import DocumentSection, DraftWriteResult
 from features.incident.scribe.ports import IncidentDocumentStore
 from features.incident.scribe.service import (
     DOCUMENT_UNREADABLE_CODE,

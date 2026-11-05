@@ -301,10 +301,9 @@ ignore_imports = [
     "packages.access.sync.providers -> infrastructure.records",
     "packages.geolocate.platforms.slack -> infrastructure.i18n",
     "features.incident.core.adapters.i18n -> infrastructure.i18n",
-    "features.incident.drive.adapters.google_drive -> infrastructure.drive",
-    "features.incident.drive.adapters.google_drive -> infrastructure.drive.factory",
-    "features.incident.drive.adapters.google_drive -> infrastructure.drive.models",
-    "features.incident.scribe.adapters.google_docs -> infrastructure.drive",
+    "features.incident.core.adapters.google_docs -> infrastructure.drive",
+    "features.incident.core.adapters.google_docs -> infrastructure.drive.factory",
+    "features.incident.core.adapters.google_docs -> infrastructure.drive.models",
     "packages.talent.adapters.google_drive -> infrastructure.drive.factory",
 ]
 
@@ -396,7 +395,7 @@ name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
 containers = ["features.incident"]
 layers = [
-    "comms | documents | drive | meet | postmortem | response | scheduling | scribe",
+    "comms | meet | postmortem | response | scheduling | scribe",
     "core",
     "common",
 ]

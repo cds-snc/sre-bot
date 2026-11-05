@@ -3,10 +3,10 @@ id: TASK-184
 title: >-
   Plugin requirements resolve a feature's own settings table from the built
   slices
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T01:15:00Z'
-updated_date: '2026-11-05T15:05:00Z'
+updated_date: '2026-11-05T18:36:00Z'
 labels:
   - plugins
   - configuration

@@ -1,10 +1,10 @@
 ---
 id: TASK-145.5.7.2
 title: 'Incident core legacy upgrade runner: guarded writes, report, bounded read'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:04:00Z'
-updated_date: '2026-11-04T21:49:00Z'
+updated_date: '2026-11-05T18:35:00Z'
 labels:
   - incident
   - features

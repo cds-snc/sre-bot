@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T01:16:00Z'
+updated_date: '2026-11-05T15:54:00Z'
 labels:
   - incident
   - features
@@ -103,6 +103,14 @@ created: 2026-10-26T15:06:00Z
 ---
 
 2026-10-26: TASK-112.4 first moves notify_stale_incident_channels off the Bolt app: it takes the integrations/slack Web API client per run and is scheduled only when [slack.tenant] is configured. The rebuilt nudge keeps both properties (decisions/reliability.md).
+
+---
+
+created: 2026-11-05T15:54:00Z
+
+---
+
+2026-11-05: _SRE_BOT_GENERATED_TIMELINE in core/adapters/google_docs.py (the section writer) and START_HEADING in modules/incident/incident_document.py are the same template marker. When the timeline is rebuilt here, keep one definition, with the report's timeline in the adapter. TASK-145.11 leaves it in the adapter.
 
 ---
 <!-- COMMENTS:END -->

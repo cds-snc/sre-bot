@@ -8,9 +8,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from contracts.operations import OperationResult, OperationStatus
-from features.incident.core.api import IncidentTranscriptReader, TranscriptMessage
+from features.incident.core.api import DocumentSection, IncidentTranscriptReader, TranscriptMessage
 from features.incident.scribe import providers, service
-from features.incident.scribe.domain import DocumentSection, DraftedDocument
+from features.incident.scribe.domain import DraftedDocument
 from features.incident.scribe.ports import IncidentReportLinkLookup
 from features.incident.scribe.service import (
     EMPTY_HISTORY_CODE,
