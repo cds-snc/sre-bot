@@ -5,8 +5,9 @@ goes through a recording fake transport answering like Google STS and IAM Creden
 no network is used. The tenant-level test builds the slice from the environment with
 outbound sockets blocked, which shows boot builds the chain without a network call. The
 assertions show:
-- the STS request carries the configured audience and an AWS-signed GetCallerIdentity
-  request as the subject token;
+- the STS request carries the configured audience and, as the subject token, an AWS-signed
+  GetCallerIdentity request to the supplier's regional STS host (compared as a parsed host,
+  never as a substring);
 - the federated token then impersonates the service account for the caller's scopes;
 - no key is read.
 """
@@ -16,7 +17,7 @@ import socket
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
-from urllib.parse import parse_qs, unquote
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 from google.auth import aws, impersonated_credentials
@@ -83,8 +84,9 @@ def test_the_task_role_is_exchanged_at_sts_then_impersonates_the_service_account
     assert form["audience"] == [AUDIENCE]
     assert form["subject_token_type"] == ["urn:ietf:params:aws:token-type:aws4_request"]
     subject_token = json.loads(unquote(form["subject_token"][0]))
-    assert "sts.ca-central-1.amazonaws.com" in subject_token["url"] or "sts.amazonaws.com" in subject_token["url"]
-    assert "GetCallerIdentity" in subject_token["url"]
+    signed_request = urlsplit(subject_token["url"])
+    assert (signed_request.scheme, signed_request.hostname) == ("https", "sts.ca-central-1.amazonaws.com")
+    assert parse_qs(signed_request.query)["Action"] == ["GetCallerIdentity"]
     assert impersonation["url"].endswith(f"/serviceAccounts/{SERVICE_ACCOUNT}:generateAccessToken")
     assert impersonation["headers"]["authorization"] == "Bearer federated-token"
     assert json.loads(impersonation["body"])["scope"] == DRIVE
