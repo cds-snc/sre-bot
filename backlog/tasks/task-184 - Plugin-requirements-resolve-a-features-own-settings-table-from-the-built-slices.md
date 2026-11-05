@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T01:15:00Z'
-updated_date: '2026-11-05T01:16:00Z'
+updated_date: '2026-11-05T14:53:00Z'
 labels:
   - plugins
   - configuration
@@ -37,7 +37,7 @@ A plugin's register_requirements can name only workplace tenants and the openai,
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-PLAN (TASK-184) - single PR from main, ~15 production LOC in 1 file + 2 doc lines + tests. No settings, terraform or env change.
+PLAN (TASK-184) - single PR from main, ~15 production LOC in 1 file + 2 doc lines + tests. No settings, terraform or env change. APPROVED 2026-11-05 (human), OQ1-OQ3 as recommended (see Open questions). Re-grounded at main f45d4ec1 (#1823 merged): host_configuration.py:243-247 and lifespan.py:248-252 unchanged; Requirement( declared only by oncall_sync, rant, user_rotations and scribe.
 
 ## Grounding (path:line, read 2026-11-05)
 - app/server/plugins/requirements.py:31-41 WORKPLACE_SETTINGS / SETTINGS_SLICES (openai, opsgenie, slack getters); :60-71 is_requirement_met returns False when SETTINGS_SLICES has no entry for the table (:67-68).
@@ -64,7 +64,7 @@ PLAN (TASK-184) - single PR from main, ~15 production LOC in 1 file + 2 doc line
 - AC2 (no slice reads the table / missing attribute / bare table = unmet, reported as plugin_boot_failed with plugin+setting, no value) -> steps 1,2 -> test_a_table_no_slice_reads_is_unmet; test_a_missing_attribute_on_a_built_slice_is_unmet; test_a_bare_table_is_unmet; test_an_unmet_feature_requirement_is_logged_once_without_its_value (resolve_requirements + capture_logs, asserts plugin, setting, phase, error_type, and that the configured value text appears nowhere in the event).
 - AC3 (workplace + openai/opsgenie/slack unchanged) -> step 2 -> the existing tests (test_workplace_tenants_resolve_through_the_configured_systems_read, test_other_settings_resolve_through_their_slice, test_an_empty_secret_counts_as_unset, test_plugin_requirements_* on the 4 real plugin modules) must pass unmodified, plus test_a_vendor_table_resolves_through_its_getter_even_when_a_built_slice_has_the_same_table (precedence: the vendor map wins).
 - AC4 (plugins.md states it) -> step 3 -> reviewed in the PR diff (no test; docs).
-- AC5 (proposed, see below: unbuilt feature slice is unmet, not built on demand, independent of which plugin built it) -> steps 1,2 -> test_a_feature_slice_not_built_at_resolution_is_unmet (built_slices stub empty); test_a_slice_built_before_the_plugin_boot_is_found_for_any_plugin (slice present in built_slices but attributed to no plugin; two plugins both resolve it).
+- AC5 (approved as OQ3: unbuilt feature slice is unmet, not built on demand, independent of which plugin built it) -> steps 1,2 -> test_a_feature_slice_not_built_at_resolution_is_unmet (built_slices stub empty); test_a_slice_built_before_the_plugin_boot_is_found_for_any_plugin (slice present in built_slices but attributed to no plugin; two plugins both resolve it).
 - Every step maps to an AC (step 4 is verification).
 
 ## Test matrix (file: app/tests/unit/server/plugins/test_server_plugins_requirements_resolve.py)
@@ -96,4 +96,18 @@ Not applicable: no entity, record, schema, persisted shape or cardinality change
 - TDD: write the failing tests first in the named file; follow testing-standards (docstrings describe behavior, stub strategy, assertion rationale only; no task ids or step numbers).
 - During TDD run ruff and the targeted test file ONLY: cd app && uv run ruff check . ; cd app && uv run pytest tests/unit/server/plugins/test_server_plugins_requirements_resolve.py
 - At the end, after all edits: make check-import-contracts and make check-settings-key-ownership (from app/ context as the Makefile defines), then full mypy (cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)') and, after it finishes, full pytest (cd app && uv run pytest tests --ignore=tests/smoke), once each, sequentially, never in parallel; rerun one only on a real error. Report commands and actual output. Do not run smoke tests. No git commands. Check each AC (backlog task edit 184 --check-ac N) only as its test passes; stop at In Progress.
+
+## Open questions (decided 2026-11-05, human: approved as recommended)
+- OQ1 The CI configuration check (tests/integration/server/test_server_plugins_configuration_requirements.py) is not changed here: no plugin declares a feature table in this PR. TASK-145.6.2 step 7 extends it when scribe declares incident_core.folder_id and report_template_id (build the incident_core slice, placeholders for env_only names).
+- OQ2 Accepted: a non-tenant google_workspace.* requirement now resolves through the built google_workspace slice (built in the configuration phase). None is declared today; google_workspace.tenant still resolves through WORKPLACE_SETTINGS first. Same rule as any table: the slice that reads it answers.
+- OQ3 Accepted (AC #5): a feature slice not built in the configuration phase stays unmet, fail closed (TASK-172 boot rule); never built on demand, which would need the host to import the feature.
+
+## Delivery
+Implemented as its own single PR from an up-to-date main (#1823 merged 2026-11-05). This approval rides in the next implementation PR in the queue (TASK-145.6.1, Stack K layer 12a); TASK-184 must merge before TASK-145.6.2 (layer 12b) is implemented, since 12b step 7 declares the incident_core requirements.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-05 (human): plan approved, OQ1-OQ3 as recommended. OQ1: the CI configuration check changes in TASK-145.6.2 step 7, not here. OQ2: a non-tenant google_workspace.* requirement resolves through the built slice (none declared today). OQ3: a feature slice not built in the configuration phase stays unmet (fail closed). Single PR from an up-to-date main (#1823 merged); merges before TASK-145.6.2 is implemented. The approval edits ride in the TASK-145.6.1 (layer 12a) PR.
+<!-- SECTION:NOTES:END -->
