@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-05T01:00:00Z'
+updated_date: '2026-11-05T02:00:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -37,14 +37,14 @@ updated_date: '2026-11-05T01:00:00Z'
 | 11b | TASK-145.5.7.2 incident core upgrade runner | `stack-k/task-145.5.7.2-upgrade-runner` | #1821 | in review | Base `main`. Merges once re-reviewed (11c sits above it). |
 | 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | in review | Top of the stack: stays open until 12a is submitted above it. |
 | 12a | TASK-145.6.1 verbatim move of documents/, drive/ and scribe's section writer into core/adapters/google_docs.py; every importer repointed | `stack-k/task-145.6.1-google-docs-move` | - | plan approved | 2026-11-05; ~16 files, mechanical only; full plan in the task. |
-| 12b | TASK-145.6.2 IncidentReport Protocol and adapter on the gateway factories; infrastructure.drive ignores deleted; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | planned | Full plan proposed 2026-11-05, ~295 LOC, 12 files; corrections C1-C4 await approval; AC #5 waits on the C4 host task. |
-| 12c | TASK-145.6.3 IncidentConversation with is_writable; reader takes a ConversationReference; IncidentReportLinkLookup deleted | `stack-k/task-145.6.3-incident-conversation` | - | planned | ~9 files, ~380 LOC. |
+| 12b | TASK-145.6.2 IncidentReport Protocol and adapter on the gateway factories; infrastructure.drive ignores deleted; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | - | plan approved | 2026-11-05 (human): ~295 LOC, 12 files; C1-C4 as recommended, D1 accept (AC #9 checked); AC #10 (report from the record, link lookup deleted) moved in from 12c; depends on TASK-184 (doc-11 row 13b, single PR from main) for AC #5. |
+| 12c | TASK-145.6.3 IncidentConversation with is_writable; reader takes a ConversationReference (link lookup deletion moved to 12b, 2026-11-05) | `stack-k/task-145.6.3-incident-conversation` | - | planned | ~9 files, ~380 LOC. |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
 
 ## Position
 
-- Checked out: `task-169-google-credential-model` (#1823, TASK-169 planning PR from `main`, open), not a stack branch. This session made no code change; it edited TASK-145.6, created 145.6.1-145.6.3, commented TASK-120, 165, 165.1 (retitled), amended decisions/incident-management.md and organisation-content.md, this doc and the untracked doc-11 and doc-15.
+- Checked out: `task-169-google-credential-model` (#1823, TASK-169 planning PR from `main`, open), not a stack branch. No code change on this branch. 2026-11-05 sessions: edited TASK-145.6, created 145.6.1-145.6.3, commented TASK-120, 165, 165.1 (retitled), amended decisions/incident-management.md and organisation-content.md; then approved 145.6.2 (C1-C4, D1), retitled 145.6.3, recorded C1 on 145.8 (AC #9) and 145.9 (AC #7), created and planned TASK-184 (C4 host task), added decision-log lines to decisions/plugins.md and incident-management.md; this doc and the untracked doc-11 and doc-15.
 - Open stack PRs: #1821 (11b, base `main`), #1822 (11c, top).
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
@@ -52,6 +52,7 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 ## Next actions
 
+1. **human**: review the TASK-184 plan (row 13b; three open questions in the session handoff); on approval it is implemented from `main` in its own PR, independent of #1823 and the stack, and must merge before 12b.
 1. **human** (2026-11-05): the TASK-145.6 planning edits are a second commit on #1823 (`task-169-google-credential-model`), because they build on TASK-169's task and ADR edits; further planning-only edits may follow there until it merges.
 2. **human**, after #1823 merges: `gh stack checkout stack-k/task-145.5.7.3-response-registers-upgrade`, `gh stack rebase`, `gh stack submit`, `gh stack add stack-k/task-145.6.1-google-docs-move`.
 3. **agent**: implement TASK-145.6.1 with TDD; submit 12a so #1822 can merge.
@@ -61,11 +62,13 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 ## Open decisions
 
 - None open. 2026-11-05 (human): TASK-145.6 plan and split approved, OQ1-OQ5 as recommended; ProductCatalog's default source is the bot's own product list (TASK-165.1).
-- TASK-145.6.2 corrections C1-C4 and the D1 fallback (in its plan), proposed 2026-11-05.
+- 2026-11-05 (human): TASK-145.6.2 C1-C4 approved as recommended; D1 accept, no bookmark fallback.
+- TASK-184 plan proposed 2026-11-05, awaiting approval (not a stack layer; gates 12b AC #5).
 - Recorded at task level: TASK-145.7 dual-write, source_alert shape and the binding step; TASK-145.8 partial updates of items without record_version; TASK-154 status lifecycle.
 
 ## Planning queue
 
 - TASK-145.6.1 (12a): plan approved.
-- TASK-145.6.2 (12b): full plan proposed, awaiting approval.
+- TASK-145.6.2 (12b): plan approved 2026-11-05.
+- TASK-184 (side PR, gates 12b): plan proposed 2026-11-05, awaiting approval.
 - TASK-145.6.3 (12c): outline (narrowed by C3); full plan at pickup.

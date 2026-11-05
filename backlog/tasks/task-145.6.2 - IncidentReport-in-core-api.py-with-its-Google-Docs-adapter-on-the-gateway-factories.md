@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T01:08:00Z'
+updated_date: '2026-11-05T01:17:00Z'
 labels:
   - incident
   - features
 dependencies:
   - TASK-145.6.1
+  - TASK-184
 parent_task_id: TASK-145.6
 priority: medium
 ordinal: 482000
@@ -33,13 +34,14 @@ Layer 12b of Stack K (TASK-145.6 plan, approved 2026-11-05). IncidentReport Prot
 - [ ] #6 No user-visible command, reply or log event changes; the legacy_surface, scribe and comms suites pass
 - [ ] #7 ruff, mypy (no new errors in touched files), lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
 - [ ] #8 A new report is filed in [incident_core] folder_id; the Protocol takes no placement; legacy declare and recreate keep filing in the folder they pass (C2); empty folder_id or report_template_id returns CONFIG_NOT_CONFIGURED naming the key
-- [ ] #9 Before merge, a read-only count of incident items without report_url whose channel has an 'Incident report' bookmark is recorded in the notes; if not zero, the fallback decision (D1) is taken before merge
+- [x] #9 Before merge, a read-only count of incident items without report_url whose channel has an 'Incident report' bookmark is recorded in the notes; if not zero, the fallback decision (D1) is taken before merge
+- [ ] #10 rg finds no IncidentReportLinkLookup, _DOC_ID_PATTERN or scribe/adapters/slack.py in app/; scribe resolves the incident with find_incident_for_conversation and takes the report from incident.report (C3)
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Full plan 2026-11-05, grounded at main 5deb8406 + #1823 and the TASK-145.6.1 plan (post-move layout: features/incident/core/adapters/google_docs.py holds the documents utils, documents adapter, drive adapter and section writer verbatim). PROPOSED, awaiting human approval: corrections C1-C4 change the outline approved with the parent plan.
+Full plan 2026-11-05, grounded at main 5deb8406 + #1823 and the TASK-145.6.1 plan (post-move layout: features/incident/core/adapters/google_docs.py holds the documents utils, documents adapter, drive adapter and section writer verbatim). APPROVED 2026-11-05 (human), C1-C4 as recommended and D1 accept: corrections C1-C4 change the outline approved with the parent plan.
 
 ## Corrections to the approved outline (re-approval needed)
 - C1 Protocol surface. The legacy status mapping (incident_document.py:55-80) and the timeline rewrite (:82-302, build_timeline_replacement alone ~118 lines of Docs batchUpdate requests) live in modules/incident, not in a feature adapter. Moving them now adds ~250 lines with no feature consumer until TASK-145.8 (status) and 145.9 (timeline). Recommended: IncidentReport in 12b has create_from_template, replace_placeholders, read_sections, write_draft_copy, link; set_status_text and append_timeline_entry are added by 145.8 and 145.9 when they rebuild those surfaces, moving the legacy code then. The ADR (incident-management.md:48) states the interface's end surface; no amendment needed.
@@ -92,7 +94,7 @@ Production: Protocol and moved types ~60, adapter class ~80, drive functions ont
 - D1 count: production is read-only from local AWS; the human runs the scan (command given at handoff).
 
 ## Blast radius and rollback
-A defect breaks /incident draft (scribe) or legacy report creation and folder listing on declare; caught by the drive tests and legacy_surface. One revert restores both (no data written differently, no settings change). No terraform, IAM, SSM or env change: no deploy-checks. If C4's host task is not merged yet, step 7 waits and AC 6 stays open; nothing else depends on it.
+A defect breaks /incident draft (scribe) or legacy report creation and folder listing on declare; caught by the drive tests and legacy_surface. One revert restores both (no data written differently, no settings change). No terraform, IAM, SSM or env change: no deploy-checks. If C4's host task (TASK-184) is not merged yet, step 7 waits and AC 6 stays open; nothing else depends on it.
 
 AC numbering in the task after the rewording: plan rows 1-3 = ACs #1-#3, 5 = #4, 6 = #5, 7 = #6, 8 = #7, 4 = #8; the D1 count is #9.
 <!-- SECTION:PLAN:END -->
@@ -103,6 +105,11 @@ AC numbering in the task after the rewording: plan rows 1-3 = ACs #1-#3, 5 = #4,
 2026-11-05 D1 count (human, read-only scan of incidents): 2 of 330 items have no report_url (missing or empty). Not yet known whether their channels hold an 'Incident report' bookmark, nor their status and age; the D1 decision (fallback or accept) waits on that, before merge (AC #9 stays open).
 
 2026-11-05 D1 identified (human scan): the 2 items without report_url are test incidents, both status Open: 4137a21d-75b4-4dc0-b5be-fe52985d6e0a ('Test New conversation Creation', channel incident-dev-2025-08-25-test-new-conversation-creation) and 827e5751-3b84-4eba-bc8a-54f3d8c3f2b2 ('2026-05-05-test-incident'). Proposed D1 decision: accept, no bookmark fallback and no backfill; /incident draft there answers 'no report'. AC #9 is checked when the plan (C1-C4, D1) is approved.
+
+2026-11-05 (human): plan approved with C1-C4 as recommended. C1: set_status_text and append_timeline_entry are added by TASK-145.8 and 145.9 (recorded there). C2: the Protocol takes no placement; legacy filing unchanged. C3: the report link from the record and the IncidentReportLinkLookup deletion are here (AC #10, moved from TASK-145.6.3 old AC #4). C4: host task TASK-184 (requirements resolve a feature's own settings table) created as a dependency; AC #5 waits on it.
+2026-11-05 D1 decided (human): accept. The 2 items without report_url are open test incidents; no bookmark fallback, no backfill; /incident draft there answers 'no report'. AC #9 checked.
+
+2026-11-05 handoff from the TASK-184 plan: tests/integration/server/test_server_plugins_configuration_requirements.py builds only the vendor slices (lines 40-48), so once scribe declares incident_core.folder_id and report_template_id (AC #5) that production/local configuration check reports them unmet unless it also builds get_incident_core_settings (and supplies placeholders for any env_only names). Fold into step 7 at TDD.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

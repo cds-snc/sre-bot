@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T14:01:00Z'
+updated_date: '2026-11-05T01:16:00Z'
 labels:
   - incident
   - features
@@ -53,6 +53,7 @@ RULES
 - [ ] #6 security_incident is editable from the update modal; the flip-action decision is recorded in the plan
 - [ ] #7 Writes in the end-state shape set record_version = RECORD_VERSION from core/store.py; reopen sets open_bucket and opened_at and Closed removes them in one update; an item without record_version is never stamped by a partial update (tested)
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [ ] #9 IncidentReport gains set_status_text(ReportReference, status) in core/api.py with its Google Docs adapter and fake (parity test); the legacy status mapping in modules/incident/incident_document.py (lines 55-80 at main 5deb8406) moves into core/adapters/google_docs.py and the legacy caller is repointed or deleted
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -91,6 +92,8 @@ Each subcommand's legacy registration is removed with its rebuild; a revert rest
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (TASK-145.5.7 planning, human approved): the TASK-145.5.7 upgrade job writes each legacy item in one update guarded on record_version absent plus every scalar attribute the bridge read, at its read value (status, name, user_id, created_at, security_incident, channel_id, report_url, meet_url, severity, the legacy times, incident_commander, operations_lead) and each end-state attribute it sets as read. Whatever this task decides for a partial update of an item without record_version must keep that guard meaningful: a write here that changes one of those attributes makes the job's write lose (guard_lost), never be overwritten by it.
+
+2026-11-05 (human, TASK-145.6.2 C1): IncidentReport ships in 145.6.2 without set_status_text; this task adds it when it rebuilds the status surface (rule: status fans out to the report's status text) and moves the legacy status mapping from incident_document.py then. The ADR's end surface (decisions/incident-management.md) is unchanged.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
