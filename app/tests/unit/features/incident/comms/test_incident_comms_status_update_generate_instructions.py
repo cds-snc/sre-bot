@@ -29,6 +29,7 @@ from features.incident.comms.prompt import build_redraft_input, build_redraft_in
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -143,21 +144,21 @@ class _StubReader:
         self._started_at = started_at
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return self._started_at
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(self._started_at)
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         self.reads.append(
-            {"conversation_id": conversation_id, "since": since, "limit": limit, "exclude": exclude_own_and_system_messages}
+            {"conversation": conversation, "since": since, "limit": limit, "exclude": exclude_own_and_system_messages}
         )
-        return self._messages
+        return OperationResult.success(self._messages)
 
 
 class _StubGenerator:
@@ -306,7 +307,7 @@ class TestRedraft:
 
         await _redraft(store=store, reader=reader)
 
-        assert reader.reads == [{"conversation_id": _CHANNEL, "since": _at(90), "limit": 1000, "exclude": True}]
+        assert reader.reads == [{"conversation": slack_conversation(_CHANNEL), "since": _at(90), "limit": 1000, "exclude": True}]
 
     @pytest.mark.asyncio
     async def test_without_an_approved_update_the_window_opens_at_the_conversation_start(self) -> None:
@@ -316,7 +317,7 @@ class TestRedraft:
 
         result = await _redraft(store=store, sequence=1, reader=reader)
 
-        assert reader.reads == [{"conversation_id": _CHANNEL, "since": _at(600), "limit": 1000, "exclude": True}]
+        assert reader.reads == [{"conversation": slack_conversation(_CHANNEL), "since": _at(600), "limit": 1000, "exclude": True}]
         assert result.data is not None
         assert (result.data.sequence, result.data.state) == (2, StatusUpdateState.DRAFT)
 

@@ -30,6 +30,7 @@ from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, bu
 from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -120,19 +121,19 @@ class _StubReader:
         self._messages = list(messages)
         self.reads = 0
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return _at(600)
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        return OperationResult.success(_at(600))
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         self.reads += 1
-        return self._messages
+        return OperationResult.success(self._messages)
 
 
 class _StubGenerator:

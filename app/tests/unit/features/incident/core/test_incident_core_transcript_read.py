@@ -1,4 +1,11 @@
-"""Unit tests for reading an incident conversation's transcript from Slack."""
+"""Unit tests for reading an incident conversation's transcript from Slack.
+
+The reader runs over a ``MagicMock(spec=WebClient)`` and is given the incident's
+conversation reference. A read returns an ``OperationResult``: the transcript on
+success, a classified result when the first history page fails, and an
+exception for a Slack code the vendor table does not name. Failures after the
+first page keep what was read and are logged, asserted through structlog's capture.
+"""
 
 from datetime import UTC, datetime
 from typing import Any
@@ -9,11 +16,14 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from structlog.testing import capture_logs
 
+from contracts.operations.status import OperationStatus
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
-from features.incident.core.domain import TranscriptMessage
+from features.incident.core.domain import ConversationReference, TranscriptMessage
 
 pytestmark = pytest.mark.unit
 
+_CONVERSATION = ConversationReference(system=WorkplaceSystem.SLACK, tenant="T0SLACK", vendor_id="C123")
 _SINCE = datetime(2023, 11, 14, 22, 13, 20, tzinfo=UTC)  # 1_700_000_000
 _SYSTEM_SUBTYPES = (
     "bot_add",
@@ -47,7 +57,9 @@ def _client(
 
 def _read(client: MagicMock, *, exclude: bool = False, limit: int = 50) -> list[TranscriptMessage]:
     reader = SlackIncidentTranscriptReader(client)
-    return list(reader.read_transcript("C123", since=_SINCE, limit=limit, exclude_own_and_system_messages=exclude))
+    result = reader.read_transcript(_CONVERSATION, since=_SINCE, limit=limit, exclude_own_and_system_messages=exclude)
+    assert result.is_success and result.data is not None
+    return list(result.data)
 
 
 def _slack_error() -> SlackApiError:
@@ -95,7 +107,7 @@ class TestReadTranscript:
         """The window start reaches Slack as a six-decimal epoch string, for whole and fractional seconds."""
         client = _client([])
 
-        SlackIncidentTranscriptReader(client).read_transcript("C123", since=since, limit=25)
+        SlackIncidentTranscriptReader(client).read_transcript(_CONVERSATION, since=since, limit=25)
 
         client.conversations_history.assert_called_once_with(channel="C123", limit=25, oldest=oldest)
 
@@ -289,13 +301,38 @@ class TestReadTranscriptFiltered:
 
 
 class TestReadTranscriptFailures:
-    def test_history_failure_gives_an_empty_transcript(self) -> None:
-        """A failed history call degrades to no messages; the caller renders its empty-history path."""
+    def test_a_failed_first_history_page_is_the_classified_result(self) -> None:
+        """A failed first page is the read's result, classified, so the caller chooses its reply."""
         client = _client([])
         client.conversations_history.side_effect = _slack_error()
 
-        assert _read(client) == []
-        assert _read(client, exclude=True) == []
+        with capture_logs() as logs:
+            result = SlackIncidentTranscriptReader(client).read_transcript(_CONVERSATION, since=_SINCE, limit=50)
+
+        assert result.status is OperationStatus.TRANSIENT_ERROR
+        assert result.error_code == "ratelimited"
+        assert any(log["event"] == "incident_transcript_history_fetch_failed" for log in logs)
+
+    def test_an_unknown_slack_code_on_the_first_page_propagates(self) -> None:
+        """A code the Slack table does not name is not guessed at; it reaches the caller's error boundary."""
+        client = _client([])
+        client.conversations_history.side_effect = SlackApiError("boom", {"ok": False, "error": "invalid_arguments"})
+
+        with pytest.raises(SlackApiError):
+            SlackIncidentTranscriptReader(client).read_transcript(_CONVERSATION, since=_SINCE, limit=50)
+
+    def test_a_reference_of_another_system_is_unsupported_without_a_call(self) -> None:
+        """Only Slack conversations are read; another system's reference is refused before any request."""
+        client = _client([])
+        google = ConversationReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="spaces/AAA")
+
+        with capture_logs() as logs:
+            result = SlackIncidentTranscriptReader(client).read_transcript(google, since=_SINCE, limit=50)
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.error_code == "UNSUPPORTED_OPERATION"
+        assert client.method_calls == []
+        assert any(log["event"] == "incident_transcript_system_unsupported" for log in logs)
 
     def test_user_lookup_failure_uses_the_user_id_as_author(self) -> None:
         """A name that cannot be resolved never drops the message."""

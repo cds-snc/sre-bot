@@ -278,12 +278,19 @@ async def draft_incident_document_from_conversation(
 
     settings = get_incident_draft_settings()
     reader = reader or get_incident_transcript_reader()
-    messages = reader.read_transcript(
-        conversation.vendor_id,
-        since=_resolve_draft_window_start(reader, conversation.vendor_id, settings),
-        limit=_resolve_draft_limit(limit, settings),
-        exclude_own_and_system_messages=True,
-    )
+    # The record's conversation is read, not the command's channel: the two are
+    # the same today, and the record's stays right once several channels bind one incident.
+    recorded = found.data.conversation if found.data is not None else None
+    messages: Sequence[TranscriptMessage] = ()
+    if recorded is not None:
+        read = reader.read_transcript(
+            recorded,
+            since=_resolve_draft_window_start(reader, recorded, settings),
+            limit=_resolve_draft_limit(limit, settings),
+            exclude_own_and_system_messages=True,
+        )
+        # A failed read drafts from nothing, which is today's empty-history reply.
+        messages = read.data if read.is_success and read.data is not None else ()
 
     return await draft_incident_document(report, messages)
 
@@ -541,18 +548,18 @@ def _resolve_draft_limit(limit: int | None, settings: IncidentDraftSettings) -> 
 
 def _resolve_draft_window_start(
     reader: IncidentTranscriptReader,
-    conversation_id: str,
+    conversation: ConversationReference,
     settings: IncidentDraftSettings,
 ) -> datetime:
     """Return the start of the window to draft from.
 
     The window starts when the conversation did, so the draft covers the whole
     incident, and falls back to the configured default window when the reader
-    cannot say.
+    cannot say or the lookup fails.
     """
-    started_at = reader.conversation_started_at(conversation_id)
-    if started_at is not None:
-        return started_at
+    started = reader.conversation_started_at(conversation)
+    if started.is_success and started.data is not None:
+        return started.data
     return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
 
 
@@ -897,7 +904,7 @@ _SUMMARY_FORMAT_INSTRUCTIONS = (
 
 
 async def summarize_incident_conversation(
-    conversation_id: str,
+    conversation: ConversationReference,
     *,
     since: timedelta | None = None,
     limit: int | None = None,
@@ -907,7 +914,7 @@ async def summarize_incident_conversation(
     """Summarize what has been said in an incident conversation.
 
     Args:
-        conversation_id: The incident conversation to summarize.
+        conversation: The incident conversation to summarize.
         since: How far back to read. When omitted the summary covers the whole
             incident, from the conversation's start, falling back to the
             configured default window when the start is unknown.
@@ -920,18 +927,21 @@ async def summarize_incident_conversation(
 
     Returns:
         The ``OperationResult`` of ``summarize_transcript`` for the messages
-        read, including its ``EMPTY_HISTORY`` error when nothing was read.
+        read, including its ``EMPTY_HISTORY`` error when nothing was read or
+        the read failed.
     """
     settings = get_incident_summary_settings()
     reader = reader or get_incident_transcript_reader()
 
-    start = _resolve_summary_window_start(reader, conversation_id, since, settings)
-    messages = reader.read_transcript(
-        conversation_id,
+    start = _resolve_summary_window_start(reader, conversation, since, settings)
+    read = reader.read_transcript(
+        conversation,
         since=start,
         limit=_resolve_summary_limit(limit, settings),
         exclude_own_and_system_messages=True,
     )
+    # A failed read summarizes nothing, which is today's empty-history reply.
+    messages = read.data if read.is_success and read.data is not None else ()
 
     return await summarize_transcript(messages, instructions=instructions)
 
@@ -1003,7 +1013,7 @@ def _resolve_summary_limit(limit: int | None, settings: IncidentSummarySettings)
 
 def _resolve_summary_window_start(
     reader: IncidentTranscriptReader,
-    conversation_id: str,
+    conversation: ConversationReference,
     since: timedelta | None,
     settings: IncidentSummarySettings,
 ) -> datetime:
@@ -1011,11 +1021,11 @@ def _resolve_summary_window_start(
 
     An explicit ``since`` is measured from now. Without one the window starts
     when the conversation did, and falls back to the configured default window
-    when the reader cannot say.
+    when the reader cannot say or the lookup fails.
     """
     if since is not None:
         return _now() - since
-    started_at = reader.conversation_started_at(conversation_id)
-    if started_at is not None:
-        return started_at
+    started = reader.conversation_started_at(conversation)
+    if started.is_success and started.data is not None:
+        return started.data
     return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)

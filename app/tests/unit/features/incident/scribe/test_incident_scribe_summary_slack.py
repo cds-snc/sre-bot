@@ -1,4 +1,10 @@
-"""Tests for the incident scribe Slack platform adapter: the summarize command."""
+"""Tests for the incident scribe Slack platform adapter: the summarize command.
+
+The handler is run with the test service scopes (``incident_scopes``), whose
+configured systems name the Slack tenant, and a patched summarize service; the
+assertions read the reply and what the service was called with, including the
+command channel's conversation reference.
+"""
 
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,6 +16,7 @@ from contracts.slack.models import CommandPayload
 from features.incident.scribe.entrypoints.slack import _parse_since_seconds, handle_summarize_command, register
 from features.incident.scribe.entrypoints.slack_views import to_slack_mrkdwn
 from features.incident.scribe.service import EMPTY_HISTORY_CODE
+from tests.factories.incident import incident_scopes, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -44,7 +51,7 @@ class TestRegisterCommands:
         with patch(_HANDLE) as mock_handle:
             handler(payload, {"--limit": 5})
 
-        mock_handle.assert_called_once_with(payload, {"--limit": 5})
+        mock_handle.assert_called_once_with(payload, {"--limit": 5}, provider.service_scopes)
 
     def test_fallback_dispatches_with_empty_args(self):
         provider = MagicMock()
@@ -55,7 +62,7 @@ class TestRegisterCommands:
         with patch(_HANDLE) as mock_handle:
             fallback(payload)
 
-        mock_handle.assert_called_once_with(payload, {})
+        mock_handle.assert_called_once_with(payload, {}, provider.service_scopes)
 
 
 class TestHandleSummarizeCommand:
@@ -63,12 +70,12 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="Everything is on fire"))) as mock_service:
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.ephemeral is True
         assert "Everything is on fire" in response.message
         mock_service.assert_awaited_once()
-        assert mock_service.await_args.args == ("C123",)
+        assert mock_service.await_args.args == (slack_conversation("C123"),)
 
     def test_empty_history_renders_localized_notice(self):
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
@@ -77,7 +84,7 @@ class TestHandleSummarizeCommand:
             _SUMMARIZE,
             new=AsyncMock(return_value=OperationResult.permanent_error(message="nothing", error_code=EMPTY_HISTORY_CODE)),
         ):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.ephemeral is True
         assert "nothing to summarize" in response.message.lower()
@@ -88,7 +95,7 @@ class TestHandleSummarizeCommand:
         with patch(
             _SUMMARIZE, new=AsyncMock(return_value=OperationResult.transient_error(message="boom", error_code="SERVER_ERROR"))
         ):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.ephemeral is True
         assert response.message.startswith("❌")
@@ -98,7 +105,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="")
 
         with patch(_SUMMARIZE, new=AsyncMock()) as mock_service:
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.ephemeral is True
         assert response.message.startswith("\u274c")
@@ -108,7 +115,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         # Header precedes the summary body, separated by a blank line.
         assert response.message.split("\n\n", 1)[0].strip() != ""
@@ -119,7 +126,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.message.endswith(
             "the summary body\n\n*This summary is AI-generated and AI can make mistakes, please review for accuracy.*"
@@ -130,7 +137,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="the summary body"))):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert response.blocks is not None
         header, *body, disclaimer = response.blocks
@@ -152,7 +159,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.permanent_error(message="x", error_code=error_code))):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert "AI-generated" not in response.message
 
@@ -161,7 +168,7 @@ class TestHandleSummarizeCommand:
         raw = "## **Key events**\n- • first\n- second"
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data=raw))):
-            response = handle_summarize_command(payload, {})
+            response = handle_summarize_command(payload, {}, incident_scopes())
 
         assert "**" not in response.message
         assert "##" not in response.message
@@ -172,7 +179,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="--limit 25", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {"--limit": 25})
+            handle_summarize_command(payload, {"--limit": 25}, incident_scopes())
 
         assert mock_service.await_args.kwargs["limit"] == 25
 
@@ -183,7 +190,7 @@ class TestHandleSummarizeCommand:
         parsed_args = {} if raw is None else {"--limit": raw}
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, parsed_args)
+            handle_summarize_command(payload, parsed_args, incident_scopes())
 
         assert mock_service.await_args.kwargs["limit"] is None
 
@@ -191,7 +198,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="--since 2h", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {"--since": "2h"})
+            handle_summarize_command(payload, {"--since": "2h"}, incident_scopes())
 
         assert mock_service.await_args.kwargs["since"] == timedelta(hours=2)
 
@@ -201,7 +208,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, parsed_args)
+            handle_summarize_command(payload, parsed_args, incident_scopes())
 
         assert mock_service.await_args.kwargs["since"] is None
 
@@ -210,7 +217,7 @@ class TestHandleSummarizeCommand:
         payload = CommandPayload(text="", user_id="U9", channel_id="C123")
 
         with patch(_SUMMARIZE, new=AsyncMock(return_value=OperationResult.success(data="ok"))) as mock_service:
-            handle_summarize_command(payload, {})
+            handle_summarize_command(payload, {}, incident_scopes())
 
         assert "instructions" not in mock_service.await_args.kwargs
 

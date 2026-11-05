@@ -2,9 +2,15 @@
 
 Provides the Slack Web client factories and the shared error classification
 per decisions/outbound-clients.md: clients raise typed SDK exceptions
-(``SlackApiError``); adapters classify them. Every client carries slack_sdk's
+(``SlackApiError``); adapters classify them. The read clients carry slack_sdk's
 native connection, rate-limit and server-error retry handlers and the
 per-call timeout, fixed once at construction; nothing else retries.
+
+Writes that are not idempotent (a posted message, a bookmark) use the write
+handle, ``get_async_slack_write_client``, which retries only rate-limited
+requests: Slack did not process a 429, while after a connection drop or an
+``internal_error`` part of the operation may already have happened, so
+replaying it could post twice.
 
 Clients are built per call and never cached here. slack_sdk clients hold no
 connection until a request is made, so building one is cheap; a caller that
@@ -64,6 +70,16 @@ def get_async_slack_web_client() -> AsyncWebClient:
     )
 
 
+def get_async_slack_write_client() -> AsyncWebClient:
+    """Build the async bot write handle, which retries only rate-limited requests."""
+    settings = get_slack_settings()
+    return AsyncWebClient(
+        token=settings.bot_token.get_secret_value(),
+        timeout=settings.request_timeout_seconds,
+        retry_handlers=[AsyncRateLimitErrorRetryHandler(max_retry_count=settings.retry_max_attempts)],
+    )
+
+
 def classify_slack_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
     """Classify expected Slack Web API errors; propagate unknown exceptions unchanged."""
     if not isinstance(exc, SlackApiError):
@@ -78,6 +94,8 @@ def classify_slack_error(exc: Exception) -> tuple[OperationStatus, str | None, i
         return OperationStatus.UNAUTHORIZED, code, None
     if code in settings.not_found_errors:
         return OperationStatus.NOT_FOUND, code, None
+    if code in settings.not_writable_errors:
+        return OperationStatus.PERMANENT_ERROR, code, None
     if code in settings.transient_errors:
         retry_after = _retry_after_seconds(exc)
         return (

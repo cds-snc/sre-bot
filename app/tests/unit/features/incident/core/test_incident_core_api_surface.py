@@ -24,10 +24,12 @@ pytestmark = pytest.mark.unit
 
 @pytest.fixture(autouse=True)
 def _clear_provider_cache() -> Iterator[None]:
-    """Keep the cached reader from leaking between tests."""
+    """Keep the cached reader and conversation from leaking between tests."""
     api.get_incident_transcript_reader.cache_clear()
+    api.get_incident_conversation.cache_clear()
     yield
     api.get_incident_transcript_reader.cache_clear()
+    api.get_incident_conversation.cache_clear()
 
 
 def test_api_exports_exactly_the_public_names() -> None:
@@ -39,6 +41,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "DraftWriteResult",
         "ExternalCaseReference",
         "Incident",
+        "IncidentConversation",
         "IncidentReport",
         "IncidentStore",
         "IncidentTranscriptReader",
@@ -61,7 +64,9 @@ def test_api_exports_exactly_the_public_names() -> None:
         "build_incident_store",
         "build_legacy_upgrade",
         "build_status_update_store",
+        "conversation_is_writable",
         "find_incident_for_conversation",
+        "get_incident_conversation",
         "get_incident_report",
         "get_incident_transcript_reader",
         "translate",
@@ -89,16 +94,38 @@ def test_interface_signatures_carry_only_plain_and_domain_types() -> None:
     started = inspect.signature(api.IncidentTranscriptReader.conversation_started_at)
     read = inspect.signature(api.IncidentTranscriptReader.read_transcript)
 
-    assert {name: p.annotation for name, p in started.parameters.items() if name != "self"} == {"conversation_id": str}
-    assert started.return_annotation == datetime | None
+    assert {name: p.annotation for name, p in started.parameters.items() if name != "self"} == {
+        "conversation": api.ConversationReference
+    }
+    assert started.return_annotation == OperationResult[datetime | None]
     assert {name: p.annotation for name, p in read.parameters.items() if name != "self"} == {
-        "conversation_id": str,
+        "conversation": api.ConversationReference,
         "since": datetime,
         "limit": int,
         "exclude_own_and_system_messages": bool,
     }
     assert read.parameters["exclude_own_and_system_messages"].default is False
-    assert "TranscriptMessage" in str(read.return_annotation)
+    assert read.return_annotation == OperationResult[Sequence[api.TranscriptMessage]]
+
+
+def test_conversation_interface_is_async_on_the_reference_with_operation_results() -> None:
+    """Every IncidentConversation method is a coroutine taking the conversation reference; none creates one."""
+    methods = {
+        name: getattr(api.IncidentConversation, name)
+        for name in ("post", "set_purpose", "add_bookmark", "invite", "archive", "is_writable")
+    }
+
+    assert not hasattr(api.IncidentConversation, "create")
+    for method in methods.values():
+        signature = inspect.signature(method)
+        assert inspect.iscoroutinefunction(method)
+        assert signature.parameters["conversation"].annotation is api.ConversationReference
+    assert inspect.signature(methods["post"]).return_annotation == OperationResult[api.MessageReference]
+    assert inspect.signature(methods["is_writable"]).return_annotation == OperationResult[bool]
+    assert inspect.signature(methods["invite"]).parameters["account_ids"].annotation == Sequence[str]
+    assert inspect.signature(api.conversation_is_writable).parameters["conversation"].annotation == (
+        api.ConversationReference | None
+    )
 
 
 def test_provider_returns_one_cached_reader_built_on_the_slack_web_client(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -113,8 +140,25 @@ def test_provider_returns_one_cached_reader_built_on_the_slack_web_client(monkey
     assert isinstance(reader, api.IncidentTranscriptReader)
     assert api.get_incident_transcript_reader() is reader
     factory.assert_called_once_with()
-    reader.conversation_started_at("C123")
+    reader.conversation_started_at(slack_conversation("C123"))
     client.conversations_info.assert_called_once_with(channel="C123")
+
+
+def test_conversation_provider_reads_on_the_shared_client_and_writes_on_the_write_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """One cached IncidentConversation, built once on the async read client and the rate-limit-only write handle."""
+    reads, writes = MagicMock(name="reads"), MagicMock(name="writes")
+    read_factory, write_factory = MagicMock(return_value=reads), MagicMock(return_value=writes)
+    monkeypatch.setattr(slack_adapter, "get_async_slack_web_client", read_factory)
+    monkeypatch.setattr(slack_adapter, "get_async_slack_write_client", write_factory)
+
+    conversations = api.get_incident_conversation()
+
+    assert isinstance(conversations, api.IncidentConversation)
+    assert api.get_incident_conversation() is conversations
+    read_factory.assert_called_once_with()
+    write_factory.assert_called_once_with()
 
 
 def test_find_incident_for_conversation_answers_with_the_store_for_the_reference() -> None:
