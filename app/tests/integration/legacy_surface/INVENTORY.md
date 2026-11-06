@@ -7,7 +7,9 @@ and by the hand-written `_register_legacy_slack_commands` step in
 `server/lifespan.py` for `modules/sre` and `modules/dev`.
 It is step 1 (Inventory) of the per-surface recipe in `decisions/migration.md`,
 and it is recorded before any module is rebuilt. Other teams depend on these
-command names, interaction ids and URLs. Every rebuild must keep them working.
+command names, ids on posted messages and URLs. Command names and ids on posted
+messages stay working; modal-internal ids may take the plugin prefix at rebuild
+(`decisions/transport-slack.md`).
 
 Each surface is assigned to a target by what it does, not by the module that
 holds it today. `modules/sre` and `modules/aws` are grab-bags, so their
@@ -50,22 +52,22 @@ All of these are registered inside a module's `register(bot)`, which
 | view `incident_view` | `modules/incident/incident.py:39` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k declare_submission` |
 | action `incident_change_locale` | `modules/incident/incident.py:40` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k locale_button` |
 | action `handle_incident_action_buttons` (`call-incident`, `ignore-incident`) | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | `app/features/incident/` | TASK-145.7 | `test_incident_declare_surface.py` `-k incident_button` |
-| action `add_folder_metadata` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| action `view_folder_metadata` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| view `add_metadata_view` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| action `delete_folder_metadata` | `modules/incident/incident_helper.py:156` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| view `view_save_incident_roles` | `modules/incident/incident_helper.py:157` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `add_folder_metadata` | `modules/incident/incident_helper.py:150` | hard-coded `register(bot)` | retired: the product's on-call schedule reference moves to the bot's own product list (the Slack editor is deleted with `modules/incident`) | TASK-165.1 and TASK-146.3; deleted by TASK-145.13 | `test_incident_folder_metadata_surface.py` `-k legacy_only_add_metadata` |
+| action `view_folder_metadata` | `modules/incident/incident_helper.py:151` | hard-coded `register(bot)` | retired: as `add_folder_metadata` | TASK-165.1 and TASK-146.3; deleted by TASK-145.13 | `test_incident_folder_metadata_surface.py` `-k legacy_only_manage_metadata` |
+| view `view_folder_metadata_modal` | `modules/incident/incident_helper.py:152` | hard-coded `register(bot)` | retired: as `add_folder_metadata` | TASK-165.1 and TASK-146.3; deleted by TASK-145.13 | `test_incident_folder_metadata_surface.py` `-k legacy_only_returning` |
+| view `add_metadata_view` | `modules/incident/incident_helper.py:153` | hard-coded `register(bot)` | retired: as `add_folder_metadata` | TASK-165.1 and TASK-146.3; deleted by TASK-145.13 | `test_incident_folder_metadata_surface.py` `-k legacy_only_add_metadata` |
+| action `delete_folder_metadata` | `modules/incident/incident_helper.py:154` | hard-coded `register(bot)` | retired: as `add_folder_metadata` | TASK-165.1 and TASK-146.3; deleted by TASK-145.13 | `test_incident_folder_metadata_surface.py` `-k legacy_only_delete_metadata` |
+| view `view_save_incident_roles` | `modules/incident/incident_helper.py:155` | hard-coded `register(bot)` | `app/features/incident/response/` | TASK-145.8 | `test_incident_roles_surface.py`; the report-property writes in `-k legacy_only` |
 | view `view_save_event` | `modules/incident/incident_helper.py:158` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
 | action `confirm_click` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
 | action `user_select_action` | `modules/incident/incident_helper.py:160` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| action `archive_channel` | `modules/incident/incident_helper.py:161` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `archive_channel` | `modules/incident/incident_helper.py:159` | hard-coded `register(bot)` | `app/features/incident/response/` (the `schedule_retro` button: `incident/postmortem/`, TASK-145.10) | TASK-145.8 | `test_incident_channel_archive_surface.py` |
 | event `reaction_added` (floppy-disk matcher) | `modules/incident/incident_helper.py:162` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
 | event `reaction_removed` (floppy-disk matcher) | `modules/incident/incident_helper.py:163` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
 | event `reaction_added` (ack-only fallback) | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
 | event `reaction_removed` (ack-only fallback) | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| action `update_incident_field` | `modules/incident/incident_helper.py:166` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
-| view `update_field_modal` | `modules/incident/incident_helper.py:167` | hard-coded `register(bot)` | `app/features/incident/` | TASK-38 (after TASK-97) | not yet — TASK-36.1.2 |
+| action `update_incident_field` | `modules/incident/incident_helper.py:164` | hard-coded `register(bot)` | `app/features/incident/response/` | TASK-145.8 | `test_incident_field_update_surface.py` |
+| view `update_field_modal` | `modules/incident/incident_helper.py:165` | hard-coded `register(bot)` | `app/features/incident/response/` | TASK-145.8 | `test_incident_field_update_surface.py` |
 | view `create_webhooks_view` | `modules/sre/webhook_helper.py:26` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
 | action `toggle_webhook` | `modules/sre/webhook_helper.py:27` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |
 | action `reveal_webhook` | `modules/sre/webhook_helper.py:28` | hard-coded `register(bot)` | `app/capabilities/webhooks/` (admin surface) | TASK-37 (cutover TASK-37.4) | not yet — TASK-36.1.4 |

@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T03:00:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
   - TASK-145.6
-  - TASK-36.1
+  - TASK-36.1.5
   - TASK-111.10
 references:
   - https://github.com/cds-snc/sre-bot/issues/1688
@@ -46,6 +46,7 @@ THIS SLICE
 - [ ] #6 incident.postmortem reads the retrospective calendar id from [incident_postmortem] calendar_id (features/incident/postmortem/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #7 Meeting scheduling comes from the incident-owned features/incident/scheduling and features/incident/meet over integrations/google_workspace, not a calendar capability (TASK-138 superseded by TASK-169 ruling, 2026-11-05 (human))
 - [ ] #8 features/incident/scheduling/availability.py takes a layout-table name (scheduling/service.py or domain.py, or core/ under feature-packages.md rule 4), and its app/bin/baselines/package_shape.txt entry is deleted
+- [ ] #9 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -85,4 +86,6 @@ One modal flow; revert restores the legacy registration.
 2026-10-13 re-ground: postmortem/ is shared with TASK-147 (postmortem as records: action items, narrative document, built dark behind a flag); this slice keeps scheduling only and adds nothing gated by that flag.
 
 2026-11-05: TASK-138 superseded (TASK-169 ruling, 2026-11-05 (human), D5): every calendar consumer is incident; a calendar capability waits for a second suite or a non-incident consumer. Dependency on 138 removed.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ3, human-approved): depends on TASK-36.1.5 (the retro pins) instead of the whole TASK-36.1. Rebuilt modal-internal ids take the incident.postmortem prefix as planned; the nudge's schedule button (archive_channel's schedule_retro branch, on messages already posted) keeps a registered legacy alias until TASK-145.13 (decisions/transport-slack.md). confirm_click is owned here, not by TASK-145.8.
 <!-- SECTION:NOTES:END -->

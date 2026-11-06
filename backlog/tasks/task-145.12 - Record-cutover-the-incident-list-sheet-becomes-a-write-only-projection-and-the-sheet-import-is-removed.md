@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T00:14:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
@@ -93,4 +93,6 @@ Sheet consumers see the same rows. Revert restores the sheet reads and the impor
 2026-11-04 (TASK-145.5.7 planning, human): the whole-table cap is the files key [incident_core] full_read_max_items, not an environment name (decisions/cloud-portability.md contract 4 amended); AC3 and step 3 reworded. The rerun of the TASK-145.5.7 job after this task merges is a dry run then apply per environment.
 
 2026-11-05: no longer waits on TASK-121; it owns its sheet port and 121 deletes infrastructure/spreadsheets after it (TASK-169 ruling, 2026-11-05 (human), D5).
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: 'Webhooks slice 4: cutover and delete modules/webhooks'
 status: To Do
 assignee: []
 created_date: 2026-07-28 18:40
-updated_date: '2026-11-03T20:45:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - migration
   - webhooks
@@ -54,3 +54,9 @@ Verify: grep every importer of modules/webhooks and models/webhooks before delet
 - [ ] #5 TASK-46 fingerprint emission and TASK-7 hardening are preserved on the new route (test)
 - [ ] #6 The WAF Common Rule Set scope-down and the body cap cover both webhook mount points (/hook/ and /api/v1/hook/), or the duplicate mount is dropped by decision; the TASK-163 edge test's public-by-decision set matches the outcome
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
+<!-- SECTION:NOTES:END -->

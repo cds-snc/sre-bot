@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
@@ -17,6 +17,8 @@ dependencies:
   - TASK-145.5.7
   - TASK-118
   - TASK-186
+  - TASK-165.1
+  - TASK-146.3
 references:
   - https://github.com/cds-snc/sre-bot/issues/1691
 parent_task_id: TASK-145
@@ -94,6 +96,10 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 2026-10-29 (TASK-175 planning): incident.scribe declares slack.tenant and google_workspace.tenant as plugin requirements; deleting TASK-173's legacy-handler boot rule here leaves scribe's declarations in place.
 
 2026-11-04 (TASK-145.5.7 planning, human approved): (1) incident.response stays a plugin: this task deletes only the hookimpl lines that register the legacy upgrade job, its [incident_response] upgrade_mode, upgrade_interval_minutes and upgrade_lease_ttl_seconds keys, the job and legacy_items.py, and the Tolerated line in incident-management.md. (2) 'Nothing pending' includes the binding step TASK-145.7 adds to the job: channel_id and by_channel are retired only after a production run reports no missing bindings.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ5, human-approved): also waits on TASK-165.1 (folder genie_schedule imported into the bot's product list) and TASK-146.3 (declare invites on-call through the capability), since this task deletes on_call.py and incident_folder.py. Removes the legacy id aliases kept for posted messages (archive_channel, the alert buttons) once a log check shows no traffic on them.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Contract task: removes the legacy id aliases, the remaining legacy_only_* tests and the seam-baseline entries for the module it deletes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -5,8 +5,8 @@ title: >-
   interactions through the Bolt dispatch boundary
 status: To Do
 assignee: []
-created_date: '2026-10-15 20:49'
-updated_date: '2026-10-20 23:35'
+created_date: 2026-10-15 20:49
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - migration
   - testing
@@ -16,7 +16,7 @@ dependencies:
 references:
   - decisions/testing.md
   - decisions/migration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1740'
+  - https://github.com/cds-snc/sre-bot/issues/1740
 parent_task_id: TASK-36.1
 priority: medium
 ordinal: 397000
@@ -34,3 +34,9 @@ Third slice of TASK-36.1, reusing the harness from the first slice. Pins 13 rows
 - [ ] #2 INVENTORY.md marks these rows pinned by this task
 - [ ] #3 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Pin task: durable entry points, modal ids read from the opened view, outcome assertions at faked external edges, internal legacy seams only in named legacy_surface/conftest.py fixtures naming the owning rebuild task, legacy_only_* tests for behaviour the rebuild ends.
+<!-- SECTION:NOTES:END -->

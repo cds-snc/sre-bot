@@ -3,8 +3,8 @@ id: TASK-41
 title: 'Strangler completion: delete modules/, the legacy list, and python-i18n'
 status: To Do
 assignee: []
-created_date: '2026-07-07 19:56'
-updated_date: '2026-10-09 17:01'
+created_date: 2026-07-07 19:56
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - migration
   - phase-5
@@ -18,7 +18,7 @@ dependencies:
   - TASK-88
 references:
   - decisions/migration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1295'
+  - https://github.com/cds-snc/sre-bot/issues/1295
   - decisions/plugin-architecture.md
 priority: medium
 ordinal: 41000
@@ -50,3 +50,9 @@ Steps:
 - [ ] #1 decisions/migration.md updated per the cascade rule
 - [ ] #2 Announcement note to dependent teams recorded in the PR
 <!-- DOD:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Contract task: removes the legacy id aliases, the remaining legacy_only_* tests and the seam-baseline entries for the module it deletes.
+<!-- SECTION:NOTES:END -->

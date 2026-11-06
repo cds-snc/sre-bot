@@ -66,6 +66,14 @@ backlog task create "Slice title" \
 - If a slice cannot be described in one sentence without "and", split it again.
 - Config/manifest-only slices (CI, terraform, env examples) are cheap to review — prefer isolating them.
 
+## Legacy Surfaces: Pin and Cutover Checklist
+
+A plan that pins or rebuilds a legacy surface (`modules/`, legacy jobs or routes) carries these steps. The rules live in `decisions/migration.md` (recipe steps 2 and 4), `decisions/transport-slack.md` (legacy ids) and `decisions/testing.md` (seams during the legacy migration).
+
+- **Pin task:** enter only through durable entry points (command names, ids on posted messages, event types); read modal ids from the opened view; assert Slack-visible output and outcomes at faked external edges; put an internal legacy seam only in a named `legacy_surface/conftest.py` fixture that names its owning rebuild task; pin behaviour the rebuild ends as `test_legacy_only_*` tests.
+- **Rebuild (cutover) task:** the pins pass with assertions unchanged; their fixtures are rewired to the target's Protocol fakes and the matching seam-baseline entries removed; the `test_legacy_only_*` tests for behaviour it ends are deleted; modal-internal ids take the plugin prefix; ids on posted messages stay registered as legacy aliases; new tests for the target code follow the strict zone (`make check-test-seams`, TASK-187).
+- **Contract task:** removes the legacy aliases and any remaining `test_legacy_only_*` tests and seam entries for the module it deletes.
+
 ## Anti-patterns
 
 - A plan that restates the task description instead of enumerating discovered call sites.
