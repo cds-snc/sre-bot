@@ -20,11 +20,10 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import approval
-from features.incident.comms.approval import approve_and_publish, approve_status_update
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, StatusUpdateEdit
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import build_profile_labels
+from features.incident.comms.service import approval
+from features.incident.comms.service.approval import approve_and_publish, approve_status_update
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 

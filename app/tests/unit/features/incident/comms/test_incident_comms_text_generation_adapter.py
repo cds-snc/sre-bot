@@ -14,11 +14,9 @@ import pytest
 from structlog.testing import capture_logs
 
 from contracts.operations import OperationStatus
-from features.incident.comms.adapters.text_generation import (
-    TEXT_GENERATION_UNAVAILABLE_CODE,
-    build_status_update_text_generator,
-)
-from features.incident.comms.ports import TextGenerator
+from contracts.operations.codes import ErrorCode
+from features.incident.comms.adapters.text_generation import build_status_update_text_generator
+from features.incident.comms.interfaces import TextGenerator
 
 pytestmark = pytest.mark.unit
 
@@ -49,6 +47,6 @@ async def test_no_tenant_gives_a_generator_that_reports_unavailable() -> None:
     get_summarizer.assert_not_called()
     assert isinstance(generator, TextGenerator)
     result = await generator.summarize("transcript", instructions="x", max_output_tokens=10)
-    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, TEXT_GENERATION_UNAVAILABLE_CODE)
+    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.TEXT_GENERATION_UNAVAILABLE)
     (logged,) = logs
     assert logged["event"] == "incident_status_update_text_generation_unconfigured"

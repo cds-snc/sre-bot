@@ -13,12 +13,11 @@ hand-written update instead of failing.
 import structlog
 
 from contracts.operations import OperationResult
-from features.incident.comms.ports import TextGenerator
+from contracts.operations.codes import ErrorCode
+from features.incident.comms.interfaces import TextGenerator
 from integrations.openai import get_openai_settings, get_summarizer
 
 logger = structlog.get_logger()
-
-TEXT_GENERATION_UNAVAILABLE_CODE = "TEXT_GENERATION_UNAVAILABLE"
 
 
 class UnavailableTextGenerator:
@@ -34,7 +33,7 @@ class UnavailableTextGenerator:
         """Return ``TEXT_GENERATION_UNAVAILABLE`` without reaching any provider."""
         return OperationResult.permanent_error(
             message="Text generation is not configured",
-            error_code=TEXT_GENERATION_UNAVAILABLE_CODE,
+            error_code=ErrorCode.TEXT_GENERATION_UNAVAILABLE,
         )
 
 

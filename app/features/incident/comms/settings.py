@@ -14,7 +14,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class IncidentStatusUpdateSettings(BaseSettings):
-    """Window, cadence and model budget for ``/sre incident status-update``."""
+    """Window, cadence and model budget for public status updates."""
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -27,8 +27,6 @@ class IncidentStatusUpdateSettings(BaseSettings):
     DEFAULT_SINCE_HOURS: int = Field(default=24, alias="INCIDENT_STATUS_UPDATE__DEFAULT_SINCE_HOURS")
     # A public update follows about every 30 minutes (decisions/incident-management.md).
     NEXT_UPDATE_MINUTES: int = Field(default=30, alias="INCIDENT_STATUS_UPDATE__NEXT_UPDATE_MINUTES")
-    # Public times are shown in Eastern time; named so EDT/EST follows daylight saving.
-    TIMEZONE: str = Field(default="America/Toronto", alias="INCIDENT_STATUS_UPDATE__TIMEZONE")
     # Eight short fields in two languages need far less than a report draft.
     MAX_OUTPUT_TOKENS: int = Field(default=2000, alias="INCIDENT_STATUS_UPDATE__MAX_OUTPUT_TOKENS")
 

@@ -7,21 +7,23 @@ No Slack SDK is imported here.
 
 import json
 from types import MappingProxyType
-from typing import Any
+from typing import Any, TypedDict
 
 from contracts.operations.codes import ErrorCode
 from contracts.slack.models import CommandResponse
-from features.incident.comms.comms_profile import ProfileLabels, format_profile_time, render_profile
 from features.incident.comms.domain import (
     CopyReadyText,
     NoNewInformationWording,
+    ProfileLabels,
     StatusUpdateEdit,
     StatusUpdateFormState,
     StatusUpdateOutcomeKind,
     StatusUpdateOverview,
+    format_profile_time,
+    render_profile,
 )
-from features.incident.comms.prompt import MAX_INSTRUCTIONS_CHARS
-from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE
+from features.incident.comms.service.draft import DRAFT_UNPARSEABLE_CODE
+from features.incident.comms.service.prompt import MAX_INSTRUCTIONS_CHARS
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,
@@ -143,6 +145,18 @@ def build_profile_labels(locale: str) -> ProfileLabels:
             {stage: status_t(f"stage.{stage.value}", locale, stage.value.capitalize()) for stage in StatusUpdateStage}
         ),
     )
+
+
+class ProfileLabelArgs(TypedDict):
+    """The copy-ready rendering's labels, as keyword arguments of the publication and approval use cases."""
+
+    labels_en: ProfileLabels
+    labels_fr: ProfileLabels
+
+
+def profile_label_args() -> ProfileLabelArgs:
+    """The English and French labels the copy-ready text is rendered with, as keyword arguments."""
+    return {"labels_en": build_profile_labels("en-US"), "labels_fr": build_profile_labels("fr-FR")}
 
 
 def _overview_actions(locale: str, update: StatusUpdate | None) -> dict[str, Any]:

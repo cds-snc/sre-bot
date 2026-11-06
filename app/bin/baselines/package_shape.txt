@@ -8,15 +8,6 @@
 # The one planned addition: a capability landing before its first consumer adds
 # its :readme-consumers entry naming that consumer task (plugin-architecture.md).
 
-# TASK-186 reshapes incident/comms into the layout table (TASK-145.4 carried these flat).
-features/incident/comms/approval.py
-features/incident/comms/comms_profile.py
-features/incident/comms/form.py
-features/incident/comms/history.py
-features/incident/comms/ports.py
-features/incident/comms/prompt.py
-features/incident/comms/publisher.py
-
 # TASK-145.13 deletes the legacy upgrade job and its runner once production reports nothing pending.
 features/incident/core/legacy_upgrade.py
 features/incident/response/legacy_upgrade_job.py

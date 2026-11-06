@@ -23,11 +23,11 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import form
 from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
 from features.incident.comms.entrypoints.slack import handle_new_update_action, register
 from features.incident.comms.entrypoints.slack_views import NEW_ACTION_ID, REVIEW_CALLBACK_ID, build_review_view
-from features.incident.comms.service import start_status_update_draft
+from features.incident.comms.service import form
+from features.incident.comms.service.draft import start_status_update_draft
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
@@ -56,7 +56,7 @@ _CHANNEL = "C123"
 _USER = "U123"
 _VIEW_ID = "V456"
 _NOW = datetime(2026, 10, 7, 15, 0, tzinfo=UTC)
-_TARGET = "features.incident.comms.form.start_status_update_draft"
+_TARGET = "features.incident.comms.service.form.start_status_update_draft"
 _METADATA = {"channel_id": _CHANNEL, "locale": "en-US", "incident_id": _INCIDENT, "sequence": 4}
 
 

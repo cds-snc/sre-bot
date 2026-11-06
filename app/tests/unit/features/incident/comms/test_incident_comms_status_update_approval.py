@@ -13,11 +13,11 @@ import pytest
 
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
-from features.incident.comms.approval import (
+from features.incident.comms.domain import StatusUpdateEdit
+from features.incident.comms.service.approval import (
     approve_status_update,
     get_draft_for_review,
 )
-from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,

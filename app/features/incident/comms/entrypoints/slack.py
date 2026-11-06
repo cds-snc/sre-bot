@@ -57,7 +57,7 @@ import json
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any
 
 import structlog
 
@@ -68,8 +68,6 @@ from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.comms.approval import approve_and_publish
-from features.incident.comms.comms_profile import ProfileLabels
 from features.incident.comms.entrypoints.slack_views import (
     GENERATE_ACTION_ID,
     HISTORY_ACTION_ID,
@@ -86,7 +84,6 @@ from features.incident.comms.entrypoints.slack_views import (
     build_generating_view,
     build_no_new_information_wording,
     build_overview_view,
-    build_profile_labels,
     build_published_error_view,
     build_review_error_view,
     build_review_field_errors,
@@ -96,19 +93,21 @@ from features.incident.comms.entrypoints.slack_views import (
     mrkdwn_blocks,
     parse_ai_form,
     parse_review_submission,
+    profile_label_args,
     status_error_text,
     status_t,
     status_update_open_failed,
     status_update_view,
 )
-from features.incident.comms.form import (
+from features.incident.comms.service.approval import approve_and_publish
+from features.incident.comms.service.form import (
     fill_status_update_form,
     open_status_update_form,
     save_status_update_form,
     start_status_update_form,
 )
-from features.incident.comms.history import read_published, set_published_and_render
-from features.incident.comms.service import get_status_update_overview
+from features.incident.comms.service.history import get_status_update_overview
+from features.incident.comms.service.publication import read_published, set_published_and_render
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
@@ -376,16 +375,6 @@ def _parse_action(body: dict[str, Any]) -> _ModalAction:
     )
 
 
-class _ProfileLabelArgs(TypedDict):
-    labels_en: ProfileLabels
-    labels_fr: ProfileLabels
-
-
-def _profile_labels() -> _ProfileLabelArgs:
-    """The English and French labels the copy-ready text is rendered with, as keyword arguments."""
-    return {"labels_en": build_profile_labels("en-US"), "labels_fr": build_profile_labels("fr-FR")}
-
-
 def handle_review_action(ack: Callable[[], Any], body: dict[str, Any], client: Any, scopes: ServiceScopeOpener) -> None:
     """Handle a press of the Review button: replace the modal in place with the review form.
 
@@ -431,7 +420,7 @@ def handle_open_action(ack: Callable[[], Any], body: dict[str, Any], client: Any
     result = None
     if isinstance(sequence, int):
         with _status_update_scope(scopes) as updates:
-            result = asyncio.run(read_published(incident_id, sequence, store=updates, **_profile_labels()))
+            result = asyncio.run(read_published(incident_id, sequence, store=updates, **profile_label_args()))
     if result is not None and result.is_success and result.data is not None:
         next_view = build_copy_ready_view(result.data.text, action.locale, action.list_metadata(), update=result.data.update)
     else:
@@ -485,7 +474,7 @@ def handle_published_action(ack: Callable[[], Any], body: dict[str, Any], client
     if isinstance(sequence, int) and isinstance(published, bool):
         with _status_update_scope(scopes) as updates:
             toggled = set_published_and_render(
-                incident_id, sequence, published=published, actor=action.user_id, store=updates, **_profile_labels()
+                incident_id, sequence, published=published, actor=action.user_id, store=updates, **profile_label_args()
             )
             result = asyncio.run(toggled)
     if result is not None and result.is_success and result.data is not None:
@@ -606,7 +595,7 @@ def handle_review_submission(ack: Callable[..., Any], body: dict[str, Any], clie
     log = action.bind("incident_status_update_approval")
     with _status_update_scope(scopes) as updates:
         approved = approve_and_publish(
-            action.incident_id, action.sequence, approver=action.user_id, edit=edit, store=updates, **_profile_labels()
+            action.incident_id, action.sequence, approver=action.user_id, edit=edit, store=updates, **profile_label_args()
         )
         result = asyncio.run(approved)
     if result.is_success and result.data is not None:

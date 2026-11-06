@@ -1,7 +1,7 @@
 """The status-update review form: what to show after start, open, save or Draft with AI.
 
-Platform-neutral use cases behind the status-updates modal. Each makes the
-store and model calls one modal action needs and returns the form to show as a
+Platform-neutral use cases of the status-update form. Each makes the
+store and model calls one form action needs and returns the form to show as a
 ``StatusUpdateFormState``, so an entry point makes one call and renders it:
 
 - ``start_status_update_form`` starts or returns the pending draft.
@@ -19,17 +19,17 @@ result. This module imports only ``core.api`` from the core.
 
 from collections.abc import Callable
 from dataclasses import replace
-from typing import Any
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms.approval import get_draft_for_review
 from features.incident.comms.domain import NoNewInformationWording, StatusUpdateEdit, StatusUpdateFormState
-from features.incident.comms.service import (
+from features.incident.comms.providers import text_generation_available
+from features.incident.comms.service._results import failure
+from features.incident.comms.service.approval import get_draft_for_review
+from features.incident.comms.service.draft import (
     generate_status_update_draft,
     save_status_update_draft,
     start_status_update_draft,
-    text_generation_available,
 )
 from features.incident.core.api import ConversationReference, IncidentStore, StatusUpdate, StatusUpdateStore
 
@@ -41,7 +41,7 @@ def start_status_update_form(
 
     Args:
         incidents: Reads the incident records.
-        conversation: The incident conversation the modal was opened from.
+        conversation: The incident conversation the form was opened from.
         author: Platform user id of the responder who pressed New update.
         store: Holds the incident's status updates.
 
@@ -50,7 +50,7 @@ def start_status_update_form(
     """
     started = start_status_update_draft(incidents, conversation, author=author, store=store)
     if not started.is_success or started.data is None:
-        return _failure(started)
+        return failure(started)
     return OperationResult.success(
         data=StatusUpdateFormState(update=started.data.update, ai_available=text_generation_available(), kind=started.data.kind)
     )
@@ -67,7 +67,7 @@ async def open_status_update_form(
     """
     stored = await get_draft_for_review(incident_id, sequence, store=store)
     if not stored.is_success or stored.data is None:
-        return _failure(stored)
+        return failure(stored)
     return OperationResult.success(data=StatusUpdateFormState(update=stored.data, ai_available=text_generation_available()))
 
 
@@ -106,7 +106,7 @@ async def save_status_update_form(
                 data=StatusUpdateFormState(update=saved.data, ai_available=text_generation_available())
             )
         if saved.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
-            return _failure(saved)
+            return failure(saved)
         failure_code = saved.error_code
     return await _kept(store, incident_id, sequence, edit, failure_code, ai_available=text_generation_available())
 
@@ -152,7 +152,7 @@ async def fill_status_update_form(
     if edit is None:
         stored = await get_draft_for_review(incident_id, sequence, store=store)
         if not stored.is_success or stored.data is None:
-            return _failure(stored)
+            return failure(stored)
         base = stored.data
         current = StatusUpdateEdit(stage=base.stage, en=base.en, fr=base.fr)
     else:
@@ -174,7 +174,7 @@ async def fill_status_update_form(
             data=StatusUpdateFormState(update=filled.data.update, ai_available=True, kind=filled.data.kind)
         )
     if filled.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
-        return _failure(filled)
+        return failure(filled)
     ai_available = filled.error_code != ErrorCode.TEXT_GENERATION_UNAVAILABLE
     return await _kept(store, incident_id, sequence, edit, filled.error_code, ai_available=ai_available, stored=base)
 
@@ -193,19 +193,9 @@ async def _kept(
     if stored is None:
         read = await get_draft_for_review(incident_id, sequence, store=store)
         if not read.is_success or read.data is None:
-            return _failure(read)
+            return failure(read)
         stored = read.data
     update = stored if edit is None else replace(stored, stage=edit.stage, en=edit.en, fr=edit.fr)
     return OperationResult.success(
         data=StatusUpdateFormState(update=update, ai_available=ai_available, kept=True, failure_code=failure_code)
-    )
-
-
-def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:
-    """Carry an error result's classification over to another payload type."""
-    return OperationResult.error(
-        result.status,
-        message=result.message or "status update failed",
-        error_code=result.error_code,
-        retry_after=result.retry_after,
     )

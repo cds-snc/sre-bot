@@ -30,10 +30,9 @@ from structlog.testing import capture_logs
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import history, providers
+from features.incident.comms import providers
 from features.incident.comms.adapters.copy_ready import CopyReadyPublisher
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, StatusUpdateOverview
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateOverview, render_copy_ready
 from features.incident.comms.entrypoints import slack as slack_entrypoints
 from features.incident.comms.entrypoints.slack import (
     handle_history_action,
@@ -54,8 +53,8 @@ from features.incident.comms.entrypoints.slack_views import (
     build_overview_view,
     build_profile_labels,
 )
-from features.incident.comms.publisher import render_copy_ready
-from features.incident.comms.service import get_status_update_overview
+from features.incident.comms.service import publication
+from features.incident.comms.service.history import get_status_update_overview
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
@@ -170,7 +169,7 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(history, "get_approved_update", fakes.get_approved_update)
+    monkeypatch.setattr(publication, "get_approved_update", fakes.get_approved_update)
     monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", fakes.get_status_update_overview)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
     return fakes

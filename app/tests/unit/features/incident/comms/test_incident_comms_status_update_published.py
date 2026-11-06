@@ -26,7 +26,7 @@ import pytest
 
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
-from features.incident.comms.history import set_published
+from features.incident.comms.service.publication import set_published
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 

@@ -1,6 +1,6 @@
 """Review and approve an incident's pending status update.
 
-Platform-neutral use case behind the status-updates modal. The approver submits
+Platform-neutral use case of the status-update review. The approver submits
 the stage and both languages' fields; approval moves the draft to ``APPROVED``
 with the approver and time and stops there: nothing is published.
 ``approve_and_publish`` approves, then renders the approved record through the
@@ -12,28 +12,24 @@ core store inline. This module imports only ``core.api`` from the core.
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
 
 import structlog
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import providers
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, StatusUpdateEdit
-from features.incident.comms.ports import StatusPagePublisher
-from features.incident.comms.service import next_update_at_for
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateEdit
+from features.incident.comms.interfaces import StatusPagePublisher
+from features.incident.comms.service._results import STAGE_ORDER, failure
+from features.incident.comms.service.draft import next_update_at_for
 from features.incident.comms.settings import get_incident_status_update_settings
 from features.incident.core.api import (
     StatusUpdate,
-    StatusUpdateStage,
     StatusUpdateState,
     StatusUpdateStore,
 )
 
 logger = structlog.get_logger()
-
-_STAGE_ORDER = tuple(StatusUpdateStage)
 
 
 async def get_draft_for_review(
@@ -50,7 +46,7 @@ async def get_draft_for_review(
     """
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     latest = listed.data[0] if listed.data else None
     if latest is None or latest.sequence != sequence or latest.state is not StatusUpdateState.DRAFT:
         return _conflict("The status update is no longer the pending draft")
@@ -95,7 +91,7 @@ async def approve_status_update(
 
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     records = listed.data
     if not records or records[0].sequence != sequence:
         log.warning("incident_status_update_stale_sequence")
@@ -109,7 +105,7 @@ async def approve_status_update(
         return _conflict("The status update is no longer a draft")
 
     last_public = next((record for record in records if record.state is not StatusUpdateState.DRAFT), None)
-    if last_public is not None and _STAGE_ORDER.index(edit.stage) < _STAGE_ORDER.index(last_public.stage):
+    if last_public is not None and STAGE_ORDER.index(edit.stage) < STAGE_ORDER.index(last_public.stage):
         log.info("incident_status_update_stage_below_floor", stage=edit.stage, floor=last_public.stage)
         return OperationResult.permanent_error(
             message="The stage cannot be earlier than the latest approved update's stage",
@@ -135,7 +131,7 @@ async def approve_status_update(
         log.info("incident_status_update_approved")
         return OperationResult.success(data=approved)
     if moved.error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
-        return _failure(moved)
+        return failure(moved)
 
     # One re-read, no retry loop: an identical winning approval is a success, anything else a conflict.
     winner = store.latest(incident_id).data
@@ -176,7 +172,7 @@ async def approve_and_publish(
     """
     approved = await approve_status_update(incident_id, sequence, approver=approver, edit=edit, store=store)
     if not approved.is_success or approved.data is None:
-        return _failure(approved)
+        return failure(approved)
     publisher = publisher or providers.get_status_page_publisher()
     return await publisher.publish(approved.data, labels_en=labels_en, labels_fr=labels_fr)
 
@@ -194,13 +190,3 @@ def _is_same_approval(record: StatusUpdate, approver: str, edit: StatusUpdateEdi
 
 def _conflict(message: str) -> OperationResult[StatusUpdate]:
     return OperationResult.permanent_error(message=message, error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
-
-
-def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:
-    """Carry an error result's classification over to another payload type."""
-    return OperationResult.error(
-        result.status,
-        message=result.message or "status update failed",
-        error_code=result.error_code,
-        retry_after=result.retry_after,
-    )

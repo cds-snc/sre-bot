@@ -23,7 +23,7 @@ from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from contracts.workplace import WorkplaceSystem
 from features.incident.comms.domain import NoNewInformationWording, StatusUpdateDraftOutcome, StatusUpdateEdit
-from features.incident.comms.service import generate_status_update_draft
+from features.incident.comms.service.draft import generate_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     IncidentStore,

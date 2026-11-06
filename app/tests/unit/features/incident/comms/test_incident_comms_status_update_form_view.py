@@ -22,7 +22,7 @@ from features.incident.comms.entrypoints.slack_views import (
     generate_notice,
     save_notice,
 )
-from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE
+from features.incident.comms.service.draft import DRAFT_UNPARSEABLE_CODE
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 
 pytestmark = pytest.mark.unit

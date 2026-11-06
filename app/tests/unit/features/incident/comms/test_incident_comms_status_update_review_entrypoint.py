@@ -25,9 +25,8 @@ from structlog.testing import capture_logs
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import approval, form, providers
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, StatusUpdateEdit
+from features.incident.comms import providers
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateEdit
 from features.incident.comms.entrypoints.slack import (
     handle_review_action,
     handle_review_submission,
@@ -49,6 +48,7 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_view,
     build_saving_view,
 )
+from features.incident.comms.service import approval, form
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,

@@ -31,7 +31,6 @@ import pytest
 
 import features.incident.comms as comms_module
 from contracts.operations import OperationResult
-from features.incident.comms import form
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import (
     GENERATE_ACTION_ID,
@@ -40,8 +39,9 @@ from features.incident.comms.entrypoints.slack_views import (
     build_no_new_information_wording,
     build_review_view,
 )
-from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
-from features.incident.comms.service import generate_status_update_draft
+from features.incident.comms.service import form
+from features.incident.comms.service.draft import generate_status_update_draft
+from features.incident.comms.service.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,

@@ -6,7 +6,7 @@ from typing import Any
 import pytest
 
 from features.incident.comms.domain import DraftedFields
-from features.incident.comms.prompt import (
+from features.incident.comms.service.prompt import (
     INSTRUCTIONS,
     MAX_FIELD_CHARS,
     build_transcript,

@@ -25,8 +25,13 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.slack.models import CommandPayload
-from features.incident.comms.comms_profile import format_profile_time, render_profile, render_profile_sections
-from features.incident.comms.domain import CopyReadyText, StatusUpdateOverview
+from features.incident.comms.domain import (
+    CopyReadyText,
+    StatusUpdateOverview,
+    format_profile_time,
+    render_profile,
+    render_profile_sections,
+)
 from features.incident.comms.entrypoints import slack as slack_entrypoints
 from features.incident.comms.entrypoints.slack import handle_status_update_command
 from features.incident.comms.entrypoints.slack_views import (

@@ -11,9 +11,7 @@ from types import MappingProxyType
 
 import pytest
 
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText
-from features.incident.comms.publisher import render_copy_ready
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, render_copy_ready
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 
 pytestmark = pytest.mark.unit

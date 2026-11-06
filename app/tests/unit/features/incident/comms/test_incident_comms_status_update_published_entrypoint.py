@@ -32,10 +32,9 @@ from structlog.testing import capture_logs
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import history, providers
+from features.incident.comms import providers
 from features.incident.comms.adapters.copy_ready import CopyReadyPublisher
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, render_copy_ready
 from features.incident.comms.entrypoints.slack import handle_published_action, register
 from features.incident.comms.entrypoints.slack_views import (
     GENERATE_ACTION_ID,
@@ -50,8 +49,8 @@ from features.incident.comms.entrypoints.slack_views import (
     build_profile_labels,
     build_published_error_view,
 )
-from features.incident.comms.history import set_published
-from features.incident.comms.publisher import render_copy_ready
+from features.incident.comms.service import publication
+from features.incident.comms.service.publication import set_published
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateStage,
@@ -150,7 +149,7 @@ def events() -> list[str]:
 @pytest.fixture
 def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     fakes = _Services(events=events)
-    monkeypatch.setattr(history, "set_published", fakes.set_published)
+    monkeypatch.setattr(publication, "set_published", fakes.set_published)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
     return fakes
 
@@ -389,7 +388,7 @@ class TestHandlePublishedActionOverRealServices:
         store = status_update_store_in(records)
         store.append(_APPROVED)
         records.writes.clear()
-        monkeypatch.setattr(history, "set_published", partial(set_published, now=_NOW))
+        monkeypatch.setattr(publication, "set_published", partial(set_published, now=_NOW))
         monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
 
         handle_published_action(ack, _toggle_body(_target(True)), client, incident_scopes(records))

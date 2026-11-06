@@ -26,8 +26,8 @@ from features.incident.comms.domain import (
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
 )
-from features.incident.comms.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
-from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
+from features.incident.comms.service.draft import DRAFT_UNPARSEABLE_CODE, generate_status_update_draft
+from features.incident.comms.service.prompt import INSTRUCTIONS, build_redraft_input, build_redraft_instructions
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,

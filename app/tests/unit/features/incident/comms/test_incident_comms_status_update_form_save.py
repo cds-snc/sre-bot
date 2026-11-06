@@ -19,9 +19,9 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import form
 from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdateEdit, StatusUpdateOutcomeKind
-from features.incident.comms.form import (
+from features.incident.comms.service import form
+from features.incident.comms.service.form import (
     open_status_update_form,
     save_status_update_form,
     start_status_update_form,
