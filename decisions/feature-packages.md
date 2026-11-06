@@ -91,7 +91,7 @@ A handler (any platform) does five things and nothing else: receive the platform
 
 ## Consequences
 
-- A new contributor runs the generator and is productive in an afternoon; that is this record's success criterion. For a complex feature, the reference is `access/`.
+- A new contributor runs the generator (`make new-package`, `bin/new_package.py`, templates in `bin/package_templates/`) and is productive in an afternoon; that is this record's success criterion. For a complex feature, the reference is `access/`.
 - Features and capabilities share one shape, so moving a need from a feature into a capability changes paths and imports, not structure.
 - Subdomains stay small: a handler, a service and little else. Adapters, wiring and the record are written once per feature, in `core/`.
 - Cost, accepted: every current package moves and renames `platforms/` and `interactions/` to `entrypoints/`. These are import-path and entry-point-name changes with no runtime surface change.
@@ -135,3 +135,4 @@ Tolerated until then:
 - 2026-10-29: a package states the vendors and capabilities it requires in a `register_requirements` hookimpl, per plugins.md; the generator template includes it (TASK-172).
 - 2026-10-29: `register_requirements` returns `Requirement` declarations the host resolves, per plugins.md (TASK-175 planning); the generator template returns an empty list.
 - 2026-11-06: the layout table gains `interfaces.py` (a package's own Protocols; `ports.py` was the drift) and `plugin.py` (per plugins.md 2026-11-04); `service.py` and `domain.py` may grow into packages; the shape check (TASK-114.1) also enforces the umbrella and dotted-name rules, with a ratcheting baseline (TASK-114 planning, human).
+- 2026-11-06: the generator (`make new-package`) creates a feature, capability, umbrella, subdomain, `core/` or `common/` in this shape, with its entry point, protected-plugins and independence or umbrella contract entries and its enablement key; a capability takes its classification and at least one existing feature consumer, so it passes the shape check from the start (TASK-114.2).

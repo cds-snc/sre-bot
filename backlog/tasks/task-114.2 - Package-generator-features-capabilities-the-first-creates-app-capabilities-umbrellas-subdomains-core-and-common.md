@@ -3,10 +3,10 @@ id: TASK-114.2
 title: >-
   Package generator: features, capabilities (the first creates
   app/capabilities/), umbrellas, subdomains, core/ and common/
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-06T02:56:00Z'
-updated_date: '2026-11-06T02:57:00Z'
+updated_date: '2026-11-06T18:18:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -31,13 +31,13 @@ Second slice of TASK-114 (split 2026-11-06, human). One generator for every pack
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The generator creates a feature, a capability, an umbrella, an umbrella subdomain, or an umbrella's core/ or common/ in the layout-table shape; the generated package passes check-package-shape with an empty baseline, ruff, and registers on a plugin manager unchanged
-- [ ] #2 A plugin (feature, capability or subdomain) gets its entry-point line (dotted for a subdomain), its module in the protected-plugins contract, and its enablement key in the [plugins.<area>] table the user picks from product-scope.md's areas; core/, common/ and the umbrella get none
-- [ ] #3 A new feature is added to the feature-independence contract; a subdomain, core/ or common/ is added to its umbrella's exhaustive layers contract; a new umbrella gets its own layers contract
-- [ ] #4 The first capability creates app/capabilities/: capabilities joins root_packages, the wheel packages and the six-layer contract; later capabilities change none of those
-- [ ] #5 A plugin's __init__.py template holds a register_requirements hookimpl returning an empty list; a capability gets api.py, hookspecs.py and a README with the Classification and Feature consumers sections
-- [ ] #6 Each edit of pyproject.toml and base.toml keeps its comments and is verified with tomllib before it is written; a failed check writes nothing
-- [ ] #7 The generator prints the product-scope.md table row to add and is run by make new-package
+- [x] #1 The generator creates a feature, a capability, an umbrella, an umbrella subdomain, or an umbrella's core/ or common/ in the layout-table shape; the generated package passes check-package-shape with an empty baseline, ruff, and registers on a plugin manager unchanged
+- [x] #2 A plugin (feature, capability or subdomain) gets its entry-point line (dotted for a subdomain), its module in the protected-plugins contract, and its enablement key in the [plugins.<area>] table the user picks from product-scope.md's areas; core/, common/ and the umbrella get none
+- [x] #3 A new feature is added to the feature-independence contract; a subdomain, core/ or common/ is added to its umbrella's exhaustive layers contract; a new umbrella gets its own layers contract
+- [x] #4 The first capability creates app/capabilities/: capabilities joins root_packages, the wheel packages and the six-layer contract; later capabilities change none of those
+- [x] #5 A plugin's __init__.py template holds a register_requirements hookimpl returning an empty list; a capability gets api.py, hookspecs.py and a README with the Classification and Feature consumers sections
+- [x] #6 Each edit of pyproject.toml and base.toml keeps its comments and is verified with tomllib before it is written; a failed check writes nothing
+- [x] #7 The generator prints the product-scope.md table row to add and is run by make new-package
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,3 +67,28 @@ Blast radius: tooling only; it changes pyproject.toml and base.toml only when ru
 Domain-model evolution: N/A.
 Gates: ruff and targeted tests during TDD; at the end make check-import-contracts, check-settings-key-ownership, check-package-shape, full mypy then full pytest, once each.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06: implemented on task-114.2-package-generator (from main d9574645, #1830 merged); In Progress for review.
+
+Anchors re-verified against main: [project.entry-points.sre_bot], contracts (a) layers with "(capabilities)", (b) no-host-imports, (e) integrations-via-adapters, (f) feature-independence, (h)/(i) umbrella layers, (m) protected-plugins, root_packages, hatch wheel packages, base.toml [plugins.<area>] tables: all as planned.
+
+Changes: bin/new_package.py (make new-package; argparse, interactive when run with no args on a terminal), bin/package_toml.py (edits as data: SetKey/Append/Insert/Replace applied to the tomlkit document and to the tomllib data; verify compares the two, a mismatch writes nothing), bin/package_templates/ (13 string.Template files + README), tomlkit 0.15.2 dev dependency, Makefile new-package.
+
+Decisions taken during implementation (recorded in the ADRs' change lines):
+- Templates live in bin/package_templates/, not bin/templates/package/: the repo .gitignore rule "package" ignores any path named package.
+- The capabilities bootstrap also adds capabilities to the source_modules of contracts (b) and (e) (plugin-architecture.md Checks: capabilities never import infrastructure or server; integrations only from adapters/). Without it the first capability (TASK-25.10) ships unguarded. plugin-architecture.md change line.
+- Capability inputs: --classification (generic|supporting) and at least one --consumer features.<x>[.<sub>] that exists, so the README passes the shape check's readme rules with an empty baseline. A capability ahead of its consumer (TASK-83.4) is still the baseline-entry route (plugin-architecture.md 2026-11-06).
+- Areas are read from base.toml's [plugins.*] tables, so [plugins.shared] is offered once it exists.
+- An umbrella takes --area (for the printed product-scope row only; no key) and gets an exhaustive layers contract with layers = [] (import-linter accepts it); subdomain, core and common join it in subdomains > core > common order.
+- --settings (any kind but umbrella) writes settings.py on [<module path joined by _>] and adds the empty table to base.toml; refused when the table exists.
+- Subdomain names core, common and the layout-table directory names are refused; an entry-point name bound to another module is refused (e.g. rant).
+- tests/integration/server/test_server_plugins_ci_requirements_guard.py now flags a plugin only when its register_requirements returns a requirement: the generated template returns [] and would otherwise fail CI for every new plugin. plugins.md change line.
+
+Scratch run on the real tree (pyproject.toml and base.toml backed up and restored, packages deleted, uv sync): feature+settings, capability (first: bootstrap)+settings, umbrella, subdomain+settings, core, common. lint-imports 14 kept 0 broken (new umbrella contract kept); check-package-shape OK (10 baselined); check-settings-key-ownership OK; ruff clean; mypy on the 25 generated files: Success, no issues; installed entry points match the enablement keys (check_plugin_enablement); plugin enablement boot, CI requirements guard and lifespan configuration-phase tests pass with the scratch plugins installed.
+
+Tests: tests/unit/bin/test_bin_package_toml_edit.py (19), tests/integration/bin/test_bin_package_generator_create.py (17).
+Gates (from app/): ruff check . -> All checks passed; make check-import-contracts -> 13 kept, 0 broken; make check-settings-key-ownership -> OK; make check-package-shape -> OK, 10 baselined; mypy . -> 41 errors in 14 files, pre-existing (same as TASK-114.1), none in touched files (run a second time only to group errors by file, a slip against run-once); pytest tests --ignore=tests/smoke -> 6426 passed.
+<!-- SECTION:NOTES:END -->

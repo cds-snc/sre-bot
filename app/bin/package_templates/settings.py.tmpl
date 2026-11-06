@@ -1,0 +1,19 @@
+"""$title settings: the [$table] table of the configuration files."""
+
+from functools import lru_cache
+
+from pydantic_settings import SettingsConfigDict
+
+from contracts.configuration import ConfigurationSlice
+
+
+class $settings_class(ConfigurationSlice):
+    """Keys of [$table]: none yet."""
+
+    model_config = SettingsConfigDict(toml_table_header=("$table",), env_prefix="$env_prefix")
+
+
+@lru_cache(maxsize=1)
+def get_${table}_settings() -> $settings_class:
+    """Return the process-wide [$table] slice."""
+    return $settings_class()

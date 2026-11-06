@@ -225,6 +225,7 @@ dev = [
     "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin,sts]>=1.43.116",
     "google-api-python-client-stubs>=1.40.0",
     "import-linter>=2.15",
+    "tomlkit>=0.15.2",
 ]
 
 [tool.hatch.build.targets.wheel]
