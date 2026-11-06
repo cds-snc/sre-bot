@@ -32,7 +32,7 @@ If the task has no approved plan, or a model pivot changes its approved assumpti
 
 ## Implement
 
-TDD, then the gates from CLAUDE.md plus `make check-import-contracts` and `make check-settings-key-ownership`. Check ACs one by one as each is verified, write notes, keep the task In Progress.
+TDD, then the gates from CLAUDE.md plus `make check-import-contracts`, `make check-settings-key-ownership`, `make check-package-shape` and `make check-test-seams`. Check ACs one by one as each is verified, write notes, keep the task In Progress.
 
 ## End
 

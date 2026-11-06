@@ -1,0 +1,60 @@
+# Test-seam guard, strict zone: tests/{unit,integration}/{features,capabilities}/ (bin/check_test_seams.py).
+# Entries are "<test file>::<patched target>": a patch of a features/, capabilities/ or modules/ internal
+# that should be a Protocol fake at the seam (decisions/testing.md). Seeded once from main 929e6c3c
+# (TASK-187); only ratchets down (decisions/migration.md coexistence rule 3). Removing an entry is always
+# safe. Do NOT add entries: net-new patches fail CI. A move PR re-keys its own entries, same count, and
+# says so in its PR body (decisions/testing.md). A trailing "# ..." comment is ignored.
+tests/integration/features/incident/comms/test_incident_comms_status_update_generate_dispatch.py::features.incident.comms.form.generate_status_update_draft
+tests/integration/features/incident/comms/test_incident_comms_status_update_generate_dispatch.py::features.incident.comms.form.text_generation_available
+tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.history.get_approved_update
+tests/integration/features/incident/comms/test_incident_comms_status_update_published_dispatch.py::features.incident.comms.history.set_published
+tests/integration/features/incident/comms/test_incident_comms_status_update_review_dispatch.py::features.incident.comms.approval.approve_status_update
+tests/integration/features/incident/comms/test_incident_comms_status_update_review_dispatch.py::features.incident.comms.form.get_draft_for_review
+tests/integration/features/incident/comms/test_incident_comms_status_update_review_dispatch.py::features.incident.comms.form.text_generation_available
+tests/integration/features/incident/comms/test_incident_comms_status_update_save_dispatch.py::features.incident.comms.form.save_status_update_draft
+tests/integration/features/incident/comms/test_incident_comms_status_update_save_dispatch.py::features.incident.comms.form.text_generation_available
+tests/unit/features/incident/comms/test_incident_comms_status_update_approval_publish.py::features.incident.comms.approval.approve_status_update
+tests/unit/features/incident/comms/test_incident_comms_status_update_dispatch.py::features.incident.comms.entrypoints.slack.handle_status_update_command
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_fill.py::features.incident.comms.form.generate_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_fill.py::features.incident.comms.form.get_draft_for_review
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_save.py::features.incident.comms.form.get_draft_for_review
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_save.py::features.incident.comms.form.save_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_save.py::features.incident.comms.form.start_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_form_save.py::features.incident.comms.form.text_generation_available
+tests/unit/features/incident/comms/test_incident_comms_status_update_generate_entrypoint.py::features.incident.comms.form.generate_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_generate_entrypoint.py::features.incident.comms.form.get_draft_for_review
+tests/unit/features/incident/comms/test_incident_comms_status_update_history_entrypoint.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/unit/features/incident/comms/test_incident_comms_status_update_history_entrypoint.py::features.incident.comms.history.get_approved_update
+tests/unit/features/incident/comms/test_incident_comms_status_update_history_render.py::features.incident.comms.history.set_published
+tests/unit/features/incident/comms/test_incident_comms_status_update_history_view.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/unit/features/incident/comms/test_incident_comms_status_update_new_entrypoint.py::features.incident.comms.form.start_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_new_entrypoint.py::features.incident.comms.form.text_generation_available
+tests/unit/features/incident/comms/test_incident_comms_status_update_published_entrypoint.py::features.incident.comms.history.set_published
+tests/unit/features/incident/comms/test_incident_comms_status_update_review_entrypoint.py::features.incident.comms.approval.approve_status_update
+tests/unit/features/incident/comms/test_incident_comms_status_update_review_entrypoint.py::features.incident.comms.form.get_draft_for_review
+tests/unit/features/incident/comms/test_incident_comms_status_update_review_entrypoint.py::features.incident.comms.form.text_generation_available
+tests/unit/features/incident/comms/test_incident_comms_status_update_review_view.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/unit/features/incident/comms/test_incident_comms_status_update_save_entrypoint.py::features.incident.comms.form.get_draft_for_review
+tests/unit/features/incident/comms/test_incident_comms_status_update_save_entrypoint.py::features.incident.comms.form.save_status_update_draft
+tests/unit/features/incident/comms/test_incident_comms_status_update_save_entrypoint.py::features.incident.comms.form.text_generation_available
+tests/unit/features/incident/comms/test_incident_comms_status_update_slack.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs._drive_service
+tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs.get_metadata
+tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs.logger.warning
+tests/unit/features/incident/scheduling/test_incident_scheduling_availability.py::features.incident.scheduling.availability.get_federal_holidays
+tests/unit/features/incident/scheduling/test_incident_scheduling_calendar_adapter.py::features.incident.scheduling.adapters.google_calendar.generate_unique_id
+tests/unit/features/incident/scheduling/test_incident_scheduling_calendar_adapter.py::features.incident.scheduling.adapters.google_calendar.logger.warning
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service._now
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service.draft_incident_document
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service.get_incident_report
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service.get_incident_transcript_reader
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_summarize.py::features.incident.scribe.service._now
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_summarize.py::features.incident.scribe.service.get_incident_transcript_reader
+tests/unit/features/incident/scribe/test_incident_scribe_conversation_summarize.py::features.incident.scribe.service.summarize_transcript
+tests/unit/features/incident/scribe/test_incident_scribe_draft_report_default.py::features.incident.scribe.service.get_incident_report
+tests/unit/features/incident/scribe/test_incident_scribe_draft_slack.py::features.incident.scribe.entrypoints.slack.draft_incident_document_from_conversation
+tests/unit/features/incident/scribe/test_incident_scribe_draft_slack.py::features.incident.scribe.entrypoints.slack.handle_draft_command
+tests/unit/features/incident/scribe/test_incident_scribe_summary_service.py::features.incident.scribe.service._now
+tests/unit/features/incident/scribe/test_incident_scribe_summary_slack.py::features.incident.scribe.entrypoints.slack.handle_summarize_command
+tests/unit/features/incident/scribe/test_incident_scribe_summary_slack.py::features.incident.scribe.entrypoints.slack.summarize_incident_conversation

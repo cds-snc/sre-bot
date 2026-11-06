@@ -1,0 +1,20 @@
+# Test-seam guard, legacy pin zone: tests/integration/legacy_surface/ (bin/check_test_seams.py).
+# Seams: "<fixture>::<patched target>  # TASK-<id>", a named conftest.py fixture whose docstring says
+# "Owning rebuild task: TASK-<id>"; the comment must name the same task, or the entry does not match.
+# inline: a pin test patching a features/, capabilities/ or modules/ internal inline.
+# unowned: such a patch in conftest.py outside an owned fixture (none may be added).
+# Seeded once from main 929e6c3c (TASK-187); only ratchets down: the owning rebuild task deletes its
+# seam and the pins it replaces. One exception (decisions/migration.md rule 3): a pin task whose
+# approved plan names a new seam adds that entry, with its owner, in that task's own PR.
+inline:tests/integration/legacy_surface/test_incident_declare_surface.py::modules.incident.core.initiate_resources_creation
+inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.incident.db_operations.get_incident_by_channel_id
+inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.incident.db_operations.lookup_incident
+inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.sre.platforms.slack._web_client
+inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::features.incident.scribe.service.draft_incident_document
+inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::features.incident.scribe.service.summarize_transcript
+inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::modules.sre.platforms.slack.incident_helper.handle_incident_command
+inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::modules.sre.platforms.slack.webhook_helper.handle_webhook_command
+legacy_acknowledged_webhooks_seam::modules.slack.webhooks.increment_acknowledged_count  # TASK-145.7
+legacy_incident_folders_seam::features.incident.core.adapters.google_docs.list_child_folders  # TASK-145.13
+legacy_scribe_transcript_reader_seam::features.incident.scribe.service.get_incident_transcript_reader  # TASK-145.11
+legacy_sre_web_client_seam::modules.sre.platforms.slack._web_client  # TASK-145.8

@@ -72,6 +72,10 @@ jobs:
         working-directory: ./app
         run: make check-package-shape
 
+      - name: Test seam freeze check
+        working-directory: ./app
+        run: make check-test-seams
+
       - name: Test
         working-directory: ./app
         run: make test
