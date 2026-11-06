@@ -6,17 +6,17 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-11-05T00:14:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - phase-5
 dependencies:
   - TASK-25.2
   - TASK-36.1.3
   - TASK-36.3
-  - TASK-109
-  - TASK-114
-  - TASK-145.9
   - TASK-37.4
+  - TASK-109
+  - TASK-114.2
+  - TASK-145.9
 references:
   - decisions/feature-packages.md
   - decisions/workplace-systems.md

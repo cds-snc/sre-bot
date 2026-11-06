@@ -4,7 +4,7 @@ title: Move packages/geolocate to app/features/geolocate/
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:01
-updated_date: '2026-11-03T20:45:00Z'
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - features
@@ -12,7 +12,7 @@ milestone: m-7
 dependencies:
   - TASK-109
   - TASK-110
-  - TASK-114
+  - TASK-114.1
   - TASK-118
   - TASK-25.5
 references:

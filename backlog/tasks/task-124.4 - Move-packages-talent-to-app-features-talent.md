@@ -4,7 +4,7 @@ title: Move packages/talent to app/features/talent/
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:01
-updated_date: '2026-10-23T17:32:00Z'
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - features
@@ -12,7 +12,7 @@ milestone: m-7
 dependencies:
   - TASK-109
   - TASK-110
-  - TASK-114
+  - TASK-114.1
   - TASK-120
 references:
   - decisions/feature-packages.md

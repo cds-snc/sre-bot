@@ -5,8 +5,8 @@ title: >-
   app/features/access/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:01'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:01
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - features
@@ -15,7 +15,7 @@ dependencies:
   - TASK-109
   - TASK-110
   - TASK-111
-  - TASK-114
+  - TASK-114.1
   - TASK-116
   - TASK-118
   - TASK-119
@@ -26,7 +26,7 @@ dependencies:
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1667'
+  - https://github.com/cds-snc/sre-bot/issues/1667
 parent_task_id: TASK-124
 priority: medium
 type: task

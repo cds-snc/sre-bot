@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-02 16:59
-updated_date: '2026-11-05T00:14:00Z'
+updated_date: '2026-11-06T03:00:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -15,7 +15,7 @@ labels:
 milestone: m-7
 dependencies:
   - TASK-110
-  - TASK-114
+  - TASK-114.2
   - TASK-36.1.2
   - TASK-169
 references:

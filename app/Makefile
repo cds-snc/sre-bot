@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports check-aws-platform-seam check-import-contracts check-fake-coverage check-settings-key-ownership env-example debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-coverage test-new
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports check-aws-platform-seam check-import-contracts check-fake-coverage check-settings-key-ownership check-package-shape env-example debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-coverage test-new
 
 dev:
 	ENVIRONMENT=local uv run uvicorn --factory main:create_app --reload
@@ -115,6 +115,9 @@ check-fake-coverage:
 
 check-settings-key-ownership:
 	uv run python -m bin.check_settings_key_ownership
+
+check-package-shape:
+	uv run python -m bin.check_package_shape
 
 env-example: # Regenerate app/.env.example from the settings classes
 	uv run python -m bin.generate_env_example

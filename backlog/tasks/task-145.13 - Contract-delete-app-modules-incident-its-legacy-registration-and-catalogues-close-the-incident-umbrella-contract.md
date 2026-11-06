@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T14:02:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - incident
   - features
@@ -16,6 +16,7 @@ dependencies:
   - TASK-145.12
   - TASK-145.5.7
   - TASK-118
+  - TASK-186
 references:
   - https://github.com/cds-snc/sre-bot/issues/1691
 parent_task_id: TASK-145
@@ -47,6 +48,7 @@ THIS SLICE
 - [ ] #5 Once a production run of the TASK-145.5.7 upgrade job reports nothing pending, features/incident/core/adapters/legacy_items.py (the read bridge), the upgrade job and their tests are deleted, and decisions/incident-management.md Migration tolerances are updated to match
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 The TASK-173 host rule (a Slack transport switched on with GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset fails boot, server/configuration/host_configuration.py) and its tests are deleted with the legacy handlers it exists for, and decisions/configuration.md Tolerated no longer lists it (dated Changes line)
+- [ ] #8 features/incident/core/legacy_upgrade.py and features/incident/response/legacy_upgrade_job.py are deleted with the job's registration, and their app/bin/baselines/package_shape.txt entries go with them
 <!-- AC:END -->
 
 ## Implementation Plan

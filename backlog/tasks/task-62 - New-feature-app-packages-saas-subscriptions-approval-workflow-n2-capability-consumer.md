@@ -5,8 +5,8 @@ title: >-
   consumer)
 status: To Do
 assignee: []
-created_date: '2026-07-28 14:33'
-updated_date: '2026-09-24 20:08'
+created_date: 2026-07-28 14:33
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - packages
   - approvals
@@ -14,12 +14,12 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-60
-  - TASK-114
+  - TASK-114.2
   - TASK-112
 references:
   - decisions/approvals.md
   - decisions/feature-packages.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1370'
+  - https://github.com/cds-snc/sre-bot/issues/1370
   - decisions/plugin-architecture.md
 priority: medium
 ordinal: 92000

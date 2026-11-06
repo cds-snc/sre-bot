@@ -81,7 +81,7 @@ Runtime orchestration (loops, schedulers, error boundaries) stays in `server/`. 
 **Legacy modules are rebuilt by surface, not moved.** Each user-facing surface of `modules/` (slash command, interaction, webhook route, scheduled job) is assigned to a target feature or capability and rebuilt there in the standard shape, behind smoke tests that pin its external behaviour. Vendor-specific concepts leave a feature's domain on the way: the domain works with documents and a conversation through Protocols it owns or capability contracts, and vendor code sits in adapters ([workplace-systems.md](workplace-systems.md) rule 2). A legacy module is deleted when its last surface has moved. Features already in `packages/` move to `features/` one per PR, with every importer rewritten, legacy ones included.
 
 **A capability** qualifies only when all three hold:
-1. at least one feature needs it now;
+1. at least one feature needs it now, or its first consumer is a queued task; until that consumer merges, the capability is a baseline entry of the shape check naming that task (an expand step, never an open-ended one);
 2. it is a domain-agnostic engine, or it carries organization policy across external systems;
 3. its vocabulary is feature-free.
 
@@ -116,9 +116,9 @@ This record replaces the former three-tier layers record, the capability-package
 - import-linter `forbidden`: `features` and `capabilities` never import `infrastructure` or `server`; `contracts` imports nothing from the app.
 - import-linter `independence` across the packages in `features/`.
 - Review: every concrete helper in `contracts/` meets the facade criteria in the Decision.
-- Review: each capability's README states its classification and names at least one feature consumer; features import a capability only through `api.py`.
+- CI shape check (`bin/check_package_shape.py`): each capability's README has a `## Classification` section (`generic` or `supporting`) and a `## Feature consumers` section of `- features.<feature>[.<subdomain>]` bullets, at least one, each naming a package under `features/`. Review: features import a capability only through `api.py`.
 - Boot test: every plugin loads, and every extension point is filled before its capability initializes.
-- CI shape check: every package under `features/` and `capabilities/` uses only names from the layout table.
+- CI shape check (`bin/check_package_shape.py`): every package under `features/` and `capabilities/` uses only names from the layout table.
 - Boot test: every entry point has an enablement key in the base configuration file, and a disabled plugin is never registered.
 - Review: no feature or capability reads an environment variable; configuration arrives through its settings slice.
 - import-linter `forbidden`: nothing outside `server/` imports provider modules; plugins resolve core services through the registry.
@@ -157,3 +157,4 @@ Tolerated until then:
 - 2026-10-26: the host may import everything except a plugin's own modules, enforced by an import-linter `protected` contract over the entry-point modules (TASK-112.2).
 - 2026-10-27: text generation reports unavailable when its vendor is not configured; a consumer that requires it states so and aborts boot without it (TASK-172, TASK-25.10).
 - 2026-10-27: the text-generation capability's slice holds the default model; features pass their generation parameters per call; the vendor slice holds the connection only (TASK-25.10).
+- 2026-11-06: a capability may land ahead of its first consumer when that consumer is a queued task, held as a named baseline entry until it merges (TASK-83.4's expand step); the README check moves from review to the shape check (TASK-114 planning, human).
