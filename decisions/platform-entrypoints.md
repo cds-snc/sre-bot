@@ -78,3 +78,4 @@ Tolerated until then:
 - 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1); its tolerated item is closed.
 - 2026-10-06: business code stays platform-neutral and a platform entry point handles interactions with its native SDK; the registrar covers block actions and view submissions (TASK-140.1).
 - 2026-10-23: current state: the Slack transport settings moved to `server/slack/settings.py` (TASK-112.1).
+- 2026-11-06: contract (j) allows `slack_bolt` in `features.**.entrypoints.slack`, as the Checks already state; a generated capability's bootstrap adds `capabilities.**.entrypoints.slack` (TASK-114.2).

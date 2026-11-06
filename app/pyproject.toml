@@ -410,7 +410,7 @@ protected_modules = ["slack_bolt"]
 # the Bolt app; a feature's Slack entry point handles interactions with Bolt's own
 # listener arguments (decisions/platform-entrypoints.md rule 3, transport-slack.md
 # Checks). Direct imports only: chains through integrations are tracked by (e).
-allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack"]
+allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack", "features.**.entrypoints.slack"]
 
 [[tool.importlinter.contracts]]
 id = "no-provider-imports"

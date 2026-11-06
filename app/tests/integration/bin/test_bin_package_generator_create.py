@@ -166,19 +166,77 @@ def test_an_umbrella_with_a_subdomain_core_and_common_matches_the_umbrella_rules
     _run(root, "umbrella", "shop", "--area", AREA)
     _run(root, "subdomain", "shop.cart", "--area", AREA)
     _run(root, "core", "shop")
-    _run(root, "common", "shop")
+    _run(root, "common", "shop", "--settings")
 
     umbrella = root / "features" / "shop"
     assert (umbrella / "__init__.py").read_text(encoding="utf-8") == ""
     assert not (umbrella / "core" / "entrypoints").exists()
     assert (umbrella / "core" / "api.py").is_file()
+    assert (umbrella / "core" / "README.md").is_file()
+    assert (umbrella / "common" / "README.md").is_file()
     assert _entry_points(root)["shop.cart"] == "features.shop.cart"
     assert "shop" not in _entry_points(root)
     assert "features.shop" in _contract(root, "feature-independence")["modules"]
     assert _contract(root, "shop-umbrella")["layers"] == ["cart", "core", "common"]
     assert _base(root)["plugins"][AREA]["shop.cart"] is True
+    assert 'toml_table_header=("shop",)' in (umbrella / "common" / "settings.py").read_text(encoding="utf-8")
     assert _registered_requirements(umbrella / "cart") == [[]]
     _assert_consistent(root)
+
+
+def test_a_capability_takes_its_consumers_area_without_an_area_flag(root: Path) -> None:
+    _run(root, "feature", "shop", "--area", AREA)
+
+    _run(root, "capability", "pricing", "--classification", "generic", "--consumer", "features.shop")
+
+    assert _base(root)["plugins"][AREA]["pricing"] is True
+    _assert_consistent(root)
+
+
+def test_a_capability_whose_consumers_span_areas_needs_the_shared_table(root: Path) -> None:
+    _run(root, "feature", "shop", "--area", AREA)
+    _run(root, "feature", "orders", "--area", "incident_response")
+
+    with pytest.raises(GeneratorError, match=r"\[plugins.shared\]"):
+        new_package.generate(
+            new_package.parse_request(
+                [
+                    "capability",
+                    "pricing",
+                    "--classification",
+                    "generic",
+                    "--consumer",
+                    "features.shop",
+                    "--consumer",
+                    "features.orders",
+                    "--root",
+                    str(root),
+                ]
+            )
+        )
+    assert not (root / "capabilities").exists()
+
+
+def test_a_capability_area_that_contradicts_its_consumers_is_refused(root: Path) -> None:
+    _run(root, "feature", "shop", "--area", AREA)
+
+    with pytest.raises(GeneratorError, match=f"plugins.{AREA}"):
+        new_package.generate(
+            new_package.parse_request(
+                [
+                    "capability",
+                    "pricing",
+                    "--area",
+                    "incident_response",
+                    "--classification",
+                    "generic",
+                    "--consumer",
+                    "features.shop",
+                    "--root",
+                    str(root),
+                ]
+            )
+        )
 
 
 def test_the_printed_next_steps_name_the_product_scope_row(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -200,7 +258,10 @@ def test_the_printed_next_steps_name_the_product_scope_row(root: Path, capsys: p
         (["subdomain", "shop.cart", "--area", AREA], "umbrella"),
         (["subdomain", "shop", "--area", AREA], "<umbrella>.<subdomain>"),
         (["capability", "pricing", "--area", AREA, "--classification", "core", "--consumer", "features.shop"], "classification"),
-        (["capability", "pricing", "--area", AREA, "--classification", "generic", "--consumer", "features.none"], "features.none"),
+        (
+            ["capability", "pricing", "--area", AREA, "--classification", "generic", "--consumer", "features.none"],
+            "features.none",
+        ),
         (["feature", "shop"], "--area"),
     ],
 )
@@ -247,3 +308,81 @@ def test_the_interactive_prompt_asks_for_the_same_values_the_flags_take(monkeypa
         "features.incident.response",
         "--settings",
     ]
+
+
+def _flat_feature_with_importers(root: Path) -> None:
+    """A flat plugin feature with settings, imported by host code and a test, and switched off in ci.toml."""
+    _run(root, "feature", "shop", "--area", AREA, "--settings")
+    (root / "features" / "shop" / "domain.py").write_text('"""Shop domain."""\n\nCURRENCY = "CAD"\n', encoding="utf-8")
+    host = root / "server" / "host.py"
+    host.parent.mkdir()
+    host.write_text(
+        '"""Host wiring."""\n\nfrom features.shop.domain import CURRENCY\nfrom features.shop.settings import get_shop_settings\n\n'
+        'OWNER = "features.shop"\nOTHER = "features.shopping"\n__all__ = ["CURRENCY", "get_shop_settings"]\n',
+        encoding="utf-8",
+    )
+    (root / "config" / "ci.toml").write_text(f"[plugins.{AREA}]\n# off in ci\nshop = false\n", encoding="utf-8")
+
+
+def test_promote_turns_a_flat_feature_into_an_umbrella_with_it_as_the_first_subdomain(root: Path) -> None:
+    _flat_feature_with_importers(root)
+
+    _run(root, "promote", "shop", "--subdomain", "cart")
+
+    umbrella = root / "features" / "shop"
+    assert (umbrella / "__init__.py").read_text(encoding="utf-8") == ""
+    assert {path.name for path in umbrella.iterdir()} == {"__init__.py", "README.md", "cart", "common"}
+    assert {"__init__.py", "README.md", "service.py", "interfaces.py", "domain.py", "entrypoints"} <= {
+        path.name for path in (umbrella / "cart").iterdir()
+    }
+    assert 'toml_table_header=("shop",)' in (umbrella / "common" / "settings.py").read_text(encoding="utf-8")
+    assert "shop" not in _entry_points(root)
+    assert _entry_points(root)["shop.cart"] == "features.shop.cart"
+    assert "features.shop" in _contract(root, "feature-independence")["modules"]
+    assert _contract(root, "shop-umbrella")["layers"] == ["cart", "common"]
+    assert "shop" not in _base(root)["plugins"][AREA]
+    assert _base(root)["plugins"][AREA]["shop.cart"] is True
+    assert _base(root)["shop"] == {}
+    ci = (root / "config" / "ci.toml").read_text(encoding="utf-8")
+    assert tomllib.loads(ci)["plugins"][AREA] == {"shop.cart": False}
+    assert "# off in ci" in ci
+    host = (root / "server" / "host.py").read_text(encoding="utf-8")
+    assert "from features.shop.cart.domain import CURRENCY" in host
+    assert "from features.shop.common.settings import get_shop_settings" in host
+    assert 'OWNER = "features.shop.cart"' in host
+    assert 'OTHER = "features.shopping"' in host
+    assert "features.shop.cart" in (umbrella / "cart" / "README.md").read_text(encoding="utf-8")
+    assert (umbrella / "common" / "README.md").is_file()
+    assert _registered_requirements(umbrella / "cart") == [[]]
+    _assert_consistent(root)
+
+
+def test_promote_without_settings_adds_no_common(root: Path) -> None:
+    _run(root, "feature", "shop", "--area", AREA)
+
+    _run(root, "promote", "shop", "--subdomain", "cart")
+
+    assert not (root / "features" / "shop" / "common").exists()
+    assert _contract(root, "shop-umbrella")["layers"] == ["cart"]
+    _assert_consistent(root)
+
+
+@pytest.mark.parametrize(
+    ("setup", "argv", "message"),
+    [
+        ([], ["promote", "shop", "--subdomain", "cart"], "no feature"),
+        ([["umbrella", "shop", "--area", AREA]], ["promote", "shop", "--subdomain", "cart"], "entry point"),
+        ([["feature", "shop", "--area", AREA]], ["promote", "shop"], "--subdomain"),
+        ([["feature", "shop", "--area", AREA]], ["promote", "shop", "--subdomain", "core"], "reserved"),
+    ],
+)
+def test_a_refused_promotion_changes_nothing(root: Path, setup: list[list[str]], argv: list[str], message: str) -> None:
+    for step in setup:
+        _run(root, *step)
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file() and "__pycache__" not in path.parts}
+
+    with pytest.raises(GeneratorError, match=message):
+        new_package.generate(new_package.parse_request([*argv, "--root", str(root)]))
+
+    after = {path: path.read_bytes() for path in root.rglob("*") if path.is_file() and "__pycache__" not in path.parts}
+    assert after == before

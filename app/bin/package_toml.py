@@ -12,7 +12,7 @@ same edits applied: anything else raises before a byte is written.
 
 import copy
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -23,7 +23,10 @@ from tomlkit.items import AoT, Table
 ENTRY_POINT_GROUP = "sre_bot"
 PROTECTED_PLUGINS = "protected-plugins"
 FEATURE_INDEPENDENCE = "feature-independence"
-CAPABILITY_GUARDED_CONTRACTS = ("no-host-imports", "integrations-via-adapters")
+# Every contract that lists features as a source lists capabilities too (plugin-architecture.md Checks).
+CAPABILITY_GUARDED_CONTRACTS = ("no-host-imports", "integrations-via-adapters", "no-legacy-imports", "no-provider-imports")
+SLACK_BOLT_CONTRACT = "slack-bolt-in-entrypoints"
+CAPABILITY_SLACK_ENTRYPOINT = "capabilities.**.entrypoints.slack"
 CAPABILITIES = "capabilities"
 CORE = "core"
 COMMON = "common"
@@ -82,7 +85,15 @@ class Replace:
     value: Any
 
 
-type Edit = SetKey | Append | Insert | Replace
+@dataclass(frozen=True)
+class DeleteKey:
+    """Remove ``key`` from the table at ``path``."""
+
+    path: Location
+    key: str
+
+
+type Edit = SetKey | DeleteKey | Append | Insert | Replace
 
 CONTRACTS: Location = ("tool", "importlinter", "contracts")
 ENTRY_POINTS: Location = ("project", "entry-points", ENTRY_POINT_GROUP)
@@ -111,6 +122,9 @@ def apply(edits: Sequence[Edit], data: Any) -> None:
     """Apply ``edits`` in order to a tomlkit document or to plain parsed data."""
     for edit in edits:
         target = _resolve(data, edit.path)
+        if isinstance(edit, DeleteKey):
+            del target[edit.key]
+            continue
         value = copy.deepcopy(edit.value)
         match edit:
             case SetKey():
@@ -226,7 +240,9 @@ def capabilities_root(pyproject: dict[str, Any]) -> list[Edit]:
     """The first capability's bootstrap: the root package, the wheel package and the guarded source lists.
 
     The six-layer contract already names ``(capabilities)`` as an optional layer, so
-    it matches once the package exists; contracts (b) and (e) start covering it here.
+    it matches once the package exists; contracts (b), (e), (g) and (k) start covering
+    it here, and (j) lets its ``entrypoints/slack.py`` import slack_bolt
+    (platform-entrypoints.md Checks).
     """
     edits: list[Edit] = []
     roots: list[str] = pyproject["tool"]["importlinter"]["root_packages"]
@@ -239,6 +255,8 @@ def capabilities_root(pyproject: dict[str, Any]) -> list[Edit]:
     for contract_id in CAPABILITY_GUARDED_CONTRACTS:
         if CAPABILITIES not in _contract(pyproject, contract_id)["source_modules"]:
             edits.append(Append((*CONTRACTS, Contract(contract_id), "source_modules"), CAPABILITIES))
+    if CAPABILITY_SLACK_ENTRYPOINT not in _contract(pyproject, SLACK_BOLT_CONTRACT)["allowed_importers"]:
+        edits.append(Append((*CONTRACTS, Contract(SLACK_BOLT_CONTRACT), "allowed_importers"), CAPABILITY_SLACK_ENTRYPOINT))
     return edits
 
 
@@ -265,3 +283,37 @@ def settings_table(base: dict[str, Any], table: str) -> list[Edit]:
     if table in base:
         return []
     return [SetKey((), table, {})]
+
+
+def rename_entry_point(pyproject: dict[str, Any], old_name: str, new_name: str, new_module: str) -> list[Edit]:
+    """Plugin ``old_name`` re-registered as ``new_name`` naming ``new_module`` (a flat feature promoted)."""
+    group: dict[str, str] = pyproject["project"]["entry-points"][ENTRY_POINT_GROUP]
+    if old_name not in group:
+        raise TomlEditError(f"no entry point named '{old_name}'")
+    if new_name in group:
+        raise TomlEditError(f"entry point '{new_name}' already names '{group[new_name]}'")
+    return [DeleteKey(ENTRY_POINTS, old_name), SetKey(ENTRY_POINTS, new_name, new_module)]
+
+
+def rename_in_contracts(pyproject: dict[str, Any], rename: Callable[[str], str], keep: frozenset[str]) -> list[Edit]:
+    """Every string in every contract's string lists passed through ``rename``, except contracts with an id in ``keep``."""
+    edits: list[Edit] = []
+    for contract in _contracts(pyproject):
+        contract_id = contract.get("id")
+        if not isinstance(contract_id, str) or contract_id in keep:
+            continue
+        for key, values in contract.items():
+            if not isinstance(values, list):
+                continue
+            for index, value in enumerate(values):
+                if isinstance(value, str) and rename(value) != value:
+                    edits.append(Replace((*CONTRACTS, Contract(contract_id), key), index, rename(value)))
+    return edits
+
+
+def rename_enablement_key(config: dict[str, Any], old_name: str, new_name: str) -> list[Edit]:
+    """Key ``old_name`` renamed ``new_name`` in whichever [plugins.<area>] table of a configuration file holds it."""
+    for area, keys in config.get("plugins", {}).items():
+        if old_name in keys:
+            return [DeleteKey(("plugins", area), old_name), SetKey(("plugins", area), new_name, keys[old_name])]
+    return []

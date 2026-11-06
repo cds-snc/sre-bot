@@ -109,6 +109,9 @@ def test_the_capabilities_bootstrap_adds_the_root_package_wheel_package_and_guar
     assert wheel_packages == sorted(wheel_packages)
     assert "capabilities" in _contract(result, "no-host-imports")["source_modules"]
     assert "capabilities" in _contract(result, "integrations-via-adapters")["source_modules"]
+    assert "capabilities" in _contract(result, "no-legacy-imports")["source_modules"]
+    assert "capabilities" in _contract(result, "no-provider-imports")["source_modules"]
+    assert "capabilities.**.entrypoints.slack" in _contract(result, "slack-bolt-in-entrypoints")["allowed_importers"]
     assert "(capabilities)" in _contract(result, "layers")["layers"]
 
 
@@ -162,3 +165,33 @@ def test_verify_rejects_a_result_that_differs_from_the_intended_edits() -> None:
 
     with pytest.raises(TomlEditError, match="differs"):
         package_toml.verify(PYPROJECT, tampered, edits)
+
+
+def test_renaming_an_entry_point_and_its_contract_strings_keeps_comments_and_other_contracts() -> None:
+    def rename(text: str) -> str:
+        return text.replace("features.incident.scribe", "features.incident.notes")
+
+    data = tomllib.loads(PYPROJECT)
+    edits = package_toml.rename_entry_point(data, "incident.scribe", "incident.notes", "features.incident.notes")
+    edits += package_toml.rename_in_contracts(data, rename, keep=frozenset({"feature-independence"}))
+
+    result = _render_pyproject(edits)
+
+    group = result["project"]["entry-points"]["sre_bot"]
+    assert "incident.scribe" not in group
+    assert group["incident.notes"] == "features.incident.notes"
+    assert "features.incident.notes" in _contract(result, "protected-plugins")["protected_modules"]
+    assert "features.incident.notes.service -> integrations.openai" in _contract(result, "integrations-via-adapters")["ignore_imports"]
+    assert _contract(result, "feature-independence") == _contract(data, "feature-independence")
+
+
+def test_renaming_an_enablement_key_keeps_its_value_area_and_the_comments() -> None:
+    edits = package_toml.rename_enablement_key(tomllib.loads(BASE), "geolocate", "geo.lookup")
+
+    new_text = package_toml.render(BASE, edits)
+
+    assert _comments(new_text) == _comments(BASE)
+    keys = tomllib.loads(new_text)["plugins"]["workplace_utilities"]
+    assert "geolocate" not in keys
+    assert keys["geo.lookup"] is True
+    assert package_toml.rename_enablement_key(tomllib.loads(BASE), "absent", "other") == []

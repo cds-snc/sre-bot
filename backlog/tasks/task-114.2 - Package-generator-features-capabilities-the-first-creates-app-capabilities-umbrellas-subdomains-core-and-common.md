@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-06T02:56:00Z'
-updated_date: '2026-11-06T18:18:00Z'
+updated_date: '2026-11-06T18:36:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -38,6 +38,7 @@ Second slice of TASK-114 (split 2026-11-06, human). One generator for every pack
 - [x] #5 A plugin's __init__.py template holds a register_requirements hookimpl returning an empty list; a capability gets api.py, hookspecs.py and a README with the Classification and Feature consumers sections
 - [x] #6 Each edit of pyproject.toml and base.toml keeps its comments and is verified with tomllib before it is written; a failed check writes nothing
 - [x] #7 The generator prints the product-scope.md table row to add and is run by make new-package
+- [x] #8 make new-package promote <feature> --subdomain <name> turns a flat plugin feature into an umbrella in place: its code becomes the subdomain, settings.py moves to common/ keeping its table and environment names, every features.<feature> reference in the app's Python is rewritten, the entry point and the enablement key in every configuration file are renamed <feature>.<subdomain>, and the umbrella gets its layers contract; a refused promotion changes nothing
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -66,6 +67,8 @@ AC traceability: #1 integration per kind; #2 entry point/protected/key assertion
 Blast radius: tooling only; it changes pyproject.toml and base.toml only when run. No runtime change; one git revert.
 Domain-model evolution: N/A.
 Gates: ruff and targeted tests during TDD; at the end make check-import-contracts, check-settings-key-ownership, check-package-shape, full mypy then full pytest, once each.
+
+2026-11-06 (human, during implementation): add a promote kind to this PR (dev tooling only, no production risk): a flat plugin feature becomes an umbrella in place, keeping its name (feature-packages.md: a feature too large for one service becomes an umbrella). Code moves into <feature>/<subdomain>/, settings.py to common/ (table and env names kept, so no SSM rename), Python references rewritten across the app, entry point and enablement keys (base.toml, ci.toml, any config file) renamed <feature>.<subdomain>, umbrella layers contract added; computed and verified before anything moves. Tests: promote cases in tests/integration/bin/test_bin_package_generator_create.py; rename edits in tests/unit/bin/test_bin_package_toml_edit.py. Also: audit the generated shapes against the current ADRs, doc-11 and doc-15.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -91,4 +94,11 @@ Scratch run on the real tree (pyproject.toml and base.toml backed up and restore
 
 Tests: tests/unit/bin/test_bin_package_toml_edit.py (19), tests/integration/bin/test_bin_package_generator_create.py (17).
 Gates (from app/): ruff check . -> All checks passed; make check-import-contracts -> 13 kept, 0 broken; make check-settings-key-ownership -> OK; make check-package-shape -> OK, 10 baselined; mypy . -> 41 errors in 14 files, pre-existing (same as TASK-114.1), none in touched files (run a second time only to group errors by file, a slip against run-once); pytest tests --ignore=tests/smoke -> 6426 passed.
+
+2026-11-06 (second commit on PR #1832, human request): promote kind and an alignment audit.
+- promote <feature> --subdomain <name> (AC #8): flat plugin feature -> umbrella in place; code into the subdomain, settings.py to common/ keeping its table and env names (no SSM rename), features.<feature> references rewritten in the app's Python and the moved package's Markdown, entry point and enablement keys renamed <feature>.<subdomain> in base.toml and every config/*.toml (ci.toml included), umbrella layers contract added; all TOML rendered and verified before anything moves. New edits: DeleteKey, rename_entry_point, rename_in_contracts (independence contract kept), rename_enablement_key.
+- Audit against the ADRs, doc-11 and doc-15 (read-only subagent, verified against ADR text), applied: capability bootstrap now also covers contracts (g) and (k) and allows capabilities.**.entrypoints.slack in (j); pyproject (j) gains features.**.entrypoints.slack (platform-entrypoints.md Checks already require it); a capability's area comes from its consumers' keys, a mismatch is refused and consumers spanning areas are refused until [plugins.shared] exists (plugins.md); core/ and common/ get a README; common/'s slice reads [<umbrella>] (matches promote; configuration.md line); next steps name ci.toml switch-off and building the slice in host_configuration.py; hookspecs template names the marker. Kept: enablement true in base (TASK-112.2 convention, pinned by test_base_keeps_the_access_plugins_off_and_every_other_plugin_on; approved plan). Not emitted: the capabilities' declared order (no file records it yet).
+- ADR change lines: plugin-architecture.md and plugins.md amended; feature-packages.md, configuration.md, platform-entrypoints.md added.
+- Scratch run on the real tree (restored): every kind plus promote; lint-imports 15 kept 0 broken, shape and ownership OK, ruff clean, mypy no issues in 33 generated files, boot tests pass.
+- Gates (from app/): ruff clean; check-import-contracts 13 kept 0 broken; check-settings-key-ownership OK; check-package-shape OK (10 baselined); mypy 41 errors in 14 files, pre-existing, none in bin/ (run once); pytest tests --ignore=tests/smoke 6437 passed.
 <!-- SECTION:NOTES:END -->
