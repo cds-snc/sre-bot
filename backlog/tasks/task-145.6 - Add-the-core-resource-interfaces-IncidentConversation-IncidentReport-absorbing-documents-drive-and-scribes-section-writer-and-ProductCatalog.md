@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T15:45:00Z'
+updated_date: '2026-11-06T19:47:00Z'
 labels:
   - incident
   - features
@@ -156,6 +156,8 @@ Report: create from template (placement found, not found -> root folder, placeme
 2026-11-04 (human approved, coordinated-incidents reconciliation): option C: ProductCatalog is out of this task's scope. Drive folders are never a source of products (incident-management.md 2026-11-04); TASK-165.1 builds the ProductCatalog port with its catalogue adapter (Backstage) once the product-catalog ADR defines a product. Listing the incident Drive folders, if declare still needs it, is report-placement configuration of the IncidentReport adapter, not a catalogue. The Opsgenie schedule read from folder metadata belongs to the on-call capability (TASK-146), not here. Re-check the title, description and ACs at re-plan (after layer 11).
 
 2026-11-05: no longer waits on TASK-169 (TASK-169 ruling, 2026-11-05 (human), D6): the credential model is invisible to its ports; AC added instead. Drive and Docs run as the service account itself after TASK-181 (shared-drive member), same account, so the appProperties it reads stay visible.
+
+2026-11-06: TASK-186 moves comms modules: service.py -> service/draft.py (overview -> service/history.py), history.py -> service/publication.py, approval/form/prompt -> service/, ports.py -> interfaces.py, comms_profile/publisher -> domain.py. Re-ground comms path and line references at pickup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

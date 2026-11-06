@@ -3,8 +3,8 @@ id: TASK-43
 title: Implement the Teams transport and re-validate the composition pattern at n=2
 status: To Do
 assignee: []
-created_date: '2026-07-07 19:56'
-updated_date: '2026-09-25 17:06'
+created_date: 2026-07-07 19:56
+updated_date: '2026-11-06T19:47:00Z'
 labels:
   - teams
   - phase-6
@@ -13,7 +13,7 @@ dependencies:
   - TASK-42
 references:
   - decisions/platform-transports.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1297'
+  - https://github.com/cds-snc/sre-bot/issues/1297
   - decisions/plugin-architecture.md
 priority: low
 ordinal: 43000
@@ -47,6 +47,8 @@ BLOCKED until task-42 lands.
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical.
+
+2026-11-06 (TASK-186 review): two Slack-side helpers a Teams handler would need are input to this task's shared-service validation: build_profile_labels (catalogue keys -> comms ProfileLabels, today in features/incident/comms/entrypoints/slack_views.py) and mrkdwn_blocks, duplicated in comms and scribe entrypoints/slack_views.py. Decide where cross-surface label building and per-transport text chunking live (platform-transports.md rule 4).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

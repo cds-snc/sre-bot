@@ -1,6 +1,6 @@
 """Start, save and AI-fill an incident's public status update draft.
 
-Platform-neutral use cases behind ``/sre incident status-update``
+Platform-neutral use cases of the status-update command
 (decisions/incident-management.md, External status updates). A responder
 writes the update; AI is an optional assist inside the form. Each use case
 resolves the incident through the core's command check, over the
@@ -27,7 +27,6 @@ Stages only move forward from the latest approved or published stage.
 Every appended draft records its origin: ``HAND`` (written or saved by a
 responder, or a manual prefill), ``MODEL``, ``MODEL_INSTRUCTED`` (the model
 followed a responder's instructions) or ``CARRIED_FORWARD``.
-``text_generation_available`` says whether AI drafting can be offered.
 
 This module imports only ``core.api`` from the core and no platform SDK.
 """
@@ -36,7 +35,6 @@ import hashlib
 from collections.abc import Callable, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 import structlog
 
@@ -49,10 +47,10 @@ from features.incident.comms.domain import (
     StatusUpdateDraftOutcome,
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
-    StatusUpdateOverview,
 )
-from features.incident.comms.ports import TextGenerator
-from features.incident.comms.prompt import (
+from features.incident.comms.interfaces import TextGenerator
+from features.incident.comms.service._results import STAGE_ORDER, failure
+from features.incident.comms.service.prompt import (
     INSTRUCTIONS,
     build_redraft_input,
     build_redraft_instructions,
@@ -80,64 +78,6 @@ logger = structlog.get_logger()
 
 DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
 
-_STAGE_ORDER = tuple(StatusUpdateStage)
-
-
-def get_status_update_overview(
-    incidents: IncidentStore,
-    conversation: ConversationReference,
-    *,
-    store: StatusUpdateStore,
-) -> OperationResult[StatusUpdateOverview]:
-    """Return the incident's pending draft and approved updates, without drafting anything.
-
-    Args:
-        incidents: Reads the incident records.
-        conversation: The incident conversation the command ran in.
-        store: Holds the incident's status updates.
-
-    Returns:
-        Success with the latest record as ``pending`` when it is a draft, and
-        every approved or published record newest first. Otherwise the command
-        check's refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
-        the store's classified error.
-    """
-    incident = find_incident_for_conversation(incidents, conversation)
-    if not incident.is_success or incident.data is None:
-        return _failure(incident)
-
-    listed = store.list_for_incident(incident.data.id)
-    if not listed.is_success or listed.data is None:
-        return _failure(listed)
-    latest = listed.data[0] if listed.data else None
-    pending = latest if latest is not None and latest.state is StatusUpdateState.DRAFT else None
-    approved = tuple(update for update in listed.data if update.state is not StatusUpdateState.DRAFT)
-    return OperationResult.success(data=StatusUpdateOverview(pending=pending, approved=approved))
-
-
-def get_pending_status_update(
-    incidents: IncidentStore,
-    conversation: ConversationReference,
-    *,
-    store: StatusUpdateStore,
-) -> OperationResult[StatusUpdate | None]:
-    """Return the incident's pending draft, without drafting anything.
-
-    Args:
-        incidents: Reads the incident records.
-        conversation: The incident conversation the command ran in.
-        store: Holds the incident's status updates.
-
-    Returns:
-        Success with the latest record when it is a draft, or ``None`` when
-        there is no record or the latest is not a draft. Otherwise the error
-        of ``get_status_update_overview``.
-    """
-    overview = get_status_update_overview(incidents, conversation, store=store)
-    if not overview.is_success or overview.data is None:
-        return _failure(overview)
-    return OperationResult.success(data=overview.data.pending)
-
 
 def start_status_update_draft(
     incidents: IncidentStore,
@@ -155,7 +95,7 @@ def start_status_update_draft(
 
     Args:
         incidents: Reads the incident records.
-        conversation: The incident conversation the modal was opened from.
+        conversation: The incident conversation the form was opened from.
         author: Platform user id of the responder starting the update.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates.
@@ -176,13 +116,13 @@ def start_status_update_draft(
 
     incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
-        return _failure(incident)
+        return failure(incident)
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     records = listed.data
     latest = records[0] if records else None
     if latest is not None and latest.state is StatusUpdateState.DRAFT:
@@ -254,12 +194,12 @@ def save_status_update_draft(
 
     incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
-        return _failure(incident)
+        return failure(incident)
     log = log.bind(incident_id=incident.data.id)
 
     listed = store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     latest = listed.data[0] if listed.data else None
     edited = DraftedFields(stage=edit.stage, en=edit.en, fr=edit.fr)
     if latest is not None and latest.sequence >= sequence and latest.author == author and _holds(latest, edited):
@@ -285,7 +225,7 @@ def save_status_update_draft(
         return OperationResult.success(data=saved)
     if appended.error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
         log.warning("incident_status_update_save_store_failed", status=appended.status, error_code=appended.error_code)
-        return _failure(appended)
+        return failure(appended)
 
     # One re-read, no retry loop: a winning draft is what the responder would see on reopening.
     winner = store.latest(saved.incident_id).data
@@ -293,7 +233,7 @@ def save_status_update_draft(
         log.info("incident_status_update_save_superseded", winner_sequence=winner.sequence)
         return OperationResult.success(data=winner)
     log.warning("incident_status_update_conflict", sequence=saved.sequence)
-    return _failure(appended)
+    return failure(appended)
 
 
 async def generate_status_update_draft(
@@ -359,13 +299,13 @@ async def generate_status_update_draft(
 
     incident = find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
-        return _failure(incident)
+        return failure(incident)
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     records = listed.data
     latest = records[0] if records else None
     if latest is None or not _is_pending(latest, sequence):
@@ -423,14 +363,9 @@ async def generate_status_update_draft(
         log,
     )
     if not generated.is_success or generated.data is None:
-        return _failure(generated)
+        return failure(generated)
     origin = StatusUpdateOrigin.MODEL_INSTRUCTED if guidance else StatusUpdateOrigin.MODEL
     return _append_new(store, record(generated.data, origin, people), StatusUpdateOutcomeKind.DRAFTED, log)
-
-
-def text_generation_available() -> bool:
-    """Whether AI drafting can be offered: the text generator is configured. No network call."""
-    return providers.text_generation_available()
 
 
 async def _generate_fields(
@@ -444,7 +379,7 @@ async def _generate_fields(
     generated = await generator.summarize(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
     if not generated.is_success or generated.data is None:
         log.warning("incident_status_update_generation_failed", status=generated.status, error_code=generated.error_code)
-        return _failure(generated)
+        return failure(generated)
     fields = parse_drafted_fields(generated.data)
     if fields is None:
         log.warning("incident_status_update_unparseable")
@@ -459,7 +394,7 @@ def _prefill_fields(last_public: StatusUpdate | None) -> DraftedFields:
     """The fields a hand-started draft starts from: the latest approved update, else blank at the first stage."""
     if last_public is None:
         blank = StatusUpdateText(affected_service="", impact="", current_action="", workaround="")
-        return DraftedFields(stage=_STAGE_ORDER[0], en=blank, fr=blank)
+        return DraftedFields(stage=STAGE_ORDER[0], en=blank, fr=blank)
     return DraftedFields(stage=last_public.stage, en=last_public.en, fr=last_public.fr)
 
 
@@ -552,7 +487,7 @@ def _draft_record(
     (a fill from instructions alone, a carry forward, or a hand start with
     nothing new) they stay ``previous``'s.
     """
-    stage = fields.stage if floor is None else max(fields.stage, floor, key=_STAGE_ORDER.index)
+    stage = fields.stage if floor is None else max(fields.stage, floor, key=STAGE_ORDER.index)
     if people or previous is None:
         cutoff, fingerprint = max(_posted_at(message) for message in people), _fingerprint(people)
     else:
@@ -585,7 +520,7 @@ def _append(
         log.info(f"incident_status_update_{kind}", sequence=update.sequence, kind=kind)
         return OperationResult.success(data=StatusUpdateDraftOutcome(update=update, kind=kind))
     if appended.error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
-        return _failure(appended)
+        return failure(appended)
 
     # One re-read, no retry loop: a winning draft is what a rerun would return anyway.
     winner = store.latest(update.incident_id).data
@@ -593,7 +528,7 @@ def _append(
         log.info("incident_status_update_pending", sequence=winner.sequence, kind=StatusUpdateOutcomeKind.PENDING)
         return OperationResult.success(data=StatusUpdateDraftOutcome(update=winner, kind=StatusUpdateOutcomeKind.PENDING))
     log.warning("incident_status_update_conflict", sequence=update.sequence)
-    return _failure(appended)
+    return failure(appended)
 
 
 def _append_new(
@@ -606,7 +541,7 @@ def _append_new(
     appended = store.append(update)
     if not appended.is_success:
         log.warning("incident_status_update_store_failed", status=appended.status, error_code=appended.error_code)
-        return _failure(appended)
+        return failure(appended)
     log.info(f"incident_status_update_{kind}", new_sequence=update.sequence, kind=kind, origin=update.origin)
     return OperationResult.success(data=StatusUpdateDraftOutcome(update=update, kind=kind))
 
@@ -646,13 +581,3 @@ def _posted_at(message: TranscriptMessage) -> datetime:
 
 def _default_generator() -> TextGenerator:
     return providers.get_status_update_text_generator()
-
-
-def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:
-    """Carry an error result's classification over to another payload type."""
-    return OperationResult.error(
-        result.status,
-        message=result.message or "status update failed",
-        error_code=result.error_code,
-        retry_after=result.retry_after,
-    )

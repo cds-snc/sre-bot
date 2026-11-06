@@ -26,11 +26,11 @@ entrypoints/slack.py      parse payload → typed values → one service call �
   │                         one service scope per call: RecordStore + ConfiguredSystems → IncidentStore, ConversationReference, StatusUpdateStore
   │
   ▼
-form.py | approval.py | history.py | service.py      platform-agnostic; no Slack or OpenAI imports
+service/ (draft, form, approval, publication, history)      platform-agnostic; no Slack or OpenAI imports
   │
   ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader ── core/api.py
   ├─► TextGenerator ──────── providers.py ──► adapters/text_generation.py   (integrations.openai)
-  └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (publisher.py, comms_profile.py)
+  └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (domain.render_copy_ready)
 ```
 
 ### Files
@@ -53,40 +53,44 @@ form.py | approval.py | history.py | service.py      platform-agnostic; no Slack
   action ids (`incident.comms.status_update.*`) and every translated string,
   reached through `core.api.translate` (no comms module imports
   `infrastructure.i18n`). No Slack SDK import.
-- `service.py` — the status-update use cases: `get_status_update_overview`,
-  `start_status_update_draft` (the pending draft, or the latest approved
-  update stored as the next draft for a responder to write),
-  `save_status_update_draft` (the typed fields as the next draft) and
-  `generate_status_update_draft` (Draft with AI: carries the typed fields
-  forward when nothing is new, otherwise one model call fills them), each
-  storing a `StatusUpdate` record. Only messages posted by people after the
-  latest approved update's cutoff count as new; thread replies are not read.
-  It imports `core/api.py` only from `core` and no integration.
-- `form.py` — the review form each modal action shows, as a
-  `StatusUpdateFormState`: `start_status_update_form`, `open_status_update_form`,
-  `save_status_update_form` and `fill_status_update_form`. A save or fill that
-  changes nothing keeps the stored draft overlaid with the typed values, with
-  the code that explains it, so the Slack handler makes one call and renders.
-- `approval.py`, `publisher.py` — approving a draft (stops at `APPROVED`, never
-  publishes) and rendering an approved update as copy-ready EN/FR text;
-  `approve_and_publish` does both in one call.
-- `history.py` — reopening an approved update and `set_published`, the
-  copy-ready view's toggle: one store transition between `APPROVED` and
-  `PUBLISHED` (recording or clearing `published_at`/`published_by`), with the
-  button carrying the target state. It records a person's confirmation that
-  they posted the text; nothing is posted to the channel. `read_published` and
-  `set_published_and_render` return the record with its copy-ready text in one call.
-- `prompt.py` — the status-update prompt and its strict answer parser, which
-  rejects any partial or malformed answer.
-- `comms_profile.py` — the default comms profile: how a status update reads
-  as public text (its sections and the next-update time in Eastern time), from
-  labels the caller has already localized.
+- `service/` — the status-update use cases, one module per use case; nothing
+  in it imports Slack or an integration, and only `core/api.py` from `core`:
+  - `service/draft.py` — `start_status_update_draft` (the pending draft, or the
+    latest approved update stored as the next draft for a responder to write),
+    `save_status_update_draft` (the typed fields as the next draft) and
+    `generate_status_update_draft` (Draft with AI: carries the typed fields
+    forward when nothing is new, otherwise one model call fills them), each
+    storing a `StatusUpdate` record. Only messages posted by people after the
+    latest approved update's cutoff count as new; thread replies are not read.
+  - `service/form.py` — the review form each form action shows, as a
+    `StatusUpdateFormState`: `start_status_update_form`, `open_status_update_form`,
+    `save_status_update_form` and `fill_status_update_form`. A save or fill that
+    changes nothing keeps the stored draft overlaid with the typed values, with
+    the code that explains it, so a surface handler makes one call and renders.
+  - `service/approval.py` — reading a draft for review and approving it (stops
+    at `APPROVED`, never publishes); `approve_and_publish` also renders the
+    approved update as copy-ready EN/FR text in one call.
+  - `service/publication.py` — reopening an approved update and `set_published`,
+    the copy-ready text's toggle: one store transition between `APPROVED` and
+    `PUBLISHED` (recording or clearing `published_at`/`published_by`), with the
+    button carrying the target state. It records a person's confirmation that
+    they posted the text; nothing is posted to the channel. `read_published` and
+    `set_published_and_render` return the record with its copy-ready text in one call.
+  - `service/history.py` — `get_status_update_overview`: the pending draft and
+    the approved updates, newest first; it drafts nothing.
+  - `service/prompt.py` — the status-update prompt and its strict answer
+    parser, which rejects any partial or malformed answer.
 - `domain.py` — frozen values: `StatusUpdateDraftOutcome` and its
-  `StatusUpdateOutcomeKind`, `DraftedFields`, `NoNewInformationWording`,
-  `StatusUpdateEdit` (with `blank_fields`), `CopyReadyText`,
-  `StatusUpdateOverview`, `StatusUpdateFormState`, `PublishedRecord`. The
+  `StatusUpdateOutcomeKind`, `DraftedFields` (model output) and
+  `StatusUpdateEdit` (a responder's submission, with `blank_fields`), kept
+  apart on purpose, `NoNewInformationWording`, `CopyReadyText`,
+  `StatusUpdateOverview`, `StatusUpdateFormState`, `PublishedRecord`; and the
+  default comms profile: `ProfileLabels` and the pure rendering of a status
+  update as public text (its sections and the next-update time in Eastern
+  time, from labels the caller has already localized), with
+  `render_copy_ready`, which every `StatusPagePublisher` renders through. The
   `StatusUpdate` record itself comes from `features/incident/core`.
-- `ports.py` — the comms-owned interfaces: `TextGenerator` and
+- `interfaces.py` — the comms-owned interfaces: `TextGenerator` and
   `StatusPagePublisher`.
 - `adapters/text_generation.py` — binds `TextGenerator` to the OpenAI
   `Summarizer`; the subdomain's only integration import.
@@ -121,10 +125,10 @@ Nothing is posted to the incident conversation.
 
 Opens the incident's status-updates modal, private to the invoker. The handler
 opens a loading view at once with the command's trigger id (it expires after
-about three seconds), then `get_status_update_overview` in `service.py`
+about three seconds), then `get_status_update_overview` in `service/history.py`
 resolves the incident and reads its records. The view is updated to the
 overview: the pending draft with its origin line, rendered in English then
-French by the default comms profile (`comms_profile.py`), or a localized
+French by the default comms profile (`domain.py`), or a localized
 no-draft notice, then the approved updates; or to a localized error with a
 Close button (outside an incident channel, ambiguous incident, store failure).
 Opening never drafts. Strings live in

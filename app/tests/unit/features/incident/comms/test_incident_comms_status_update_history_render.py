@@ -18,11 +18,10 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import history
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, PublishedRecord
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, PublishedRecord
 from features.incident.comms.entrypoints.slack_views import build_profile_labels
-from features.incident.comms.history import (
+from features.incident.comms.service import publication
+from features.incident.comms.service.publication import (
     read_published,
     set_published,
     set_published_and_render,
@@ -73,7 +72,7 @@ def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
     status_updates.append(_APPROVED)
     status_updates.append(_DRAFT)
-    monkeypatch.setattr(history, "set_published", partial(set_published, now=_NOW))
+    monkeypatch.setattr(publication, "set_published", partial(set_published, now=_NOW))
     return status_updates
 
 

@@ -18,7 +18,7 @@ from structlog.testing import capture_logs
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateEdit
-from features.incident.comms.service import save_status_update_draft
+from features.incident.comms.service.draft import save_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,

@@ -10,7 +10,7 @@ from types import MappingProxyType
 
 import pytest
 
-from features.incident.comms.comms_profile import ProfileLabels, render_profile, render_profile_sections
+from features.incident.comms.domain import ProfileLabels, render_profile, render_profile_sections
 from features.incident.core.api import StatusUpdateStage, StatusUpdateText
 
 pytestmark = pytest.mark.unit

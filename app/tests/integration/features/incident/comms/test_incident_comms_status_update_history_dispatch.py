@@ -26,9 +26,8 @@ import pytest
 
 import features.incident.comms as comms_module
 from contracts.operations import OperationResult
-from features.incident.comms import history, providers
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText, StatusUpdateOverview
+from features.incident.comms import providers
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateOverview
 from features.incident.comms.entrypoints import slack as slack_entrypoints
 from features.incident.comms.entrypoints.slack_views import (
     HISTORY_ACTION_ID,
@@ -37,6 +36,7 @@ from features.incident.comms.entrypoints.slack_views import (
     build_overview_view,
     build_profile_labels,
 )
+from features.incident.comms.service import publication
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,
@@ -122,7 +122,7 @@ class ServiceFakes:
 @pytest.fixture
 def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
     service_fakes = ServiceFakes()
-    monkeypatch.setattr(history, "get_approved_update", service_fakes.get_approved_update)
+    monkeypatch.setattr(publication, "get_approved_update", service_fakes.get_approved_update)
     monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", service_fakes.get_status_update_overview)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: service_fakes)
     return service_fakes

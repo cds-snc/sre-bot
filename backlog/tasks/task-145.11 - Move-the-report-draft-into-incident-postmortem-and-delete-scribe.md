@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-06T20:16:00Z'
 labels:
   - incident
   - features
@@ -27,7 +27,7 @@ ordinal: 361000
 Layer D2 of TASK-145. Move: /sre incident draft becomes a postmortem use case and features/incident/scribe is deleted. The draft rules that TASK-145.6.1 moved unchanged into core's Google Docs adapter come back to postmortem in the same layer. The draft output does not change.
 
 THIS SLICE
-- scribe/service.py's draft path becomes postmortem/report.py (fill the report for review) with postmortem/prompt.py (section prompts and metadata rules), the draft settings slice, the incident_draft catalogue and the IncidentDocumentStore use through core's IncidentReport. The command registers under incident.postmortem. It calls the text-generation capability's structured fill (TASK-25.10, TASK-134) as scribe does before the move.
+- scribe/service.py's draft path becomes postmortem/service/report.py (fill the report for review) with postmortem/service/prompt.py (section prompts and metadata rules), the drafted-section rendering and the template profile in postmortem/domain.py (pure rules over postmortem types; layout table of 2026-11-06, feature-packages.md), the draft settings slice, the incident_draft catalogue and the IncidentDocumentStore use through core's IncidentReport. The command registers under incident.postmortem. It calls the text-generation capability's structured fill (TASK-25.10, TASK-134) as scribe does before the move.
 - The draft rules leave core/adapters/google_docs.py and move to postmortem (decided 2026-11-05, human; incident-management.md log). core keeps only what two or more subdomains use, and an adapter only translates.
   - postmortem renders the drafted sections into a neutral block body: headings, paragraphs, bullets and links. Rendering covers the model-text-to-lines step (_render_body_lines, _is_subheading, _strip_markdown), PR-reference linking (_PR_REFERENCE_PATTERN), the AI-draft banner text and the " - AI draft" title suffix, and the fix for values the model writes twice (_doubled_value_repairs, _halve_if_doubled).
   - The template facts become a template profile that postmortem passes as data: groups dropped when empty, labels styled as body text, metadata labels, and the guidance restored under named headings (_ENSURED_GUIDANCE). The profile is a postmortem constant until TASK-165's per-type document templates supply it.
@@ -36,6 +36,8 @@ THIS SLICE
 - Tests renamed test_incident_postmortem_report_*; mock patch strings rewritten.
 - features/incident/scribe/ is deleted: entry point "incident.scribe" removed from pyproject, any import-linter ignore entry naming scribe renamed to the module that now imports it (never added), the umbrella layers contract lists response | comms | postmortem above core above common, the umbrella README loses the scribe section.
 - The report draft is also offered when the status reaches Ready to be Reviewed: response raises the transition through an extension point in common/ and postmortem registers the reaction at startup; no subdomain imports the other. Omit this bullet if it pushes the slice over the size gate and open a follow-up.
+- The draft calls the core security guard (TASK-145.9) before the structured fill; a security incident needs the responder's confirmation (incident-management.md 2026-11-06).
+- Organisation wording leaves the prompt: the metadata options scribe hardcodes ("CDS Staff", "Other government department(s)", scribe/service.py:142) become data of the template profile, which TASK-165's per-type templates later supply (organisation-content.md, tolerated until this rebuild).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -46,6 +48,9 @@ THIS SLICE
 - [ ] #4 The draft command's behaviour and output are unchanged (existing tests pass under their new names)
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 core/adapters/google_docs.py holds no draft rules: body rendering, PR linking, banner and title text, the doubled-value fix and the template profile live in postmortem. IncidentReport.write_draft_copy takes a neutral block body and a template profile, and the draft output is unchanged
+- [ ] #7 The draft lives in postmortem/service/report.py and postmortem/service/prompt.py, rendering and the template profile in postmortem/domain.py; make check-package-shape passes with no new baseline entry
+- [ ] #8 /sre incident draft is refused for a security incident, or one whose flag cannot be read, until the responder confirms, through the core security guard
+- [ ] #9 No organisation wording remains in the postmortem prompt: the metadata options are template-profile data
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -93,6 +98,8 @@ A missed import breaks the draft command at boot; the lifespan test catches it. 
 2026-10-13 re-ground: the draft move keeps today's behaviour (fills the report document). Under the TASK-147 flag the draft writes proposals to the record instead (TASK-147.7), so the moved draft keeps its fill step behind a seam that slice can redirect.
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
+
+2026-11-06 (human, TASK-186 review): the plan's module names (postmortem/report.py, draft_rendering.py, prompt.py) are superseded by the 2026-11-06 layout table: postmortem/service/report.py, postmortem/service/prompt.py, rendering and the template profile in postmortem/domain.py. Scope gains the core security guard call and the organisation wording moving into the template profile (description and ACs updated); re-approve the plan at Stack M's pickup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

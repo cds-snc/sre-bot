@@ -1,7 +1,7 @@
 """Read one approved status update of an incident and mark it published or not.
 
-Platform-neutral use cases behind the status-updates modal's Open button and the
-copy-ready view's published toggle. The functions are async like the other
+Platform-neutral use cases behind opening an approved update and its published
+toggle. The functions are async like the other
 status-update use cases and call the synchronous core store inline. Reading
 writes nothing; the toggle's only write is one store transition. Nothing is
 posted anywhere. ``read_published`` and ``set_published_and_render`` also render
@@ -10,16 +10,15 @@ the record through the ``StatusPagePublisher`` as copy-ready text, in one call. 
 
 from dataclasses import replace
 from datetime import UTC, datetime
-from typing import Any
 
 import structlog
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import providers
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import PublishedRecord
-from features.incident.comms.ports import StatusPagePublisher
+from features.incident.comms.domain import ProfileLabels, PublishedRecord
+from features.incident.comms.interfaces import StatusPagePublisher
+from features.incident.comms.service._results import failure
 from features.incident.core.api import StatusUpdate, StatusUpdateState, StatusUpdateStore
 
 logger = structlog.get_logger()
@@ -87,7 +86,7 @@ async def set_published(
         log.info("incident_status_update_published_set")
         return OperationResult.success(data=changed)
     if moved.error_code != ErrorCode.STATUS_UPDATE_CONFLICT:
-        return _failure(moved)
+        return failure(moved)
 
     # One re-read, no retry loop: a concurrent writer that reached the target state is a success.
     reread = _read_approved(store, incident_id, sequence)
@@ -147,11 +146,11 @@ async def _render(
 ) -> OperationResult[PublishedRecord]:
     """Render a read or toggled record through the publisher; a failed ``read`` is passed on."""
     if not read.is_success or read.data is None:
-        return _failure(read)
+        return failure(read)
     publisher = publisher or providers.get_status_page_publisher()
     rendered = await publisher.publish(read.data, labels_en=labels_en, labels_fr=labels_fr)
     if not rendered.is_success or rendered.data is None:
-        return _failure(rendered)
+        return failure(rendered)
     return OperationResult.success(data=PublishedRecord(update=read.data, text=rendered.data))
 
 
@@ -159,7 +158,7 @@ def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) ->
     """Return the record at ``sequence`` when it is approved or published, read from the incident's list."""
     listed = store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
-        return _failure(listed)
+        return failure(listed)
     record = next((update for update in listed.data if update.sequence == sequence), None)
     if record is None:
         return OperationResult.permanent_error(
@@ -170,13 +169,3 @@ def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) ->
             message="The status update is not approved", error_code=ErrorCode.STATUS_UPDATE_NOT_APPROVED
         )
     return OperationResult.success(data=record)
-
-
-def _failure[T](result: OperationResult[Any]) -> OperationResult[T]:
-    """Carry an error result's classification over to another payload type."""
-    return OperationResult.error(
-        result.status,
-        message=result.message or "status update failed",
-        error_code=result.error_code,
-        retry_after=result.retry_after,
-    )

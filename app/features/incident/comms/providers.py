@@ -9,7 +9,7 @@ from functools import lru_cache
 
 from features.incident.comms.adapters.copy_ready import CopyReadyPublisher
 from features.incident.comms.adapters.text_generation import UnavailableTextGenerator, build_status_update_text_generator
-from features.incident.comms.ports import StatusPagePublisher, TextGenerator
+from features.incident.comms.interfaces import StatusPagePublisher, TextGenerator
 
 
 @lru_cache(maxsize=1)

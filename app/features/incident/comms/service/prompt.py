@@ -16,7 +16,7 @@ from features.incident.core.api import StatusUpdateStage, StatusUpdateText, Tran
 
 # A runaway field is cut rather than stored whole; a status update is a few sentences.
 MAX_FIELD_CHARS = 600
-# Reviewer guidance is a few sentences; matches the review modal input's max length.
+# Reviewer guidance is a few sentences; the form's instructions input caps at this length.
 MAX_INSTRUCTIONS_CHARS = 500
 
 _FIELDS = ("affected_service", "impact", "current_action", "workaround")

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-01 14:05
-updated_date: '2026-10-23T17:11:00Z'
+updated_date: '2026-11-06T20:10:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -48,4 +48,11 @@ TASK-145.11 (the report draft moves into incident/postmortem and scribe is delet
 - [ ] #3 The incident scribe service (features/incident/scribe/service.py) calls the capability operation and keeps only incident-specific logic (prompt text, timeline, metadata fields, pull-request links, document writing); its existing tests pass with assertions unchanged
 - [ ] #4 The capability's in-memory fake covers the new operation and is what the scribe draft service tests use
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
+- [ ] #6 comms' first-JSON-object extraction (features/incident/comms/service/prompt.py _first_object) uses the capability's generic parsing; comms keeps its strict rule (any partial or malformed answer is refused) and its tests pass unchanged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (human, TASK-186 review): both incident consumers of answer parsing move onto the capability (plugin-architecture.md, text generation is a capability), not only scribe.
+<!-- SECTION:NOTES:END -->

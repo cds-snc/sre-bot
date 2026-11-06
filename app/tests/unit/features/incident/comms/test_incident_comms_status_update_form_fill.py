@@ -20,15 +20,15 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import form
 from features.incident.comms.domain import (
     NoNewInformationWording,
     StatusUpdateDraftOutcome,
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
 )
-from features.incident.comms.form import fill_status_update_form
-from features.incident.comms.service import DRAFT_UNPARSEABLE_CODE
+from features.incident.comms.service import form
+from features.incident.comms.service.draft import DRAFT_UNPARSEABLE_CODE
+from features.incident.comms.service.form import fill_status_update_form
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     ConversationReference,

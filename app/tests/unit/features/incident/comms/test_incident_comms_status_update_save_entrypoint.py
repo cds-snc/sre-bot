@@ -25,7 +25,6 @@ import pytest
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import form
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack import handle_save_action, register
 from features.incident.comms.entrypoints.slack_views import (
@@ -34,6 +33,7 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_error_view,
     build_review_view,
 )
+from features.incident.comms.service import form
 from features.incident.core.api import (
     ConversationReference,
     IncidentStore,

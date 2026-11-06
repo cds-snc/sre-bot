@@ -17,7 +17,7 @@ import pytest
 
 from contracts.operations import OperationResult
 from features.incident.comms.domain import NoNewInformationWording, StatusUpdateEdit
-from features.incident.comms.service import generate_status_update_draft, start_status_update_draft
+from features.incident.comms.service.draft import generate_status_update_draft, start_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryStatusUpdateStore
 from features.incident.core.api import (
     StatusUpdate,

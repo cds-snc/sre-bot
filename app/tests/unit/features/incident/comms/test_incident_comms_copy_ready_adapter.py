@@ -13,11 +13,9 @@ import pytest
 from contracts.operations import OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.adapters.copy_ready import CopyReadyPublisher
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText
-from features.incident.comms.ports import StatusPagePublisher
+from features.incident.comms.domain import CopyReadyText, ProfileLabels, render_copy_ready
+from features.incident.comms.interfaces import StatusPagePublisher
 from features.incident.comms.providers import get_status_page_publisher
-from features.incident.comms.publisher import render_copy_ready
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateState, StatusUpdateText
 
 pytestmark = pytest.mark.unit

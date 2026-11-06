@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-06T19:47:00Z'
 labels:
   - clients
   - phase-3
@@ -68,3 +68,9 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 - [ ] #8 capabilities/text_generation/settings.py holds the default model; each feature use case passes its own output budget from its own settings (scribe's catch-up summary gains one, 3000 as today, so production sends the same); the port carries an optional per-call temperature, omitted when unset; decisions/configuration.md drops the generation-parameters tolerance
 - [ ] #9 The text-generation capability is created with make new-package (TASK-114.2); its README names its feature consumers; its enablement key sits in [plugins.incident_response] (one consuming area, product-scope.md 2026-11-06)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (TASK-186 review): settle at pickup whether comms' local TextGenerator (features/incident/comms/interfaces.py after TASK-186) is deleted in favour of the capability's api.py Protocol, as incident-management.md:128 implies, or kept behind comms/adapters/text_generation.py as AC #2 reads; reconcile the ADR line either way. comms keeps its status-update prompt (service/prompt.py after TASK-186).
+<!-- SECTION:NOTES:END -->

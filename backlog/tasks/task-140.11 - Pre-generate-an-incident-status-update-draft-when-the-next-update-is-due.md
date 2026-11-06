@@ -5,15 +5,15 @@ title: >-
   manual pause and resume
 status: To Do
 assignee: []
-created_date: '2026-10-07 18:52'
-updated_date: '2026-10-20 17:12'
+created_date: 2026-10-07 18:52
+updated_date: '2026-11-06T19:47:00Z'
 labels:
   - incident
 dependencies:
   - TASK-140.6
   - TASK-140.10
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1683'
+  - https://github.com/cds-snc/sre-bot/issues/1683
 parent_task_id: TASK-140
 priority: low
 type: feature
@@ -95,6 +95,8 @@ TASK-144.5 (2026-10-09) changed the services this task builds on; read the descr
 Re-ground at pickup (TASK-145.4): the status-update code is the comms subdomain, features/incident/comms/ (plugin incident.comms). scribe/status_update.py is comms/service.py; the form, approval, history and prompt modules are comms/{form,approval,history,prompt}.py; action ids are incident.comms.status_update.*.
 
 2026-10-14: TASK-152 grants <table arn>/index/* only for the audit trail, retry records and incidents tables; the GSI this task adds to sre_bot_incident_status_updates adds that table's index ARN to terraform/iam.tf in the same change. The store is on RecordStore after TASK-145.5.6, so the GSI is declared in its RecordTable.indexes with projection ALL (index reads return full items, TASK-145.5.4).
+
+2026-11-06: TASK-186 moves comms modules: service.py -> service/draft.py (overview -> service/history.py), history.py -> service/publication.py, approval/form/prompt -> service/, ports.py -> interfaces.py, comms_profile/publisher -> domain.py. Re-ground comms path and line references at pickup.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

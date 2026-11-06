@@ -27,7 +27,6 @@ import pytest
 
 import features.incident.comms as comms_module
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import form
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import (
     REVIEW_CALLBACK_ID,
@@ -35,7 +34,8 @@ from features.incident.comms.entrypoints.slack_views import (
     build_review_error_view,
     build_review_view,
 )
-from features.incident.comms.service import save_status_update_draft
+from features.incident.comms.service import form
+from features.incident.comms.service.draft import save_status_update_draft
 from features.incident.core.api import (
     StatusUpdate,
     StatusUpdateOrigin,

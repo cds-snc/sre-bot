@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from features.incident.comms import providers
-from features.incident.comms.service import text_generation_available
+from features.incident.comms.providers import text_generation_available
 
 pytestmark = pytest.mark.unit
 

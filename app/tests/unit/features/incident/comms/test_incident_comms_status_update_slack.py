@@ -7,6 +7,7 @@ status-update handler makes one service call and builds no domain value itself.
 """
 
 import ast
+import importlib.util
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -386,7 +387,9 @@ _STATUS_UPDATE_HANDLERS = (
 )
 # "About 30 lines": a long keyword-argument call laid out one argument per line counts each line.
 _MAX_HANDLER_LINES = 35
-_SERVICE_MODULES = frozenset(f"features.incident.comms.{name}" for name in ("approval", "form", "history", "service"))
+_SERVICE_MODULES = frozenset(
+    f"features.incident.comms.service.{name}" for name in ("approval", "form", "history", "publication", "draft")
+)
 
 
 def _entrypoint_tree() -> ast.Module:
@@ -426,6 +429,11 @@ class TestHandlerDiscipline:
         assert len(service_calls) == 1
         assert len(event_loops) <= 1
         assert lines <= _MAX_HANDLER_LINES
+
+    @pytest.mark.parametrize("module", sorted(_SERVICE_MODULES))
+    def test_each_listed_service_module_exists(self, module: str) -> None:
+        """A listed module that no longer exists would silently drop its calls from the one-call check."""
+        assert importlib.util.find_spec(module) is not None
 
     def test_entry_point_imports_no_domain_constructor_or_replace(self) -> None:
         """Kept drafts are built by the service, so the entry point needs neither the domain types nor ``replace``."""

@@ -7,8 +7,7 @@ adapters, so both import them from here rather than from each other.
 from typing import Protocol, runtime_checkable
 
 from contracts.operations import OperationResult
-from features.incident.comms.comms_profile import ProfileLabels
-from features.incident.comms.domain import CopyReadyText
+from features.incident.comms.domain import CopyReadyText, ProfileLabels
 from features.incident.core.api import StatusUpdate
 
 

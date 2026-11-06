@@ -33,7 +33,7 @@ app/features/<feature>/
 ├── hookspecs.py       # capabilities only: the extension points it owns (optional)
 ├── service.py         # business logic; the only orchestrator
 ├── interfaces.py      # the Protocols service.py depends on, implemented in adapters/ (optional)
-├── domain.py          # frozen dataclasses, enums, invariants (optional)
+├── domain.py          # frozen dataclasses, enums, invariants and pure rules over them (optional)
 ├── schemas.py         # Pydantic models at trust boundaries (optional)
 ├── store.py           # persistence through the records contract (optional)
 ├── providers.py       # local wiring: builds services from registry-provided contracts (optional)
@@ -43,7 +43,7 @@ app/features/<feature>/
 └── locales/           # EN/FR catalogues (see i18n.md)
 ```
 
-A package's `__init__.py` declares each vendor or capability it cannot run without in a `register_requirements` hookimpl that returns `Requirement` values, and declares none it uses optionally ([plugins.md](plugins.md)); the generator's template includes the hook, returning an empty list. `service.py` and `domain.py` may each grow into a package of the same name (`service/`, `domain/`) when one module no longer reads well, as Django lets `models.py` become `models/`; nothing else gains a sibling module. A package generator (`make new-package`) creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
+A package's `__init__.py` declares each vendor or capability it cannot run without in a `register_requirements` hookimpl that returns `Requirement` values, and declares none it uses optionally ([plugins.md](plugins.md)); the generator's template includes the hook, returning an empty list. `service.py` and `domain.py` may each grow into a package of the same name (`service/`, `domain/`) when one module no longer reads well, as Django lets `models.py` become `models/`; nothing else gains a sibling module. A `service/` package holds one module per use case, named in the domain's words as rule 2 names subdomains (`incident/comms`: `draft`, `form`, `approval`, `publication`, `history`), and keeps the helpers they share private inside it; its `__init__.py` re-exports nothing. A pure rule several adapters or surfaces apply, such as rendering a status update through a comms profile, lives in `domain.py`, never inside one adapter: adapters do not import each other. A package generator (`make new-package`) creates new packages in this shape. A CI shape check rejects any top-level name outside the table; the table grows by amending this record. A complex feature holds subdomains, each shaped like the table above.
 
 ### Complex features: an umbrella directory, never a flat prefix
 
@@ -137,3 +137,4 @@ Tolerated until then:
 - 2026-11-06: the layout table gains `interfaces.py` (a package's own Protocols; `ports.py` was the drift) and `plugin.py` (per plugins.md 2026-11-04); `service.py` and `domain.py` may grow into packages; the shape check (TASK-114.1) also enforces the umbrella and dotted-name rules, with a ratcheting baseline (TASK-114 planning, human).
 - 2026-11-06: the generator (`make new-package`) creates a feature, capability, umbrella, subdomain, `core/` or `common/` in this shape, with its entry point, protected-plugins and independence or umbrella contract entries and its enablement key; a capability takes its classification and at least one existing feature consumer, so it passes the shape check from the start (TASK-114.2).
 - 2026-11-06: `make new-package ARGS="promote <feature> --subdomain <name>"` turns a flat feature into an umbrella in place, keeping its name: its code becomes the first subdomain, `settings.py` moves to `common/` with its table and environment names unchanged, references are rewritten, and the entry point and enablement keys become `<feature>.<subdomain>`; generated `core/` and `common/` get a README (TASK-114.2).
+- 2026-11-06: a `service/` package splits one module per use case in the domain's words with private shared helpers and no re-exports; `domain.py` also holds pure rules over its types, and a pure rule several adapters apply lives there, never in one adapter (TASK-186, which reshaped `incident/comms` into the table and removed its package-shape baseline entries).

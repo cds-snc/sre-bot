@@ -1,16 +1,31 @@
-"""Domain values for the incident comms use case: public status updates.
+"""Domain values and rules for the incident comms use case: public status updates.
 
 Frozen, platform-neutral dataclasses shared by the services, the publisher and
-the platform adapters. This module depends only on the stdlib and the incident
+the platform adapters, and the default comms profile: how a status update
+reads as public text. This module depends only on the stdlib and the incident
 core's public types.
+
+The profile is modelled on GC Notify's published incident history. It shows
+the stage, affected service, impact, current action, workaround and, unless
+the incident is resolved, the next update time in America/Toronto as
+``YYYY-MM-DD HH:MM`` followed by the language's zone suffix (ET or HE).
+Rendering is pure: the caller supplies already-localized labels, so this
+module has no translation lookups and no platform SDK. The copy-ready text
+and every status page publisher render through ``render_copy_ready`` so they
+cannot drift.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
+from zoneinfo import ZoneInfo
 
 from features.incident.core.api import StatusUpdate, StatusUpdateStage, StatusUpdateText
 
 _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
+_PROFILE_ZONE = ZoneInfo("America/Toronto")
+_TIME_FORMAT = "%Y-%m-%d %H:%M"
 
 
 class StatusUpdateOutcomeKind(StrEnum):
@@ -88,7 +103,7 @@ class CopyReadyText:
 
 @dataclass(frozen=True)
 class StatusUpdateOverview:
-    """An incident's status updates as the modal lists them.
+    """An incident's status updates as the form lists them.
 
     Attributes:
         pending: The latest record when it is a draft, else ``None``.
@@ -122,7 +137,91 @@ class StatusUpdateFormState:
 
 @dataclass(frozen=True)
 class PublishedRecord:
-    """An approved status update with its copy-ready text, as the copy-ready view shows it."""
+    """An approved status update with its copy-ready text, as the copy-ready text shows it."""
 
     update: StatusUpdate
     text: CopyReadyText
+
+
+@dataclass(frozen=True)
+class ProfileLabels:
+    """The localized labels of one language's rendered profile.
+
+    Attributes:
+        stage: Label of the stage line.
+        affected_service: Label of the affected service line.
+        impact: Label of the impact line.
+        current_action: Label of the current action line.
+        workaround: Label of the workaround line.
+        next_update: Label of the next update line.
+        time_suffix: Zone suffix after the time (ET in English, HE in French).
+        stage_names: Display name of each stage.
+    """
+
+    stage: str
+    affected_service: str
+    impact: str
+    current_action: str
+    workaround: str
+    next_update: str
+    time_suffix: str
+    stage_names: Mapping[StatusUpdateStage, str]
+
+
+def format_profile_time(moment: datetime, labels: ProfileLabels) -> str:
+    """Return ``moment`` as ``YYYY-MM-DD HH:MM`` in America/Toronto followed by the language's zone suffix."""
+    return f"{moment.astimezone(_PROFILE_ZONE).strftime(_TIME_FORMAT)} {labels.time_suffix}"
+
+
+def render_profile_sections(
+    text: StatusUpdateText,
+    stage: StatusUpdateStage,
+    next_update_at: datetime,
+    labels: ProfileLabels,
+) -> tuple[str, ...]:
+    """Return one language of a status update as ``Label: value`` lines, one per field.
+
+    Args:
+        text: The update's fields in this language.
+        stage: The update's stage.
+        next_update_at: When the next update is due; timezone-aware.
+        labels: The language's labels and zone suffix.
+
+    Returns:
+        The lines in order: stage, affected service, impact, current action,
+        workaround, then the next update time. A resolved incident has no
+        next update, so that line is left out.
+    """
+    lines = [
+        f"{labels.stage}: {labels.stage_names[stage]}",
+        f"{labels.affected_service}: {text.affected_service}",
+        f"{labels.impact}: {text.impact}",
+        f"{labels.current_action}: {text.current_action}",
+        f"{labels.workaround}: {text.workaround}",
+    ]
+    if stage is not StatusUpdateStage.RESOLVED:
+        lines.append(f"{labels.next_update}: {format_profile_time(next_update_at, labels)}")
+    return tuple(lines)
+
+
+def render_profile(
+    text: StatusUpdateText,
+    stage: StatusUpdateStage,
+    next_update_at: datetime,
+    labels: ProfileLabels,
+) -> str:
+    """Render one language of a status update, the lines of ``render_profile_sections`` one per row."""
+    return "\n".join(render_profile_sections(text, stage, next_update_at, labels))
+
+
+def render_copy_ready(update: StatusUpdate, labels_en: ProfileLabels, labels_fr: ProfileLabels) -> CopyReadyText:
+    """Return the update's English and French text, label lines separated by a blank line.
+
+    Args:
+        update: The update; its stored ``next_update_at`` is rendered.
+        labels_en: English labels and zone suffix.
+        labels_fr: French labels and zone suffix.
+    """
+    en = render_profile_sections(update.en, update.stage, update.next_update_at, labels_en)
+    fr = render_profile_sections(update.fr, update.stage, update.next_update_at, labels_fr)
+    return CopyReadyText(en="\n\n".join(en), fr="\n\n".join(fr))

@@ -3,8 +3,7 @@
 ``get_status_update_overview`` resolves the conversation to its incident with
 one incident-store read, lists the incident's records once, and returns the latest record as
 the pending draft when it is a draft, beside every approved or published record
-newest first. ``get_pending_status_update`` returns the overview's pending
-draft, so its results are unchanged.
+newest first.
 
 The store is the core's ``InMemoryStatusUpdateStore`` behind a counting wrapper
 and the incident store is an ``InMemoryIncidentStore`` holding one incident on
@@ -22,7 +21,7 @@ import pytest
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateOverview
-from features.incident.comms.service import get_pending_status_update, get_status_update_overview
+from features.incident.comms.service.history import get_status_update_overview
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
     ConversationReference,
@@ -213,46 +212,6 @@ class TestOverviewErrors:
     def test_store_error_is_returned_with_its_classification(self) -> None:
         """A failed list read is returned with its status, code and retry hint."""
         result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
-
-        assert (result.status, result.error_code, result.retry_after) == (
-            OperationStatus.TRANSIENT_ERROR,
-            ErrorCode.RATE_LIMITED,
-            3,
-        )
-
-
-class TestPendingDelegates:
-    @pytest.mark.parametrize(
-        "states",
-        [
-            (StatusUpdateState.APPROVED, StatusUpdateState.DRAFT),
-            (StatusUpdateState.PUBLISHED, StatusUpdateState.APPROVED),
-            (),
-        ],
-        ids=["latest-draft", "latest-approved", "empty"],
-    )
-    def test_pending_equals_the_overview_pending(self, states: tuple[StatusUpdateState, ...]) -> None:
-        """The pending read returns exactly the overview's pending draft for the same records."""
-        records = [_update(index, state) for index, state in enumerate(states, start=1)]
-
-        pending = get_pending_status_update(_CountingIncidents(), _CONVERSATION, store=_CountingStore(*records))
-        overview = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_CountingStore(*records))
-
-        assert overview.data is not None
-        assert (pending.status, pending.data) == (OperationStatus.SUCCESS, overview.data.pending)
-
-    def test_pending_read_lists_once(self) -> None:
-        """The pending read still resolves once and lists once."""
-        incidents = _CountingIncidents()
-        store = _CountingStore(_update(1, StatusUpdateState.DRAFT))
-
-        get_pending_status_update(incidents, _CONVERSATION, store=store)
-
-        assert (incidents.calls, store.list_calls) == ([_CONVERSATION], [_INCIDENT])
-
-    def test_pending_read_keeps_the_store_error(self) -> None:
-        """The pending read returns the store's classified error as before."""
-        result = get_pending_status_update(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,

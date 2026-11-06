@@ -13,7 +13,7 @@ import json
 import pytest
 
 from features.incident.comms.domain import StatusUpdateEdit
-from features.incident.comms.prompt import (
+from features.incident.comms.service.prompt import (
     INSTRUCTIONS,
     MAX_INSTRUCTIONS_CHARS,
     build_redraft_input,
