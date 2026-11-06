@@ -213,10 +213,10 @@ build-backend = "hatchling.build"
 dev = [
     "ruff==0.17.1",
     "mypy==2.4.0",
-    "pytest==9.1.1",
+    "pytest==9.2.0",
     "pytest-asyncio==1.4.0",
     "pytest-env==1.8.1",
-    "coverage==7.16.2",
+    "coverage==7.17.0",
     "pytest-cov==7.1.0",
     "freezegun==1.5.5",
     "requests-mock==1.12.1",
