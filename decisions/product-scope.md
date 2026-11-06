@@ -24,6 +24,8 @@ The bot was named for site reliability engineering and the root README described
 | Platform access | `access` umbrella, AWS Identity Center, Google Workspace provisioning |
 | Workplace utilities | `talent`, ATIP, `secret`, `geolocate`, `rant` |
 
+A capability belongs to the area of its consumers; one used by two or more areas is shared and is switched on its own, not by an area ([plugins.md](plugins.md)).
+
 **An area leaves for an app of its own only when one of three things is true**: a different team owns it, it needs a different release cadence, or it needs a different trust boundary that enablement, its own service account ([service-accounts.md](service-accounts.md)) and its own settings slice cannot provide. None holds today. Talent and ATIP handle personal information about candidates and requesters; their own service accounts, settings slices and enablement keys are the mitigation until an owner outside the team appears.
 
 **Rejected: a second app now.** It would buy independent releases, blast radius and ownership that no one needs yet, and cost a second CI pipeline, deploy, Slack app and command prefix, secrets set, observability stack, dependency stream and decision corpus.
@@ -46,3 +48,4 @@ The bot was named for site reliability engineering and the root README described
 - 2026-10-26: the bot is built as a framework another organisation can adopt; organisation-specific content stays out of the code, its pattern decided by TASK-167 (human).
 - 2026-10-26: end state recorded: the app repository holds only app code; each organisation configures and deploys its instance from its own deployment repository (configuration files, organisation content, deployment code); not scheduled, the refactor comes first (human).
 - 2026-10-28: organisation content's pattern is [organisation-content.md](organisation-content.md) (TASK-167; Accepted 2026-10-28).
+- 2026-11-06: a capability used by two or more areas is shared, with its enablement key in `[plugins.shared]` (TASK-114 planning, human).

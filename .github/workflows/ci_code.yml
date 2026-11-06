@@ -68,6 +68,10 @@ jobs:
         working-directory: ./app
         run: make check-settings-key-ownership
 
+      - name: Package shape check
+        working-directory: ./app
+        run: make check-package-shape
+
       - name: Test
         working-directory: ./app
         run: make test

@@ -5,8 +5,8 @@ title: >-
   app/capabilities/approvals/ capability
 status: To Do
 assignee: []
-created_date: '2026-07-28 14:33'
-updated_date: '2026-10-13 13:42'
+created_date: 2026-07-28 14:33
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -21,10 +21,10 @@ dependencies:
   - TASK-109
   - TASK-110
   - TASK-113
-  - TASK-114
+  - TASK-114.2
 references:
   - decisions/approvals.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1368'
+  - https://github.com/cds-snc/sre-bot/issues/1368
   - decisions/plugin-architecture.md
 priority: high
 ordinal: 90000

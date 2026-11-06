@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-10-28T14:15:00Z'
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -15,7 +15,7 @@ milestone: m-7
 dependencies:
   - TASK-106
   - TASK-110
-  - TASK-114
+  - TASK-114.2
 references:
   - decisions/workplace-systems.md
   - decisions/plugin-architecture.md

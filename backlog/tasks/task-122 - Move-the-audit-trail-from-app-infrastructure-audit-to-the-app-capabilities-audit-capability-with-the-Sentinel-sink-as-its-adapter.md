@@ -5,8 +5,8 @@ title: >-
   app/capabilities/audit/ capability, with the Sentinel sink as its adapter
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:00'
-updated_date: '2026-10-15 17:49'
+created_date: 2026-09-24 20:00
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -16,12 +16,12 @@ dependencies:
   - TASK-106
   - TASK-108
   - TASK-109
-  - TASK-114
+  - TASK-114.2
 references:
   - decisions/plugin-architecture.md
   - decisions/cloud-portability.md
   - decisions/observability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1665'
+  - https://github.com/cds-snc/sre-bot/issues/1665
 priority: medium
 type: task
 ordinal: 264000
@@ -46,4 +46,5 @@ The Sentinel sink moves out of integrations/sentinel into this capability's adap
 - [ ] #3 app/infrastructure/audit/ is deleted with no re-export; grep finds no import of the old path
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #5 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the AuditTrailService line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
+- [ ] #6 If no earlier cross-area capability built it, this task adds the [plugins.shared] enablement table (plugins.md, product-scope.md, 2026-11-06) and puts the audit capability's key there
 <!-- AC:END -->

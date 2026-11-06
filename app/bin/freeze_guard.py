@@ -18,7 +18,9 @@ module constant or a global, so a test can point a guard at a throwaway tree by
 monkeypatching that guard's constants alone.
 
 Consumers: check_sdk_typing.py, check_vendor_package_contract.py,
-check_aws_platform_seam.py and check_fake_coverage.py use all three.
+check_aws_platform_seam.py and check_fake_coverage.py use all three;
+check_package_shape.py walks directories, not files, and uses the baseline
+and the report.
 check_runtime_imports.py uses the walker only -- it deliberately has no
 baseline, because the tree it guards is clean and any violation is net-new.
 

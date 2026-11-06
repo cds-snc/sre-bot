@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-03T19:00:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - identity
 dependencies:
@@ -16,7 +16,7 @@ dependencies:
   - TASK-108
   - TASK-109
   - TASK-110
-  - TASK-114
+  - TASK-114.2
   - TASK-122
 references:
   - decisions/people-and-accounts.md
@@ -54,6 +54,7 @@ Nothing consumes it yet, so it can merge without changing behavior.
 - [ ] #6 The capability is declared by an entry point with an enablement key, registers at startup without import-time side effects, persists only through the records contract from the registry, and no feature imports it yet
 - [ ] #7 Full test suite, ruff, mypy and lint-imports pass
 - [ ] #8 A Person can be a merged_into tombstone that resolves to its survivor; provenance includes verified
+- [ ] #9 The README names its first feature consumer task (TASK-165.2 or TASK-83.9) and app/bin/baselines/package_shape.txt holds the capability's readme-consumers entry naming it (plugin-architecture.md capability test 1, amended 2026-11-06); its enablement key goes in [plugins.shared], which this task builds if no earlier cross-area capability did (plugins.md, product-scope.md, 2026-11-06)
 <!-- AC:END -->
 
 ## Implementation Notes

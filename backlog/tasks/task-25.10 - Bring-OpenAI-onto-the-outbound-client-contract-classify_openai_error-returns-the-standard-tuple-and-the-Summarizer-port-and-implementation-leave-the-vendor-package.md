@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-10-27T18:58:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - clients
   - phase-3
@@ -15,7 +15,7 @@ milestone: m-3
 dependencies:
   - TASK-106
   - TASK-110
-  - TASK-114
+  - TASK-114.2
 references:
   - decisions/outbound-clients.md
   - decisions/sdk-typing.md
@@ -66,4 +66,5 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 - [ ] #6 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages
 - [ ] #7 integrations/openai/settings.py holds the connection only: [openai] timeout_seconds (plus the retry policy of AC #3) and [openai.tenant] base_url, with OPENAI__API_KEY; max_output_tokens, temperature and the tenant's model are gone from the vendor slice, and production.toml and local.toml move model to the capability's table in the same PR
 - [ ] #8 capabilities/text_generation/settings.py holds the default model; each feature use case passes its own output budget from its own settings (scribe's catch-up summary gains one, 3000 as today, so production sends the same); the port carries an optional per-call temperature, omitted when unset; decisions/configuration.md drops the generation-parameters tolerance
+- [ ] #9 The text-generation capability is created with make new-package (TASK-114.2); its README names its feature consumers; its enablement key sits in [plugins.incident_response] (one consuming area, product-scope.md 2026-11-06)
 <!-- AC:END -->

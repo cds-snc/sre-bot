@@ -5,8 +5,8 @@ title: >-
   the access 'no approvers found' operator alert
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:07'
-updated_date: '2026-10-15 17:49'
+created_date: 2026-09-24 20:07
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -16,13 +16,13 @@ dependencies:
   - TASK-106
   - TASK-109
   - TASK-110
-  - TASK-114
+  - TASK-114.2
   - TASK-26.1
 references:
   - decisions/plugin-architecture.md
   - decisions/platform-entrypoints.md
   - decisions/cloud-portability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1671'
+  - https://github.com/cds-snc/sre-bot/issues/1671
 priority: medium
 type: feature
 ordinal: 273000

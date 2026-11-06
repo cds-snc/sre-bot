@@ -3,8 +3,8 @@ id: TASK-83.9
 title: Compare person-based retro attendees with Slack profile emails in shadow mode
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 17:47'
+created_date: 2026-09-10 16:18
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - identity
 dependencies:
@@ -12,7 +12,7 @@ dependencies:
   - TASK-145
 references:
   - app/modules/incident/schedule_retro.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1633'
+  - https://github.com/cds-snc/sre-bot/issues/1633
 parent_task_id: TASK-83
 priority: medium
 ordinal: 176000
@@ -32,4 +32,5 @@ modules/incident/schedule_retro.py resolves retro attendees from Slack profile e
 - [ ] #2 Differences (unlinked attendees, different addresses) are logged per retro with person and account ids, never emails
 - [ ] #3 A setting disables the comparison
 - [ ] #4 Existing retro scheduling tests stay green, and new tests cover linked, unlinked and mixed attendees
+- [ ] #5 If app/bin/baselines/package_shape.txt still holds the people capability's readme-consumers entry, it is deleted and the capability README names this consumer
 <!-- AC:END -->

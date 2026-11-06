@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T00:14:00Z'
+updated_date: '2026-11-06T03:00:00Z'
 labels:
   - incident
   - features
@@ -45,6 +45,7 @@ THIS SLICE
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #6 incident.postmortem reads the retrospective calendar id from [incident_postmortem] calendar_id (features/incident/postmortem/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #7 Meeting scheduling comes from the incident-owned features/incident/scheduling and features/incident/meet over integrations/google_workspace, not a calendar capability (TASK-138 superseded by TASK-169 ruling, 2026-11-05 (human))
+- [ ] #8 features/incident/scheduling/availability.py takes a layout-table name (scheduling/service.py or domain.py, or core/ under feature-packages.md rule 4), and its app/bin/baselines/package_shape.txt entry is deleted
 <!-- AC:END -->
 
 ## Implementation Plan

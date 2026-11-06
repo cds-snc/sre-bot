@@ -4,7 +4,7 @@ title: E4 Coordination foundations
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-04T16:45:00Z'
+updated_date: '2026-11-06T02:59:00Z'
 labels:
   - incident
 milestone: m-7
@@ -38,4 +38,5 @@ The coordination ADR records the work model proposed in large-scale-incident-ana
 - [ ] #7 decisions/incident-coordination.md records D35–D38 (findings as optional records with an external reference and never a register, per-repository progress on action items, where action items live with the root incident id, incident-wide embargo with tracked disclosure dates) and adds no task or action-item record type beside the core/ one.
 - [ ] #8 The approved task plan retains a human-reviewed six-scenario cardinality matrix (CVE, credentials, platform outage, vendor, privacy, VDP/pentest report), including many issues across many teams/repositories and products with no repository. The ADR records ownership, lifecycle and visibility invariants; exhaustive field lists stay in plans/code. Behavioral tests cover the foundation cases introduced here, with later cases assigned to their owning epics.
 - [ ] #9 The incident API distinguishes explicitly extensible classification/display values from closed lifecycle and authorization values. Contract tests preserve existing records/responses, reject unsupported commands and transitions, and never grant access for unknown values. Unknown read classifications must remain visibly unknown, not become success states; surface tasks inherit that compatibility requirement.
+- [ ] #10 If app/bin/baselines/package_shape.txt still holds the people capability's readme-consumers entry, it is deleted and the capability README names this consumer
 <!-- AC:END -->

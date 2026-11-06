@@ -3,8 +3,8 @@ id: TASK-37.1
 title: 'Webhooks slice 1: Webhook domain model + RecordStore-backed store'
 status: To Do
 assignee: []
-created_date: '2026-07-28 18:39'
-updated_date: '2026-10-20 17:51'
+created_date: 2026-07-28 18:39
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - migration
   - webhooks
@@ -17,11 +17,11 @@ dependencies:
   - TASK-27.5
   - TASK-108
   - TASK-109
-  - TASK-114
+  - TASK-114.2
 references:
   - decisions/webhooks.md
   - decisions/feature-packages.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1376'
+  - https://github.com/cds-snc/sre-bot/issues/1376
   - decisions/plugin-architecture.md
 parent_task_id: TASK-37
 priority: high

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-10-28T16:50:00Z'
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - migration
   - phase-5
@@ -17,7 +17,7 @@ dependencies:
   - TASK-39
   - TASK-35
   - TASK-26.1
-  - TASK-114
+  - TASK-114.2
   - TASK-118
 references:
   - decisions/migration.md

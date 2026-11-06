@@ -3,8 +3,8 @@ id: TASK-124.3
 title: Move packages/rant to app/features/rant/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:01'
-updated_date: '2026-10-20 23:28'
+created_date: 2026-09-24 20:01
+updated_date: '2026-11-06T02:58:00Z'
 labels:
   - plugin-architecture
   - features
@@ -12,13 +12,13 @@ milestone: m-7
 dependencies:
   - TASK-109
   - TASK-110
-  - TASK-114
+  - TASK-114.1
   - TASK-25.4
   - TASK-26.1
 references:
   - decisions/feature-packages.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1668'
+  - https://github.com/cds-snc/sre-bot/issues/1668
 parent_task_id: TASK-124
 priority: medium
 type: task
