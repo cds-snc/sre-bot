@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T01:16:00Z'
+updated_date: '2026-11-06T19:24:00Z'
 labels:
   - incident
   - features
@@ -26,7 +26,7 @@ ordinal: 358000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer C2 of TASK-145. Rebuilds the /sre incident subcommands and interactions that read and change an incident: status, the information display and update modals, roles, the folder-metadata interactions over ProductCatalog, archive, the confirm step and the recreate-missing-resources path.
+Layer C2 of TASK-145. Rebuilds the /sre incident subcommands and interactions that read and change an incident: status, the information display and update modals, roles, archive and the recreate-missing-resources path.
 
 RULES
 - Every command resolves its incident through find_incident_for_conversation; only operations that write to the conversation call conversation_is_writable. A status, severity, timing or report update on an incident whose channel is archived succeeds and reports that the channel message was skipped.
@@ -41,6 +41,8 @@ RULES
 - security_incident (bool) is editable by the coordinator from the update modal. Whether a flip triggers actions (true at declare invites the security group) is decided at planning.
 - Parity rebuild: close keeps today's behaviour (closes all resources and archives the channel). The status lifecycle and close redesign is a separate task, TASK-154.
 - Legacy registrations removed in the same PR; names, fields and replies unchanged apart from the three added role pickers, pinned by TASK-36.1.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ2, human-approved): the folder-metadata interactions and the products subcommand are not rebuilt: incident-management.md (2026-11-04, 2026-11-05) builds no ProductCatalog over Drive folders; the product's on-call schedule reference moves to the bot's own product list (TASK-165.1 import, TASK-146.3) and the legacy editor is deleted by TASK-145.13. confirm_click is the retro modal's button and belongs to TASK-145.10. Rebuilt modal-internal ids take the incident.response prefix; archive_channel, on stale-channel nudges already posted, keeps a registered legacy alias until TASK-145.13 (decisions/transport-slack.md).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -54,12 +56,13 @@ RULES
 - [ ] #7 Writes in the end-state shape set record_version = RECORD_VERSION from core/store.py; reopen sets open_bucket and opened_at and Closed removes them in one update; an item without record_version is never stamped by a partial update (tested)
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 IncidentReport gains set_status_text(ReportReference, status) in core/api.py with its Google Docs adapter and fake (parity test); the legacy status mapping in modules/incident/incident_document.py (lines 55-80 at main 5deb8406) moves into core/adapters/google_docs.py and the legacy caller is repointed or deleted
+- [ ] #10 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; re-ground at pickup (after TASK-145.7). SIZE GATE: proposed split into TASK-145.8.1 (status, severity, show and update fields; IncidentStore.update_field) and TASK-145.8.2 (five roles, archive and confirm, folder metadata, recreate missing resources, list), human decision before implementation.
+Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; re-ground at pickup (after TASK-145.7). SIZE GATE: proposed split into TASK-145.8.1 (status, severity, show and update fields; IncidentStore.update_field) and TASK-145.8.2 (five roles, archive, recreate missing resources, list), human decision before implementation.
 
 ## Discovered state
 - modules/incident/incident_helper.py (720): /sre incident dispatcher handle_incident_command (198-437: help, create, close, show, list, schedule, channels, products, status, roles, updates pointer); registrations 151-167 (add_folder_metadata, view_folder_metadata, view_folder_metadata_modal, add_metadata_view, delete_folder_metadata, view_save_incident_roles, view_save_event, confirm_click, user_select_action, archive_channel, reactions, update_incident_field, update_field_modal); modules/sre/platforms/slack.py:16 routes /sre incident to it. incident_status.py (81): update_status, posts to channel (70). information_display.py (183): incident_information_view modal. information_update.py (330): update_field_modal and field views, posts (50, 264). incident_roles.py (145): save_incident_roles, Drive metadata ic_id/ol_id (20-21), posts (13). incident_conversation.archive_channel_action (433). incident_folder.py: metadata and sheet status update (314-328). db_operations.update_incident_field (121, list_append for activities). tests/modules/incident/test_recreate_missing_resources.py covers the recreate path.
@@ -68,7 +71,7 @@ Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; r
 ## Steps
 1. core/store.py: update_field(incident_id, field, value, *, expected=None) atomic, no read-modify-write; fake.
 2. response/service.py: set_status (record, report status text, projection status cell, channel post when writable), set_severity, update_field (timing fields and text), show (every link rendered from references through the owning adapter), set_roles (five roles on the record; channel purpose footer kept; Drive properties no longer written), archive (writability check, archive through IncidentConversation, record status), recreate_missing_resources (fill empty references through the declare steps), list (store).
-3. response/entrypoints: the subcommands status, show, roles, list, archive, products, channels under sre.incident; the information modal, update-field modal, roles modal (five pickers, IC and OL required), folder-metadata interactions, confirm_click; each one service call. Views in slack_views.py; keys in locales.
+3. response/entrypoints: the subcommands status, show, roles, list, archive, channels under sre.incident; the information modal, update-field modal, roles modal (five pickers, IC and OL required); each one service call. products and the folder-metadata interactions are retired (TASK-165.1, TASK-146.3, deleted by TASK-145.13); confirm_click is TASK-145.10's. Views in slack_views.py; keys in locales.
 4. Legacy: the matching subcommands and registrations removed from incident_helper.py, incident_status.py, information_display.py, information_update.py, incident_roles.py in the same PR; pinned by TASK-36.1. modules/sre keeps routing only what remains.
 
 ## AC traceability
@@ -79,7 +82,7 @@ Status change: each fan-out step failing independently; archived channel. Severi
 
 ## Assumptions and doubts
 - The five-role picker is the only visible change; the handbook-style names come from common/vocabulary.
-- Folder metadata stays a ProductCatalog concern through the Drive adapter until products become records (DRAFT-2).
+- Folder metadata is not rebuilt (2026-11-06): no ProductCatalog over Drive folders (incident-management.md 2026-11-04); TASK-165.1 imports each folder's genie_schedule into the bot's product list.
 
 ## Size
 Over the gate as one task (~800 lines); each half about 400.
@@ -94,6 +97,8 @@ Each subcommand's legacy registration is removed with its rebuild; a revert rest
 2026-11-04 (TASK-145.5.7 planning, human approved): the TASK-145.5.7 upgrade job writes each legacy item in one update guarded on record_version absent plus every scalar attribute the bridge read, at its read value (status, name, user_id, created_at, security_incident, channel_id, report_url, meet_url, severity, the legacy times, incident_commander, operations_lead) and each end-state attribute it sets as read. Whatever this task decides for a partial update of an item without record_version must keep that guard meaningful: a write here that changes one of those attributes makes the job's write lose (guard_lost), never be overwritten by it.
 
 2026-11-05 (human, TASK-145.6.2 C1): IncidentReport ships in 145.6.2 without set_status_text; this task adds it when it rebuilds the status surface (rule: status fans out to the report's status text) and moves the legacy status mapping from incident_document.py then. The ADR's end surface (decisions/incident-management.md) is unchanged.
+
+2026-11-06 (TASK-36.1.2 pins): legacy bugs pinned as is, to rule in this plan: /sre incident products answers Unknown command (dispatcher key product, help text products); archive sends incident_channel_archived to Sentinel twice (close_incident and archive_channel_action); a refused archive in a non-incident channel still sends it; re-saving roles with no roles line in the purpose leaves a doubled newline. The pins' one internal seam, legacy_sre_web_client_seam, is deleted here.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

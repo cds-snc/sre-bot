@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-11-06T02:58:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - migration
   - phase-5
@@ -75,6 +75,8 @@ Targets:
 2026-10-28 (TASK-111.14): the ATIP announce channel was hard-coded (C033L7RGCT0) in modules/atip/atip.py; it now reads [atip] announce_channel_id from modules/atip/settings.py. The rebuild moves that slice to features/atip with the module and adds the Trello board id to the same table.
 
 2026-10-28 (found in TASK-111.14): modules/secret/secret.py:58,64 write the encrypted-message service host (https://encrypted-message.cdssandbox.xyz) in code; the secret rebuild reads it from its slice's table (deployment configuration, production.toml).
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

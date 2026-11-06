@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-05T00:43:00Z'
+updated_date: '2026-11-06T19:04:00Z'
 labels:
   - incident
 milestone: m-7
 dependencies:
-  - TASK-145
+  - TASK-145.6
 references:
   - .claude/skills/domain-model-evolution/SKILL.md
 parent_task_id: TASK-165
@@ -33,12 +33,15 @@ The bot must run standalone: its product catalogue's default source is a product
 - [ ] #4 The approved task plan retains the reviewed scenario/cardinality matrix from the domain-model-evolution skill: multiple repositories per product, shared dependencies, missing owners and products without repositories. The ADR records ownership and relationship invariants, with contractual fields only; tests cover the catalogue behavior introduced here.
 - [ ] #5 A ProductCatalog contract with a default adapter over the bot's own product list provides products, owner-group identifiers, repositories for a product, and owner lookup for a repository, with no external catalogue configured; an optional Backstage adapter serves the same contract; owner-group identifiers are not expanded into people
 - [ ] #6 A test boots the incident feature with no external catalogue configured and lists products from the bot's own source
+- [ ] #7 Before TASK-145.13 deletes modules/incident, a one-off import carries each product Drive folder's genie_schedule into the bot's product list as the product's ScheduleReference; the folder-to-product mapping is confirmed by a human (a report-placement folder is not a product), every other appProperties key is listed for a human ruling and none is dropped silently; the plan settles schedules per product (legacy 0..1) against the scenarios recorded in TASK-36.1.2 OQ5
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (human approved, coordinated-incidents reconciliation): the incident record keeps an optional product meaning one product's response (incident-management.md 2026-11-04). This task defines its identifier (a product-catalogue id) and builds the ProductCatalog port in features/incident/core with its catalogue adapter (Backstage); TASK-145.6 no longer builds one over Drive folders. A product is not a team: teams own products many-to-many. Legacy stored items carry teams (a Drive folder name list) as a legacy attribute; nothing maps it to a product or infers engagements from it (D33). Adding product to declare (TASK-145.7 ships without it) is part of this task's consumer work or a follow-up it names.
+
+2026-11-06 (TASK-36.1.2 OQ5, human-approved): depends on TASK-145.6 (core, where ProductCatalog lives) instead of all of TASK-145, and gates TASK-145.13, so the legacy schedule source (on_call.py, folder metadata) is not deleted before the product list holds the references. Scenarios for the plan: one schedule; none (declare invites nobody and says so); unknown metadata keys; self-managed rotation or after the Opsgenie end of service 2027-04-05 (system-typed reference, TASK-146.3); coordinated incident engaging many products; one schedule shared by several products; a folder that is report placement only.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - phase-5
 dependencies:
@@ -69,4 +69,6 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-25 (decisions/authorization.md): the rebuilt AWS surfaces declare permissions and get roles from the central configuration. modules/permissions is_user_member_of_groups and the AWS_ADMIN_GROUPS setting are deleted, not carried over.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->

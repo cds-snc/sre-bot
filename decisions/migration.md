@@ -31,9 +31,9 @@ The modules are not organised around features. `modules/sre/` and `modules/aws/`
 **Per-surface recipe:**
 
 1. **Inventory.** List every user-facing surface of `modules/`: slash commands, interactions, webhook routes and scheduled jobs. Assign each one to a target feature or capability.
-2. **Pin.** Write smoke tests that pin each surface's external behaviour before touching it.
+2. **Pin.** Write smoke tests that pin each surface's external behaviour before touching it. A pin enters only through what survives the rebuild: command names, ids on messages already posted, and event types; it opens a modal from its command and reads the modal's ids from the opened view. It asserts what users and external systems see: Slack-visible output and outcomes at the faked edges in domain terms (a field read back through the show command, one timeline entry), never stored item shapes or call shapes inside `modules/`. A behaviour the rebuild deliberately ends is pinned in a test named `test_legacy_only_*`, deleted by the task that ends it. Where the pin's fakes may sit is [testing.md](testing.md)'s seam rule.
 3. **Rebuild.** Build the surface in the standard package shape ([feature-packages.md](feature-packages.md)) in its target feature or capability, with handlers registered through hookspecs and strings through the translator contract ([i18n.md](i18n.md)). Vendor concepts leave the feature on the way: an incident works with documents and a chat channel through capability contracts, not with Google Drive folders.
-4. **Cut over.** Remove the legacy registration of that surface in the same PR series. Command names and behaviour stay the same; smoke tests stay green.
+4. **Cut over.** Remove the legacy registration of that surface in the same PR series. Command names, ids on posted messages and behaviour stay the same ([transport-slack.md](transport-slack.md) legacy ids); modal-internal ids take the plugin prefix. The pins' assertions stay green unchanged; the cutover PR only rewires their fixtures to the target's fakes.
 5. **Delete.** A legacy module is deleted when its last surface has moved.
 
 No migration is left half-done: a surface is either legacy or rebuilt, never both.
@@ -79,3 +79,4 @@ No migration is left half-done: a surface is either legacy or rebuilt, never bot
 - 2026-09-24: webhooks sequencing defers to [webhooks.md](webhooks.md); modules are rebuilt by surface into the plugin-architecture layers, the retired `PREFIX` carve-out is removed, and the non-layer directory table moved here.
 - 2026-10-01: rule 5 destinations include an umbrella's `core/` and `common/`, per [feature-packages.md](feature-packages.md).
 - 2026-10-06: the `sre` and `dev` provider subcommands moved from hookimpls to the hand-written `_register_legacy_slack_commands()` step (TASK-110.1); no `modules/` hookimpl remains.
+- 2026-11-06: pin contract (durable entry points, ids read from opened views, outcome assertions, `test_legacy_only_*` tests) and the cutover rule for ids (TASK-36.1.2 OQ1, human).

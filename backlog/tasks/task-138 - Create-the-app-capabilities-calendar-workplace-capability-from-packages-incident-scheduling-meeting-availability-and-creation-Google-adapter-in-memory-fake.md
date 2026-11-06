@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-02 16:59
-updated_date: '2026-11-06T03:00:00Z'
+updated_date: '2026-11-06T19:05:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -16,7 +16,6 @@ milestone: m-7
 dependencies:
   - TASK-110
   - TASK-114.2
-  - TASK-36.1.2
   - TASK-169
 references:
   - decisions/workplace-systems.md
@@ -58,6 +57,8 @@ Sequencing: a workplace capability move like TASK-119 to TASK-121, after TASK-11
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-05: superseded by the TASK-169 ruling, 2026-11-05 (human) (D5): every calendar consumer is incident (TASK-145.10; TASK-38.6 is archived), and features/incident/scheduling and features/incident/meet are already incident-owned, so no calendar capability is built now. A calendar capability is created, as a new task, when a second suite's calendar (Microsoft 365) or a non-incident consumer is scheduled. TASK-145.10 no longer depends on this task. For a human to archive.
+
+2026-11-06: dependency on TASK-36.1.2 removed (the retro pins moved to TASK-36.1.5, gating TASK-145.10). Still superseded; for a human to archive.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T15:54:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
@@ -16,6 +16,7 @@ dependencies:
   - TASK-36.3
   - TASK-25.10
   - TASK-145.5.7
+  - TASK-36.1.5
 references:
   - https://github.com/cds-snc/sre-bot/issues/1700
 parent_task_id: TASK-145
@@ -47,6 +48,7 @@ THIS SLICE
 - [ ] #5 core/store.py has timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, captured_entry_id (uuid5 over system, tenant, conversation and message id; a re-capture yields the same key) and a uuid4 manual entry id, each tested
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 IncidentReport gains append_timeline_entry(ReportReference, entry) in core/api.py with its Google Docs adapter and fake (parity test); the legacy timeline rewrite in modules/incident/incident_document.py (lines 82-302 at main 5deb8406, build_timeline_replacement included) moves into core/adapters/google_docs.py, and incident_document.py is deleted with its legacy test once 145.8 has moved the status mapping and no caller remains
+- [ ] #8 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -93,6 +95,8 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 2026-11-04 (TASK-145.5.7 planning, human approved): the nudge job registers with the lease_ttl keyword on register_interval/register_daily added by TASK-145.5.7.1, its TTL from the response settings slice (reliability.md 2026-11-04). Precondition unchanged: the TASK-145.5.7 job has run (dry run then apply) after TASK-145.8 deploys.
 
 2026-11-05 (human, TASK-145.6.2 C1): IncidentReport ships in 145.6.2 without append_timeline_entry; this task adds it with timeline capture and moves the legacy timeline rewrite (~220 lines) from incident_document.py then. Size gate: count this move in the 145.9 plan; it may split the slice.
+
+2026-11-06: depends on TASK-36.1.5 (reaction pins split from TASK-36.1.2). Reaction events carry no ids; the pins assert one timeline entry in the report and rewire to the IncidentReport fake at rebuild.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

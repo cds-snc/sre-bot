@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-04T17:26:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
@@ -20,6 +20,7 @@ dependencies:
   - TASK-145.6
   - TASK-157
   - TASK-111.15.1
+  - TASK-187
 references:
   - https://github.com/cds-snc/sre-bot/issues/1698
   - decisions/incident-management.md
@@ -64,6 +65,7 @@ RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 The new-incident policy (INCIDENT_CORE__NEW_INCIDENT_SYSTEM) resolves at startup against the configured-systems read (TASK-145.5.9): set, or unset with one configured system; when the named system is unconfigured, none is configured, or the policy is unset with several, boot fails with one CRITICAL plugin_boot_failed event naming the key (declare is the feature's core path, so an enabled incident feature requires it: decisions/plugins.md, TASK-172) (tested)
 - [ ] #10 incident.response reads the handbook id from [incident_response] handbook_id (features/incident/response/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
+- [ ] #11 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -113,6 +115,8 @@ Declare is the most-used surface; the legacy path is removed in the same PR, so 
 2026-11-04 (TASK-145.5.7 planning, human approved): (1) incident.response is already a plugin when this task starts: TASK-145.5.7.3 adds its entry point, contract (m) entry, [plugins.incident_response] key (true in base, false in ci), register_requirements for the Slack and Google tenants, and one hookimpl registering the legacy upgrade job; declare is added to that plugin. (2) The binding backfill (doc-11 row 18) is a step added to the TASK-145.5.7 job, not a new runner (incident-management.md Migration rule 3): after declare writes bindings and lookups fall back (rule 1), the step puts one binding per record from its conversation map idempotently and raises the version marker to 2 for every item below it (rule 4 amendment recorded for A1, doc-11 row 17a). (3) Batch writers stamp the tenant verified through contracts/workplace TenantVerifier (workplace-systems.md rule 3, 2026-11-04).
 
 2026-11-04 (human approved, coordinated-incidents reconciliation): option C: declare ships without a product. The record's product stays unset until TASK-165.1's catalogue exists; the declare picker becomes a labelled report-folder choice (placement configuration of the report adapter) or a single configured incidents folder, never a product picker over Drive folders. The on-call invite from folder metadata stays on the legacy path until the on-call capability (TASK-146) provides it. Adding the product to declare later is additive (an optional field and a picker over ProductCatalog).
+
+2026-11-06 (TASK-36.1.2 OQ1, human-approved; for the Stack L re-plan): interaction ids follow decisions/transport-slack.md as amended: modal-internal ids (the declare modal, the locale toggle) take the incident.response prefix and the pin reads them from the opened view; ids on messages already posted (the alert buttons under webhook alerts) keep a registered legacy alias until TASK-145.13. 'names unchanged' in this task means command names and posted-message ids.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

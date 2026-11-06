@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-27 15:48
-updated_date: '2026-11-04T23:00:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - architecture
   - layers
@@ -59,6 +59,8 @@ After this ticket, no app/jobs/ package remains. Depends on TASK-64, so the wide
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (TASK-145.5.7.3 planning, human approved): the relocated safe_run keeps logging a failed run once at error with the traceback (logger.exception, added by TASK-145.5.7.3); job bodies never log and re-raise (reliability.md).
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

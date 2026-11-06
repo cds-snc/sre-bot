@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-05T15:54:00Z'
+updated_date: '2026-11-06T19:12:00Z'
 labels:
   - incident
   - features
@@ -91,6 +91,8 @@ A missed import breaks the draft command at boot; the lifespan test catches it. 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-13 re-ground: the draft move keeps today's behaviour (fills the report document). Under the TASK-147 flag the draft writes proposals to the record instead (TASK-147.7), so the moved draft keeps its fill step behind a seam that slice can redirect.
+
+2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
