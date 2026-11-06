@@ -1,8 +1,9 @@
 """Guard that the ci configuration switches off every plugin that states a requirement.
 
-CI configures no vendor tenant or token, so an enabled plugin with a ``register_requirements``
-hookimpl would abort every CI boot. Every installed entry point is loaded on a
-throwaway pluggy manager (none blocked) to find the plugins that implement the hook;
+CI configures no vendor tenant or token, so an enabled plugin whose ``register_requirements``
+returns a requirement would abort every CI boot; one returning none (the generator's
+template) boots anywhere. Every installed entry point is loaded on a throwaway pluggy
+manager (none blocked) and each hookimpl is called to find the plugins that state one;
 the plugin tables of base.toml and ci.toml are read straight from the files and
 merged key by key, as the loader does, so the pytest-env pin of
 [plugins.incident_response] cannot hide a missing switch-off in ci.toml.
@@ -24,7 +25,7 @@ def _plugins_stating_requirements() -> set[str]:
     pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
     pm.load_setuptools_entrypoints(PLUGIN_NAMESPACE)
-    return {impl.plugin_name for impl in pm.hook.register_requirements.get_hookimpls()}
+    return {impl.plugin_name for impl in pm.hook.register_requirements.get_hookimpls() if impl.function()}
 
 
 def _ci_enablement() -> dict[str, bool]:

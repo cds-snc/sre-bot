@@ -1,0 +1,5 @@
+# $title
+
+What every subdomain of `$umbrella` works on: the feature's record, its store, and purpose-shaped interfaces for the resources the record references, with one adapter per system (decisions/feature-packages.md, umbrella rule 4).
+
+An item enters `core/` when it is the record itself or has two or more subdomain consumers. Subdomains import only `api.py`. Not a plugin: no `entrypoints/`, no hookimpls, no entry point.

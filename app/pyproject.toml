@@ -225,6 +225,7 @@ dev = [
     "types-boto3[ce,config,dynamodb,guardduty,identitystore,lambda,organizations,securityhub,sqs,sso-admin,sts]>=1.43.116",
     "google-api-python-client-stubs>=1.40.0",
     "import-linter>=2.15",
+    "tomlkit>=0.15.2",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -409,7 +410,7 @@ protected_modules = ["slack_bolt"]
 # the Bolt app; a feature's Slack entry point handles interactions with Bolt's own
 # listener arguments (decisions/platform-entrypoints.md rule 3, transport-slack.md
 # Checks). Direct imports only: chains through integrations are tracked by (e).
-allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack"]
+allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack", "features.**.entrypoints.slack"]
 
 [[tool.importlinter.contracts]]
 id = "no-provider-imports"
