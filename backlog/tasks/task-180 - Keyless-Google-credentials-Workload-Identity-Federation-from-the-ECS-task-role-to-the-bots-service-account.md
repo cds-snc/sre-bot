@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-05T00:09:00Z'
-updated_date: '2026-11-05T21:47:00Z'
+updated_date: '2026-11-06T00:52:00Z'
 labels:
   - security
   - configuration
@@ -48,7 +48,7 @@ Human GCP steps (in cdssnc, from the README service identity section): enable ia
 - [ ] #5 This PR changes no terraform and deploys on the key with both new names absent. After it deploys: a terraform-only PR (no task, as #1792) declares GOOGLE_WORKSPACE__TENANT__SERVICE_ACCOUNT_EMAIL in terraform/ssm.tf, the human sets its value before any deploy and redeploys the running tag; deploy-checks pre at this merge, and post google after the redeploy, pass with every task on the key and the email set (boot checks it is the key's account). The audience parameter is TASK-180.1; the Codespaces secret is TASK-185
 - [ ] #6 A Codespace or devcontainer authenticates with gcloud application-default login plus Token Creator, granted per developer and revocable; the devcontainer installs the gcloud CLI; the Codespaces key secret is no longer needed (deleted by TASK-182; the development account is TASK-185)
 - [x] #7 ruff, mypy, lint-imports, make check-import-contracts, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
-- [ ] #8 A google task check in bin/deploy-checks.zsh (post only; per task credential source from the configuration summary and error counts, never message bodies; google:federation requires federation on every task) passes on the key after this PR deploys; TASK-180.1 runs it after the cutover; TASK-183 deletes it when Done
+- [x] #8 A google task check in bin/deploy-checks.zsh (post only; per task credential source from the configuration summary and error counts, never message bodies; google:federation requires federation on every task) passes on the key after this PR deploys; TASK-180.1 runs it after the cutover; TASK-183 deletes it when Done
 - [x] #9 Documentation a new developer can follow: the Google README and the runbook carry a credentials-at-a-glance table (ECS, Codespace or devcontainer, another platform through a credential configuration file, the key until TASK-182), the selection order and troubleshooting rows per source; the root README's local setup links to them; the runbook's 'Until TASK-180 ships' section names only what TASK-180.1, 181 and 183 still change
 - [x] #10 Portability: the application-default path accepts a Workload Identity Federation credential configuration file (file-sourced token, no key) through GOOGLE_APPLICATION_CREDENTIALS, proven by a test with no network; decisions/service-accounts.md rule 5 names the AWS supplier as the ECS adapter and application default credentials as the platform default
 <!-- AC:END -->
@@ -213,6 +213,10 @@ Observation (not changed, for the human): google-auth 2.62 starts a background r
 Gates: ruff All checks passed; make check-import-contracts 13 kept 0 broken; make check-settings-key-ownership OK; check-vendor-package-contract, check-runtime-imports, check-sdk-typing OK; mypy Found 41 errors in 14 files (all pre-existing, none in touched files); pytest tests --ignore=tests/smoke 6294 passed.
 
 Open ACs: #5 (terraform-only PR, value, redeploy, deploy-checks), #6 (a human logs in from a Codespace with a temporary grant), #8 (post google after deploy).
+
+2026-11-05: #1828 merged 23:43 UTC (e85a30c5), deployed as sre-bot-task:88. deploy-checks post google at 23:48:14Z (tmp/deploy-checks/post-google-20261105T234814Z.txt): google_configured PASS and google_no_refusal PASS, both tasks source=key with service_account_email unset; version PASS (e85a30c5); boot_errors, runtime_errors and slack_up PASS. rollout showed IN_PROGRESS because the check ran 1.5 minutes into the rollout (deploy job still running), so it gets a rerun. The 4 non-JSON lines (debug built_conditional_write_store, the starlette import warning) are not from this change. AC #8 checked; AC #5 waits on the email parameter PR.
+
+2026-11-06: regional-access-boundary observation resolved, no task. google-auth 2.62 deep-copies the request before the background lookup (_regional_access_boundary_utils.py start_refresh) and skips the lookup when the copy fails. Checked: copy.deepcopy(google_auth_httplib2.Request(httplib2.Http())) returns a new Http with no connections, before and after use. The lookup never shares the service's Http, so outbound-clients.md's thread rule holds.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
