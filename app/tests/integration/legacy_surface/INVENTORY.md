@@ -93,15 +93,17 @@ Totals: 18 actions, 11 views and 4 events, 33 interactions in all.
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| `provision_aws_identity_center` (every 2h, Tier-2 lease; calls `modules.aws.identity_center.synchronize`) | `jobs/scheduled_tasks.py:101` (body `:157`) | scheduler | `app/features/` Identity Center provisioning feature (boundary set by TASK-88) | TASK-88; job strangle TASK-65; runtime TASK-52 | not yet — TASK-36.3 |
-| `notify_stale_incident_channels` (daily 16:00, Tier-2 lease; `modules.incident`) | `jobs/scheduled_tasks.py:104` | scheduler | `app/features/incident/` | TASK-38 (after TASK-97); job strangle TASK-65; runtime TASK-52 | not yet — TASK-36.3 |
-| `spending.execute_spending_data_update_job` (daily 00:00, Tier-2 lease; `modules.aws.spending`) | `jobs/scheduled_tasks.py:109` | scheduler | `app/features/` spending-report feature (boundary set by TASK-88) | TASK-88; job strangle TASK-65; runtime TASK-52 | not yet — TASK-36.3 |
-| `access_sync_reconciliation` (daily, settings-driven) | `packages/access/sync/__init__.py:94` | plugin job (`register_background_jobs` hookimpl) | `app/features/access/` (sync) | TASK-124.1; runtime TASK-52 | not yet — TASK-36.3 |
-| `oncall_sync` (interval) | `packages/oncall_sync/__init__.py:34` | plugin job (`register_background_jobs` hookimpl) | `app/features/oncall_sync/` | TASK-124.2 (rotations dependency TASK-123); runtime TASK-52 | not yet — TASK-36.3 |
+| `provision_aws_identity_center` (every 2h, Tier-2 lease; calls `modules.aws.identity_center.synchronize`) | `jobs/scheduled_tasks.py:147` (entry point `:211`) | scheduler | `app/features/` Identity Center provisioning feature (boundary set by TASK-88) | TASK-88; job strangle TASK-65; runtime TASK-52 | `test_aws_identity_center_provision_job_run.py` |
+| `notify_stale_incident_channels` (daily 16:00, Tier-2 lease; `modules.incident`) | `jobs/scheduled_tasks.py:150-153` (entry point `:165`) | scheduler | `app/features/incident/` | TASK-145.9; job strangle TASK-65; runtime TASK-52 | `test_incident_stale_channel_job_run.py` |
+| `spending.execute_spending_data_update_job` (daily 00:00, Tier-2 lease; `modules.aws.spending`) | `jobs/scheduled_tasks.py:156-159` (entry point `modules/aws/spending.py:256`) | scheduler | `app/features/` spending-report feature (boundary set by TASK-88) | TASK-88; job strangle TASK-65; runtime TASK-52 | `test_aws_spending_data_update_job_run.py` |
+| `access_sync_reconciliation` (daily, settings-driven) | `packages/access/sync/__init__.py:85` (entry point `:48`) | plugin job (`register_background_jobs` hookimpl) | `app/features/access/` (sync) | TASK-124.1; runtime TASK-52 | `test_access_sync_reconciliation_job_run.py` |
+| `oncall_sync` (interval) | `packages/oncall_sync/__init__.py:40` (entry point `:25`) | plugin job (`register_background_jobs` hookimpl) | per TASK-146 re-cut | TASK-146.2; runtime TASK-52 | `test_oncall_sync_job_run.py` |
 
 The runtime in `jobs/scheduled_tasks.py` also schedules the host-owned Tier-1
 jobs `scheduler_heartbeat` and `integration_healthchecks`. Neither is a module
-surface, and TASK-52 moves both to `app/server/scheduler/`.
+surface, and TASK-52 moves both to `app/server/scheduler/`. The plugin job
+`incident_legacy_upgrade` (`features/incident/response/plugin.py`, deleted by
+TASK-145.13) has its own tests and is out of scope here.
 
 ## Provider-registered Slack commands
 
