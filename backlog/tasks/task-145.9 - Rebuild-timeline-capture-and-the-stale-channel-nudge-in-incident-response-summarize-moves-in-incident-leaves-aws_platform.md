@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-06T20:16:00Z'
 labels:
   - incident
   - features
@@ -34,9 +34,11 @@ THIS SLICE
 - Timeline capture through IncidentReport and IncidentStore; entries are their own records.
 - Timeline layout in core/store.py: timeline_table(name), partition incident_id and sort entry_key, with the table name from the incident core settings; an entry_key helper building <posted_at>#<entry_id> with posted_at as fixed-width ISO-8601 UTC (isoformat(timespec="microseconds"), +00:00, format_stored_time in core/adapters/incident_items.py); captured_entry_id, a uuid5 over system, tenant, conversation and message id, so a re-capture writes the same key and put_if_not_exists dedupes; a uuid4 id for manual entries. The vendor message id stays in the entry's source_message reference.
 - The nudge job is registered by response through the background-job hookimpl with its schedule and lease from the response settings slice; the hand import in app/jobs/scheduled_tasks.py is deleted. Stale detection reads the store, not a channel-name pattern; it queries the sparse open index through IncidentStore.list_open (open_bucket = OPEN, sort opened_at), never a scan, so a closed incident drops out; the nudge carries the archive action id and the schedule-postmortem action id from common/vocabulary.
-- summarize: scribe/service.py's summary path becomes response/summary.py with its settings slice, catalogue (incident_summary) and tests renamed test_incident_response_summary_*; the command registers under incident.response. It calls the text-generation capability (TASK-25.10).
+- summarize: scribe/service.py's summary path becomes response/service/summary.py (prompt text in response/service/prompt.py; layout table of 2026-11-06, feature-packages.md) with its settings slice, catalogue (incident_summary) and tests renamed test_incident_response_summary_*; the command registers under incident.response. It calls the text-generation capability (TASK-25.10).
 - After this slice no module under app/modules/incident imports db_operations or packages.aws_platform; the incident seam baseline entries are removed, which is what TASK-88 needs.
 - Legacy registrations and the job hand import removed in the same PR; pinned by TASK-36.1 (reactions) and TASK-36.3 (job).
+- Security guard (incident-management.md 2026-11-06): comms' _security_gate (comms/service/draft.py) moves into core as one guard exported by core/api.py; comms and summarize call it before the model call, keeping their log events and the SECURITY_CONFIRMATION_REQUIRED code; summarize gains the responder's confirmation, so a security incident's transcript reaches the model only after it.
+- Transcript text: comms' build_transcript (comms/service/prompt.py) and scribe's _transcript_line render the same messages twice; the shared rendering moves into core (feature-packages.md rule 3, two consumers) and both callers use it, with output unchanged for each.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -49,6 +51,9 @@ THIS SLICE
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 IncidentReport gains append_timeline_entry(ReportReference, entry) in core/api.py with its Google Docs adapter and fake (parity test); the legacy timeline rewrite in modules/incident/incident_document.py (lines 82-302 at main 5deb8406, build_timeline_replacement included) moves into core/adapters/google_docs.py, and incident_document.py is deleted with its legacy test once 145.8 has moved the status mapping and no caller remains
 - [ ] #8 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
+- [ ] #9 /sre incident summarize is refused for a security incident, or one whose flag cannot be read, until the responder confirms, through the core security guard; comms drafting uses the same guard with its behaviour and log events unchanged
+- [ ] #10 Transcript text for the model is rendered by one core function used by comms and summarize, each prompt's transcript text unchanged
+- [ ] #11 summarize lives in response/service/summary.py (prompt in response/service/prompt.py); make check-package-shape passes with no new baseline entry
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -97,6 +102,8 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 2026-11-05 (human, TASK-145.6.2 C1): IncidentReport ships in 145.6.2 without append_timeline_entry; this task adds it with timeline capture and moves the legacy timeline rewrite (~220 lines) from incident_document.py then. Size gate: count this move in the 145.9 plan; it may split the slice.
 
 2026-11-06: depends on TASK-36.1.5 (reaction pins split from TASK-36.1.2). Reaction events carry no ids; the pins assert one timeline entry in the report and rewire to the IncidentReport fake at rebuild.
+
+2026-11-06 (human, TASK-186 review): scope gains the core security guard (comms' gate moves into core/api.py; summarize calls it), the shared transcript rendering into core, and the layout-table paths response/service/summary.py and service/prompt.py (description and ACs updated). Re-check the size gate at Stack L's re-plan; split the guard and transcript moves into their own layer if it trips.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

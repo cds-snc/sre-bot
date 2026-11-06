@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-06T02:57:00Z'
-updated_date: '2026-11-06T19:56:00Z'
+updated_date: '2026-11-06T20:10:00Z'
 labels:
   - incident
   - plugin-architecture
@@ -89,4 +89,6 @@ cd app: ruff; targeted tests; make check-import-contracts; make check-settings-k
 - ADR: feature-packages.md domain.py row, service/ and shared-rule sentences, 2026-11-06 change line. Baseline: 7 comms entries removed.
 - Gates: ruff clean; targeted tests 1307 passed; make check-import-contracts 13 kept 0 broken; check-settings-key-ownership OK; check-package-shape OK (3 baselined); check-fake-coverage OK; mypy 41 errors in 14 files, all pre-existing in legacy modules/, none in comms; pytest 6478 passed.
 - Merging deploys with no runtime behaviour change; one git revert restores.
+
+2026-11-06 (human, review of the ADR history): this PR also carries incident-management.md (core security guard every subdomain calls; comms is for outside audiences, AI text joins the subdomain whose users need it) and the task edits that follow from the layout table: TASK-145.9 and TASK-145.11 (service/ paths, the guard, transcript rendering into core, organisation wording into the template profile) and TASK-134 (comms' JSON extraction).
 <!-- SECTION:NOTES:END -->
