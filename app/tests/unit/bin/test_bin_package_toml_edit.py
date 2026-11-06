@@ -181,7 +181,10 @@ def test_renaming_an_entry_point_and_its_contract_strings_keeps_comments_and_oth
     assert "incident.scribe" not in group
     assert group["incident.notes"] == "features.incident.notes"
     assert "features.incident.notes" in _contract(result, "protected-plugins")["protected_modules"]
-    assert "features.incident.notes.service -> integrations.openai" in _contract(result, "integrations-via-adapters")["ignore_imports"]
+    assert (
+        "features.incident.notes.service -> integrations.openai"
+        in _contract(result, "integrations-via-adapters")["ignore_imports"]
+    )
     assert _contract(result, "feature-independence") == _contract(data, "feature-independence")
 
 

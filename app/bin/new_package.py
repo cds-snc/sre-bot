@@ -497,8 +497,7 @@ def promote(request: Request) -> list[str]:
         f"Entry point and enablement key renamed '{feature}' -> '{new_name}' in pyproject.toml and "
         + ", ".join(f"config/{path.name}" for path in configs)
         + f"; {len(rewrites)} file(s) rewritten.",
-        "Run 'uv sync' so the renamed entry point is installed. Rename any PLUGINS__<AREA> override of "
-        f"'{feature}' in app/.env.",
+        f"Run 'uv sync' so the renamed entry point is installed. Rename any PLUGINS__<AREA> override of '{feature}' in app/.env.",
         f"Next: move tests/*/features/{feature}/ tests under {subdomain}/ if they test it, grep the docs for "
         f"'{old_module}', then make check-package-shape check-import-contracts check-settings-key-ownership.",
     ]
