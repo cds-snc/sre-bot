@@ -4,7 +4,7 @@ title: E8 Reporting and communication audiences
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:59:00Z'
-updated_date: '2026-11-04T16:45:00Z'
+updated_date: '2026-11-06T01:56:00Z'
 labels:
   - incident
 milestone: m-7
@@ -32,4 +32,11 @@ Coordinators need audience-specific updates, senior-management summaries, metric
 - [ ] #3 Coordination metrics describe the agreed lifecycle and response measures without exposing embargoed content.
 - [ ] #4 The organisation-level postmortem consumes each workstream's timeline and lessons as inputs through the postmortem capability after TASK-147.
 - [ ] #5 D33 determines audience membership; until an accepted source is available, membership is configured as explicit people and never inferred from unstandardized groups.
+- [ ] #6 Verification and drill incidents carry a marker on the record (shape decided at planning through the domain-model evolution gate, incident-management.md 2026-11-06) and are left out of metrics, reports and organisation-level views by default; the legacy upgrade's handling of legacy test incidents is decided at the same time
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (human, TASK-180.1 reassessment): verification and drill incidents are marked and left out of metrics; accepted for now, revisited if it proves out of line with practice. Known legacy test incidents: 2 of 330 (TASK-145.6.2 D1). Until this ships, a verification incident's title starts with TEST and it is closed after the check.
+<!-- SECTION:NOTES:END -->
