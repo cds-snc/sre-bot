@@ -279,3 +279,58 @@ def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHa
     yield harness
     i18n.set("locale", locale)
     i18n.set("fallback", fallback)
+
+
+class ChannelAwareSlackClient(FakeSlackClient):
+    """``FakeSlackClient`` whose channel listing and history answers depend on the request.
+
+    ``conversations_list`` replies by the request's cursor (``None`` for the
+    first page) and ``conversations_history`` by the requested channel, which
+    is what a workspace with several channels and pages looks like to a job.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.channel_pages: dict[str | None, dict[str, Any]] = {}
+        self.history_by_channel: dict[str, dict[str, Any]] = {}
+
+    def conversations_list(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(("conversations_list", kwargs))
+        return self.channel_pages.get(kwargs.get("cursor"), {"ok": True, "channels": []})
+
+    def conversations_history(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(("conversations_history", kwargs))
+        return self.history_by_channel.get(kwargs["channel"], {"ok": True, "messages": []})
+
+
+@dataclass
+class RoutedSlackEdges:
+    """The Slack Web API fake and the Sentinel events a scheduled job reached."""
+
+    client: ChannelAwareSlackClient
+    sentinel_events: list[dict[str, Any]] = field(default_factory=list)
+
+
+@pytest.fixture
+def routed_slack_client(monkeypatch: pytest.MonkeyPatch) -> RoutedSlackEdges:
+    """Route every ``WebClient`` request into a ``ChannelAwareSlackClient`` and record Sentinel events.
+
+    Jobs build their own outbound Web client per run, so the routing is on
+    ``WebClient.api_call`` rather than on an injected client. Calls arrive by
+    method name (``chat.postMessage`` -> ``chat_postMessage``) with unset
+    optional arguments removed, as the SDK would send them.
+    """
+    edges = RoutedSlackEdges(client=ChannelAwareSlackClient())
+
+    def route_api_call(web_client: WebClient, api_method: str, **kwargs: Any) -> Any:
+        arguments = kwargs.get("json") or kwargs.get("params") or kwargs.get("data") or {}
+        sent = {name: value for name, value in arguments.items() if value is not None}
+        return getattr(edges.client, api_method.replace(".", "_"))(**sent)
+
+    def record_sentinel_event(payload: dict[str, Any]) -> bool:
+        edges.sentinel_events.append(payload)
+        return True
+
+    monkeypatch.setattr(WebClient, "api_call", route_api_call)
+    monkeypatch.setattr(sentinel_client, "send_event", record_sentinel_event)
+    return edges
