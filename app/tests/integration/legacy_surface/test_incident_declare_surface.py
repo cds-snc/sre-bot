@@ -27,7 +27,7 @@ from modules.incident import core as incident_core
 
 from .conftest import TRIGGER_ID, USER_ID, LegacyHandlerHarness
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("legacy_incident_folders_seam")]
 
 ALERT_CHANNEL_ID = "C0ALERTS"
 ALERT_MESSAGE_TS = "1700000000.000100"

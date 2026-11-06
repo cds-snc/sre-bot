@@ -26,6 +26,7 @@ from packages.rant.service import format_rant
 from packages.user_rotations.platforms import slack as user_rotations_slack
 from packages.user_rotations.service import UserRotationShift
 from tests.factories.incident import seed_legacy_incident
+from tests.factories.slack_bolt import FakeSlackClient
 
 from .conftest import CHANNEL_ID, RESPONSE_URL, TRIGGER_ID, USER_ID, SlackCommandHarness, build_harness
 
@@ -117,9 +118,11 @@ def test_registered_command_tree_is_unchanged(slack_command_harness: SlackComman
     assert commands["sre.incident"].legacy_mode is True
 
 
-def test_command_prefix_is_applied_to_root_slash_commands(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_command_prefix_is_applied_to_root_slash_commands(
+    monkeypatch: pytest.MonkeyPatch, legacy_scribe_transcript_reader_seam: FakeSlackClient
+) -> None:
     """A configured prefix renames the slash commands Slack routes to the app."""
-    harness = build_harness(monkeypatch, command_prefix="dev-")
+    harness = build_harness(monkeypatch, "dev-", legacy_scribe_transcript_reader_seam)
 
     response = harness.dispatch("sre", "version")
 

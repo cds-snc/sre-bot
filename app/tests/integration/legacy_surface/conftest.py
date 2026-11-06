@@ -15,8 +15,14 @@ lifespan's own ``_register_legacy_handlers`` on a fresh Bolt app, and feeds it
 slash commands, interaction payloads and Events API callbacks. Bolt hands those
 listeners a ``WebClient`` it builds per request, so ``WebClient.api_call`` is
 routed into a ``FakeSlackClient``. The external edges the legacy handlers reach
-are faked: ``response_url`` posts, the Sentinel ``send_event`` sender, the Drive
-folder listing and the webhook acknowledged-count increment.
+are faked: ``response_url`` posts and the Sentinel ``send_event`` sender.
+
+A legacy module that reaches no external edge is faked at an internal seam,
+and only in a named ``legacy_*_seam`` fixture whose docstring names its owning
+rebuild task: the task that rebuilds the caller and deletes the fixture. The
+test-seam guard (``make check-test-seams``) lists each seam in
+``bin/baselines/test_seams_legacy.txt`` and fails on a patch of a features/,
+capabilities/ or modules/ target anywhere else (decisions/testing.md).
 """
 
 import json
@@ -85,8 +91,6 @@ TEAM_ID = "T0TEAM"
 RESPONSE_URL = "https://hooks.slack.test/commands/response"
 REPORT_URL = "https://docs.google.com/document/d/doc-source/edit"
 
-
-_REAL_LIST_CHILD_FOLDERS = incident_drive.list_child_folders
 
 INCIDENT_FOLDERS: tuple[dict[str, str], ...] = (
     {"id": "F0PLATFORM", "name": "Platform"},
@@ -171,9 +175,28 @@ def capture_response_url_posts(monkeypatch: pytest.MonkeyPatch, responses: list[
     monkeypatch.setattr(WebhookClient, "send_dict", capture_send_dict)
 
 
-def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> SlackCommandHarness:
-    """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app."""
+@pytest.fixture
+def legacy_scribe_transcript_reader_seam(monkeypatch: pytest.MonkeyPatch) -> FakeSlackClient:
+    """Internal legacy seam: scribe's transcript reader factory, over the harness's Slack client.
+
+    Scribe resolves its reader through ``core/api.py``, not a provider, so the
+    real Slack reader is built over the returned fake client and handed to
+    scribe's service module. Owning rebuild task: TASK-145.11, which moves the
+    report draft into incident/postmortem and deletes scribe; this fixture is
+    deleted there (or earlier if TASK-145.9 moves summarize off it).
+    """
     client = FakeSlackClient()
+    reader = SlackIncidentTranscriptReader(cast(WebClient, client))
+    monkeypatch.setattr(incident_scribe_service, "get_incident_transcript_reader", lambda: reader)
+    return client
+
+
+def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str, client: FakeSlackClient) -> SlackCommandHarness:
+    """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app.
+
+    ``client`` is the fake from ``legacy_scribe_transcript_reader_seam``, so
+    scribe's transcript reader and every other Slack lookup share it.
+    """
     app = build_bolt_app(monkeypatch)
     settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))
     provider = SlackPlatformProvider(
@@ -191,9 +214,6 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
     # Each package's Slack lookups run through its real adapter over the same fake client.
     web_client = cast(WebClient, client)
     monkeypatch.setattr(rant_slack, "get_user_identity_lookup", lambda: SlackUserIdentityLookup(web_client))
-    monkeypatch.setattr(
-        incident_scribe_service, "get_incident_transcript_reader", lambda: SlackIncidentTranscriptReader(web_client)
-    )
 
     plugin_manager = pluggy.PluginManager(PLUGIN_NAMESPACE)
     plugin_manager.add_hookspecs(FeatureLifecycleSpecs)
@@ -209,9 +229,11 @@ def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str) -> Slack
 
 
 @pytest.fixture
-def slack_command_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[SlackCommandHarness]:
+def slack_command_harness(
+    monkeypatch: pytest.MonkeyPatch, legacy_scribe_transcript_reader_seam: FakeSlackClient
+) -> Iterator[SlackCommandHarness]:
     """Harness using the deployment's configured slash-command prefix."""
-    yield build_harness(monkeypatch, get_slack_transport_settings().command_prefix)
+    yield build_harness(monkeypatch, get_slack_transport_settings().command_prefix, legacy_scribe_transcript_reader_seam)
 
 
 @dataclass
@@ -256,7 +278,38 @@ class LegacyHandlerHarness:
 
 
 @pytest.fixture
-def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHandlerHarness]:
+def legacy_acknowledged_webhooks_seam(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """Internal legacy seam: the webhook acknowledged-count increment, recorded instead of stored.
+
+    The alert buttons in ``modules/incident/incident_alert.py`` call
+    ``modules.slack.webhooks.increment_acknowledged_count`` directly, so no
+    external edge is reachable; the returned list records each webhook id.
+    Owning rebuild task: TASK-145.7, which rebuilds declare and the alert
+    buttons in incident/response; this fixture is deleted there.
+    """
+    acknowledged: list[str] = []
+    monkeypatch.setattr(legacy_webhooks, "increment_acknowledged_count", acknowledged.append)
+    return acknowledged
+
+
+@pytest.fixture
+def legacy_incident_folders_seam(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Internal legacy seam: the declare form's product-folder listing, as a fixed list.
+
+    ``modules/incident/incident_folder.py`` lists the folders through the core
+    Google Docs adapter's module function; the declare pins assert on the
+    rendered options, so the listing returns ``INCIDENT_FOLDERS``. Pins over the
+    Drive edge (``incident_surface``) never request it. Owning rebuild task:
+    TASK-145.13, which deletes modules/incident (folder metadata is retired, not
+    rebuilt); this fixture is deleted there.
+    """
+    monkeypatch.setattr(incident_drive, "list_child_folders", lambda parent_folder_id: [dict(f) for f in INCIDENT_FOLDERS])
+
+
+@pytest.fixture
+def legacy_handler_harness(
+    monkeypatch: pytest.MonkeyPatch, legacy_acknowledged_webhooks_seam: list[str]
+) -> Iterator[LegacyHandlerHarness]:
     """Bolt app with ``_register_legacy_handlers`` applied and every external edge faked.
 
     Listener-injected Web API clients reach the harness's ``FakeSlackClient``
@@ -268,7 +321,12 @@ def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHa
     client.replies["users_info"] = {"ok": True, "user": {"id": USER_ID, "locale": "en-US"}}
     client.replies["conversations_create"] = {"ok": True, "channel": {"id": "C0NEWINCIDENT"}}
     app = build_bolt_app(monkeypatch)
-    harness = LegacyHandlerHarness(app=app, client=client, command_prefix=get_slack_transport_settings().command_prefix)
+    harness = LegacyHandlerHarness(
+        app=app,
+        client=client,
+        command_prefix=get_slack_transport_settings().command_prefix,
+        acknowledged_webhooks=legacy_acknowledged_webhooks_seam,
+    )
 
     def route_api_call(web_client: WebClient, api_method: str, **kwargs: Any) -> Any:
         arguments = kwargs.get("json") or kwargs.get("params") or kwargs.get("data") or {}
@@ -283,8 +341,6 @@ def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHa
     monkeypatch.setattr(WebClient, "api_call", route_api_call)
     capture_response_url_posts(monkeypatch, harness.responses)
     monkeypatch.setattr(sentinel_client, "send_event", record_sentinel_event)
-    monkeypatch.setattr(incident_drive, "list_child_folders", lambda parent_folder_id: [dict(f) for f in INCIDENT_FOLDERS])
-    monkeypatch.setattr(legacy_webhooks, "increment_acknowledged_count", harness.acknowledged_webhooks.append)
 
     _register_legacy_handlers(app, structlog.get_logger())
     locale, fallback = i18n.get("locale"), i18n.get("fallback")
@@ -612,8 +668,7 @@ def incident_surface(
     """``/sre`` registered beside the legacy handlers, with the incident module's external edges faked.
 
     The edges are the boto3 DynamoDB client under the incidents table adapter,
-    the Google client factory under the Drive, Docs and Sheets calls (the real
-    Drive listing replaces the harness's fixed folder list) and, from
+    the Google client factory under the Drive, Docs and Sheets calls and, from
     ``legacy_handler_harness``, the Slack Web API, ``response_url`` and Sentinel.
     The ``/sre`` client factory is the one internal legacy seam
     (``legacy_sre_web_client_seam``).
@@ -623,7 +678,6 @@ def incident_surface(
     google = FakeGoogleWorkspace()
     monkeypatch.setattr(dynamodb_adapter, "get_aws_client", lambda *args, **kwargs: dynamodb)
     monkeypatch.setattr(google_workspace_client, "_build_service", lambda api_name, *args, **kwargs: google.service(api_name))
-    monkeypatch.setattr(incident_drive, "list_child_folders", _REAL_LIST_CHILD_FOLDERS)
     get_spreadsheet_provider.cache_clear()
 
     settings = SimpleNamespace(app_token=SecretStr("xapp-test"), bot_token=SecretStr("xoxb-test"))

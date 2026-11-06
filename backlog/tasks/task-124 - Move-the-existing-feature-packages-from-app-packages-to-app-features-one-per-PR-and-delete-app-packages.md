@@ -5,8 +5,8 @@ title: >-
   per PR, and delete app/packages/
 status: To Do
 assignee: []
-created_date: '2026-09-24 20:01'
-updated_date: '2026-10-15 17:49'
+created_date: 2026-09-24 20:01
+updated_date: '2026-11-06T21:08:00Z'
 labels:
   - plugin-architecture
   - features
@@ -20,7 +20,7 @@ dependencies:
 references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1666'
+  - https://github.com/cds-snc/sre-bot/issues/1666
 priority: medium
 type: task
 ordinal: 266000
@@ -52,3 +52,9 @@ Common acceptance for every child:
 - [ ] #2 app/packages/ does not exist; packages is removed from the import-linter root packages, the ruff isort first-party list and the TASK-18 contracts
 - [ ] #3 decisions/feature-packages.md and plugins.md no longer list packages/ or platforms/ directories as tolerated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-06 (TASK-187 OQ2, human): each packages/ -> features/ move PR enters the test-seam guard's strict zone (tests/{unit,integration}/{features,capabilities}/) and re-keys its own entries in app/bin/baselines/test_seams_strict.txt: same count, renamed paths, stated in the PR body (decisions/testing.md Checks; python -m bin.check_test_seams --print-entries shows the current keys). A test that moves into the strict zone with internal patches adds them only as re-keyed entries of that move, never as new ones.
+<!-- SECTION:NOTES:END -->

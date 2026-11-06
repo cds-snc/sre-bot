@@ -1,4 +1,4 @@
-.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports check-aws-platform-seam check-import-contracts check-fake-coverage check-settings-key-ownership check-package-shape new-package env-example debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-coverage test-new
+.PHONY: dev dev-setup fmt install lint test test-unit test-integration test-legacy test-all fmt-ci lint-ci install-dev run test-coverage-unit backlog-board audit-client-usage-matrix client-usage-matrix check-sdk-typing check-vendor-package-contract check-runtime-imports check-aws-platform-seam check-import-contracts check-fake-coverage check-settings-key-ownership check-package-shape check-test-seams new-package env-example debug install-ci lint-types lock-check test-coverage-integration test-coverage-all test-coverage test-new
 
 dev:
 	ENVIRONMENT=local uv run uvicorn --factory main:create_app --reload
@@ -118,6 +118,9 @@ check-settings-key-ownership:
 
 check-package-shape:
 	uv run python -m bin.check_package_shape
+
+check-test-seams:
+	uv run python -m bin.check_test_seams
 
 new-package: # Create a feature, capability, umbrella, subdomain, core or common package; asks for each value, or pass ARGS="feature <name> --area <area>"
 	uv run python -m bin.new_package $(ARGS)
