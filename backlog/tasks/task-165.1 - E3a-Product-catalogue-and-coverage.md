@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-06T19:04:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - incident
 milestone: m-7
@@ -60,6 +60,14 @@ created: 2026-11-05T00:43:00Z
 ---
 
 Correction to the previous comment: the replacements are AC #5 and #6 (renumbered after the removal).
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ1, OQ2, OQ12), proposed scope: the one-off genie_schedule import replaces the incident schedule-source adapter (TASK-146.3 in 145.7 L9a) with the catalogue entry and deletes its tolerated line; the Notify management invite trigger moves from [incident_response] notify_management_placement_id to the product id. AC #7 ('a report-placement folder is not a product') holds.
 
 ---
 <!-- COMMENTS:END -->

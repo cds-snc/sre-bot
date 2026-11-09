@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T18:09:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - incident
   - features
@@ -74,3 +74,15 @@ Assumptions: the legacy row format has no reader other than people (AC #1); veri
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ3): AC #6 is delivered by the L4c projection adapter, before this task's L11 cutover, because 145.8's status fan-out needs the writer. OQ17: the dev incident commands (modules/dev/incident.py list, add-incident, load-incidents) are deleted in L11 under AC #2; pins test_slack_command_registration_surface.py:88, :91, :207 and INVENTORY.md:121 updated there.
+
+---
+<!-- COMMENTS:END -->

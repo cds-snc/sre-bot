@@ -4,7 +4,7 @@ title: E7 Workstreams and incident links
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-04T17:16:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - incident
 milestone: m-7
@@ -41,3 +41,15 @@ Extend the MVP from one coordinating incident and engagement edges to a coherent
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (human approved, TASK-145.5.7 reconciliation): legacy and pre-coordination incidents carry no root metadata, and the TASK-145.5.7 legacy upgrade job is deleted by TASK-145.13 before doc-15 row 1 starts. AC6's plan for existing items therefore either reads absent root metadata as a standalone incident (its own root, no backfill, absent from any root index) or builds its own runner per decisions/incident-management.md Migration rule 3; it cannot extend the 145.5.7 job.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ10), proposed: the binding entity is renamed IncidentBinding (table sre_bot_incident_bindings) because 'surface' means a rebuilt legacy interaction group in migration.md and a message/modal/App Home in Slack; AC #2's 'working-surface binding' would read 'binding' once the human rules.
+
+---
+<!-- COMMENTS:END -->

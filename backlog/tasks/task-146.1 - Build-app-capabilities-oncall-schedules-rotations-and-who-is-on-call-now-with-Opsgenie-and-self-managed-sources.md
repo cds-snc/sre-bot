@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-06T02:58:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - oncall
   - capabilities
@@ -60,6 +60,14 @@ created: 2026-11-03T19:02:00Z
 ---
 
 Dependency re-cut (2026-11-03): TASK-25.6 is Opsgenie-client-specific and is no longer a prerequisite for the GoAlert target within the 2–3 week window. Re-add it only if the accepted on-call design explicitly needs a transitional Opsgenie read.
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ1), proposed: pulled forward as a side PR during Stack L L0-L8 so the rebuilt declare invites on-call through the capability (no interim Opsgenie adapter in the incident umbrella). Missing dependency: TASK-25.6 (decisions/oncall.md:39 builds the adapter after 25.6; the client lacks a per-attempt timeout, outbound-clients.md:21). Not added until the human rules.
 
 ---
 <!-- COMMENTS:END -->

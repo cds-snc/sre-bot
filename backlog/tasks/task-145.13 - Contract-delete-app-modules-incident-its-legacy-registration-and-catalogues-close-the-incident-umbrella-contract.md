@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T18:10:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - incident
   - features
@@ -118,6 +118,14 @@ created: 2026-11-09T18:10:00Z
 ---
 
 Stack L re-plan 2026-11-09: the waits on TASK-165.1 and TASK-146.3 are reassessed in OQ12 (TASK-145.7 comment): recommended option B (interim on-call adapter in core under an import-linter ratchet) removes both waits; scope stays the by_channel fallback, the legacy aliases (listed by the registrar since L1) and modules/incident.
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ12, OQ17), proposed: the waits on TASK-165.1 and TASK-146.3 drop if 146.3 lands inside 145.7's L9a (declare invites through capabilities.oncall.api; the only remnant is a read-only schedule-source adapter owned by 165.1, outside modules/incident). The dev incident commands are deleted by TASK-145.12 (L11), so 'repointed or deleted' and 'decide delete or rewrite at pickup' no longer apply. Dependencies unchanged until the human rules.
 
 ---
 <!-- COMMENTS:END -->
