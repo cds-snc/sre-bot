@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-09T18:09:00Z'
 labels:
   - incident
   - features
@@ -50,33 +50,11 @@ THIS SLICE
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after TASK-145.9). Standalone PR, not stacked: it changes a runtime data path (doc-2). ADDED DEPENDENCY to confirm: a features/ module may not import infrastructure.spreadsheets without a new ignore entry, which migration.md rule 3 forbids, so the projection writer needs the spreadsheets capability (TASK-121) or the legacy writer is called through the frozen module until then.
-
-## Discovered state
-- modules/incident/incident_folder.py: append_values on INCIDENT_LIST "Sheet1!A:A" (281), update_spreadsheet_incident_status (314-328), get_incidents_from_sheet (373), create_missing_incidents (487, writes legacy items through db_operations.create_incident), over infrastructure.spreadsheets.get_spreadsheet_provider(). Readers of the sheet: the duplicate-row check before the append in modules/incident/core.py (about line 251, matches channel_id or channel slug), listings, retro inputs (to enumerate at pickup with rg get_incidents_from_sheet). modules/dev/incident.py load_incidents (43-57) is the only caller of create_missing_incidents; tests/unit/modules/dev/test_dev_incident_handler.py covers it.
-- Legacy /sre incident list (modules/incident/incident_helper.py handle_list): `active` is a placeholder, `stale` lists open incidents older than 14 days without activity. Both are open-incident listings.
-
-## Steps
-1. Replace every sheet read with IncidentStore reads: listings use list_open (open index), the per-channel lookup uses find_by_conversation; delete get_incidents_from_sheet and its callers' sheet paths. The duplicate-row check is removed: the declare appends the projection row once, inside its idempotent write.
-2. Delete create_missing_incidents, complete_incidents_details if unused after, and the load-incidents dev command with its tests.
-3. IncidentListProjection interface in core/api.py (append_row, update_status) with one adapter over capabilities.spreadsheets.api (if TASK-121 landed) and a rebuild job regenerating the sheet from the store with RecordStore.read_all (TASK-27.5), max_items from [incident_core] full_read_max_items (added by TASK-145.5.7); past the cap the rebuild fails without writing; response calls the projection from declare and status change.
-4. /sre incident list (active and stale) reads IncidentStore.list_open; stale filters on last activity client-side over the open incidents.
-5. After deploy, per environment: rerun the TASK-145.5.7 job, dry run then apply; record the reports in the notes.
-
-## AC traceability
-AC1: step 1 -> `rg get_incidents_from_sheet app` empty; projection interface exposes two writes. AC2: step 2 -> `rg create_missing_incidents app` empty; step 5 recorded. AC3: steps 1, 3, 4 -> list tests over list_open, no duplicate-row check, rebuild over read_all including the over-cap failure. AC4: gates.
-
-## Test matrix
-Projection: append and status update calls; failure logged and declare continues; a replayed declare appends once. Rebuild: sheet regenerated from store items; over-cap read fails and writes nothing. List active and stale over the in-memory IncidentStore.
-
-## Assumptions and doubts
-- TASK-121 timing decides the projection adapter's import.
-
-## Size
-About 300 production lines, mostly the projection adapter and rebuild, plus deletions.
-
-## Blast radius and rollback
-Sheet consumers see the same rows. Revert restores the sheet reads and the import; the upgrade job rerun is idempotent.
+PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline, whose "infrastructure.spreadsheets or the frozen module" dependency contradicts AC #6 (TASK-169 ruling: an incident-owned adapter over integrations/google_workspace). Two PRs:
+- L4c projection adapter (~150 / 4, incident core; inert; early because TASK-145.8 L6b's status fan-out and 145.7 L9a's declare need it): core/api.py IncidentListProjection Protocol (append_row(incident), update_status(incident, status)), core/adapters/google_sheets.py over integrations/google_workspace (AC #6), fake + parity test, list_sheet_id from [incident_core] (AC #5: each writing subdomain states it as required when it registers its first writer, L6b and L9b). Legacy writers today: incident_folder.py:279 add_new_incident_to_list (append_values :304), :311 update_spreadsheet_incident_status. Row format copied from them (pinned by the declare pin's sheet assertions).
+- L11 projection becomes write-only (~250 mostly deletions / ~8, response + legacy; waits L9b, L10b): /sre incident list active and stale read IncidentStore.list_open (AC #3); the duplicate-row check (modules/incident/core.py ~251, verify) removed; get_incidents_from_sheet (:411) and create_missing_incidents (:523) deleted with their caller and tests (AC #2); the dev incident commands (modules/dev/incident.py list, add-incident :104, load-incidents) deleted (AC #2: no code writes a legacy-shape item; dev list already breaks on end-state items after L9b: OQ17); 145.9's AC #4 import check verified here. After deploy: the job rerun (L12, human) recorded in the notes (AC #2).
+Blast radius: L4c none (inert). L11: list active/stale output (pinned) and dev-only commands; one revert.
+Assumptions: the legacy row format has no reader other than people (AC #1); verify rg for get_incidents_from_sheet callers at L11.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

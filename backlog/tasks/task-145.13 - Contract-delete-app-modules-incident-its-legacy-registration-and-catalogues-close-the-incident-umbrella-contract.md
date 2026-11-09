@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-09T18:10:00Z'
 labels:
   - incident
   - features
@@ -110,6 +110,14 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Coordinated incidents target-shape note (doc-11 E1 contract): after every legacy incident has a verified working-surface binding, remove channel_id and the by_channel lookup/index. This is the contract step; preserve no permanent dual-read fallback.
+
+---
+
+created: 2026-11-09T18:10:00Z
+
+---
+
+Stack L re-plan 2026-11-09: the waits on TASK-165.1 and TASK-146.3 are reassessed in OQ12 (TASK-145.7 comment): recommended option B (interim on-call adapter in core under an import-linter ratchet) removes both waits; scope stays the by_channel fallback, the legacy aliases (listed by the registrar since L1) and modules/incident.
 
 ---
 <!-- COMMENTS:END -->

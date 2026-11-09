@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T14:11:00Z'
+updated_date: '2026-11-09T18:10:00Z'
 labels:
   - incident
   - features
@@ -60,35 +60,22 @@ THIS SLICE
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after TASK-145.8 and TASK-36.3). doc-2 forbids mixing a mechanical move with a behaviour change in one layer, so this task is delivered as TASK-145.9.1 (rebuild: timeline capture, nudge job, aws_platform exit) and TASK-145.9.2 (mechanical: summarize moves into response), human decision before implementation.
+PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.9.1/145.9.2). Planning only: no subtasks until approved. Outline; each slice is planned in full at pickup.
 
-## Discovered state
-- Timeline: modules/incident/incident_conversation.py handle_reaction_added (264) and handle_reaction_removed (325) with the floppy-disk matcher (incident_helper.py 162-165), calling incident_document.update_timeline_section (84-200: extraction 134, headings 171, replacement 187); db_operations.log_activity (164) appends with list_append. Nudge: notify_stale_incident_channels.py (50) posts with an archive button (callback archive_channel); hand-imported by jobs/scheduled_tasks.py:109 ("scheduler:notify_stale_incident_channels"). aws_platform: db_operations.py imports packages.aws_platform.adapters.dynamodb (233 lines, all incident data access).
-- Summarize: scribe/service.py summary path (functions around summarize, settings IncidentSummarySettings, catalogue incident_summary.*, tests test_incident_scribe_summary_{service,slack,settings,locales}.py, test_incident_scribe_conversation_summarize.py), handler handle_summarize_command (entrypoints/slack.py 317-370).
-
-## Steps
-TASK-145.9.1
-1. core/store.py: append_timeline_entry(entry) as its own record (conditional put) and delete_timeline_entry; list_timeline; fake. Store test proves no list_append and no get-then-put.
-2. response/service.py: capture_message (IncidentReport.append_timeline_entry plus store append), uncapture (both removed), stale_incidents (store list where no timeline or status change within the window). response/entrypoints: reaction_added and reaction_removed listeners with the matcher, registered through the registrar's event support (verify the registrar exposes events; TASK-26.1 contract); the nudge job registered through the background-job hookimpl with schedule and lease from the response settings slice; the nudge carries the archive and schedule-postmortem action ids from common/vocabulary.
-3. Delete modules/incident/db_operations.py, notify_stale_incident_channels.py and the jobs/scheduled_tasks.py import; remove the incident seam baseline entries; legacy registrations removed; pinned by TASK-36.1 (reactions) and TASK-36.3 (job).
-TASK-145.9.2
-4. `git mv` the summary path into response/summary.py (service), its settings class into response/settings.py, the catalogue into response/locales, tests renamed test_incident_response_summary_*; the command registers under incident.response; scribe keeps draft only. The Summarizer import moves with it (ignore entry renamed, not added) until TASK-25.10.
-
-## AC traceability
-AC1: steps 1-2 -> capture tests. AC2: step 2 -> job registration test; `rg notify_stale jobs/` empty. AC3: step 4 -> summary tests under response; `rg summar features/incident/scribe` empty. AC4: step 3 -> `rg 'aws_platform|db_operations' app/modules/incident` empty; baseline diff. AC5: timeline layout helper tests. AC6: gates.
-
-## Test matrix
-Capture: reaction on a message in an incident channel -> record and report entry; removal deletes both; reaction in a non-incident channel ignored; report failure leaves the record entry and reports. Nudge: stale detection window; safe to run twice; buttons carry the shared ids. Summarize: unchanged behaviour under new paths.
-
-## Assumptions and doubts
-- The Slack registrar contract may not expose event listeners yet (TASK-26.1 defined commands, actions and views); if so, the reactions register through the hookspec that TASK-140.2 added or a small contract extension lands first as its own PR.
-- TASK-88 waits for this slice's aws_platform exit.
-
-## Size
-9.1 about 350 production lines; 9.2 a move of about 450 lines with no new code.
-
-## Blast radius and rollback
-The nudge job and the reactions are low-traffic; the aws_platform deletion is the riskiest step and reverts with the PR.
+## 1. Re-grounded state
+- Reaction capture: registered incident_helper.py:160-163; handlers incident_conversation.py:261 (added) and :322 (removed), matcher :74; they read Slack (channel name, bookmarks: get_incident_document_id :230) and rewrite the report timeline (incident_document.py:82 update_timeline_section). CORRECTION: they do not call db_operations.log_activity (the outline's Discovered state is wrong) and read no incident item.
+- Stale nudge: app/jobs/scheduled_tasks.py:150-153 and :165-167 -> modules/incident/notify_stale_incident_channels.py:10 (Slack channels only); it posts the archive_channel button that TASK-145.8 L7a re-registers with that id as a legacy alias.
+- Summarize: features/incident/scribe/entrypoints/slack.py:211 -> scribe/service.py:906; builds a ConversationReference from payload.channel_id with no store lookup (AC #12 changes that).
+- Core security guard: comms/service/draft.py:410 _security_gate (called :352, refusal :429-439, SECURITY_CONFIRMATION_REQUIRED). Shared transcript rendering: comms/service/prompt.py:68 build_transcript and scribe/service.py:511, :515 _transcript_line (also :1003).
+- None of these surfaces reads incident items, so 145.9 does not gate the declare cutover: it follows L9b only to keep one cutover in flight at a time.
+## 2. Size gate: trips (~1,100 production LOC with the moves, >10 files, core + response + scribe + comms + jobs, moves mixed with behaviour). Split:
+- L10a core report timeline (~250 / 4, incident core; mechanical move + Protocol): IncidentReport.append_timeline_entry (and removal) in core/api.py, the legacy rewrite incident_document.py 82-302 (build_timeline_replacement included) moved verbatim into core/adapters/google_docs.py, fake + parity test (AC #7). The legacy handlers call the moved function. Waits: -.
+- L10b cutover capture + nudge (~350 / 8, response; waits L10a, L3 (timeline store, if OQ13 moves AC #5 there), L7a (archive alias)): reaction handlers registered by response, writing timeline records (captured_entry_id uuid5, re-capture same key) and report entries through core (AC #1, #5); the nudge registered by response's background-job hookimpl reading the store, posting the prefixed archive id (AC #2); jobs/scheduled_tasks.py no longer imports it; incident_document.py and its legacy test deleted when no caller remains (AC #7 end). Pins (36.1.5) rewired.
+- L10c summarize move (~450 moved / ~8, response + scribe; mechanical; waits TASK-25.10.3): summary.py and prompt.py into response/service/ (AC #3, #11); scribe loses its summary path, catalogue and test; behaviour unchanged; optional text-generation use with no requirement in response (2026-11-09 ruling). Size exception requested for a pure move (same basis as 25.10.2's).
+- L10d guard, rendering, command check (~200 / 6, core + response + comms; behaviour; waits L10c): one core security guard used by comms and summarize (AC #9, comms behaviour and log events unchanged), one core transcript renderer (AC #10, each prompt's text unchanged), summarize resolves through find_incident_for_conversation and reads the primary binding's conversation (AC #12).
+Only L10c and L10d wait on TASK-25.10 (all three slices); L10a and L10b do not.
+## 3. AC changes proposed (comment): AC #4 (no module imports modules.incident.db_operations for incident data) cannot hold at L10: modules/dev/incident.py and incident_folder.py create_missing_incidents import it until TASK-145.12 (L11). Move the check to 145.12 AC #2 or narrow #4 to the surfaces this task rebuilds. AC #5 (timeline_table, entry_key, ids) moves to TASK-145.8 L3 if OQ13 is approved (severity changes are the first timeline writer).
+## 4. Blast radius: L10b changes reaction capture and the nightly nudge (one revert each); L10c none (move); L10d the comms security refusal path (tested unchanged). The inline baseline lines 10-12 (test_incident_updates_command_surface.py) are this task's to remove at L10d.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -137,6 +124,14 @@ created: 2026-11-05T20:31:00Z
 ---
 
 2026-11-05 (TASK-145.6.3 approval, OQ6): AC #8 added. incident-management.md Checks require every incident command to resolve its incident through find_incident_for_conversation; summarize skips it today and 145.6.3 keeps that behaviour. The layer that carries it is chosen at this task's split approval (not 145.9.2, the mechanical move). 145.6.3 also makes the transcript reader take a ConversationReference and return OperationResult (synchronous on WebClient, tolerated in transport-slack.md until its last caller moves).
+
+---
+
+created: 2026-11-09T18:10:00Z
+
+---
+
+Stack L re-plan 2026-11-09: proposed AC changes (not applied): AC #4 moves to TASK-145.12 (OQ20); AC #5 moves to TASK-145.8 L3 if OQ13 is approved. Correction: reaction capture does not call db_operations.log_activity.
 
 ---
 <!-- COMMENTS:END -->
