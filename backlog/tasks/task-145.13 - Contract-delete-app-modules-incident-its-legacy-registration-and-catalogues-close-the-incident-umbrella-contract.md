@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-09T19:04:00Z'
 labels:
   - incident
   - features
@@ -17,8 +17,6 @@ dependencies:
   - TASK-145.5.7
   - TASK-118
   - TASK-186
-  - TASK-165.1
-  - TASK-146.3
 references:
   - https://github.com/cds-snc/sre-bot/issues/1691
 parent_task_id: TASK-145
@@ -36,7 +34,7 @@ THIS SLICE
 - Delete app/modules/incident/ and its entry in the legacy handler registration; delete the incident python-i18n catalogues under app/locales/ once the per-package catalogues carry every key (TASK-118 translator contract, parity gate green for EN and FR).
 - Remove every freeze-baseline entry naming app/modules/incident; no baseline grows.
 - app/tests/integration/legacy_surface/INVENTORY.md: every incident row points at its response, comms or postmortem handler and its pinning test; surfaces found outside the original inventory are listed with their disposition.
-- modules/dev/incident.py and the /sre incident dispatcher in modules/sre are repointed or deleted.
+- The /sre incident dispatcher in modules/sre is repointed or deleted (the dev incident commands are deleted by TASK-145.12).
 - The legacy item bridge (TASK-145.5.8) and the upgrade job (TASK-145.5.7) are deleted once a production run reports nothing pending. Legacy attributes stay on stored items: no strip pass.
 - decisions/incident-management.md Migration: remove the closed tolerances and add a dated Changes line; decisions/migration.md and feature-packages.md Context lines naming modules/incident are updated.
 <!-- SECTION:DESCRIPTION:END -->
@@ -75,7 +73,7 @@ AC1: step 1 -> `ls app/modules/incident` fails; `rg 'modules\.incident' app` emp
 Boot: lifespan test loads every plugin; the legacy registration list has no incident entry; the full suite passes without the legacy tests.
 
 ## Assumptions and doubts
-- modules/dev commands (load-incidents, add-incident) may still be wanted in dev; decide delete or rewrite at pickup.
+- The modules/dev incident commands are deleted by TASK-145.12 (2026-11-09, OQ17).
 
 ## Size
 Deletions mostly; about 100 lines of edits.
@@ -100,6 +98,8 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 2026-11-06 (TASK-36.1.2 OQ1/OQ5, human-approved): also waits on TASK-165.1 (folder genie_schedule imported into the bot's product list) and TASK-146.3 (declare invites on-call through the capability), since this task deletes on_call.py and incident_folder.py. Removes the legacy id aliases kept for posted messages (archive_channel, the alert buttons) once a log check shows no traffic on them.
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Contract task: removes the legacy id aliases, the remaining legacy_only_* tests and the seam-baseline entries for the module it deletes.
+
+2026-11-09 (human, Stack L OQ12): no longer waits on TASK-165.1 or TASK-146.3: declare invites on-call through the capability inside TASK-145.7 (146.3 delivered there); the only remnant is the read-only schedule-source adapter owned by 165.1, outside modules/incident. The dev incident commands are deleted by TASK-145.12 (OQ17).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -110,6 +110,22 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Coordinated incidents target-shape note (doc-11 E1 contract): after every legacy incident has a verified working-surface binding, remove channel_id and the by_channel lookup/index. This is the contract step; preserve no permanent dual-read fallback.
+
+---
+
+created: 2026-11-09T18:10:00Z
+
+---
+
+Stack L re-plan 2026-11-09: the waits on TASK-165.1 and TASK-146.3 are reassessed in OQ12 (TASK-145.7 comment): recommended option B (interim on-call adapter in core under an import-linter ratchet) removes both waits; scope stays the by_channel fallback, the legacy aliases (listed by the registrar since L1) and modules/incident.
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09 (OQ12, OQ17), proposed: the waits on TASK-165.1 and TASK-146.3 drop if 146.3 lands inside 145.7's L9a (declare invites through capabilities.oncall.api; the only remnant is a read-only schedule-source adapter owned by 165.1, outside modules/incident). The dev incident commands are deleted by TASK-145.12 (L11), so 'repointed or deleted' and 'decide delete or rewrite at pickup' no longer apply. Dependencies unchanged until the human rules.
 
 ---
 <!-- COMMENTS:END -->

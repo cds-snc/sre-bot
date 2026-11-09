@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-09T18:37:00Z'
 labels:
   - oncall
   - capabilities
@@ -56,6 +56,14 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Re-cut for E2: keep oncall_sync consuming the on-call capability; do not make it an Opsgenie-specific consumer. Update the capability adapter and this feature together when the accepted on-call ADR selects GoAlert.
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Out of sync (Stack L assessment 2026-11-09): this task cites an accepted on-call ADR selecting GoAlert; decisions/oncall.md:47-48 records no replacement chosen and no such ADR exists. Fix at pickup.
 
 ---
 <!-- COMMENTS:END -->

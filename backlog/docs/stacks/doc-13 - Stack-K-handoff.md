@@ -3,7 +3,7 @@ id: doc-13
 title: Stack K handoff
 type: guide
 created_date: 2026-10-14 22:27
-updated_date: '2026-11-05T19:12:00Z'
+updated_date: '2026-11-09T18:30:00Z'
 ---
 # Stack K handoff
 ## Stack
@@ -35,18 +35,19 @@ updated_date: '2026-11-05T19:12:00Z'
 | 10 | TASK-145.5.6 StatusUpdateStore onto RecordStore | `stack-k/task-145.5.6-status-update-store` | #1735 | merged | 2026-11-04 20:35 UTC. |
 | 11a | TASK-145.5.7.1 host TenantVerifier and lease_ttl | `stack-k/task-145.5.7.1-host-tenant-verifier-and-lease` | #1820 | merged | 5deb8406. |
 | 11b | TASK-145.5.7.2 incident core upgrade runner | `stack-k/task-145.5.7.2-upgrade-runner` | #1821 | merged | 2026-11-05 (33511c15), deployed (new task started; `/sre help` and the alert buttons work; the deploy script was not run, none required). |
-| 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | merged | 2026-11-05. Task still In Progress: the human sets Done (edit rides in 12c's commit).
+| 11c | TASK-145.5.7.3 incident.response becomes a plugin and registers the job (mode off) | `stack-k/task-145.5.7.3-response-registers-upgrade` | #1822 | merged | 2026-11-05. Task Done (edit rode in #1827).
 | 12a | TASK-145.6.1 verbatim move of documents/, drive/ and scribe's section writer into core/adapters/google_docs.py; every importer repointed | `stack-k/task-145.6.1-google-docs-move` | #1825 | merged | 2026-11-05 20:35 UTC (squash). Base `main` since #1822 merged (GitHub retarget). ACs #1-#5 checked, In Progress. The four document section types moved to core/domain.py (pulled forward from 12b). |
 | 12b | TASK-145.6.2 IncidentReport Protocol, Google Docs adapter and fake; Drive on the gateway (infrastructure.drive ignores deleted); scribe drafts from the record's report; [incident_core] ids required on register | `stack-k/task-145.6.2-incident-report` | #1826 | merged | 2026-11-05 23:36 UTC (04738f72). Committed 8704abdd, submitted above #1825. ACs #1-#10 checked, In Progress; the human sets Done. Production SSM INCIDENT_CORE folder and template ids confirmed non-empty (human, 2026-11-05). |
-| 12c | TASK-145.6.3 IncidentConversation with is_writable; conversation_is_writable; the transcript reader takes a ConversationReference | `stack-k/task-145.6.3-incident-conversation` | #1827 | in review | Base `main` since #1826 merged; Stack K's last layer. Plan commits 4d61cb56, 94d43ef2 submitted as #1827. 2026-11-05: implemented with TDD, committed (7bfeb90c before the human's rebase onto the merged 12a) and submitted; ACs #1-#6 checked, In Progress; gates green (ruff; contracts 13 kept; key ownership OK; mypy 41 pre-existing; pytest 6396 passed). |
+| 12c | TASK-145.6.3 IncidentConversation with is_writable; conversation_is_writable; the transcript reader takes a ConversationReference | `stack-k/task-145.6.3-incident-conversation` | #1827 | merged | 2026-11-09 17:51 UTC (af75dffe, squash), after a rebase onto main that kept every dated Changes line. Base `main` since #1826 merged; Stack K's last layer. Plan commits 4d61cb56, 94d43ef2 submitted as #1827. 2026-11-05: implemented with TDD, committed (7bfeb90c before the human's rebase onto the merged 12a) and submitted; ACs #1-#6 checked, In Progress; gates green (ruff; contracts 13 kept; key ownership OK; mypy 41 pre-existing; pytest 6396 passed). |
 
 TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A planning-only refinement is normally an earlier commit on the layer it refines; a large planning sync goes on its own planning layer (`stack-k/plan-<n>`, labelled P<n>).
 
 ## Position
 
+- **Finished 2026-11-09**: every layer merged, the last #1827 (12c, TASK-145.6.3, af75dffe). No open stack PRs. The closures that rode in #1827 are on main (TASK-145.5, 145.5.7, 145.5.7.1, 145.5.7.3, 145.6, 145.6.1-145.6.3, 114.1, 114.2, 36.1.2, 36.1.5, 36.3, 186, 187 Done; TASK-138 archived). TASK-145.7 onward is Stack L, a new stack from `main`.
 - 2026-11-05 (row 9.10b.1 session, side PR planning): 12a #1825 merged 20:35 UTC; the human rebased the stack onto it. 12c's implementation is committed and submitted. The stack branches were not touched by the session.
 - 2026-11-05 23:36 UTC: #1826 (12b) merged (04738f72).
-- Open stack PRs: #1827 (12c, base `main`, Stack K's last layer). Its rebase onto main stops on decisions/outbound-clients.md and decisions/incident-management.md: keep every dated Changes line from both sides.
+- Open stack PRs: none (#1827 merged 2026-11-09).
 - 2026-11-06: this doc's update rode in the TASK-114 session (popped from the 12c stash onto `task-114-package-generator`) and ships with TASK-114.1's PR.
 - Never stage: `backlog/docs/doc-6*`, `doc-8*`, `doc-9*`, `doc-11*`, `doc-15*`, `CDS Incident Management Handbook.md`, `Incident Response Runbook.md`, `large-scale-incident-analysis.md`, `access-vs-team-analysis.md`, `coordinated-incidents-executive-briefing.md`.
 - Production data facts (scans, 2026-10-15): 323 incident items; 30 `closed` and 1 `reviewed` lowercase; security_incident absent on 316; every created_at an epoch string. 2026-11-05: 2 of 330 items have no report_url, both open test incidents (D1 accepted: /incident draft there answers no-document). Production cannot run bin scripts (no ECS Exec, no RunTask), hence the in-app job.
@@ -56,9 +57,9 @@ TASK-27.5 left the stack (doc-11 R6, human 2026-10-20) and merged as #1736. A pl
 
 1. Done 2026-11-05: 12c committed and submitted; #1825 (12a) merged.
 2. Done 2026-11-05 23:36 UTC: #1826 (12b) merged (04738f72).
-3. **human**: rebase #1827 (12c) onto main (keep every dated Changes line in decisions/outbound-clients.md and decisions/incident-management.md), re-review and merge it last; no further Stack K layers are planned (TASK-145.7 onward is Stack L).
-4. **human**: after each merge, `backlog task edit <id> --status Done` for TASK-145.6.1, 145.6.2, 145.6.3 (and TASK-145.6 once all three are Done); the task-file edits ride in the next commit.
-5. The job runs (per environment, dry run then apply) only after TASK-145.8 deploys, before TASK-145.9 merges, and again after TASK-145.12. TASK-145.7 adds the binding step before that first run.
+3. Done 2026-11-09 17:51 UTC: #1827 (12c) merged (af75dffe). Was: **human**: rebase #1827 (12c) onto main (keep every dated Changes line in decisions/outbound-clients.md and decisions/incident-management.md), re-review and merge it last; no further Stack K layers are planned (TASK-145.7 onward is Stack L).
+4. Done: TASK-145.6.1, 145.6.2, 145.6.3 and TASK-145.6 are Done on main (rode in #1827).
+5. Handed to Stack L (doc-11 row 18): the job runs (dry run, then apply) after the TASK-145.8 reader cutovers deploy and before the declare cutover, with the binding step (marker 2) added first; it is rerun after the last legacy writer.
 
 ## Open decisions
 

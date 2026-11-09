@@ -168,6 +168,46 @@ resource "aws_dynamodb_table" "sre_bot_incident_timeline" {
   }
 }
 
+# Incident bindings: one item per place responders work an incident (a chat conversation now,
+# a Backstage page later). binding_key is '<kind>#<system>#<tenant>#<vendor_id>'.
+# conversation_id is set only on chat bindings, so the by_conversation index is sparse.
+resource "aws_dynamodb_table" "sre_bot_incident_bindings" {
+  name           = "sre_bot_incident_bindings"
+  hash_key       = "incident_id"
+  range_key      = "binding_key"
+  read_capacity  = 2
+  write_capacity = 2
+
+  attribute {
+    name = "incident_id"
+    type = "S"
+  }
+
+  attribute {
+    name = "binding_key"
+    type = "S"
+  }
+
+  attribute {
+    name = "conversation_id"
+    type = "S"
+  }
+
+  # Find the incident bound to a chat conversation.
+  # Write capacity matches the table's: with projection ALL every chat binding write is also written here.
+  global_secondary_index {
+    name            = "by_conversation"
+    projection_type = "ALL"
+    read_capacity   = 1
+    write_capacity  = 2
+
+    key_schema {
+      attribute_name = "conversation_id"
+      key_type       = "HASH"
+    }
+  }
+}
+
 # Dedicated table for idempotency cache
 # Stores cached API responses with automatic TTL-based expiration
 resource "aws_dynamodb_table" "sre_bot_idempotency" {
@@ -267,6 +307,7 @@ locals {
     aws_dynamodb_table.sre_bot_incident_status_updates.arn,
     aws_dynamodb_table.incidents_table.arn,
     aws_dynamodb_table.sre_bot_incident_timeline.arn,
+    aws_dynamodb_table.sre_bot_incident_bindings.arn,
     aws_dynamodb_table.sre_bot_idempotency.arn,
     aws_dynamodb_table.sre_bot_audit_trail.arn,
   ]

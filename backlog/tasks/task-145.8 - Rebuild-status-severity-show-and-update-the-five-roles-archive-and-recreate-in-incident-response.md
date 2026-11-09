@@ -6,13 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:24:00Z'
+updated_date: '2026-11-09T19:06:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
-  - TASK-145.7
   - TASK-27.2
   - TASK-36.1.2
 references:
@@ -31,7 +30,7 @@ Layer C2 of TASK-145. Rebuilds the /sre incident subcommands and interactions th
 RULES
 - Every command resolves its incident through find_incident_for_conversation; only operations that write to the conversation call conversation_is_writable. A status, severity, timing or report update on an incident whose channel is archived succeeds and reports that the channel message was skipped.
 - Status change fans out from the record: atomic field update, then the report's status text, then the list projection (write-only), then the channel message when writable.
-- Severity is set at declare and changed from the update modal (none and SEV0 to SEV4, SEV0 new); it is a record field, never read from a document.
+- Severity is set at declare and changed from the update modal (none and SEV1 to SEV4 until TASK-145.7's declare cutover adds SEV0 to both pickers); it is a record field, never read from a document.
 - The five roles (incident commander, operations lead, communications lead, policy lead, postmortem owner) are stored on the record and shown in the show modal; the report's Drive properties are no longer written. The roles command offers all five; only IC and OL are required.
 - The show modal renders every link from the record's references through the owning adapter, with the stored url as a hint only.
 - IncidentStore.update_field maps to RecordStore.update (TASK-27.2) with a set change and the optional expected guard: a guard that does not hold is a distinct non-error result, and a missing incident is NOT_FOUND. Closed sets the status and removes open_bucket and opened_at in one update, so the sparse open index drops the incident atomically.
@@ -57,38 +56,53 @@ RULES
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 IncidentReport gains set_status_text(ReportReference, status) in core/api.py with its Google Docs adapter and fake (parity test); the legacy status mapping in modules/incident/incident_document.py (lines 55-80 at main 5deb8406) moves into core/adapters/google_docs.py and the legacy caller is repointed or deleted
 - [ ] #10 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
+- [ ] #11 Each person-chosen severity change writes a timeline entry after the guarded field update (deterministic entry id; a failed entry is logged and never rolls the field back); core/store.py holds timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, and a uuid4 manual entry id, each tested (moved from TASK-145.9 AC #5)
+- [ ] #12 A write onto an item without record_version upgrades it through the shared upgrade function, puts its binding and writes the change with record_version 2 in one guarded update (incident-management.md Migration rules 3-4 as amended in TASK-145.7's A1)
+- [ ] #13 Before the first reader cutover, the legacy Incident model reads upgraded items (extra=ignore and an int severity rendered as sev-N, tested) as a rollback guard only; it is deleted with the model by TASK-145.7
+- [ ] #14 A cutover fixes a recorded legacy bug only when no pin asserts it, naming it in the PR body with a new test (migration.md rule added in the roles and archive cutover): the archive sends one Sentinel event and a refused archive logs nothing
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline plan grounded at main d2d973ae (2026-10-09) against the legacy module; re-ground at pickup (after TASK-145.7). SIZE GATE: proposed split into TASK-145.8.1 (status, severity, show and update fields; IncidentStore.update_field) and TASK-145.8.2 (five roles, archive, recreate missing resources, list), human decision before implementation.
+APPROVED 2026-11-09 (human): the program breakdown and the revised recommendations of the second OQ assessment comment on TASK-145.7 (OQ1-OQ20), including the L5r rollback guard, the on-call capability path (25.6 -> 146.1, 146.3 in L9a), L9c and the IncidentBinding rename. Subtasks created 2026-11-09. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.8.1/145.8.2, "after TASK-145.7").  This task's slices: L3 (core update operations), L6a, L6b, L7a, L7b (reader cutovers, before the declare cutover L9b).
 
-## Discovered state
-- modules/incident/incident_helper.py (720): /sre incident dispatcher handle_incident_command (198-437: help, create, close, show, list, schedule, channels, products, status, roles, updates pointer); registrations 151-167 (add_folder_metadata, view_folder_metadata, view_folder_metadata_modal, add_metadata_view, delete_folder_metadata, view_save_incident_roles, view_save_event, confirm_click, user_select_action, archive_channel, reactions, update_incident_field, update_field_modal); modules/sre/platforms/slack.py:16 routes /sre incident to it. incident_status.py (81): update_status, posts to channel (70). information_display.py (183): incident_information_view modal. information_update.py (330): update_field_modal and field views, posts (50, 264). incident_roles.py (145): save_incident_roles, Drive metadata ic_id/ol_id (20-21), posts (13). incident_conversation.archive_channel_action (433). incident_folder.py: metadata and sheet status update (314-328). db_operations.update_incident_field (121, list_append for activities). tests/modules/incident/test_recreate_missing_resources.py covers the recreate path.
-- scribe registers its /sre incident subcommands under parent "sre.incident" through the registrar: response does the same, so the legacy dispatcher loses subcommands one by one.
+## 1. Re-grounded state (legacy paths are frozen; not references)
+- Dispatcher: modules/sre/platforms/slack.py:49 handle_incident_command (registered ~205, legacy_mode); incident_helper.py:196-240; registrations incident_helper.py:144-166.
+- show: incident_helper.py:276 -> information_display.py:14 (get_incident_by_channel_id :18, Incident(**item) :29, severity rendered :50).
+- update modal: button update_incident_field (incident_helper.py:164) -> information_update.py:50; view update_field_modal (:165) -> :264; reads Incident (:329); writes db_operations.update_incident_field (:322) for detection_time, start_impact_time, end_impact_time, retrospective_url, severity (none, sev-1..sev-4: FIELD_SCHEMA 25-34), status; posts to the channel (323-327) and appends a logs line (log_activity, db_operations.py:159-160). Write order today: report, sheet, record, channel (306-327).
+- status: `status update <s>` incident_helper.py:366 -> :577 (reads :592) -> incident_status.update_status at :603 WITHOUT incident_id, so the slash path never writes the record (incident_status.py:56-59 skips it); it writes the report status text (incident_document, lines 55-80 mapping) and the sheet (incident_folder.py:311). `status show` is a stub (382-383).
+- roles: `roles manage` incident_helper.py:388 -> incident_roles.py:57 (Drive appProperties ic_id/ol_id); view view_save_incident_roles (:155) -> incident_roles.py:13 (Drive metadata 20-21, purpose 54). Two pickers (IC, OL); the record has five roles.
+- archive: button archive_channel (incident_helper.py:159) on the stale-nudge message -> incident_conversation.py:430 -> close_incident (incident_helper.py:435: read :443, refuse non-incident 459-470, status Closed written through update_status with incident_id :475, post, conversations_archive :501, Sentinel :508), then Sentinel again (incident_conversation.py:452).
+- recreate: `create resources` incident_helper.py:254 -> :631 -> modules/incident/core.py:336 (read :377; no record -> _create_database_record :406/:316).
+- Pins: tests/integration/legacy_surface/test_incident_field_update_surface.py (show, update, status: 12), test_incident_roles_surface.py (13, 2 legacy_only), test_incident_channel_archive_surface.py (8); fixture legacy_sre_web_client_seam conftest.py:788-794 (owner TASK-145.8), used by the incident_surface fixture :803; baseline app/bin/baselines/test_seams_legacy.txt:20. No pin for slash status update, status show, roles show or recreate (recreate: tests/modules/incident/test_recreate_missing_resources.py). Inline baseline lines 10-12 (test_incident_updates_command_surface.py) carry no owner: assigned to TASK-145.9 (summary) at its plan.
+- Core on main: IncidentStore has no write; StatusUpdateStore.transition (store.py:360-379) is the guarded-update model; RecordStore.update(table, key, changes, *, expected) with Set/Remove/Increment (contracts/records/store.py:131-150, 288); an unmet guard returns success with data=None. upgrade_legacy_item (core/adapters/legacy_items.py:99) is pure; the job's per-item plan (_plan_item, legacy_upgrade.py:230) is private until L2b.
 
-## Steps
-1. core/store.py: update_field(incident_id, field, value, *, expected=None) atomic, no read-modify-write; fake.
-2. response/service.py: set_status (record, report status text, projection status cell, channel post when writable), set_severity, update_field (timing fields and text), show (every link rendered from references through the owning adapter), set_roles (five roles on the record; channel purpose footer kept; Drive properties no longer written), archive (writability check, archive through IncidentConversation, record status), recreate_missing_resources (fill empty references through the declare steps), list (store).
-3. response/entrypoints: the subcommands status, show, roles, list, archive, channels under sre.incident; the information modal, update-field modal, roles modal (five pickers, IC and OL required); each one service call. products and the folder-metadata interactions are retired (TASK-165.1, TASK-146.3, deleted by TASK-145.13); confirm_click is TASK-145.10's. Views in slack_views.py; keys in locales.
-4. Legacy: the matching subcommands and registrations removed from incident_helper.py, incident_status.py, information_display.py, information_update.py, incident_roles.py in the same PR; pinned by TASK-36.1. modules/sre keeps routing only what remains.
+## 2. Dependency reversal (verified)
+Readers and update operations need only IncidentStore.get/find_by_conversation, the bridge, RECORD_VERSION/OPEN_BUCKET, format_stored_time and RecordStore.update: none of declare. Recreate needs 145.7's inert core slices L4a (conversation additions) and L4b (VideoCall), not the declare cutover. So TASK-145.8 no longer depends on TASK-145.7; TASK-145.7 depends on TASK-145.8 (its cutover L9b waits on L6a-L7b). Per-slice dependencies (L7b on L4a/L4b, L3 on L2b) are wired when the subtasks are created.
 
-## AC traceability
-AC1: step 2 -> service tests with an archived conversation (write skipped and reported). AC2: steps 1-2 -> store update_field test; roles tests assert no Drive metadata call. AC3: step 2 -> fan-out order test with failing report/projection/channel stubs. AC4: pinned surfaces. AC8: gates.
+## 3. AC #7: writes onto items the job has not upgraded (recommendation: upgrade-on-write)
+Legacy declare keeps creating legacy items until L9b, and the sheet import and dev add-incident until L11, so items without the marker keep appearing after the job's first run (L8). "Refuse until the job has run" would therefore refuse status, severity and role changes on every incident declared between L8 and L9b: rejected. Upgrade-on-write: a core write that reads an item without record_version calls the shared plan_item_upgrade (L2b), puts the binding (idempotent), then applies ONE guarded update holding the upgraded attributes, the requested change and record_version 2, guarded on record_version absent plus every read attribute (the job's guard). A lost guard re-reads and retries once, then returns a classified conflict. An unreadable legacy item (Migration rule 7) refuses the write with the field named, exactly as the job lists it. This keeps AC #7 ("an item without record_version is never stamped by a partial update") and makes writer and job one rule.
 
-## Test matrix
-Status change: each fan-out step failing independently; archived channel. Severity set and shown. Roles: five set, IC/OL required, metadata adapter never called. Archive: not writable -> refusal; success. Recreate: each missing reference recreated once. List: active and stale.
+## 4. Slices
+L3 core update operations (~350 / 5, incident core; waits L2b): IncidentStore gains update_fields(incident_id, changes: IncidentChanges, *, expected_version) for title, impact times, retrospective link, severity, security_incident; set_roles(incident_id, roles); close(incident_id) (status Closed, open_bucket and opened_at removed in one update); reopen(incident_id) (status, open_bucket, opened_at = format_stored_time(now) in one update); each through upgrade-on-write (section 3); in-memory fake with the same guard rules. Severity changes are recorded: the guarded field update first, then append_timeline_entry of a system entry (kind severity_changed, from, to, by; deterministic id from incident, change and time, so a retry writes the same entry; a failed entry is logged and never rolls the field back) on sre_bot_incident_timeline; this pulls 145.9 AC #5 (timeline_table, entry_key, ids) into L3 (proposed in a comment on 145.9; OQ13). Tests: tests/unit/features/incident/core/test_incident_core_store_update_*.py: guarded update happy, lost guard, upgrade-on-write in one pass (binding + marker 2), unreadable legacy item refused, close/reopen bucket rules, severity change appends one timeline entry, replay of the same change.
+L6a cutover show + update modal (~380 / 9, response; waits L3): response/entrypoints/slack.py registers `incident show` and the modal (ids incident.response.show / incident.response.update_field; modal-internal, prefixed; the show view's update buttons are inside the modal); views render links through the owning adapter with the stored url as hint (AC #5 part); update writes through L3 in today's order with each failure logged and the rest continuing; severity options none, SEV0-SEV4 decided at OQ14 (recommend: keep none, sev-1..sev-4 until L9b adds SEV0 to both pickers together, so the pin is unchanged here); security_incident editable (AC #6: the flip is a field of the update modal, no separate action). Deletes information_display.py, information_update.py and their registrations. Pins: field-update pins rewired to fakes.
+L6b cutover status (~300 / 7, response + core adapter; waits L3, L4c): `incident status update` writes record, report text, projection, channel in that order (AC #3). Named behaviour change: the legacy slash path never wrote the record. IncidentReport.set_status_text with the mapping moved from incident_document.py 55-80 into core/adapters/google_docs.py (AC #9); projection update through L4c. Deletes incident_status.py.
+L7a cutover roles + archive (~350 / 8, response; waits L1, L3): five roles on the record (set_roles); no Drive property writes for roles (AC #2); purpose rewritten from the record; archive button incident.response.archive with legacy alias archive_channel (posted by the legacy stale nudge until L10b); close through L3, archive, one Sentinel event. 36.1.2 rulings (OQ15), under a migration.md rule added in this PR ("a cutover may fix a recorded legacy bug that no pin asserts, named in the PR body and covered by a new test"): Sentinel event sent once (the pin asserts a set, unchanged); a refused archive logs nothing; roles purpose output kept exactly as pinned (the note's "doubled newline" does not match the pin: append path gives "Checkout outage \nIC:"; a wording fix belongs to a UX task); products vs product is not this task's (ADR 2026-11-06 retires /sre incident products; 145.13 deletes it). Deletes legacy_sre_web_client_seam (conftest.py:788-794) and baseline line 20 once the roles, archive and field-update pins no longer request it.
+L7b cutover recreate (~250 / 6, response; waits L3, L4a, L4b): `incident create resources` fills each missing reference (report, video call, bookmarks) through core and set_reference; replaces a map whole guarded on the old value (AC #5). A channel with no record: OQ16 (recommend: answers not-an-incident, every command resolves through find_incident_for_conversation (AC #1); the legacy record-creating branch is not carried). Deletes recreate_missing_resources, _create_database_record and their test.
 
-## Assumptions and doubts
-- The five-role picker is the only visible change; the handbook-style names come from common/vocabulary.
-- Folder metadata is not rebuilt (2026-11-06): no ProductCatalog over Drive folders (incident-management.md 2026-11-04); TASK-165.1 imports each folder's genie_schedule into the bot's product list.
+## 5. AC traceability
+#1 L6a-L7b. #2 L3 + L7a. #3 L6b. #4 L6a, L6b, L7a. #5 L6a (links) + L7b. #6 L6a. #7 L3 (section 3). #8 every PR. #9 L6b. #10 L6a-L7b.
+Proposed new AC (comment): each person-chosen severity change is recorded as a timeline entry (Revision 1; TASK-154 owns lifecycle only, its description has no severity scope).
 
-## Size
-Over the gate as one task (~800 lines); each half about 400.
+## 6. Blast radius and rollback
+Each cutover changes one group of commands; one revert restores the legacy registration (legacy code deleted in the same PR returns with the revert). Items written by the rebuilt writers are end-state (marker 2): a reverted legacy reader would fail on them (Incident(**item), extra=forbid). Upgrade-on-write starts with L6a's own deploy, so there is no bake before the first new-shape write. Recommended (OQ18): the L5r rollback guard (Incident extra="ignore" plus int severity rendering, ~15 LOC, deleted with the model in L9b) merges before L6a, so every reader-cutover revert stays safe (AWS rollback-safety practice: the revert target reads the new shape first). If the human keeps the no-relax rule, each of L6a-L7b is forward-fix only after its first write, stated in its PR body. L8 waits on all four deployed.
 
-## Blast radius and rollback
-Each subcommand's legacy registration is removed with its rebuild; a revert restores it. Status fan-out is the riskiest path: it writes four systems.
+## 7. Assumptions
+1 The bridge maps every field the modal writes (verify at L3 against legacy_items.py). 2 The archive_channel action carries only the archive branch (verify incident_conversation.py:430 at L7a; another branch would move with it). 3 Pins need only fixture rewiring (assertions unchanged).
+
+## Subtasks (created 2026-11-09)
+L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-145.8.1; L4a TASK-145.7.5; L4b TASK-145.7.6; L4c TASK-145.12.1; L5 TASK-145.7.7; L5r TASK-145.8.2; L6a TASK-145.8.3; L6b TASK-145.8.4; L7a TASK-145.8.5; L7b TASK-145.8.6; L8 TASK-145.7.8; L9a TASK-145.7.9; L9b TASK-145.7.10; L9c TASK-145.7.11; L10a TASK-145.9.1; L10b TASK-145.9.2; L10c TASK-145.9.3; L10d TASK-145.9.4; L11 TASK-145.12.2; side: TASK-25.6 -> TASK-146.1 (before L9a); TASK-146.3 delivered by TASK-145.7.9; L12 (job rerun) is TASK-145.12.2's notes. Other slices are planned in full at pickup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -109,6 +123,22 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Coordinated incidents ADR note (doc-11 A1/E1): re-plan the chosen change-severity surface to record each person-chosen severity change. Do not derive severity from the count or breadth of engagements. Choose one owning task during planning to avoid duplicate behavior.
+
+---
+
+created: 2026-11-09T18:10:00Z
+
+---
+
+Stack L re-plan 2026-11-09: dependency on TASK-145.7 reversed (verified: readers and updates need none of declare; recreate needs only 145.7's inert core slices L4a/L4b). Proposed new AC: each person-chosen severity change is recorded as a timeline entry (OQ13). AC #7 resolved by upgrade-on-write (plan section 3). Open questions OQ13-OQ16 and OQ18 are on TASK-145.7's comment.
+
+---
+
+created: 2026-11-09T18:37:00Z
+
+---
+
+Stack L OQ assessment 2026-11-09: proposed AC text change: the update modal's severity options gain SEV0 at the declare cutover (L9b, with the declare picker), not in 145.8's own cutover (OQ14). AC #7 upgrade-on-write needs incident-management.md Migration rules 3-4 amended (A1, L0). Rollback guard L5r proposed (OQ18). Full assessment on TASK-145.7.
 
 ---
 <!-- COMMENTS:END -->
