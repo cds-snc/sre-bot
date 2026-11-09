@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: 2026-10-15 20:49
-updated_date: '2026-11-09T17:44:00Z'
+updated_date: '2026-11-09T19:04:00Z'
 labels:
   - migration
   - testing
@@ -98,4 +98,6 @@ Production 0. This task: 4 new test files + conftest + INVENTORY + 3 ADRs (9 fil
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-06 implemented (tests and docs only, from main 76f73bde): conftest.py additive (incident_surface fixture: in-memory DynamoDB client under the incidents adapter, Google client factory for Drive/Docs/Sheets, view helpers reading modal ids from recorded views; one internal legacy seam, legacy_sre_web_client_seam, owner TASK-145.8); test_incident_roles_surface.py (13, 2 legacy_only), test_incident_field_update_surface.py (12), test_incident_channel_archive_surface.py (8), test_incident_folder_metadata_surface.py (5, all legacy_only); INVENTORY.md 9 rows and the id sentence. Pytest collects only test_*, so the ADR names test_legacy_only_*. Mutation-checked each file. Legacy behaviour pinned as is, for TASK-145.8 to rule: /sre incident products answers Unknown command (the key is product, help says products); archive sends incident_channel_archived to Sentinel twice; a refused archive in a non-incident channel still sends it (not pinned); re-saving roles with no roles line in the purpose leaves a doubled newline. Gates: ruff clean; contracts 13 kept; key ownership OK; package shape OK (10 baselined); mypy 41 pre-existing in 14 files (none in touched files); pytest 6475 passed.
+
+2026-11-09 (Stack L OQ15): correction: the roles purpose pin (test_incident_roles_surface.py:128-141) asserts the replace case ('Checkout outage\n\nIC: ...'); the append case yields 'Checkout outage \nIC:'. No doubled newline is pinned; the rebuilt roles keep the pinned output.
 <!-- SECTION:NOTES:END -->

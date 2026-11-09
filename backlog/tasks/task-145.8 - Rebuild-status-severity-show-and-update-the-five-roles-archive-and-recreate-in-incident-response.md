@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T18:37:00Z'
+updated_date: '2026-11-09T19:06:00Z'
 labels:
   - incident
   - features
@@ -30,7 +30,7 @@ Layer C2 of TASK-145. Rebuilds the /sre incident subcommands and interactions th
 RULES
 - Every command resolves its incident through find_incident_for_conversation; only operations that write to the conversation call conversation_is_writable. A status, severity, timing or report update on an incident whose channel is archived succeeds and reports that the channel message was skipped.
 - Status change fans out from the record: atomic field update, then the report's status text, then the list projection (write-only), then the channel message when writable.
-- Severity is set at declare and changed from the update modal (none and SEV0 to SEV4, SEV0 new); it is a record field, never read from a document.
+- Severity is set at declare and changed from the update modal (none and SEV1 to SEV4 until TASK-145.7's declare cutover adds SEV0 to both pickers); it is a record field, never read from a document.
 - The five roles (incident commander, operations lead, communications lead, policy lead, postmortem owner) are stored on the record and shown in the show modal; the report's Drive properties are no longer written. The roles command offers all five; only IC and OL are required.
 - The show modal renders every link from the record's references through the owning adapter, with the stored url as a hint only.
 - IncidentStore.update_field maps to RecordStore.update (TASK-27.2) with a set change and the optional expected guard: a guard that does not hold is a distinct non-error result, and a missing incident is NOT_FOUND. Closed sets the status and removes open_bucket and opened_at in one update, so the sparse open index drops the incident atomically.
@@ -56,12 +56,16 @@ RULES
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #9 IncidentReport gains set_status_text(ReportReference, status) in core/api.py with its Google Docs adapter and fake (parity test); the legacy status mapping in modules/incident/incident_document.py (lines 55-80 at main 5deb8406) moves into core/adapters/google_docs.py and the legacy caller is repointed or deleted
 - [ ] #10 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
+- [ ] #11 Each person-chosen severity change writes a timeline entry after the guarded field update (deterministic entry id; a failed entry is logged and never rolls the field back); core/store.py holds timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, and a uuid4 manual entry id, each tested (moved from TASK-145.9 AC #5)
+- [ ] #12 A write onto an item without record_version upgrades it through the shared upgrade function, puts its binding and writes the change with record_version 2 in one guarded update (incident-management.md Migration rules 3-4 as amended in TASK-145.7's A1)
+- [ ] #13 Before the first reader cutover, the legacy Incident model reads upgraded items (extra=ignore and an int severity rendered as sev-N, tested) as a rollback guard only; it is deleted with the model by TASK-145.7
+- [ ] #14 A cutover fixes a recorded legacy bug only when no pin asserts it, naming it in the PR body with a new test (migration.md rule added in the roles and archive cutover): the archive sends one Sentinel event and a refused archive logs nothing
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.8.1/145.8.2, "after TASK-145.7"). Planning only: no subtasks until approved. This task's slices: L3 (core update operations), L6a, L6b, L7a, L7b (reader cutovers, before the declare cutover L9b).
+APPROVED 2026-11-09 (human): the program breakdown and the revised recommendations of the second OQ assessment comment on TASK-145.7 (OQ1-OQ20), including the L5r rollback guard, the on-call capability path (25.6 -> 146.1, 146.3 in L9a), L9c and the IncidentBinding rename. Subtasks created 2026-11-09. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.8.1/145.8.2, "after TASK-145.7").  This task's slices: L3 (core update operations), L6a, L6b, L7a, L7b (reader cutovers, before the declare cutover L9b).
 
 ## 1. Re-grounded state (legacy paths are frozen; not references)
 - Dispatcher: modules/sre/platforms/slack.py:49 handle_incident_command (registered ~205, legacy_mode); incident_helper.py:196-240; registrations incident_helper.py:144-166.
@@ -96,6 +100,9 @@ Each cutover changes one group of commands; one revert restores the legacy regis
 
 ## 7. Assumptions
 1 The bridge maps every field the modal writes (verify at L3 against legacy_items.py). 2 The archive_channel action carries only the archive branch (verify incident_conversation.py:430 at L7a; another branch would move with it). 3 Pins need only fixture rewiring (assertions unchanged).
+
+## Subtasks (created 2026-11-09)
+L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-145.8.1; L4a TASK-145.7.5; L4b TASK-145.7.6; L4c TASK-145.12.1; L5 TASK-145.7.7; L5r TASK-145.8.2; L6a TASK-145.8.3; L6b TASK-145.8.4; L7a TASK-145.8.5; L7b TASK-145.8.6; L8 TASK-145.7.8; L9a TASK-145.7.9; L9b TASK-145.7.10; L9c TASK-145.7.11; L10a TASK-145.9.1; L10b TASK-145.9.2; L10c TASK-145.9.3; L10d TASK-145.9.4; L11 TASK-145.12.2; side: TASK-25.6 -> TASK-146.1 (before L9a); TASK-146.3 delivered by TASK-145.7.9; L12 (job rerun) is TASK-145.12.2's notes. Other slices are planned in full at pickup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

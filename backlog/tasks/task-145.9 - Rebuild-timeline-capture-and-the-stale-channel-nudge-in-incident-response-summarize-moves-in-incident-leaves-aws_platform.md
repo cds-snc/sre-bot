@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T18:10:00Z'
+updated_date: '2026-11-09T19:06:00Z'
 labels:
   - incident
   - features
@@ -46,21 +46,21 @@ THIS SLICE
 - [ ] #1 Floppy-disk capture and removal write and delete timeline records and report entries through core; the legacy handlers are gone
 - [ ] #2 The stale-channel job is registered by response through the hookimpl and reads the store; app/jobs/scheduled_tasks.py no longer imports it
 - [ ] #3 /sre incident summarize is handled by response/summary.py and scribe no longer holds a summary path, catalogue or test
-- [ ] #4 No module imports modules.incident.db_operations or packages.aws_platform for incident data; the incident seam baseline entries are removed
-- [ ] #5 core/store.py has timeline_table(name) (incident_id, entry_key), the entry_key helper '<posted_at>#<entry_id>' with fixed-width ISO-8601 UTC posted_at, captured_entry_id (uuid5 over system, tenant, conversation and message id; a re-capture yields the same key) and a uuid4 manual entry id, each tested
+- [ ] #4 No module this task rebuilds imports modules.incident.db_operations or packages.aws_platform for incident data, and the incident seam baseline entries it owns are removed (the repository-wide check is TASK-145.12's)
+- [ ] #5 Timeline capture writes through the timeline store TASK-145.8 adds to core/store.py; captured_entry_id is a uuid5 over system, tenant, conversation and message id, so a re-capture yields the same key (tested)
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 IncidentReport gains append_timeline_entry(ReportReference, entry) in core/api.py with its Google Docs adapter and fake (parity test); the legacy timeline rewrite in modules/incident/incident_document.py (lines 82-302 at main 5deb8406, build_timeline_replacement included) moves into core/adapters/google_docs.py, and incident_document.py is deleted with its legacy test once 145.8 has moved the status mapping and no caller remains
 - [ ] #8 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
 - [ ] #9 /sre incident summarize is refused for a security incident, or one whose flag cannot be read, until the responder confirms, through the core security guard; comms drafting uses the same guard with its behaviour and log events unchanged
 - [ ] #10 Transcript text for the model is rendered by one core function used by comms and summarize, each prompt's transcript text unchanged
 - [ ] #11 summarize lives in response/service/summary.py (prompt in response/service/prompt.py); make check-package-shape passes with no new baseline entry
-- [ ] #12 /sre incident summarize resolves its incident through find_incident_for_conversation (a channel that is not an incident gets the not-an-incident reply) and reads the incident's conversation (the primary binding once TASK-145.7 adds bindings); a behaviour change, so not in the mechanical summarize move
+- [ ] #12 /sre incident summarize resolves its incident through find_incident_for_conversation (a channel that is not an incident gets the not-an-incident reply) and reads the incident's conversation (the primary IncidentBinding); a behaviour change, so not in the mechanical summarize move
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.9.1/145.9.2). Planning only: no subtasks until approved. Outline; each slice is planned in full at pickup.
+APPROVED 2026-11-09 (human): the program breakdown and the revised recommendations of the second OQ assessment comment on TASK-145.7 (OQ1-OQ20), including the L5r rollback guard, the on-call capability path (25.6 -> 146.1, 146.3 in L9a), L9c and the IncidentBinding rename. Subtasks created 2026-11-09. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline (145.9.1/145.9.2).  Outline; each slice is planned in full at pickup.
 
 ## 1. Re-grounded state
 - Reaction capture: registered incident_helper.py:160-163; handlers incident_conversation.py:261 (added) and :322 (removed), matcher :74; they read Slack (channel name, bookmarks: get_incident_document_id :230) and rewrite the report timeline (incident_document.py:82 update_timeline_section). CORRECTION: they do not call db_operations.log_activity (the outline's Discovered state is wrong) and read no incident item.
@@ -76,6 +76,9 @@ PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 
 Only L10c and L10d wait on TASK-25.10 (all three slices); L10a and L10b do not.
 ## 3. AC changes proposed (comment): AC #4 (no module imports modules.incident.db_operations for incident data) cannot hold at L10: modules/dev/incident.py and incident_folder.py create_missing_incidents import it until TASK-145.12 (L11). Move the check to 145.12 AC #2 or narrow #4 to the surfaces this task rebuilds. AC #5 (timeline_table, entry_key, ids) moves to TASK-145.8 L3 if OQ13 is approved (severity changes are the first timeline writer).
 ## 4. Blast radius: L10b changes reaction capture and the nightly nudge (one revert each); L10c none (move); L10d the comms security refusal path (tested unchanged). The inline baseline lines 10-12 (test_incident_updates_command_surface.py) are this task's to remove at L10d.
+
+## Subtasks (created 2026-11-09)
+L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-145.8.1; L4a TASK-145.7.5; L4b TASK-145.7.6; L4c TASK-145.12.1; L5 TASK-145.7.7; L5r TASK-145.8.2; L6a TASK-145.8.3; L6b TASK-145.8.4; L7a TASK-145.8.5; L7b TASK-145.8.6; L8 TASK-145.7.8; L9a TASK-145.7.9; L9b TASK-145.7.10; L9c TASK-145.7.11; L10a TASK-145.9.1; L10b TASK-145.9.2; L10c TASK-145.9.3; L10d TASK-145.9.4; L11 TASK-145.12.2; side: TASK-25.6 -> TASK-146.1 (before L9a); TASK-146.3 delivered by TASK-145.7.9; L12 (job rerun) is TASK-145.12.2's notes. Other slices are planned in full at pickup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

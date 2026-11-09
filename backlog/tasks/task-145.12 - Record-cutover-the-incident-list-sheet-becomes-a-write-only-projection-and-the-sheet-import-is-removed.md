@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T18:37:00Z'
+updated_date: '2026-11-09T19:06:00Z'
 labels:
   - incident
   - features
@@ -45,16 +45,22 @@ THIS SLICE
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #5 The projection reads the incident list sheet id from [incident_core] list_sheet_id and every subdomain that writes the projection states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #6 The list-sheet projection writer is an incident-owned adapter calling integrations/google_workspace directly; nothing in the incident umbrella uses infrastructure/spreadsheets (TASK-169 ruling, 2026-11-05 (human))
+- [ ] #7 No module imports modules.incident.db_operations or packages.aws_platform for incident data (moved from TASK-145.9 AC #4)
+- [ ] #8 The dev incident commands (list, add-incident, load-incidents in modules/dev/incident.py) are deleted with their registrations; their pins and INVENTORY.md rows are updated
+- [ ] #9 The projection adapter (append_row, update_status) lands in core before TASK-145.8's status cutover, inert until a writer registers
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-PROPOSED, AWAITING APPROVAL. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline, whose "infrastructure.spreadsheets or the frozen module" dependency contradicts AC #6 (TASK-169 ruling: an incident-owned adapter over integrations/google_workspace). Two PRs:
+APPROVED 2026-11-09 (human): the program breakdown and the revised recommendations of the second OQ assessment comment on TASK-145.7 (OQ1-OQ20), including the L5r rollback guard, the on-call capability path (25.6 -> 146.1, 146.3 in L9a), L9c and the IncidentBinding rename. Subtasks created 2026-11-09. Stack L program re-plan of 2026-11-09 against main 3075170b; cross-task order and rules in TASK-145.7's plan (sections 0 and 2) and doc-11 row 18. Supersedes the 2026-10-09 outline, whose "infrastructure.spreadsheets or the frozen module" dependency contradicts AC #6 (TASK-169 ruling: an incident-owned adapter over integrations/google_workspace). Two PRs:
 - L4c projection adapter (~150 / 4, incident core; inert; early because TASK-145.8 L6b's status fan-out and 145.7 L9a's declare need it): core/api.py IncidentListProjection Protocol (append_row(incident), update_status(incident, status)), core/adapters/google_sheets.py over integrations/google_workspace (AC #6), fake + parity test, list_sheet_id from [incident_core] (AC #5: each writing subdomain states it as required when it registers its first writer, L6b and L9b). Legacy writers today: incident_folder.py:279 add_new_incident_to_list (append_values :304), :311 update_spreadsheet_incident_status. Row format copied from them (pinned by the declare pin's sheet assertions).
 - L11 projection becomes write-only (~250 mostly deletions / ~8, response + legacy; waits L9b, L10b): /sre incident list active and stale read IncidentStore.list_open (AC #3); the duplicate-row check (modules/incident/core.py ~251, verify) removed; get_incidents_from_sheet (:411) and create_missing_incidents (:523) deleted with their caller and tests (AC #2); the dev incident commands (modules/dev/incident.py list, add-incident :104, load-incidents) deleted (AC #2: no code writes a legacy-shape item; dev list already breaks on end-state items after L9b: OQ17); 145.9's AC #4 import check verified here. After deploy: the job rerun (L12, human) recorded in the notes (AC #2).
 Blast radius: L4c none (inert). L11: list active/stale output (pinned) and dev-only commands; one revert.
 Assumptions: the legacy row format has no reader other than people (AC #1); verify rg for get_incidents_from_sheet callers at L11.
+
+## Subtasks (created 2026-11-09)
+L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-145.8.1; L4a TASK-145.7.5; L4b TASK-145.7.6; L4c TASK-145.12.1; L5 TASK-145.7.7; L5r TASK-145.8.2; L6a TASK-145.8.3; L6b TASK-145.8.4; L7a TASK-145.8.5; L7b TASK-145.8.6; L8 TASK-145.7.8; L9a TASK-145.7.9; L9b TASK-145.7.10; L9c TASK-145.7.11; L10a TASK-145.9.1; L10b TASK-145.9.2; L10c TASK-145.9.3; L10d TASK-145.9.4; L11 TASK-145.12.2; side: TASK-25.6 -> TASK-146.1 (before L9a); TASK-146.3 delivered by TASK-145.7.9; L12 (job rerun) is TASK-145.12.2's notes. Other slices are planned in full at pickup.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes

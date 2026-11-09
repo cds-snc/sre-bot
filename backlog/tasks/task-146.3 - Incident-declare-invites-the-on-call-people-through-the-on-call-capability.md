@@ -4,13 +4,12 @@ title: Incident declare invites the on-call people through the on-call capabilit
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-09T18:37:00Z'
+updated_date: '2026-11-09T19:04:00Z'
 labels:
   - oncall
   - capabilities
 dependencies:
   - TASK-146.1
-  - TASK-145.7
 references:
   - https://github.com/cds-snc/sre-bot/issues/1704
 parent_task_id: TASK-146
@@ -36,6 +35,12 @@ THIS SLICE
 - [ ] #2 Declare invites the people the on-call fake returns and continues when the lookup fails
 - [ ] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09 (human, Stack L OQ1): delivered inside TASK-145.7's declare-service subtask (L9a): response depends on capabilities.oncall.api only; a ScheduleSource port in core resolves the chosen placement to a ScheduleReference; its interim adapter reads the placement folder's genie_schedule through the Drive gateway, read only, tolerated with owner TASK-165.1. This task's ACs are checked by that subtask.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

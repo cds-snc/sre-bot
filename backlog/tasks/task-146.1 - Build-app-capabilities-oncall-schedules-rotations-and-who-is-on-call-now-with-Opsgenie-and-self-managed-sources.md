@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-09T18:37:00Z'
+updated_date: '2026-11-09T19:04:00Z'
 labels:
   - oncall
   - capabilities
 dependencies:
   - TASK-114.2
+  - TASK-25.6
 references:
   - https://github.com/cds-snc/sre-bot/issues/1702
 parent_task_id: TASK-146
@@ -43,6 +44,12 @@ THIS SLICE
 - [ ] #6 With no Opsgenie settings the capability registers and the self-managed source answers (boot test, decisions/oncall.md)
 - [ ] #7 Deleting user_rotations also removes its [plugins.incident_response] key, its module from the protected-plugins import contract, and the oncall_sync -> user_rotations ignore entries (repointed to the capability's api)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09 (human, Stack L OQ1): pulled forward as a side PR during Stack L L0-L8; the declare cutover (TASK-145.7 L9b) waits on it. Depends on TASK-25.6 (decisions/oncall.md:39: the Opsgenie adapter follows the outbound-client contract).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

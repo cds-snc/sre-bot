@@ -4,7 +4,7 @@ title: E7 Workstreams and incident links
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-09T18:37:00Z'
+updated_date: '2026-11-09T19:04:00Z'
 labels:
   - incident
 milestone: m-7
@@ -29,7 +29,7 @@ Extend the MVP from one coordinating incident and engagement edges to a coherent
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Parent, related, and duplicate links are stored consistently on both incidents and repaired safely after partial failure.
-- [ ] #2 An engagement can be fulfilled as a child incident after human confirmation; the child has an initial working-surface binding and its progress is mirrored to the parent.
+- [ ] #2 An engagement can be fulfilled as a child incident after human confirmation; the child has an initial IncidentBinding (a place responders work it) and its progress is mirrored to the parent.
 - [ ] #3 Promote, attach, detach, merge, and resolve-gating operations preserve authorization, embargo, and incident-link invariants.
 - [ ] #4 Targeted tests exercise the supported link and workstream lifecycle, including repair and failure cases; the epic leaves no temporary parallel relationship model.
 - [ ] #5 Fulfil moves an engagement's action items to the child, and every action item carries its root incident id, kept current by promote, attach, detach, and merge (D37), so references on the item (engagement, repository, later finding) follow the work.
