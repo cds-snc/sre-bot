@@ -33,12 +33,14 @@ from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 from urllib.parse import urlencode
 
+import httplib2
 import i18n  # type: ignore
 import pluggy
 import pytest
 import structlog
 from boto3.dynamodb.types import TypeSerializer
 from botocore.exceptions import ClientError
+from googleapiclient.errors import HttpError
 from pydantic import SecretStr
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_sdk import WebClient
@@ -408,6 +410,8 @@ def routed_slack_client(monkeypatch: pytest.MonkeyPatch) -> RoutedSlackEdges:
 
 INCIDENT_CHANNEL_NAME = "incident-2026-10-checkout"
 REPORT_DOCUMENT_ID = "doc-source"
+# The report template's timeline placeholder; the bot edits the text between it and the "Trigger" heading.
+TIMELINE_PLACEHOLDER = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 VIEW_ID = "V0OPEN"
 ROOT_VIEW_ID = "V0ROOT"
 INCIDENT_SHEET_ROW = ["2026-10-01", "Checkout outage", "Forms", "Open", "#2026-10-checkout"]
@@ -494,13 +498,22 @@ class FakeIncidentTable:
 
 
 class _Request:
-    """A googleapiclient request whose ``execute`` returns a prepared result."""
+    """A googleapiclient request whose ``execute`` returns a prepared result, or raises a prepared error."""
 
     def __init__(self, result: Any) -> None:
         self._result = result
 
     def execute(self, **_: Any) -> Any:
+        if isinstance(self._result, Exception):
+            raise self._result
         return self._result
+
+
+def google_http_error(status: int, message: str) -> HttpError:
+    """The error googleapiclient raises when Google answers ``status`` with ``message``."""
+    response = httplib2.Response({"status": status})
+    response.reason = message
+    return HttpError(resp=response, content=json.dumps({"error": {"code": status, "message": message}}).encode())
 
 
 class FakeDriveFiles:
@@ -557,22 +570,137 @@ class FakeDriveFiles:
 
 
 class FakeDocsDocuments:
-    """The Docs ``documents()`` resource over plain-text documents; only ``replaceAllText`` is understood."""
+    """The Docs ``documents()`` resource over in-memory documents.
+
+    ``texts`` holds each document's text and ``links`` the link URL on each of its
+    characters (``None`` for plain text; reset when ``texts`` is set directly).
+    ``get`` returns the body as paragraphs of text runs with Google's 1-based
+    indexes and the current revision id. ``batchUpdate`` applies
+    ``replaceAllText``, ``deleteContentRange``, ``insertText`` and link
+    ``updateTextStyle`` requests in order (paragraph styling is accepted and
+    ignored). A ``writeControl.requiredRevisionId`` that is not the current
+    revision is refused with HTTP 400, as Google refuses it; ``concurrent_edits``
+    makes that many guarded writes find the document moved on by another editor.
+    Every ``batchUpdate`` body sent is kept in ``edits``.
+    """
 
     def __init__(self) -> None:
         self.texts: dict[str, str] = {}
+        self.links: dict[str, list[str | None]] = {}
+        self.revisions: dict[str, int] = {}
+        self.edits: list[dict[str, Any]] = []
+        self.concurrent_edits = 0
+
+    def _links(self, document_id: str) -> list[str | None]:
+        links = self.links.setdefault(document_id, [])
+        if len(links) != len(self.texts[document_id]):
+            links[:] = [None] * len(self.texts[document_id])
+        return links
+
+    def _revision(self, document_id: str) -> str:
+        return f"rev-{self.revisions.get(document_id, 1)}"
+
+    def _bump(self, document_id: str) -> None:
+        self.revisions[document_id] = self.revisions.get(document_id, 1) + 1
+
+    def get(self, *, documentId: str, **_: Any) -> _Request:
+        text, links = self.texts[documentId], self._links(documentId)
+        content: list[dict[str, Any]] = []
+        elements: list[dict[str, Any]] = []
+        start = 0
+        for position, char in enumerate(text):
+            end = position + 1
+            if end < len(text) and char != "\n" and links[end] == links[start]:
+                continue
+            style = {"link": {"url": links[start]}} if links[start] else {}
+            elements.append(
+                {"startIndex": start + 1, "endIndex": end + 1, "textRun": {"content": text[start:end], "textStyle": style}}
+            )
+            start = end
+            if char == "\n" or end == len(text):
+                content.append(
+                    {"startIndex": elements[0]["startIndex"], "endIndex": end + 1, "paragraph": {"elements": elements}}
+                )
+                elements = []
+        return _Request({"documentId": documentId, "revisionId": self._revision(documentId), "body": {"content": content}})
 
     def batchUpdate(self, *, documentId: str, body: dict[str, Any]) -> _Request:
-        replies = []
-        for request in body["requests"]:
+        self.edits.append(body)
+        required = body.get("writeControl", {}).get("requiredRevisionId")
+        if required is not None:
+            if self.concurrent_edits:
+                self.concurrent_edits -= 1
+                self._bump(documentId)
+            if required != self._revision(documentId):
+                return _Request(google_http_error(400, "The document was modified after the required revision"))
+        replies = [self._apply(documentId, request) for request in body["requests"]]
+        self._bump(documentId)
+        return _Request({"replies": replies})
+
+    def _apply(self, document_id: str, request: dict[str, Any]) -> dict[str, Any]:
+        text, links = self.texts[document_id], self._links(document_id)
+        if "replaceAllText" in request:
             spec = request["replaceAllText"]
             flags = 0 if spec["containsText"]["matchCase"] else re.IGNORECASE
-            updated, changed = re.subn(
-                re.escape(spec["containsText"]["text"]), spec["replaceText"], self.texts[documentId], flags=flags
-            )
-            self.texts[documentId] = updated
-            replies.append({"replaceAllText": {"occurrencesChanged": changed}})
-        return _Request({"replies": replies})
+            updated, changed = re.subn(re.escape(spec["containsText"]["text"]), spec["replaceText"], text, flags=flags)
+            self.texts[document_id] = updated
+            return {"replaceAllText": {"occurrencesChanged": changed}}
+        if "deleteContentRange" in request:
+            span = request["deleteContentRange"]["range"]
+            start, end = span["startIndex"] - 1, span["endIndex"] - 1
+            self.texts[document_id] = text[:start] + text[end:]
+            del links[start:end]
+        elif "insertText" in request:
+            at, inserted = request["insertText"]["location"]["index"] - 1, request["insertText"]["text"]
+            self.texts[document_id] = text[:at] + inserted + text[at:]
+            links[at:at] = [None] * len(inserted)
+        elif "updateTextStyle" in request:
+            span = request["updateTextStyle"]["range"]
+            url = request["updateTextStyle"]["textStyle"]["link"]["url"]
+            links[span["startIndex"] - 1 : span["endIndex"] - 1] = [url] * (span["endIndex"] - span["startIndex"])
+        else:
+            assert "updateParagraphStyle" in request, request
+        return {}
+
+    def linked_text(self, document_id: str) -> str:
+        """The document's text with each linked run written as ``[text](url)``, as a reader of the document sees it."""
+        rendered, run, run_link = "", "", None
+        for char, link in [*zip(self.texts[document_id], self._links(document_id), strict=True), ("", None)]:
+            if link != run_link or not char:
+                rendered += f"[{run}]({run_link})" if run_link else run
+                run, run_link = "", link
+            run += char
+        return rendered
+
+
+EVENT_LINK = "https://calendar.google.com/calendar/event?eid=retro-1"
+
+
+class FakeCalendar:
+    """The Calendar ``freebusy()`` and ``events()`` resources.
+
+    ``fully_busy`` holds the emails whose calendars are busy over the whole
+    requested range; every other calendar is free. Inserted events are kept in
+    ``events`` (calendar id and body); ``insert_error`` makes inserts fail.
+    """
+
+    def __init__(self) -> None:
+        self.fully_busy: set[str] = set()
+        self.queries: list[dict[str, Any]] = []
+        self.events: list[dict[str, Any]] = []
+        self.insert_error: Exception | None = None
+
+    def query(self, *, body: dict[str, Any]) -> _Request:
+        self.queries.append(body)
+        busy = [{"start": body["timeMin"], "end": body["timeMax"]}]
+        calendars = {item["id"]: {"busy": busy if item["id"] in self.fully_busy else []} for item in body["items"]}
+        return _Request({"kind": "calendar#freeBusy", "calendars": calendars})
+
+    def insert(self, *, calendarId: str, body: dict[str, Any], **_: Any) -> _Request:
+        if self.insert_error is not None:
+            return _Request(self.insert_error)
+        self.events.append({"calendarId": calendarId, "body": body})
+        return _Request({"id": "retro-1", "htmlLink": EVENT_LINK, "start": body["start"], "end": body["end"]})
 
 
 class FakeSheetValues:
@@ -595,15 +723,16 @@ class FakeSheetValues:
 
 @dataclass
 class FakeGoogleWorkspace:
-    """The Drive, Docs and Sheets services the incident module reaches, as in-memory state."""
+    """The Drive, Docs, Sheets and Calendar services the incident module reaches, as in-memory state."""
 
     drive: FakeDriveFiles = field(default_factory=FakeDriveFiles)
     docs: FakeDocsDocuments = field(default_factory=FakeDocsDocuments)
     sheet: FakeSheetValues = field(default_factory=FakeSheetValues)
+    calendar: FakeCalendar = field(default_factory=FakeCalendar)
 
     def service(self, api_name: str) -> Any:
         """The service object Google's client factory would build for ``api_name``."""
-        drive, docs, sheet = self.drive, self.docs, self.sheet
+        drive, docs, sheet, calendar = self.drive, self.docs, self.sheet, self.calendar
         match api_name:
             case "drive":
                 return SimpleNamespace(files=lambda: drive)
@@ -611,7 +740,15 @@ class FakeGoogleWorkspace:
                 return SimpleNamespace(documents=lambda: docs)
             case "sheets":
                 return SimpleNamespace(spreadsheets=lambda: SimpleNamespace(values=lambda: sheet))
+            case "calendar":
+                return SimpleNamespace(
+                    freebusy=lambda: SimpleNamespace(query=calendar.query), events=lambda: SimpleNamespace(insert=calendar.insert)
+                )
         raise AssertionError(api_name)
+
+    def add_timeline_report(self) -> None:
+        """The incident's report document from the template, with an empty timeline section."""
+        self.docs.texts[REPORT_DOCUMENT_ID] = f"Incident report\nTimeline\n{TIMELINE_PLACEHOLDER}\n\nTrigger\n"
 
     def add_incident_report(self, status: str = "Open") -> None:
         """The incident's report document and its row in the incident list sheet."""
@@ -668,7 +805,7 @@ def incident_surface(
     """``/sre`` registered beside the legacy handlers, with the incident module's external edges faked.
 
     The edges are the boto3 DynamoDB client under the incidents table adapter,
-    the Google client factory under the Drive, Docs and Sheets calls and, from
+    the Google client factory under the Drive, Docs, Sheets and Calendar calls and, from
     ``legacy_handler_harness``, the Slack Web API, ``response_url`` and Sentinel.
     The ``/sre`` client factory is the one internal legacy seam
     (``legacy_sre_web_client_seam``).
@@ -754,6 +891,7 @@ _ANSWER_STATE = {
     "static_select": lambda answer: {"selected_option": {"value": answer}},
     "datepicker": lambda answer: {"selected_date": answer},
     "timepicker": lambda answer: {"selected_time": answer},
+    "number_input": lambda answer: {"value": answer},
 }
 
 

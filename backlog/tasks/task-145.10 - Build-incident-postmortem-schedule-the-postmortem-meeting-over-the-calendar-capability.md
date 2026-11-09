@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-06T22:26:00Z'
 labels:
   - incident
   - features
@@ -88,4 +88,6 @@ One modal flow; revert restores the legacy registration.
 2026-11-05: TASK-138 superseded (TASK-169 ruling, 2026-11-05 (human), D5): every calendar consumer is incident; a calendar capability waits for a second suite or a non-incident consumer. Dependency on 138 removed.
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ3, human-approved): depends on TASK-36.1.5 (the retro pins) instead of the whole TASK-36.1. Rebuilt modal-internal ids take the incident.postmortem prefix as planned; the nudge's schedule button (archive_channel's schedule_retro branch, on messages already posted) keeps a registered legacy alias until TASK-145.13 (decisions/transport-slack.md). confirm_click is owned here, not by TASK-145.8.
+
+2026-11-06 (TASK-36.1.5 pins): the retro pins capture legacy behaviour to rule on here: a refused calendar insert escapes handle_schedule_retro_submit, so the modal stays on 'Scheduling the retro...' and nothing is posted (its 'did not return a link' failure view is unreachable: insert_event raises, never returns None); schedule_event collects each attendee email twice (harmless); the unavailable-user rule flags only a single busy block within an hour of both range edges. Rewire test_incident_retro_schedule_surface.py to the rebuilt postmortem scheduling.
 <!-- SECTION:NOTES:END -->
