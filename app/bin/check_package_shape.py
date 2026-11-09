@@ -35,6 +35,10 @@ Rules, each reported as one key:
     resolve to a directory under features/
     (``<path>:readme-missing|readme-classification|readme-consumers``).
 
+The names come from bin/package_layout.toml, the machine copy of the layout
+table, through bin/package_layout.py: one source for this guard and the
+generator.
+
 Known violations are grandfathered in bin/baselines/package_shape.txt, each
 group naming the task that removes it. A violation not in the baseline fails;
 a baselined one that is gone is reported stale and never fails (the baseline
@@ -52,38 +56,18 @@ import tomllib
 from pathlib import Path
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, load_baseline, report
+from bin.package_layout import Kind, layout
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 
 APP_ROOT = Path(__file__).resolve().parent.parent
-FEATURES_ROOT = APP_ROOT / "features"
-CAPABILITIES_ROOT = APP_ROOT / "capabilities"
+FEATURES_ROOT = APP_ROOT / layout().roots.features
+CAPABILITIES_ROOT = APP_ROOT / layout().roots.capabilities
 BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "package_shape.txt"
 PYPROJECT_PATH = APP_ROOT / "pyproject.toml"
 
-PACKAGE_FILES = frozenset(
-    {
-        "__init__.py",
-        "README.md",
-        "settings.py",
-        "service.py",
-        "domain.py",
-        "interfaces.py",
-        "schemas.py",
-        "store.py",
-        "providers.py",
-        "plugin.py",
-    }
-)
-CAPABILITY_FILES = frozenset({"api.py", "hookspecs.py"})
-PACKAGE_DIRS = frozenset({"adapters", "entrypoints", "locales", "service", "domain"})
-UMBRELLA_ROOT_FILES = frozenset({"__init__.py", "README.md"})
 CORE = "core"
 COMMON = "common"
-COMMON_IO_NAMES = frozenset({"adapters", "store.py", "providers.py"})
 PLUGIN_MODULE = "plugin"
-CLASSIFICATIONS = frozenset({"generic", "supporting"})
-CLASSIFICATION_HEADING = "## Classification"
-CONSUMERS_HEADING = "## Feature consumers"
 
 
 def _relative(path: Path) -> str:
@@ -134,24 +118,28 @@ def _defines_hookimpl(path: Path) -> bool:
     return False
 
 
+def _kind(name: str) -> Kind:
+    return layout().kinds[name]
+
+
 def _is_umbrella(package: Path, targets: set[str]) -> bool:
     if _is_named(package, targets):
         return False
-    return any(child.is_dir() and child.name not in PACKAGE_DIRS for child in _children(package))
+    return any(child.is_dir() and child.name not in _kind("feature").allowed_dirs for child in _children(package))
 
 
-def _check_names(package: Path, allowed_files: frozenset[str], allowed_dirs: frozenset[str]) -> set[str]:
+def _check_names(package: Path, kind: Kind) -> set[str]:
     violations: set[str] = set()
     for child in _children(package):
-        allowed = allowed_dirs if child.is_dir() else allowed_files
+        allowed = kind.allowed_dirs if child.is_dir() else kind.allowed_files
         if child.name not in allowed:
             violations.add(_relative(child))
     return violations
 
 
-def _check_plugin_package(package: Path, allowed_files: frozenset[str], targets: set[str]) -> set[str]:
+def _check_plugin_package(package: Path, kind: Kind, targets: set[str]) -> set[str]:
     """A flat package or an umbrella subdomain: table names, plugin.py, and hookimpls imply an entry point."""
-    violations = _check_names(package, allowed_files, PACKAGE_DIRS)
+    violations = _check_names(package, kind)
     plugin = package / f"{PLUGIN_MODULE}.py"
     if plugin.is_file() and f"{_module(package)}.{PLUGIN_MODULE}" not in targets:
         violations.add(f"{_relative(plugin)}:plugin-unnamed")
@@ -161,8 +149,7 @@ def _check_plugin_package(package: Path, allowed_files: frozenset[str], targets:
 
 
 def _check_core(core: Path, targets: set[str]) -> set[str]:
-    allowed_files = (PACKAGE_FILES - {f"{PLUGIN_MODULE}.py"}) | {"api.py"}
-    violations = _check_names(core, allowed_files, PACKAGE_DIRS - {"entrypoints"})
+    violations = _check_names(core, _kind(CORE))
     key = _relative(core)
     if (core / "entrypoints").is_dir():
         violations = {v for v in violations if v != f"{key}/entrypoints"}
@@ -176,26 +163,29 @@ def _check_core(core: Path, targets: set[str]) -> set[str]:
 
 
 def _check_common(common: Path) -> set[str]:
-    return {_relative(child) for child in _children(common) if child.name in COMMON_IO_NAMES}
+    """common/ holds none of its kind's forbidden names, and only its declared ones unless the kind is open."""
+    kind = _kind(COMMON)
+    violations = {_relative(child) for child in _children(common) if child.name in kind.forbidden_names}
+    return violations if kind.open else violations | _check_names(common, kind)
 
 
-def _check_umbrella(umbrella: Path, allowed_files: frozenset[str], targets: set[str]) -> set[str]:
+def _check_umbrella(umbrella: Path, subdomain: Kind, targets: set[str]) -> set[str]:
     violations: set[str] = set()
     init = umbrella / "__init__.py"
     if init.is_file() and init.read_text(encoding="utf-8").strip():
         violations.add(f"{_relative(init)}:umbrella-init")
     for child in _children(umbrella):
         if child.is_file():
-            if child.name not in UMBRELLA_ROOT_FILES:
+            if child.name not in _kind("umbrella").allowed_files:
                 violations.add(_relative(child))
         elif child.name == CORE:
             violations |= _check_core(child, targets)
         elif child.name == COMMON:
             violations |= _check_common(child)
-        elif child.name in PACKAGE_DIRS:
+        elif child.name in _kind("feature").allowed_dirs:
             violations.add(_relative(child))
         else:
-            violations |= _check_plugin_package(child, allowed_files, targets)
+            violations |= _check_plugin_package(child, subdomain, targets)
     return violations
 
 
@@ -220,11 +210,12 @@ def _check_readme(capability: Path) -> set[str]:
     lines = [line.rstrip() for line in readme.read_text(encoding="utf-8").splitlines()]
     violations: set[str] = set()
 
-    classification = _section(lines, CLASSIFICATION_HEADING)
-    if not classification or classification[0] not in CLASSIFICATIONS:
+    rules = layout()
+    classification = _section(lines, rules.classification_heading)
+    if not classification or classification[0] not in rules.classifications:
         violations.add(f"{key}:readme-classification")
 
-    consumers = [line.removeprefix("- ") for line in _section(lines, CONSUMERS_HEADING) or [] if line.startswith("- ")]
+    consumers = [line.removeprefix("- ") for line in _section(lines, rules.consumers_heading) or [] if line.startswith("- ")]
     resolved = [
         consumer
         for consumer in consumers
@@ -252,16 +243,20 @@ def find_violations() -> set[str]:
     entry_points = load_entry_points()
     targets = set(entry_points.values())
     violations = _check_entry_point_names(entry_points)
-    for root, allowed_files in ((FEATURES_ROOT, PACKAGE_FILES), (CAPABILITIES_ROOT, PACKAGE_FILES | CAPABILITY_FILES)):
+    # A capability umbrella's subdomains take the capability shape, as its flat packages do.
+    for root, flat, member in (
+        (FEATURES_ROOT, _kind("feature"), _kind("subdomain")),
+        (CAPABILITIES_ROOT, _kind("capability"), _kind("capability")),
+    ):
         if not root.is_dir():
             continue
         for package in _children(root):
             if not package.is_dir():
                 continue
             if _is_umbrella(package, targets):
-                violations |= _check_umbrella(package, allowed_files, targets)
+                violations |= _check_umbrella(package, member, targets)
             else:
-                violations |= _check_plugin_package(package, allowed_files, targets)
+                violations |= _check_plugin_package(package, flat, targets)
             if root == CAPABILITIES_ROOT:
                 violations |= _check_readme(package)
     return violations

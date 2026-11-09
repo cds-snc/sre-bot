@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-09T13:42:00Z'
+updated_date: '2026-11-09T15:43:00Z'
 labels:
   - clients
   - phase-3
@@ -59,14 +59,14 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 integrations/openai/ contains only __init__.py, client.py and settings.py; classify_openai_error returns (OperationStatus, error_code, retry_after); every openai entry in bin/baselines/vendor_package_contract.txt is removed
-- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; the port reports unavailable when the OpenAI tenant entry is absent, never an error; features/incident/scribe/service.py and features/incident/comms/adapters/text_generation.py import only its api.py, with unchanged behaviour (comms treats text generation as optional and falls back when it is unavailable; scribe requires it, TASK-172) covered by their existing tests; the 'features.incident.scribe.service -> integrations.openai' import-linter ignore is removed
-- [ ] #3 The OpenAI client's retry policy is explicit at construction (or explicitly none, with the reason recorded), alongside its timeout
-- [ ] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
+- [ ] #2 The port and its OpenAI implementation live in app/capabilities/text_generation/ (api.py, adapters/openai.py, an in-memory fake, README with classification and feature consumers); the package passes the TASK-114 shape check and its vocabulary is feature-free; the capability always provides an implementation, a no-op answering is_available() false when the OpenAI tenant entry is absent, never an error; features/incident/scribe/service.py imports only its api.py; comms' local TextGenerator interface and adapters/text_generation.py are deleted and comms depends on the capability's api.py Protocol (incident-management.md:128); behaviour is unchanged (comms treats text generation as optional and falls back when it is unavailable; scribe requires it while scribe exists, TASK-172) and covered by their existing tests; the 'features.incident.scribe.service -> integrations.openai' import-linter ignore is removed
+- [x] #3 The OpenAI client's retry policy is explicit at construction (or explicitly none, with the reason recorded), alongside its timeout
+- [x] #4 Classification tests cover each mapped HTTP status family and Retry-After, plus one unmapped exception propagating; no 'from __future__ import annotations' remains in touched files
 - [ ] #5 decisions/outbound-clients.md no longer lists OpenAI as a tolerated divergence; ruff, mypy, lint-imports, pytest tests --ignore=tests/smoke and make check-vendor-package-contract pass, with output recorded in notes
 - [ ] #6 The capability has its pyproject entry point and an enablement key in the base configuration file (decisions/plugins.md); if it is the first package under app/capabilities/, the same PR adds capabilities to the import-linter root_packages
 - [ ] #7 integrations/openai/settings.py holds the connection only: [openai] timeout_seconds (plus the retry policy of AC #3) and [openai.tenant] base_url, with OPENAI__API_KEY; max_output_tokens, temperature and the tenant's model are gone from the vendor slice, and production.toml and local.toml move model to the capability's table in the same PR
-- [ ] #8 capabilities/text_generation/settings.py holds the default model; each feature use case passes its own output budget from its own settings (scribe's catch-up summary gains one, 3000 as today, so production sends the same); the port carries an optional per-call temperature, omitted when unset; decisions/configuration.md drops the generation-parameters tolerance
-- [ ] #9 The text-generation capability is created with make new-package (TASK-114.2); its README names its feature consumers; its enablement key sits in [plugins.incident_response] (one consuming area, product-scope.md 2026-11-06)
+- [ ] #8 capabilities/text_generation/settings.py holds the model ([text_generation] model): empty in base.toml, set in production.toml and local.toml (the organisation's value, configuration.md); an unset model makes the capability report unavailable, and a required consumer declares Requirement('text_generation.model'); each feature use case passes its own output budget from its own settings (scribe's catch-up summary gains one, 3000 as today, so production sends the same); the port carries an optional per-call temperature, omitted when unset; decisions/configuration.md drops the generation-parameters tolerance
+- [ ] #9 The text-generation capability is created with make new-package (TASK-114.2; after TASK-114.4 it emits only the parts it uses); its README names its feature consumers; its enablement key sits in [plugins.incident_response] (one consuming area, product-scope.md 2026-11-06)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -79,6 +79,8 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 - TASK-25.10.2 create the capability with make new-package; scribe and comms repointed to api.py; the comms TextGenerator question settled there (deleted); text_generation_available ends. Plan at pickup; a size exception is proposed.
 - TASK-25.10.3 generation parameters move to the capability and the callers (ACs #7 and #8). Plan at pickup.
 Parent ACs, by slice: #1 (tuple: .1; files and baseline: .2), #2 .2, #3 .1, #4 .1, #5 (outbound-clients: .1 and .2; configuration.md: .3), #6 .2, #7 .3, #8 .3, #9 .2. Check each parent AC as its slice merges.
+
+2026-11-09 (human): AC #2 rewording approved as proposed in comment #1 (comms' local TextGenerator and adapters/text_generation.py deleted; comms depends on the capability's api.py Protocol), and aligned with the OQ3 ruling (no-op implementation plus is_available()). OQ6 ruled: the model is the organisation's value, so [text_generation] model is empty in base.toml and set in production.toml and local.toml; unset means unavailable, plus Requirement('text_generation.model') for required consumers; AC #8 reworded ('holds the default model' replaced). OQ4 ruled: TASK-114.3 as proposed (row 15g, before 25.10.2). TASK-25.10.1 merged (#1838, d3778e0a, 2026-11-09 15:06 UTC): ACs #3 and #4 checked (slice .1 only); #1 and #5 wait on .2 (and #5 on .3).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

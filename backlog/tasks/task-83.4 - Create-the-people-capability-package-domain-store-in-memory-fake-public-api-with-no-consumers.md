@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-09T15:12:00Z'
 labels:
   - identity
 dependencies:
@@ -61,6 +61,8 @@ Nothing consumes it yet, so it can merge without changing behavior.
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-25 (people-and-accounts.md amendment): the domain also needs verified link provenance and a merged_into tombstone on Person, so a merged person still resolves to its survivor. The join flow itself is TASK-83.14.
+
+2026-11-09 (TASK-114.3 plan): 114.3 does not add a planned-consumer option; this task's plan adds it to the generator (with the readme-consumers baseline entry under the migration.md rule 3 named expand-step exception). The layout options it needs (--hookspecs, --service, --adapters) come from 114.3.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
