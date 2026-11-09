@@ -3,10 +3,10 @@ id: TASK-145.7.1
 title: >-
   Incident bindings table, its by_conversation index and IAM grant;
   incident-management.md A1
-status: To Do
+status: In Progress
 assignee: []
 created_date: '2026-11-09T19:05:00Z'
-updated_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-09T19:27:00Z'
 labels:
   - incident
   - terraform
@@ -28,10 +28,11 @@ Stack L L0 (storage expand; the only new table in TASK-145). Terraform adds sre_
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 terraform/dynamodb.tf declares sre_bot_incident_bindings with hash incident_id, range binding_key and GSI by_conversation (hash conversation_id, projection ALL), point-in-time recovery and encryption as the timeline table; its arn is in local.dynamodb_table_arns
-- [ ] #2 terraform/iam.tf grants Query on the table's index/*; terraform fmt -check and validate pass
-- [ ] #3 decisions/incident-management.md carries the A1 clauses a-n of TASK-145.7's plan section 4 with one dated Changes line, and the 2026-11-06 line's waits for TASK-145.13 are revised (no wait on TASK-165.1 or TASK-146.3)
+- [x] #1 terraform/dynamodb.tf declares sre_bot_incident_bindings with hash incident_id, range binding_key and GSI by_conversation (hash conversation_id, projection ALL), point-in-time recovery and encryption as the timeline table; its arn is in local.dynamodb_table_arns
+- [x] #2 terraform/iam.tf grants Query on the table's index/*; terraform fmt -check and validate pass
+- [x] #3 decisions/incident-management.md carries the A1 clauses a-n of TASK-145.7's plan section 4 with one dated Changes line, and the 2026-11-06 line's waits for TASK-145.13 are revised (no wait on TASK-165.1 or TASK-146.3)
 - [ ] #4 deploy-checks pre and post outputs are recorded in the notes; no app code names the table
+- [x] #5 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -61,3 +62,9 @@ Riding with later PRs: transport-slack.md alias mechanism (L1); System selection
 5. Verification: terraform fmt -check and validate (cd terraform); rg proves no app code names the table. Human: zsh bin/deploy-checks.zsh pre before merge, post after the deploy (terraform and IAM change).
 AC traceability: enabling work for AC #5 (re-worded) and for the A1 decisions; no AC is closed by L0. Tests: none (L2a adds the RecordTable-vs-terraform drift test). Rollback: one revert (terraform destroys the empty table, the grant goes). Ordering: deployed before L2a merges.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-09 (L0 implemented, In Progress): terraform/dynamodb.tf adds sre_bot_incident_bindings (hash incident_id, range binding_key, attribute conversation_id, GSI by_conversation hash conversation_id projection ALL, read 1/write 2; blocks as the timeline table: no PITR or SSE block, backups through local.dynamodb_table_arns, where its arn is added); terraform/iam.tf grants Query on its index/*. terraform fmt -check and validate (init -backend=false) pass; rg finds no app code naming the table. decisions/incident-management.md A1: Vocabulary (Binding, severity Revision 1, system timeline entries), Bindings paragraph (cardinality, declare commit order, severity-change order), Stored form (record_version 1/2, bindings table and lookup order, source_alert message reference), core/ owns, System selection runtime clause, Checks test line, tolerated by_channel fallback (stale scan line replaced), rules 1 (readers before writers, revert window), 3 (upgrade on write), 4 (marker raise), 6 (legacy writers), the binding step, one Changes line withdrawing 145.13's waits on 165.1 and 146.3. Gates: ruff clean; contracts 13 kept; key ownership OK; package shape OK (3 baselined); test seams OK (47 + 12); mypy 41 errors, all pre-existing in legacy files; pytest 6666 passed. AC #4 waits on the human's deploy-checks pre and post outputs (gates AC #5 added for parity with the other Stack L subtasks).
+<!-- SECTION:NOTES:END -->
