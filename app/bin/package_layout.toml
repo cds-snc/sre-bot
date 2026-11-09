@@ -1,0 +1,65 @@
+# Package layout manifest: the machine copy of the layout table in
+# decisions/feature-packages.md. That record is the authority; amend it and this
+# file together (tests/unit/bin/test_bin_package_layout_load.py fails when the
+# names differ). Read through bin/package_layout.py by the package-shape check
+# (bin/check_package_shape.py) and, from TASK-114.4, by the generator.
+#
+# Names: a trailing "/" marks a directory. A kind lists its required and
+# optional entries; "extends" starts from another kind's entries, "exclude"
+# drops some of them. An "open" kind allows any name except its "forbidden"
+# ones. Required entries are what the generator always writes; the shape check
+# allows required and optional entries alike.
+
+roots = { features = "features", capabilities = "capabilities" }
+
+# A subdomain named like a layout-table directory or an umbrella kernel would be read as one.
+reserved_subdomains = ["core", "common", "adapters", "entrypoints", "locales", "service", "domain"]
+
+# Modules that may each grow into a package of the same name (service/, domain/).
+grows_into_package = ["service.py", "domain.py"]
+
+[capability_readme]
+classification_heading = "## Classification"
+consumers_heading = "## Feature consumers"
+classifications = ["generic", "supporting"]
+
+# A flat feature plugin.
+[kinds.feature]
+required = ["__init__.py", "README.md", "service.py", "entrypoints/"]
+optional = [
+    "settings.py",
+    "interfaces.py",
+    "domain.py",
+    "schemas.py",
+    "store.py",
+    "providers.py",
+    "plugin.py",
+    "adapters/",
+    "locales/",
+]
+
+# An umbrella's plugin subdomain: the feature shape.
+[kinds.subdomain]
+extends = "feature"
+
+# A capability: the feature shape plus its public api.py and its own extension points.
+[kinds.capability]
+extends = "feature"
+required = ["api.py"]
+optional = ["hookspecs.py"]
+
+# An umbrella's core/: not a plugin, so no plugin.py and no entrypoints/; public surface is api.py.
+[kinds.core]
+extends = "feature"
+required = ["api.py"]
+exclude = ["plugin.py", "entrypoints/"]
+
+# An umbrella's common/: shared code that does no I/O.
+[kinds.common]
+required = ["__init__.py", "README.md"]
+open = true
+forbidden = ["adapters/", "store.py", "providers.py"]
+
+# An umbrella's root: no code of its own.
+[kinds.umbrella]
+required = ["__init__.py", "README.md"]

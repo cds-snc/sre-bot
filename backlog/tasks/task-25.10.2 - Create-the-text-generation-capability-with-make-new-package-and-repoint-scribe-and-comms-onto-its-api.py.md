@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-09T14:11:00Z'
+updated_date: '2026-11-09T15:42:00Z'
 labels:
   - clients
   - phase-3
 milestone: m-3
 dependencies:
   - TASK-25.10.1
-  - TASK-114.3
+  - TASK-114.4
 references:
   - decisions/plugin-architecture.md
   - decisions/feature-packages.md
@@ -72,4 +72,6 @@ Q3, availability: ADR gap. plugins.md and plugin-architecture.md say an optional
 Production safety: behaviour unchanged. The unconfigured implementation is today's comms UnavailableTextGenerator, moved, and comms' fallback path keeps its tests, which move onto the in-memory fake with available False.
 
 2026-11-09 (human): Q3 ruled: the capability always provides an implementation, a no-op when unconfigured, with is_available() on its Protocol; the ADR text rides with this PR (AC added).
+
+2026-11-09: now depends on TASK-114.4 (the generator slice of the 114.3 re-plan) instead of TASK-114.3; AC #8's '--adapters and no other optional entry' comes from 114.4.
 <!-- SECTION:NOTES:END -->

@@ -3,10 +3,10 @@ id: TASK-25.10.1
 title: >-
   OpenAI vendor client on the outbound-client contract: classify_openai_error
   returns the standard tuple and the client's retry policy is explicit
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T13:40:00Z'
-updated_date: '2026-11-09T14:19:00Z'
+updated_date: '2026-11-09T15:12:00Z'
 labels:
   - clients
   - phase-3
@@ -98,4 +98,6 @@ On merge, production gets connection retries (at most 2 extra connect attempts, 
 - outbound-clients.md: the OpenAI tolerance keeps only the Summarizer location; the httpx retry primitive is added to rule 1 (docs: retries only on ConnectError/ConnectTimeout, python-httpx.org/advanced/transports); 2026-11-09 Changes line.
 - Tests: test_openai_client.py rewritten (tuple per family, Retry-After 42/0/absent/HTTP-date, unmapped propagates, factory asserts retries and timeout through a recording AsyncHTTPTransport); summarizer 401/429/400 assert the new codes; settings load (connect_retries loads, defaults to 2, negative fails); base [openai] key set. __future__ removed from the touched test files.
 Gates: ruff 'All checks passed!'; targeted 62 passed. mypy 'Found 41 errors in 14 files (checked 422 source files)': all pre-existing in legacy modules/ (same count as the TASK-36.3 session), none in touched files. It was invoked twice, the second run only to filter touched files. pytest tests --ignore=tests/smoke: '1 failed, 6550 passed': test_bin_test_seams_check.py::test_the_repository_tests_match_their_baselines, pre-existing on main. make check-test-seams lists 51 strict entries, all under tests/**/features/incident/comms/, which are TASK-186's moved paths that the re-key PR #1836 fixes; unrelated, not fixed here. make check-vendor-package-contract 'OK: no net-new vendor-package contract violations (15 baselined entry(ies) remain)'; make check-settings-key-ownership OK; make check-import-contracts 'Contracts: 13 kept, 0 broken'.
+
+2026-11-09: merged (#1838, d3778e0a, 15:06 UTC). Done is the human's.
 <!-- SECTION:NOTES:END -->
