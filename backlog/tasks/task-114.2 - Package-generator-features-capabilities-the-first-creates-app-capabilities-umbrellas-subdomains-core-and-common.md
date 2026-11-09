@@ -3,10 +3,10 @@ id: TASK-114.2
 title: >-
   Package generator: features, capabilities (the first creates
   app/capabilities/), umbrellas, subdomains, core/ and common/
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-06T02:56:00Z'
-updated_date: '2026-11-06T18:36:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - plugin-architecture
   - tooling

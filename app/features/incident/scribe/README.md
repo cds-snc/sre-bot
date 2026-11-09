@@ -176,8 +176,10 @@ guidance is left exactly as it is, ready for a human.
    service resolves the channel to its incident (`find_incident_for_conversation`)
    and takes the report the record references; a channel that is no incident,
    or an incident without a report, gets the no-document notice. It then reads
-   the transcript through the `IncidentTranscriptReader` interface of
-   `features/incident/core`: fetched from channel creation, display names
+   the transcript of the record's conversation through the
+   `IncidentTranscriptReader` interface of `features/incident/core` (a failed
+   read drafts from nothing, so it gets the empty-history notice): fetched from
+   channel creation, display names
    resolved, each message carrying its time, and noise removed:
 
    - **This bot's own messages** — topic changes, hangout links, "an incident

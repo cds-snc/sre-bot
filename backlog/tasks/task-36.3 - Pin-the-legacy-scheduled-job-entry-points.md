@@ -1,10 +1,10 @@
 ---
 id: TASK-36.3
 title: Pin the legacy scheduled-job entry points
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-09-28 14:36
-updated_date: '2026-11-06T17:51:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - migration
   - testing

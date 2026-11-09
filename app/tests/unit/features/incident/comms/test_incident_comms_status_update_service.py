@@ -3,7 +3,9 @@
 The service runs against the in-memory status-update store, an in-memory
 incident store holding the incident on the channel, and a stub transcript
 reader, with a fixed ``now``, so each test controls exactly which records exist
-and which messages are read, and asserts what was stored. Starting takes no text
+and which messages are read, and asserts what was stored. The reader records the
+conversation reference it was given (the record's) and can return a classified
+failure, which the service reads as an empty window. Starting takes no text
 generator and never reads the security flag, so no model call or security read
 can happen.
 """
@@ -22,6 +24,7 @@ from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdat
 from features.incident.comms.service.draft import start_status_update_draft
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.api import (
+    ConversationReference,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateStage,
@@ -81,26 +84,39 @@ def _record(
 
 
 class _StubReader:
-    def __init__(self, messages: Sequence[TranscriptMessage] = (), *, started_at: datetime | None = _at(600)) -> None:
+    def __init__(
+        self,
+        messages: Sequence[TranscriptMessage] = (),
+        *,
+        started_at: datetime | None = _at(600),
+        read_fails: bool = False,
+        start_fails: bool = False,
+    ) -> None:
         self._messages = list(messages)
         self._started_at = started_at
+        self._read_fails = read_fails
+        self._start_fails = start_fails
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
-        return self._started_at
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+        if self._start_fails:
+            return OperationResult.transient_error(message="ratelimited", error_code="ratelimited")
+        return OperationResult.success(self._started_at)
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         self.reads.append(
-            {"conversation_id": conversation_id, "since": since, "limit": limit, "exclude": exclude_own_and_system_messages}
+            {"conversation": conversation, "since": since, "limit": limit, "exclude": exclude_own_and_system_messages}
         )
-        return self._messages
+        if self._read_fails:
+            return OperationResult.transient_error(message="ratelimited", error_code="ratelimited")
+        return OperationResult.success(self._messages)
 
 
 class _RacingStore(InMemoryStatusUpdateStore):
@@ -242,7 +258,31 @@ class TestWindow:
 
         _start(reader=reader)
 
-        assert reader.reads == [{"conversation_id": _CHANNEL, "since": _at(600), "limit": 1000, "exclude": True}]
+        assert reader.reads == [{"conversation": slack_conversation(_CHANNEL), "since": _at(600), "limit": 1000, "exclude": True}]
+
+    def test_the_records_conversation_is_read(self) -> None:
+        """The conversation read is the incident record's reference (its stored link tells it from the command's)."""
+        recorded = replace(slack_conversation(_CHANNEL), url="https://example.slack.com/archives/C0INCIDENT")
+        reader = _StubReader([_human("hello", 5)])
+
+        _start(reader=reader, incidents=incident_store_with(replace(incident_on(_CHANNEL, _INCIDENT), conversation=recorded)))
+
+        assert reader.reads[0]["conversation"] == recorded
+
+    def test_a_failed_start_lookup_falls_back_to_the_default_window(self) -> None:
+        """A classified failure of the start lookup is treated like an unknown start."""
+        reader = _StubReader([_human("hello", 5)], start_fails=True)
+
+        _start(reader=reader)
+
+        assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
+
+    def test_a_failed_read_is_an_empty_window(self) -> None:
+        """A classified read failure keeps today's outcome: no conversation from people to date the update from."""
+        result = _start(reader=_StubReader(read_fails=True))
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.error_code == ErrorCode.EMPTY_HISTORY
 
     def test_an_unknown_conversation_start_falls_back_to_the_default_window(self) -> None:
         """When the platform cannot say when the conversation started, the last 24 hours are read."""

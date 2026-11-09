@@ -3,10 +3,10 @@ id: TASK-145.5.7
 title: >-
   Incident legacy upgrade job: upgrade every item without record_version to the
   end-state shape, the open index included
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-14 23:10
-updated_date: '2026-11-04T18:01:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features
@@ -57,15 +57,15 @@ TIMING
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The job ships with upgrade_mode off ([incident_response] upgrade_mode = "off" in base.toml, the default; the job is not registered); dry_run reports the counts and writes nothing; apply upgrades every item without record_version through legacy_items.py to the end-state attributes and reference maps and stamps record_version 1 (tested against InMemoryRecordStore over each legacy item shape) [TASK-145.5.7.2, .3]
-- [ ] #2 Incidents not Closed get open_bucket OPEN and opened_at; Closed incidents get neither; a missing legacy security flag is written as security_incident false [TASK-145.5.7.2]
-- [ ] #3 Every write is a guarded RecordStore.update (record_version absent plus every scalar attribute the bridge read, at its read value), so reruns change nothing and a concurrent writer wins (guard_lost counted); legacy attributes stay on the item [TASK-145.5.7.2]
-- [ ] #4 A status outside the five IncidentStatus values (ignoring case and surrounding whitespace) or another unreadable field fails the run before any apply write, reporting the incident ids with the stored value (status) or the field; dropped optional values are reported with id and field and do not block apply [TASK-145.5.7.2]
-- [ ] #5 One structured report event per run carries the counts; the run procedure (per environment, dry run then apply, after TASK-145.8 deploys and again after TASK-145.12) and the removal owner (TASK-145.13) are recorded in features/incident/README.md; running it is a precondition of TASK-145.9, not of this task [TASK-145.5.7.2, .3]
-- [ ] #6 The whole-table read is RecordStore.read_all with max_items from the documented incident core setting [incident_core] full_read_max_items (features/incident/common/settings.py, default 10000, declared in app/config/base.toml); past the cap the run fails before any apply write and the report names the cap (decisions/cloud-portability.md contract 4) [TASK-145.5.7.2]
-- [ ] #7 Before apply writes anything, the job asks the host TenantVerifier (auth.test judged by the unchanged TASK-157 check_slack_tenant: a configured id must match; an Enterprise org the entry does not name is a mismatch); a mismatch or a failed call fails the run with the expected and received ids, and dry_run reports the same check (decisions/workplace-systems.md rule 3) [TASK-145.5.7.1, .2]
-- [ ] #8 IncidentStore.find_by_conversation logs a warning naming the stored and requested tenants for each by_channel candidate it drops for its tenant, never dropping one silently (decisions/incident-management.md, Stored form) [TASK-145.5.7.2]
-- [ ] #9 The job is registered by the incident.response plugin through BackgroundJobRegistry at lifespan startup (never at import), as an interval job under a lease whose TTL is upgrade_lease_ttl_seconds from the plugin's settings (lease_ttl on the registry), and opens one ServiceScopeOpener scope per run; with upgrade_mode off nothing is registered [TASK-145.5.7.1, .3]
+- [x] #1 The job ships with upgrade_mode off ([incident_response] upgrade_mode = "off" in base.toml, the default; the job is not registered); dry_run reports the counts and writes nothing; apply upgrades every item without record_version through legacy_items.py to the end-state attributes and reference maps and stamps record_version 1 (tested against InMemoryRecordStore over each legacy item shape) [TASK-145.5.7.2, .3]
+- [x] #2 Incidents not Closed get open_bucket OPEN and opened_at; Closed incidents get neither; a missing legacy security flag is written as security_incident false [TASK-145.5.7.2]
+- [x] #3 Every write is a guarded RecordStore.update (record_version absent plus every scalar attribute the bridge read, at its read value), so reruns change nothing and a concurrent writer wins (guard_lost counted); legacy attributes stay on the item [TASK-145.5.7.2]
+- [x] #4 A status outside the five IncidentStatus values (ignoring case and surrounding whitespace) or another unreadable field fails the run before any apply write, reporting the incident ids with the stored value (status) or the field; dropped optional values are reported with id and field and do not block apply [TASK-145.5.7.2]
+- [x] #5 One structured report event per run carries the counts; the run procedure (per environment, dry run then apply, after TASK-145.8 deploys and again after TASK-145.12) and the removal owner (TASK-145.13) are recorded in features/incident/README.md; running it is a precondition of TASK-145.9, not of this task [TASK-145.5.7.2, .3]
+- [x] #6 The whole-table read is RecordStore.read_all with max_items from the documented incident core setting [incident_core] full_read_max_items (features/incident/common/settings.py, default 10000, declared in app/config/base.toml); past the cap the run fails before any apply write and the report names the cap (decisions/cloud-portability.md contract 4) [TASK-145.5.7.2]
+- [x] #7 Before apply writes anything, the job asks the host TenantVerifier (auth.test judged by the unchanged TASK-157 check_slack_tenant: a configured id must match; an Enterprise org the entry does not name is a mismatch); a mismatch or a failed call fails the run with the expected and received ids, and dry_run reports the same check (decisions/workplace-systems.md rule 3) [TASK-145.5.7.1, .2]
+- [x] #8 IncidentStore.find_by_conversation logs a warning naming the stored and requested tenants for each by_channel candidate it drops for its tenant, never dropping one silently (decisions/incident-management.md, Stored form) [TASK-145.5.7.2]
+- [x] #9 The job is registered by the incident.response plugin through BackgroundJobRegistry at lifespan startup (never at import), as an interval job under a lease whose TTL is upgrade_lease_ttl_seconds from the plugin's settings (lease_ttl on the registry), and opens one ServiceScopeOpener scope per run; with upgrade_mode off nothing is registered [TASK-145.5.7.1, .3]
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -135,6 +135,8 @@ Contrasting scenarios for TASK-145.5.7.2 tests: (1) happy path: a single-team Cl
 2026-10-20 (SLACK_TEAM_ID review): this job is the first writer to persist tenants without a request, so it verifies the configured tenant with auth.test before apply (AC7) and owns the lookup warning (AC8). Depends on TASK-157 (inbound tenant guard).
 
 2026-11-04: D10 settled by TASK-157's production smoke (deploy dc79aa33, task-definition :78): /sre help plus a button or modal answered with slack_tenant_mismatch = 0 under the team_id-only [slack.tenant] entry, so no enterprise id arrives inbound and the host TenantVerifier (145.5.7.1) can reuse check_slack_tenant unchanged. 145.5.7.1 implementation unblocked.
+
+2026-11-09: ACs verified through 145.5.7.1 (#1820), 145.5.7.2 (#1821) and 145.5.7.3 (#1822). The job ships off; production runs follow the README procedure, and Stack L adds the binding step (TASK-145.7).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -3,10 +3,10 @@ id: TASK-145.5
 title: >-
   Build incident/core: the record with severity and five roles, its store over
   the records contract, and common/
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-10-23T17:29:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features
@@ -37,10 +37,10 @@ Out of this task:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
-- [ ] #2 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
-- [ ] #3 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
-- [ ] #4 TASK-152, TASK-145.5.1 to TASK-145.5.6 and TASK-145.5.8 to TASK-145.5.10 are done (TASK-145.5.7 may close after this task; it gates TASK-145.9)
+- [x] #1 The incident record, its typed references with system and tenant, and the vocabulary exist in core/domain.py and common/ (TASK-145.5.3)
+- [x] #2 find_incident_for_conversation and the security flag resolve through IncidentStore over RecordStore, obtained through the ServiceScopeOpener; legacy_incidents.py and the narrow lookup Protocols are gone (TASK-145.5.4, TASK-145.5.5)
+- [x] #3 No incident adapter in core/ imports an AWS client (TASK-145.5.6)
+- [x] #4 TASK-152, TASK-145.5.1 to TASK-145.5.6 and TASK-145.5.8 to TASK-145.5.10 are done (TASK-145.5.7 may close after this task; it gates TASK-145.9)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -72,4 +72,6 @@ Review cadence: review is requested once two layers are stacked, and at least tw
 2026-10-13 re-plan before pickup: IncidentStore is built over RecordStore (the records contract: TASK-27.4, TASK-27.1, TASK-108), not an interim adapter over get_aws_client; the plan's step 4 and AC #5 are rewritten at re-plan. The incident record also carries the postmortem facts that TASK-147.2 builds on.
 
 2026-10-14 wiring (rewritten after TASK-109 merged): IncidentStore gets its RecordStore through the svcs registry (app/server/services.py, TASK-109) under import-linter contract (k); it does not import get_record_store and adds no import-linter ignore entry. TASK-109 is a dependency.
+
+2026-11-09: TASK-152, 145.5.1 to 145.5.10 done (145.5.7 closed with this edit).
 <!-- SECTION:NOTES:END -->

@@ -3,10 +3,10 @@ id: TASK-36.1.5
 title: >-
   Pin the legacy incident reaction and retro-scheduling interactions
   (floppy-disk timeline capture, retro modal) through the Bolt dispatch boundary
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-06T19:04:00Z'
-updated_date: '2026-11-06T22:26:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - migration
   - testing

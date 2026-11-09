@@ -3,10 +3,10 @@ id: TASK-114.1
 title: >-
   Package-shape check: layout table, umbrella, core/common, entry-point and
   capability README rules, ratcheting baseline, blocking CI step
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-06T02:56:00Z'
-updated_date: '2026-11-06T03:13:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - plugin-architecture
   - tooling

@@ -54,6 +54,7 @@ THIS SLICE
 - [ ] #9 /sre incident summarize is refused for a security incident, or one whose flag cannot be read, until the responder confirms, through the core security guard; comms drafting uses the same guard with its behaviour and log events unchanged
 - [ ] #10 Transcript text for the model is rendered by one core function used by comms and summarize, each prompt's transcript text unchanged
 - [ ] #11 summarize lives in response/service/summary.py (prompt in response/service/prompt.py); make check-package-shape passes with no new baseline entry
+- [ ] #12 /sre incident summarize resolves its incident through find_incident_for_conversation (a channel that is not an incident gets the not-an-incident reply) and reads the incident's conversation (the primary binding once TASK-145.7 adds bindings); a behaviour change, so not in the mechanical summarize move
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -128,6 +129,14 @@ created: 2026-11-05T15:54:00Z
 ---
 
 2026-11-05: _SRE_BOT_GENERATED_TIMELINE in core/adapters/google_docs.py (the section writer) and START_HEADING in modules/incident/incident_document.py are the same template marker. When the timeline is rebuilt here, keep one definition, with the report's timeline in the adapter. TASK-145.11 leaves it in the adapter.
+
+---
+
+created: 2026-11-05T20:31:00Z
+
+---
+
+2026-11-05 (TASK-145.6.3 approval, OQ6): AC #8 added. incident-management.md Checks require every incident command to resolve its incident through find_incident_for_conversation; summarize skips it today and 145.6.3 keeps that behaviour. The layer that carries it is chosen at this task's split approval (not 145.9.2, the mechanical move). 145.6.3 also makes the transcript reader take a ConversationReference and return OperationResult (synchronous on WebClient, tolerated in transport-slack.md until its last caller moves).
 
 ---
 <!-- COMMENTS:END -->

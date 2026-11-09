@@ -3,10 +3,10 @@ id: TASK-36.1.2
 title: >-
   Pin the legacy incident response interactions (roles, field update, archive,
   folder metadata) through the Bolt dispatch boundary
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-10-15 20:49
-updated_date: '2026-11-06T19:24:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - migration
   - testing

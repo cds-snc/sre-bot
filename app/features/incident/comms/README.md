@@ -28,7 +28,7 @@ entrypoints/slack.py      parse payload → typed values → one service call �
   ▼
 service/ (draft, form, approval, publication, history)      platform-agnostic; no Slack or OpenAI imports
   │
-  ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader ── core/api.py
+  ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader (the record's conversation; a failed read is an empty window) ── core/api.py
   ├─► TextGenerator ──────── providers.py ──► adapters/text_generation.py   (integrations.openai)
   └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (domain.render_copy_ready)
 ```

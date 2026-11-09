@@ -2,8 +2,11 @@
 
 The conversation is resolved to its incident through an in-memory incident store
 seeded with one incident on Slack channel C123; the report drafted from is the
-one the record holds. The store, the transcript reader and the start signal
-record what they were asked in one shared event list, so order is observable.
+one the record holds, and the conversation read is the record's reference (its
+stored link tells it from the command's). The store, the transcript reader and
+the start signal record what they were asked in one shared event list, so order
+is observable. A reader failure is a classified ``OperationResult`` the fake
+returns on request; the draft gives the same outcome as an empty transcript.
 """
 
 from collections.abc import Iterator, Sequence
@@ -46,44 +49,58 @@ _REPORT = ReportReference(
     system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="DOC123", url="https://docs.google.com/document/d/DOC123/edit"
 )
 _CONVERSATION = slack_conversation("C123")
+_RECORDED_CONVERSATION = replace(_CONVERSATION, url="https://example.slack.com/archives/C123")
 
 
 class FakeTranscriptReader:
-    """In-memory ``IncidentTranscriptReader`` that records how it was asked, in a shared event list."""
+    """In-memory ``IncidentTranscriptReader`` that records how it was asked, in a shared event list.
+
+    ``read_fails`` and ``start_fails`` make the read or the start lookup return a
+    classified transient failure.
+    """
 
     def __init__(
         self,
         events: list[str],
         messages: Sequence[TranscriptMessage] = _MESSAGES,
         started_at: datetime | None = _STARTED,
+        *,
+        read_fails: bool = False,
+        start_fails: bool = False,
     ) -> None:
         self._events = events
         self._messages = messages
         self._started_at = started_at
+        self._read_fails = read_fails
+        self._start_fails = start_fails
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation_id: str) -> datetime | None:
+    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         self._events.append("conversation_started_at")
-        return self._started_at
+        if self._start_fails:
+            return OperationResult.transient_error("Slack transcript read failed: ratelimited", "ratelimited")
+        return OperationResult.success(self._started_at)
 
     def read_transcript(
         self,
-        conversation_id: str,
+        conversation: ConversationReference,
         *,
         since: datetime,
         limit: int,
         exclude_own_and_system_messages: bool = False,
-    ) -> Sequence[TranscriptMessage]:
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
         self._events.append("read_transcript")
         self.reads.append(
             {
-                "conversation_id": conversation_id,
+                "conversation": conversation,
                 "since": since,
                 "limit": limit,
                 "exclude_own_and_system_messages": exclude_own_and_system_messages,
             }
         )
-        return self._messages
+        if self._read_fails:
+            return OperationResult.transient_error("Slack transcript read failed: ratelimited", "ratelimited")
+        return OperationResult.success(self._messages)
 
 
 class RecordingIncidentStore(InMemoryIncidentStore):
@@ -94,7 +111,7 @@ class RecordingIncidentStore(InMemoryIncidentStore):
         self._events = events
         self.lookups: list[ConversationReference] = []
         if seeded:
-            self.seed(replace(incident_on("C123", "inc-1"), report=report))
+            self.seed(replace(incident_on("C123", "inc-1"), report=report, conversation=_RECORDED_CONVERSATION))
 
     def find_by_conversation(self, conversation: ConversationReference) -> OperationResult:
         self._events.append("find_incident")
@@ -238,6 +255,14 @@ class TestWindowAndLimit:
 
         assert reader.reads[0]["limit"] == expected
 
+    async def test_a_failed_start_lookup_falls_back_to_the_default_window(self, draft: AsyncMock, events: list[str]) -> None:
+        """A classified failure of the start lookup is treated like an unknown start."""
+        reader = FakeTranscriptReader(events, start_fails=True)
+
+        await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, reader=reader)
+
+        assert reader.reads[0]["since"] == _NOW - timedelta(hours=24)
+
     async def test_transcript_is_read_once_for_the_conversation_with_filtering_on(
         self, draft: AsyncMock, events: list[str]
     ) -> None:
@@ -247,7 +272,7 @@ class TestWindowAndLimit:
         await draft_incident_document_from_conversation(RecordingIncidentStore(events), _CONVERSATION, reader=reader)
 
         assert len(reader.reads) == 1
-        assert reader.reads[0]["conversation_id"] == "C123"
+        assert reader.reads[0]["conversation"] == _RECORDED_CONVERSATION
         assert reader.reads[0]["exclude_own_and_system_messages"] is True
 
     async def test_reader_defaults_to_the_core_provider(
@@ -273,11 +298,22 @@ class TestFailures:
     async def test_empty_transcript_gives_the_empty_history_error(
         self, events: list[str], monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Nothing read (no messages, or a platform failure behind the reader) is the empty-history outcome."""
+        """Nothing read is the empty-history outcome."""
         monkeypatch.setattr(service, "get_incident_report", _readable_report)
 
         result = await draft_incident_document_from_conversation(
             RecordingIncidentStore(events), _CONVERSATION, reader=FakeTranscriptReader(events, messages=())
+        )
+
+        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert result.error_code == EMPTY_HISTORY_CODE
+
+    async def test_a_failed_read_gives_the_empty_history_error(self, events: list[str], monkeypatch: pytest.MonkeyPatch) -> None:
+        """A classified read failure keeps today's reply: the same empty-history outcome as no messages."""
+        monkeypatch.setattr(service, "get_incident_report", _readable_report)
+
+        result = await draft_incident_document_from_conversation(
+            RecordingIncidentStore(events), _CONVERSATION, reader=FakeTranscriptReader(events, read_fails=True)
         )
 
         assert result.status == OperationStatus.PERMANENT_ERROR

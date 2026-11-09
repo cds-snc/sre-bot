@@ -3,10 +3,10 @@ id: TASK-186
 title: >-
   Reshape incident/comms into the layout table: interfaces.py, service and
   domain packages, the publisher an adapter
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-06T02:57:00Z'
-updated_date: '2026-11-06T20:10:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - incident
   - plugin-architecture

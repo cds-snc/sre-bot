@@ -1,6 +1,6 @@
 """Behavior tests for ``classify_slack_error``.
 
-Each expected Slack Web API error family is mapped onto the closed
+Each expected Slack Web API error family (the not-writable conversation codes included) is mapped onto the closed
 ``OperationStatus`` set using the code catalogues and the transient retry hint
 from ``integrations.slack.settings``; anything unexpected propagates
 unchanged. Errors are real ``SlackApiError`` objects carrying real
@@ -61,6 +61,28 @@ class TestMappedFamilies:
         error = _slack_error("ratelimited", headers={"Retry-After": "soon"}, status_code=429)
 
         assert classify_slack_error(error) == (OperationStatus.TRANSIENT_ERROR, "ratelimited", 30)
+
+    @pytest.mark.parametrize(
+        "code",
+        [
+            "is_archived",
+            "not_in_channel",
+            "restricted_action",
+            "restricted_action_read_only_channel",
+            "restricted_action_thread_only_channel",
+        ],
+    )
+    def test_not_writable_codes_are_permanent_errors(self, code: str) -> None:
+        """A conversation the bot cannot write to is permanent: retrying the write cannot succeed."""
+        assert classify_slack_error(_slack_error(code)) == (OperationStatus.PERMANENT_ERROR, code, None)
+
+    def test_ekm_access_denied_stays_unauthorized(self) -> None:
+        """A code is in one catalogue only; the key-management refusal keeps its credential class."""
+        assert classify_slack_error(_slack_error("ekm_access_denied")) == (
+            OperationStatus.UNAUTHORIZED,
+            "ekm_access_denied",
+            None,
+        )
 
 
 class TestSettingsOverrides:
