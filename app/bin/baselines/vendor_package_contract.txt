@@ -17,7 +17,6 @@ module:integrations/slack/parser.py
 module:integrations/slack/provider.py
 module:integrations/slack/users.py
 operation-result:integrations/maxmind/client.py
-operation-result:integrations/openai/client.py
 operation-result:integrations/openai/summarizer.py
 operation-result:integrations/slack/formatter.py
 operation-result:integrations/slack/provider.py

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T20:16:00Z'
+updated_date: '2026-11-09T14:11:00Z'
 labels:
   - incident
   - features
@@ -104,6 +104,10 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 2026-11-06: depends on TASK-36.1.5 (reaction pins split from TASK-36.1.2). Reaction events carry no ids; the pins assert one timeline entry in the report and rewire to the IncidentReport fake at rebuild.
 
 2026-11-06 (human, TASK-186 review): scope gains the core security guard (comms' gate moves into core/api.py; summarize calls it), the shared transcript rendering into core, and the layout-table paths response/service/summary.py and service/prompt.py (description and ACs updated). Re-check the size gate at Stack L's re-plan; split the guard and transcript moves into their own layer if it trips.
+
+2026-11-09 (TASK-25.10 plan, open for this task's re-plan): incident.scribe declares Requirement('openai.tenant') (TASK-172; TASK-25.10.3 adds 'text_generation.model'), so scribe aborts boot without a model gateway. When this task moves scribe's summarize path into incident.response, the requirement must not move with it unchanged. Requiring text generation in response would abort the whole response plugin, declare included, in any environment without a gateway, and ci.toml would switch it off, dropping its CI boot coverage (plugins.md). Recommendation: the moved use becomes optional, like comms' drafting. It asks the capability's is_available() (TASK-25.10.2) and answers with an unavailable message otherwise, and the plugin declares no text-generation requirement. This narrows TASK-172's 'scribe requires it' to the dissolved package. It needs a human ruling at this re-plan, recorded in plugin-architecture.md and plugins.md.
+
+2026-11-09 (human): ruled. The moved text-generation use is optional: it asks is_available() (TASK-25.10.2) and answers with an unavailable message otherwise. The plugin it moves into declares no text-generation requirement. TASK-172's 'scribe requires it' holds only while scribe exists. Record it in plugin-architecture.md and plugins.md with this task's PR.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

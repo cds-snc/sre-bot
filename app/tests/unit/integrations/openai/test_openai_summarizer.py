@@ -4,8 +4,6 @@ No live network calls -- an httpx MockTransport serves canned responses so the
 real request/response/raise_for_status path is exercised offline.
 """
 
-from __future__ import annotations
-
 import json
 from unittest.mock import patch
 
@@ -13,6 +11,7 @@ import httpx
 import pytest
 
 import integrations.openai.summarizer as summarizer_module
+from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.summarizer import OpenAISummarizer, Summarizer
 
@@ -99,8 +98,11 @@ class TestOpenAISummarizer:
         ):
             result = await summarizer.summarize("t")
 
-        assert result.status == OperationStatus.PERMANENT_ERROR
-        assert result.error_code == "UNAUTHORIZED"
+        assert (result.status, result.error_code, result.retry_after) == (
+            OperationStatus.UNAUTHORIZED,
+            ErrorCode.UNAUTHENTICATED,
+            None,
+        )
 
     @pytest.mark.asyncio
     async def test_rate_limit_is_transient(self, openai_settings):
@@ -114,9 +116,11 @@ class TestOpenAISummarizer:
         ):
             result = await summarizer.summarize("t")
 
-        assert result.status == OperationStatus.TRANSIENT_ERROR
-        assert result.error_code == "RATE_LIMITED"
-        assert result.retry_after == 7
+        assert (result.status, result.error_code, result.retry_after) == (
+            OperationStatus.TRANSIENT_ERROR,
+            ErrorCode.RATE_LIMITED,
+            7,
+        )
 
 
 class TestTemperature:
@@ -201,7 +205,7 @@ class TestErrorDiagnostics:
         ):
             result = await OpenAISummarizer(settings=openai_settings).summarize("transcript")
 
-        assert result.status == OperationStatus.PERMANENT_ERROR
+        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR)
         # The body names the offending parameter, and we record what we sent.
         assert "Unsupported parameter: temperature" in logged["response_body"]
         assert "temperature" in logged["sent_parameters"]
