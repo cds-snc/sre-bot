@@ -18,6 +18,7 @@ from contracts.records import RecordStore
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.store import OPEN_BUCKET, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import record_incident_store
 
 pytestmark = pytest.mark.unit
 
@@ -45,7 +46,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE, TENANTS)
+    return record_incident_store(records, table=TABLE, tenants=TENANTS)
 
 
 def test_only_open_incidents_come_back_oldest_first() -> None:
@@ -89,7 +90,7 @@ def test_a_store_failure_is_classified() -> None:
         OperationStatus.TRANSIENT_ERROR, message="timeout talking to dynamodb", error_code="TIMEOUT"
     )
 
-    result = RecordIncidentStore(records, TABLE, TENANTS).list_open()
+    result = record_incident_store(records, table=TABLE, tenants=TENANTS).list_open()
 
     assert (result.status, result.error_code) == (OperationStatus.TRANSIENT_ERROR, "TIMEOUT")
     assert result.message is not None

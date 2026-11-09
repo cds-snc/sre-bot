@@ -35,9 +35,9 @@ from features.incident.core.api import (
     StatusUpdateText,
     TranscriptMessage,
 )
-from features.incident.core.store import RecordIncidentStore, incidents_table
+from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import SLACK_TENANT, incident_on, slack_conversation
+from tests.factories.incident import SLACK_TENANT, incident_on, record_incident_store, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -154,7 +154,7 @@ def _legacy_item_store(**overrides: Any) -> IncidentStore:
     records = InMemoryRecordStore()
     table = incidents_table("incidents")
     assert records.put(table, item).is_success
-    return RecordIncidentStore(records, table, {WorkplaceSystem.SLACK: SLACK_TENANT})
+    return record_incident_store(records, table=table, tenants={WorkplaceSystem.SLACK: SLACK_TENANT})
 
 
 _PENDING = _record(1, StatusUpdateState.DRAFT)

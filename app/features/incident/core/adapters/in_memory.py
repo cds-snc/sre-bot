@@ -21,11 +21,13 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.domain import (
+    BindingKind,
     ConversationReference,
     DocumentField,
     DocumentSection,
     DraftWriteResult,
     Incident,
+    IncidentBinding,
     MessageReference,
     ReportReference,
     SectionDraft,
@@ -38,6 +40,7 @@ from features.incident.core.store import (
     ambiguous_conversation,
     no_such_incident,
     not_an_incident,
+    select_active_bindings,
 )
 
 
@@ -100,6 +103,12 @@ class InMemoryIncidentStore(IncidentStore):
     def __init__(self) -> None:
         self._incidents: dict[str, Incident] = {}
         self._open: set[str] = set()
+        self._bindings: dict[tuple[str, str, str, str, str], IncidentBinding] = {}
+
+    def bind(self, binding: IncidentBinding) -> None:
+        """Store ``binding``; one for an incident that is not seeded is dangling, as in the real store."""
+        key = (binding.incident_id, binding.kind.value, binding.system.value, binding.tenant, binding.vendor_id)
+        self._bindings[key] = binding
 
     def seed(self, incident: Incident, *, open: bool | None = None) -> None:
         """Store ``incident``; ``open`` puts it in the open list and defaults to whether its status is open."""
@@ -115,7 +124,23 @@ class InMemoryIncidentStore(IncidentStore):
         return OperationResult.success(data=incident) if incident is not None else no_such_incident()
 
     def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
-        """Return the one seeded incident with the same conversation system, tenant and id."""
+        """Return the one incident the lookup order of ``RecordIncidentStore`` finds: bindings first, then the conversation match."""
+        if not conversation.vendor_id.strip():
+            return not_an_incident()
+        candidates = [
+            binding
+            for binding in self._bindings.values()
+            if binding.kind is BindingKind.CHAT_CONVERSATION and binding.vendor_id == conversation.vendor_id
+        ]
+        live = [
+            self._incidents[binding.incident_id]
+            for binding in select_active_bindings(conversation, candidates)
+            if binding.incident_id in self._incidents
+        ]
+        if len(live) > 1:
+            return ambiguous_conversation(conversation, match_count=len(live))
+        if live:
+            return OperationResult.success(data=live[0])
         matches = [
             incident
             for incident in self._incidents.values()

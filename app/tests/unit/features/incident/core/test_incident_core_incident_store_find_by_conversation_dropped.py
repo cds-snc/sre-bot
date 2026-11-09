@@ -16,8 +16,9 @@ from structlog.testing import capture_logs
 from contracts.records import RecordTable
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.domain import ConversationReference
-from features.incident.core.store import RecordIncidentStore, incidents_table
+from features.incident.core.store import incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import record_incident_store
 
 pytestmark = pytest.mark.unit
 
@@ -45,7 +46,7 @@ def _find(*items: dict[str, Any]) -> tuple[Any, list[dict[str, Any]]]:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    store = RecordIncidentStore(records, TABLE, {WorkplaceSystem.SLACK: TENANT})
+    store = record_incident_store(records, table=TABLE, tenants={WorkplaceSystem.SLACK: TENANT})
     with capture_logs() as logs:
         result = store.find_by_conversation(CONVERSATION)
     return result, [log for log in logs if log["event"] == "incident_conversation_candidate_dropped"]

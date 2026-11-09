@@ -36,6 +36,18 @@ from contracts.records import (
     SortOrder,
 )
 from contracts.workplace import WorkplaceSystem
+from features.incident.core.adapters.binding_items import (
+    CONVERSATION_ATTRIBUTE,
+    UnknownBindingKindError,
+    UnreadableBindingItemError,
+    parse_binding_item,
+)
+from features.incident.core.adapters.binding_items import (
+    PARTITION_ATTRIBUTE as BINDING_PARTITION_ATTRIBUTE,
+)
+from features.incident.core.adapters.binding_items import (
+    SORT_ATTRIBUTE as BINDING_SORT_ATTRIBUTE,
+)
 from features.incident.core.adapters.incident_items import (
     incident_record_unreadable,
     parse_incident_item,
@@ -53,7 +65,13 @@ from features.incident.core.adapters.status_updates import (
     status_update_item,
     status_update_key,
 )
-from features.incident.core.domain import ConversationReference, Incident, StatusUpdate, StatusUpdateState
+from features.incident.core.domain import (
+    ConversationReference,
+    Incident,
+    IncidentBinding,
+    StatusUpdate,
+    StatusUpdateState,
+)
 
 logger = structlog.get_logger()
 
@@ -78,6 +96,17 @@ def incidents_table(name: str) -> RecordTable:
         indexes={
             "by_channel": RecordIndex(physical_name="by_channel", key=KeySchema(partition="channel_id")),
             "open": RecordIndex(physical_name="open", key=KeySchema(partition="open_bucket", sort="opened_at")),
+        },
+    )
+
+
+def bindings_table(name: str) -> RecordTable:
+    """Return the bindings table declaration; the keys and index match terraform/dynamodb.tf."""
+    return RecordTable(
+        name=name,
+        key=KeySchema(partition=BINDING_PARTITION_ATTRIBUTE, sort=BINDING_SORT_ATTRIBUTE),
+        indexes={
+            "by_conversation": RecordIndex(physical_name="by_conversation", key=KeySchema(partition=CONVERSATION_ATTRIBUTE))
         },
     )
 
@@ -108,9 +137,12 @@ class IncidentStore(Protocol):
     def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
         """Return the one incident whose conversation is ``conversation``.
 
-        Only incidents of the same system and tenant count, since two tenants
-        can share one conversation id. Several matches are PERMANENT_ERROR
-        with ``AMBIGUOUS_INCIDENT_CONVERSATION``.
+        The incident's active bindings are read first; only when none names an
+        incident that exists does the lookup read the incident records' own
+        conversation. The two sources are never merged. Only incidents of the
+        same system and tenant count, since two tenants can share one
+        conversation id. Several matches are PERMANENT_ERROR with
+        ``AMBIGUOUS_INCIDENT_CONVERSATION``.
         """
         ...
 
@@ -128,12 +160,22 @@ class RecordIncidentStore(IncidentStore):
 
     ``tenants`` is the configured tenant per workplace system, which the legacy
     item bridge gives the references of items without ``record_version``.
+    ``bindings`` is the bindings table ``find_by_conversation`` reads first; it
+    has no default, so no construction can skip it.
     """
 
-    def __init__(self, records: RecordStore, table: RecordTable, tenants: Mapping[WorkplaceSystem, str]) -> None:
+    def __init__(
+        self,
+        records: RecordStore,
+        table: RecordTable,
+        tenants: Mapping[WorkplaceSystem, str],
+        *,
+        bindings: RecordTable,
+    ) -> None:
         self._records = records
         self._table = table
         self._tenants = tenants
+        self._bindings = bindings
 
     def get(self, incident_id: str) -> OperationResult[Incident]:
         """Return the incident with this id."""
@@ -150,17 +192,59 @@ class RecordIncidentStore(IncidentStore):
     def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
         """Return the one incident whose conversation is ``conversation``.
 
-        Queries the by_channel index with a small bound; index reads return full
-        items. A candidate of another system or tenant is skipped before parsing
-        and logged as a warning naming both tenants; one with an unreadable
-        conversation is skipped; a legacy candidate is upgraded
-        first. A candidate that cannot be read cannot be checked, so the lookup
-        fails closed. A full
-        page means more may exist, so it is ambiguous; there is no fallback read.
+        Queries the bindings table's by_conversation index with a small bound;
+        a binding of an unknown kind is skipped and logged, an unreadable one of
+        a known kind fails the lookup closed, a full page is ambiguous. The
+        active bindings of the same system and tenant name incident records,
+        which are read; a binding whose record is missing is dropped. No live
+        binding falls back to the by_channel read of the incidents table, one
+        is the answer, several are ambiguous. A bindings-table failure is a
+        classified failure with no fallback.
         """
         if not conversation.vendor_id.strip():
             return not_an_incident()
         operation = "find_by_conversation"
+        result = self._records.query(
+            self._bindings,
+            RecordQuery(partition=conversation.vendor_id, index="by_conversation", limit=_CONVERSATION_QUERY_BOUND),
+        )
+        if not result.is_success:
+            return self._failed(result, operation=operation, table=self._bindings)
+        rows: list[Mapping[str, Any]] = result.data or []
+        if len(rows) >= _CONVERSATION_QUERY_BOUND:
+            return ambiguous_conversation(conversation, match_count=len(rows))
+        bindings: list[IncidentBinding] = []
+        for row in rows:
+            try:
+                bindings.append(parse_binding_item(row))
+            except UnknownBindingKindError as unknown:
+                logger.warning("incident_binding_unknown_kind", incident_id=unknown.incident_id, kind=unknown.kind)
+            except UnreadableBindingItemError as unreadable:
+                logger.warning("incident_binding_unreadable", incident_id=unreadable.incident_id, field=unreadable.field)
+                return incident_record_unreadable()
+        live: list[Incident] = []
+        for binding in select_active_bindings(conversation, bindings):
+            read = self.get(binding.incident_id)
+            if read.data is not None:
+                live.append(read.data)
+            elif read.status is not OperationStatus.NOT_FOUND:
+                return read
+        if not live:
+            return self._find_by_channel(conversation, operation=operation)
+        if len(live) > 1:
+            return ambiguous_conversation(conversation, match_count=len(live))
+        return OperationResult.success(data=live[0])
+
+    def _find_by_channel(self, conversation: ConversationReference, *, operation: str) -> OperationResult[Incident]:
+        """Return the incident whose own record names ``conversation``, read from the by_channel index.
+
+        Index reads return full items. A candidate of another system or tenant
+        is skipped before parsing and logged as a warning naming both tenants;
+        one with an unreadable conversation is skipped; a legacy candidate is
+        upgraded first. A candidate that cannot be read cannot be checked, so
+        the lookup fails closed. A full page means more may exist, so it is
+        ambiguous; there is no fallback read.
+        """
         result = self._records.query(
             self._table,
             RecordQuery(partition=conversation.vendor_id, index="by_channel", limit=_CONVERSATION_QUERY_BOUND),
@@ -245,7 +329,7 @@ class RecordIncidentStore(IncidentStore):
             return None
         return upgraded.item
 
-    def _failed[T](self, result: OperationResult[Any], *, operation: str) -> OperationResult[T]:
+    def _failed[T](self, result: OperationResult[Any], *, operation: str, table: RecordTable | None = None) -> OperationResult[T]:
         status = result.status
         if status is OperationStatus.NOT_FOUND:
             # A missing table or index is a broken store; NOT_FOUND is reserved for "not an incident".
@@ -253,13 +337,39 @@ class RecordIncidentStore(IncidentStore):
         logger.warning(
             "incident_store_failed",
             operation=operation,
-            table=self._table.name,
+            table=(self._table if table is None else table).name,
             status=status.value,
             error_code=result.error_code,
         )
         return OperationResult.error(
             status, message=_STORE_FAILED_MESSAGE, error_code=result.error_code, retry_after=result.retry_after
         )
+
+
+def select_active_bindings(conversation: ConversationReference, bindings: Sequence[IncidentBinding]) -> list[IncidentBinding]:
+    """Return the bindings that count for ``conversation``: not archived, and of its system and tenant.
+
+    A binding of another system or tenant is dropped with a warning naming both
+    tenants (never the conversation id, which the caller already holds). Shared
+    by the real store and the in-memory fake so their classification cannot drift.
+    """
+    active: list[IncidentBinding] = []
+    for binding in bindings:
+        if binding.archived_at is not None:
+            continue
+        if (binding.system, binding.tenant) != (conversation.system, conversation.tenant):
+            logger.warning(
+                "incident_conversation_candidate_dropped",
+                incident_id=binding.incident_id,
+                stored_system=binding.system.value,
+                stored_tenant=binding.tenant,
+                requested_system=conversation.system.value,
+                requested_tenant=conversation.tenant,
+                source="binding",
+            )
+            continue
+        active.append(binding)
+    return active
 
 
 def _refusal[T](result: OperationResult[Any]) -> OperationResult[T]:

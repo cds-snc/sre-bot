@@ -17,10 +17,12 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
+from features.incident.core.adapters.binding_items import binding_item
 from features.incident.core.api import IncidentStore, build_incident_store
 from features.incident.core.domain import ConversationReference
-from features.incident.core.store import incidents_table
+from features.incident.core.store import bindings_table, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import binding_on, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -88,6 +90,24 @@ def test_build_reads_the_incidents_table_named_in_the_settings() -> None:
 
     assert store.get("inc-configured").is_success
     assert store.get("inc-default").status is OperationStatus.NOT_FOUND
+
+
+def test_build_reads_the_bindings_table_named_in_the_settings() -> None:
+    """A binding in the configured bindings table finds its incident; one in the default table is not read."""
+    records = _records_with(TABLE_NAME, _legacy_item("inc-bound"))
+    other = "other_channel"
+    bound = binding_on(other, "inc-bound")
+    assert records.put(bindings_table("bindings_configured"), binding_item(bound)).is_success
+    conversation = slack_conversation(other)
+
+    configured = IncidentCoreSettings(incidents_table=TABLE_NAME, bindings_table="bindings_configured")
+    elsewhere = IncidentCoreSettings(incidents_table=TABLE_NAME, bindings_table="bindings_elsewhere")
+
+    found = build_incident_store(records, _FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT}), configured)
+    missed = build_incident_store(records, _FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT}), elsewhere)
+
+    assert found.find_by_conversation(conversation).data is not None
+    assert missed.find_by_conversation(conversation).status is OperationStatus.NOT_FOUND
 
 
 def test_builder_is_a_plain_function_returning_a_new_store_per_call() -> None:

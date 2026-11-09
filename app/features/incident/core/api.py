@@ -33,12 +33,14 @@ from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
+    BindingKind,
     ConversationReference,
     DocumentField,
     DocumentSection,
     DraftWriteResult,
     ExternalCaseReference,
     Incident,
+    IncidentBinding,
     MessageReference,
     PostmortemMeetingReference,
     ReportReference,
@@ -58,17 +60,20 @@ from features.incident.core.store import (
     RecordIncidentStore,
     RecordStatusUpdateStore,
     StatusUpdateStore,
+    bindings_table,
     incidents_table,
     status_updates_table,
 )
 
 __all__ = [
+    "BindingKind",
     "ConversationReference",
     "DocumentField",
     "DocumentSection",
     "DraftWriteResult",
     "ExternalCaseReference",
     "Incident",
+    "IncidentBinding",
     "IncidentConversation",
     "IncidentReport",
     "IncidentStore",
@@ -245,13 +250,18 @@ def build_incident_store(records: RecordStore, systems: ConfiguredSystems, setti
     """Return the ``IncidentStore`` over the resolved ``RecordStore``.
 
     A plain function, called by an entry point inside its service scope with the
-    services it resolved there. The table name comes from the incident core
-    settings; the tenants the legacy item bridge needs are copied from the
+    services it resolved there. The table names come from the incident core
+    settings (incidents and bindings); the tenants the legacy item bridge needs are copied from the
     configured-systems read, so a system not configured has no tenant. The
     new-incident policy is not read: only the declare path resolves it, so
     reading existing incidents never depends on it.
     """
-    return RecordIncidentStore(records, incidents_table(settings.incidents_table), dict(systems.tenants()))
+    return RecordIncidentStore(
+        records,
+        incidents_table(settings.incidents_table),
+        dict(systems.tenants()),
+        bindings=bindings_table(settings.bindings_table),
+    )
 
 
 def build_status_update_store(records: RecordStore, settings: IncidentCoreSettings) -> StatusUpdateStore:

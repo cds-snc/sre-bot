@@ -45,6 +45,7 @@ def test_table_names_default_to_the_provisioned_tables() -> None:
     assert settings.incidents_table == "incidents"
     assert settings.timeline_table == "sre_bot_incident_timeline"
     assert settings.status_updates_table == "sre_bot_incident_status_updates"
+    assert settings.bindings_table == "sre_bot_incident_bindings"
 
 
 def test_table_names_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -52,15 +53,17 @@ def test_table_names_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setenv("INCIDENT_CORE__INCIDENTS_TABLE", "incidents_test")
     monkeypatch.setenv("INCIDENT_CORE__TIMELINE_TABLE", "timeline_test")
     monkeypatch.setenv("INCIDENT_CORE__STATUS_UPDATES_TABLE", "status_updates_test")
+    monkeypatch.setenv("INCIDENT_CORE__BINDINGS_TABLE", "bindings_test")
 
     settings = IncidentCoreSettings()
 
     assert settings.incidents_table == "incidents_test"
     assert settings.timeline_table == "timeline_test"
     assert settings.status_updates_table == "status_updates_test"
+    assert settings.bindings_table == "bindings_test"
 
 
-@pytest.mark.parametrize("key", ["incidents_table", "timeline_table", "status_updates_table"])
+@pytest.mark.parametrize("key", ["incidents_table", "timeline_table", "status_updates_table", "bindings_table"])
 def test_a_blank_table_name_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, key: str) -> None:
     """A blank name could never address a table, so the slice fails naming the key."""
     monkeypatch.setenv(f"INCIDENT_CORE__{key.upper()}", "  ")
@@ -112,6 +115,7 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
         "incidents_table": "incidents",
         "timeline_table": "sre_bot_incident_timeline",
         "status_updates_table": "sre_bot_incident_status_updates",
+        "bindings_table": "sre_bot_incident_bindings",
         "full_read_max_items": 10000,
         "folder_id": "",
         "report_template_id": "",
