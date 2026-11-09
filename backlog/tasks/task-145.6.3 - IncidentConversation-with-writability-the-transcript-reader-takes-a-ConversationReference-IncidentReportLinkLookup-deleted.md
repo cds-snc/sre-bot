@@ -3,10 +3,10 @@ id: TASK-145.6.3
 title: >-
   IncidentConversation with writability; the transcript reader takes a
   ConversationReference
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T20:50:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features

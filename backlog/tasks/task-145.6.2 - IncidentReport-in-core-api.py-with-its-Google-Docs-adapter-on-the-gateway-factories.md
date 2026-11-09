@@ -3,10 +3,10 @@ id: TASK-145.6.2
 title: >-
   IncidentReport in core/api.py with its Google Docs adapter on the gateway
   factories
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T19:11:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features

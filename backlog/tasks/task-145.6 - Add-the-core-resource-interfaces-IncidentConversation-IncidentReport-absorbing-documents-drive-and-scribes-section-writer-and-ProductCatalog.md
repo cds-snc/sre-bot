@@ -3,10 +3,10 @@ id: TASK-145.6
 title: >-
   Add the core resource interfaces IncidentConversation and IncidentReport
   (absorbing documents/, drive/ and scribe's section writer)
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T19:47:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features
@@ -38,13 +38,13 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 features/incident/documents, features/incident/drive and scribe/adapters/google_docs.py are deleted; core/adapters/google_docs.py is the only Google Docs adapter in the umbrella
-- [ ] #2 IncidentTranscriptReader takes a ConversationReference; IncidentReportLinkLookup no longer exists
-- [ ] #3 No user-visible command, reply or log event changes; the legacy_surface suite and the scribe and comms tests pass
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #5 The core reads the incident folder and report template ids from [incident_core] (folder_id, report_template_id) and each subdomain that uses them states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
-- [ ] #6 Its Google adapters build services through integrations/google_workspace without passing a delegation subject or building credentials; which calls delegate is the gateway's (TASK-181; decisions/service-accounts.md rule 5)
-- [ ] #7 IncidentConversation and IncidentReport are Protocols in core/api.py with one adapter each in core/adapters/ and in-memory fakes; ProductCatalog is TASK-165.1's
+- [x] #1 features/incident/documents, features/incident/drive and scribe/adapters/google_docs.py are deleted; core/adapters/google_docs.py is the only Google Docs adapter in the umbrella
+- [x] #2 IncidentTranscriptReader takes a ConversationReference; IncidentReportLinkLookup no longer exists
+- [x] #3 No user-visible command, reply or log event changes; the legacy_surface suite and the scribe and comms tests pass
+- [x] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #5 The core reads the incident folder and report template ids from [incident_core] (folder_id, report_template_id) and each subdomain that uses them states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
+- [x] #6 Its Google adapters build services through integrations/google_workspace without passing a delegation subject or building credentials; which calls delegate is the gateway's (TASK-181; decisions/service-accounts.md rule 5)
+- [x] #7 IncidentConversation and IncidentReport are Protocols in core/api.py with one adapter each in core/adapters/ and in-memory fakes; ProductCatalog is TASK-165.1's
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -158,6 +158,8 @@ Report: create from template (placement found, not found -> root folder, placeme
 2026-11-05: no longer waits on TASK-169 (TASK-169 ruling, 2026-11-05 (human), D6): the credential model is invisible to its ports; AC added instead. Drive and Docs run as the service account itself after TASK-181 (shared-drive member), same account, so the appProperties it reads stay visible.
 
 2026-11-06: TASK-186 moves comms modules: service.py -> service/draft.py (overview -> service/history.py), history.py -> service/publication.py, approval/form/prompt -> service/, ports.py -> interfaces.py, comms_profile/publisher -> domain.py. Re-ground comms path and line references at pickup.
+
+2026-11-09: ACs verified through 145.6.1 (#1825), 145.6.2 (#1826) and 145.6.3 (#1827).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

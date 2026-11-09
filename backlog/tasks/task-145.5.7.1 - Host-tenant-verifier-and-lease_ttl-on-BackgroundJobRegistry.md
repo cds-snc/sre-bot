@@ -1,10 +1,10 @@
 ---
 id: TASK-145.5.7.1
 title: Host tenant verifier and lease_ttl on BackgroundJobRegistry
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-04T14:04:00Z'
-updated_date: '2026-11-04T18:19:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - reliability

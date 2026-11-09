@@ -3,10 +3,10 @@ id: TASK-145.6.1
 title: >-
   Move the incident Google sources into core/adapters/google_docs.py and repoint
   every importer
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-05T00:44:00Z'
-updated_date: '2026-11-05T15:45:00Z'
+updated_date: '2026-11-09T17:43:00Z'
 labels:
   - incident
   - features
