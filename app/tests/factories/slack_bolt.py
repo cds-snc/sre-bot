@@ -56,13 +56,15 @@ class InlineExecutor(Executor):
 class FakeSlackClient:
     """Records every Web API call and answers with canned payloads.
 
-    Any method name is accepted; its reply comes from ``replies`` (a dict, or
-    an exception to raise) and defaults to an empty ``ok`` payload.
+    Any method name is accepted; its reply comes from ``replies`` (a dict, an
+    exception to raise, or a function of the call's arguments returning the
+    dict, for a reply that depends on the request) and defaults to an empty
+    ``ok`` payload.
     """
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
-        self.replies: dict[str, dict[str, Any] | Exception] = {
+        self.replies: dict[str, dict[str, Any] | Exception | Callable[..., dict[str, Any]]] = {
             "auth_test": {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"},
             "views_open": {"ok": True, "view": {"id": "VFAKE"}},
         }
@@ -76,6 +78,8 @@ class FakeSlackClient:
             reply = self.replies.get(name, {"ok": True})
             if isinstance(reply, Exception):
                 raise reply
+            if callable(reply):
+                return reply(**kwargs)
             return reply
 
         return method
