@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T20:16:00Z'
+updated_date: '2026-11-06T22:26:00Z'
 labels:
   - incident
   - features
@@ -104,6 +104,8 @@ The nudge job and the reactions are low-traffic; the aws_platform deletion is th
 2026-11-06: depends on TASK-36.1.5 (reaction pins split from TASK-36.1.2). Reaction events carry no ids; the pins assert one timeline entry in the report and rewire to the IncidentReport fake at rebuild.
 
 2026-11-06 (human, TASK-186 review): scope gains the core security guard (comms' gate moves into core/api.py; summarize calls it), the shared transcript rendering into core, and the layout-table paths response/service/summary.py and service/prompt.py (description and ACs updated). Re-check the size gate at Stack L's re-plan; split the guard and transcript moves into their own layer if it trips.
+
+2026-11-06 (TASK-36.1.5 pins): test_incident_conversation_reaction_surface.py pins timeline capture: one linked, attributed entry per floppy disk, chronological order, re-add no-op, removal deletes only that entry, a stale-revision write retried from a fresh read, ack-only for other emoji and non-incident channels. Legacy behaviour to rule on: every failure is logged and swallowed (the reacting user is never told). Rewire the pins to the rebuilt append_timeline_entry.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
