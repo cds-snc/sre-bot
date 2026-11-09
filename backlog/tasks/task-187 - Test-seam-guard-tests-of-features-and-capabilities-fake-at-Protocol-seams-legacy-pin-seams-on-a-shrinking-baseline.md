@@ -3,10 +3,10 @@ id: TASK-187
 title: >-
   Test-seam guard: tests of features and capabilities fake at Protocol seams;
   legacy pin seams on a shrinking baseline
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-06T19:11:00Z'
-updated_date: '2026-11-06T21:12:00Z'
+updated_date: '2026-11-09T17:44:00Z'
 labels:
   - testing
   - migration
