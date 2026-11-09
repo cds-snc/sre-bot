@@ -1,19 +1,15 @@
-"""OpenAI vendor client: authenticated client factory and error
-classification.
+"""OpenAI vendor client: authenticated client factory and error classification.
 
-This module provides authenticated client construction and ``classify_openai_error``.
-exceptions and contains no business logic. The adapter in
-``app.integrations.openai.summarizer`` is the boundary that calls into this
-module inside ``try/except`` and classifies.
+``build_openai_client`` builds the authenticated client with its resilience settings,
+and ``classify_openai_error`` maps the expected httpx failures onto the outbound-client
+contract's (status, error_code, retry_after) tuple (decisions/outbound-clients.md). The
+module holds no business logic; the adapter calling the API wraps the call in
+``try/except`` and classifies.
 """
-
-from __future__ import annotations
-
-import contextlib
 
 import httpx
 
-from contracts.operations.result import OperationResult
+from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 
@@ -21,7 +17,10 @@ from integrations.openai.settings import OpenAISettings, get_openai_settings
 def build_openai_client(settings: OpenAISettings | None = None) -> httpx.AsyncClient:
     """Build an authenticated httpx client for the OpenAI REST API.
 
-    Caller manages the client's lifecycle (use as an async context manager).
+    The retry policy is set here, once: the transport retries a connection that never
+    opened ([openai] connect_retries; httpcore retries only ``ConnectError`` and
+    ``ConnectTimeout``, with backoff), so a completion that reached the endpoint is never
+    re-sent. The caller manages the client's lifecycle (use it as an async context manager).
     """
     settings = settings or get_openai_settings()
     return httpx.AsyncClient(
@@ -31,72 +30,42 @@ def build_openai_client(settings: OpenAISettings | None = None) -> httpx.AsyncCl
             "Content-Type": "application/json",
         },
         timeout=settings.timeout_seconds,
+        transport=httpx.AsyncHTTPTransport(retries=settings.connect_retries),
     )
 
 
-def classify_openai_error(exc: Exception) -> OperationResult:
-    """Map OpenAI/HTTP exceptions to ``OperationResult``.
+def classify_openai_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify expected httpx failures from the OpenAI API; propagate unknown exceptions.
 
-    Unmapped exceptions propagate uncaught -- they are bugs, not outcomes.
+    ``retry_after`` is the 429 response's Retry-After delay in seconds, or ``None`` when
+    the header is absent or not a number of seconds.
     """
     if isinstance(exc, httpx.HTTPStatusError):
-        response = exc.response
-        status_code = response.status_code
-
+        status_code = exc.response.status_code
         if status_code == 401:
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                "OpenAI authentication failed",
-                error_code="UNAUTHORIZED",
-            )
+            return OperationStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED, None
         if status_code == 403:
-            return OperationResult.error(
-                OperationStatus.PERMANENT_ERROR,
-                "OpenAI API access forbidden",
-                error_code="FORBIDDEN",
-            )
+            return OperationStatus.UNAUTHORIZED, ErrorCode.FORBIDDEN, None
         if status_code == 404:
-            return OperationResult.error(
-                OperationStatus.NOT_FOUND,
-                "OpenAI resource not found",
-                error_code="NOT_FOUND",
-            )
+            return OperationStatus.NOT_FOUND, ErrorCode.NOT_FOUND, None
         if status_code == 429:
-            retry_after = 60
-            header_value = response.headers.get("Retry-After")
-            if header_value:
-                with contextlib.suppress(TypeError, ValueError):
-                    retry_after = int(header_value)
-            return OperationResult.error(
-                OperationStatus.TRANSIENT_ERROR,
-                "OpenAI API rate limited",
-                error_code="RATE_LIMITED",
-                retry_after=retry_after,
-            )
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.RATE_LIMITED, _retry_after(exc.response)
         if 500 <= status_code < 600:
-            return OperationResult.error(
-                OperationStatus.TRANSIENT_ERROR,
-                f"OpenAI API server error ({status_code})",
-                error_code="SERVER_ERROR",
-            )
-        return OperationResult.error(
-            OperationStatus.PERMANENT_ERROR,
-            f"OpenAI API client error ({status_code})",
-            error_code="HTTP_ERROR",
-        )
-
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.SERVER_ERROR, None
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR, None
     if isinstance(exc, httpx.TimeoutException):
-        return OperationResult.error(
-            OperationStatus.TRANSIENT_ERROR,
-            "OpenAI API request timed out",
-            error_code="TIMEOUT",
-        )
-
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.TIMEOUT, None
     if isinstance(exc, httpx.HTTPError):
-        return OperationResult.error(
-            OperationStatus.TRANSIENT_ERROR,
-            "OpenAI API request failed",
-            error_code="CONNECTION_ERROR",
-        )
-
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.CONNECTION_ERROR, None
     raise exc
+
+
+def _retry_after(response: httpx.Response) -> int | None:
+    """Return the Retry-After delay in seconds, or ``None`` when absent or an HTTP-date."""
+    value = response.headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None

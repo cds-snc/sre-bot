@@ -121,9 +121,11 @@ system_admin_permissions = ""
 view_only_permissions = ""
 
 [openai]
-# The completion budget, temperature (negative omits it) and request timeout. The model endpoint is
-# the [openai.tenant] entry (base_url, model), named in the deployment's environment file; with no
+# The completion budget, temperature (negative omits it), request timeout and connection retries
+# (a connection that never opened; a sent request is never retried). The model endpoint is the
+# [openai.tenant] entry (base_url, model), named in the deployment's environment file; with no
 # entry OpenAI is not configured. The key is a secret from OPENAI__API_KEY.
+connect_retries = 2
 max_output_tokens = 3000
 temperature = -1.0
 timeout_seconds = 180.0

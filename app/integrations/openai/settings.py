@@ -44,7 +44,7 @@ class OpenAISettings(ConfigurationSlice):
     """Vendor credential, endpoint and tuning settings for the OpenAI API.
 
     Keys of [openai]:
-        max_output_tokens, temperature, timeout_seconds.
+        connect_retries, max_output_tokens, temperature, timeout_seconds.
         [openai.tenant] base_url, model: the model endpoint. Default: none (OpenAI not configured).
 
     Environment only:
@@ -67,6 +67,10 @@ class OpenAISettings(ConfigurationSlice):
     # completion takes well over a minute, so a 60s timeout aborted requests
     # the model was still legitimately writing.
     timeout_seconds: float = 180.0
+    # Retries cover a connection that never opened (httpcore retries only ConnectError and
+    # ConnectTimeout), so a completion request that reached the endpoint is never re-sent:
+    # it is not idempotent and every attempt is billed (decisions/outbound-clients.md).
+    connect_retries: int = Field(default=2, ge=0)
 
     @model_validator(mode="after")
     def _tenant_and_key_go_together(self) -> OpenAISettings:

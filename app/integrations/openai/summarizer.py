@@ -98,7 +98,13 @@ class OpenAISummarizer:
                 response_body=_error_body(exc),
                 sent_parameters=sorted(payload),
             )
-            return classify_openai_error(exc)
+            status, error_code, retry_after = classify_openai_error(exc)
+            return OperationResult.error(
+                status,
+                f"OpenAI request failed ({error_code})",
+                error_code=error_code,
+                retry_after=retry_after,
+            )
 
         summary = _extract_summary(body)
         finish_reason = _finish_reason(body)

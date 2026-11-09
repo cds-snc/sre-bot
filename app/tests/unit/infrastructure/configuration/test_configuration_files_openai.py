@@ -51,7 +51,7 @@ def test_base_names_no_tenant_and_only_the_tuning() -> None:
     """The base file holds the framework's tuning, never the deploying organisation's endpoint."""
     table = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))["openai"]
 
-    assert set(table) == {"max_output_tokens", "temperature", "timeout_seconds"}
+    assert set(table) == {"connect_retries", "max_output_tokens", "temperature", "timeout_seconds"}
 
 
 @pytest.mark.parametrize("name", ["base.toml", "local.toml", "ci.toml", "production.toml"])

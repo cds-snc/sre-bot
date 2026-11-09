@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T20:16:00Z'
+updated_date: '2026-11-09T14:11:00Z'
 labels:
   - incident
   - features
@@ -100,6 +100,10 @@ A missed import breaks the draft command at boot; the lifespan test catches it. 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 
 2026-11-06 (human, TASK-186 review): the plan's module names (postmortem/report.py, draft_rendering.py, prompt.py) are superseded by the 2026-11-06 layout table: postmortem/service/report.py, postmortem/service/prompt.py, rendering and the template profile in postmortem/domain.py. Scope gains the core security guard call and the organisation wording moving into the template profile (description and ACs updated); re-approve the plan at Stack M's pickup.
+
+2026-11-09 (TASK-25.10 plan, open for this task's re-plan): incident.scribe declares Requirement('openai.tenant') (TASK-172; TASK-25.10.3 adds 'text_generation.model'), so scribe aborts boot without a model gateway. When this task moves scribe's draft path into incident.postmortem, the requirement must not move with it unchanged. Requiring text generation in postmortem would abort the whole postmortem plugin, its records included, in any environment without a gateway, and ci.toml would switch it off, dropping its CI boot coverage (plugins.md). Recommendation: the moved use becomes optional, like comms' drafting. It asks the capability's is_available() (TASK-25.10.2) and answers with an unavailable message otherwise, and the plugin declares no text-generation requirement. This narrows TASK-172's 'scribe requires it' to the dissolved package. It needs a human ruling at this re-plan, recorded in plugin-architecture.md and plugins.md.
+
+2026-11-09 (human): ruled. The moved text-generation use is optional: it asks is_available() (TASK-25.10.2) and answers with an unavailable message otherwise. The plugin it moves into declares no text-generation requirement. TASK-172's 'scribe requires it' holds only while scribe exists. Record it in plugin-architecture.md and plugins.md with this task's PR.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

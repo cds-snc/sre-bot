@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 from tests.unit.integrations.openai.conftest import BASE_URL, MODEL, install_openai_files
 
@@ -40,11 +40,33 @@ def test_openai_settings_fields_have_no_alias(field: str) -> None:
 
 def test_tuning_comes_from_the_openai_table(tmp_path: Path) -> None:
     """[openai] sets the completion budget, temperature and timeout."""
-    install_openai_files(tmp_path, base="[openai]\nmax_output_tokens = 1234\ntemperature = 0.25\ntimeout_seconds = 42.5\n")
+    install_openai_files(
+        tmp_path, base="[openai]\nmax_output_tokens = 1234\ntemperature = 0.25\ntimeout_seconds = 42.5\nconnect_retries = 4\n"
+    )
 
     settings = OpenAISettings()
 
-    assert (settings.max_output_tokens, settings.temperature, settings.timeout_seconds) == (1234, 0.25, 42.5)
+    assert (settings.max_output_tokens, settings.temperature, settings.timeout_seconds, settings.connect_retries) == (
+        1234,
+        0.25,
+        42.5,
+        4,
+    )
+
+
+def test_connect_retries_default_to_two(tmp_path: Path) -> None:
+    """With no connect_retries key, a refused connection is retried twice."""
+    install_openai_files(tmp_path)
+
+    assert OpenAISettings().connect_retries == 2
+
+
+def test_negative_connect_retries_fail_validation(tmp_path: Path) -> None:
+    """A negative retry count fails boot naming the key, never silently zero."""
+    install_openai_files(tmp_path, base="[openai]\nconnect_retries = -1\n")
+
+    with pytest.raises(ConfigurationError, match="connect_retries"):
+        OpenAISettings()
 
 
 def test_no_tenant_and_no_key_is_openai_not_configured(tmp_path: Path) -> None:

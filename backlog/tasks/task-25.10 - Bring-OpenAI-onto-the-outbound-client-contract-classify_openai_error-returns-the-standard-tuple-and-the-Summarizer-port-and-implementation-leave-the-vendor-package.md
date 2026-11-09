@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-06T19:47:00Z'
+updated_date: '2026-11-09T13:42:00Z'
 labels:
   - clients
   - phase-3
@@ -73,4 +73,22 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-06 (TASK-186 review): settle at pickup whether comms' local TextGenerator (features/incident/comms/interfaces.py after TASK-186) is deleted in favour of the capability's api.py Protocol, as incident-management.md:128 implies, or kept behind comms/adapters/text_generation.py as AC #2 reads; reconcile the ADR line either way. comms keeps its status-update prompt (service/prompt.py after TASK-186).
+
+2026-11-09 (plan session): the size gate trips. Unsplit, the task is about 30 production files across integrations/openai, the new capability, scribe, comms and server configuration, and it mixes a vendor contract change, a move and a settings migration. Split expand -> migrate -> contract, sequential, each a single PR from main:
+- TASK-25.10.1 vendor client contract: tuple classification, explicit connect retries. Planned; awaits approval.
+- TASK-25.10.2 create the capability with make new-package; scribe and comms repointed to api.py; the comms TextGenerator question settled there (deleted); text_generation_available ends. Plan at pickup; a size exception is proposed.
+- TASK-25.10.3 generation parameters move to the capability and the callers (ACs #7 and #8). Plan at pickup.
+Parent ACs, by slice: #1 (tuple: .1; files and baseline: .2), #2 .2, #3 .1, #4 .1, #5 (outbound-clients: .1 and .2; configuration.md: .3), #6 .2, #7 .3, #8 .3, #9 .2. Check each parent AC as its slice merges.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-09T13:42:00Z
+
+---
+
+Proposed AC #2 wording (25.10 plan, 2026-11-09): replace 'features/incident/comms/adapters/text_generation.py import only its api.py' with 'comms' local TextGenerator interface and adapters/text_generation.py are deleted; comms depends on the capability's api.py Protocol (incident-management.md:128)'. The capability reports unavailable itself, so the comms adapter would be dead code. Awaiting the human's ruling.
+
+---
+<!-- COMMENTS:END -->
