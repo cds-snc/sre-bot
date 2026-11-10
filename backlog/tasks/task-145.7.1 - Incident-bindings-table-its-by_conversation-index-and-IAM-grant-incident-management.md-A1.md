@@ -3,10 +3,10 @@ id: TASK-145.7.1
 title: >-
   Incident bindings table, its by_conversation index and IAM grant;
   incident-management.md A1
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:05:00Z'
-updated_date: '2026-11-09T19:27:00Z'
+updated_date: '2026-11-10T15:11:00Z'
 labels:
   - incident
   - terraform
@@ -31,7 +31,7 @@ Stack L L0 (storage expand; the only new table in TASK-145). Terraform adds sre_
 - [x] #1 terraform/dynamodb.tf declares sre_bot_incident_bindings with hash incident_id, range binding_key and GSI by_conversation (hash conversation_id, projection ALL), point-in-time recovery and encryption as the timeline table; its arn is in local.dynamodb_table_arns
 - [x] #2 terraform/iam.tf grants Query on the table's index/*; terraform fmt -check and validate pass
 - [x] #3 decisions/incident-management.md carries the A1 clauses a-n of TASK-145.7's plan section 4 with one dated Changes line, and the 2026-11-06 line's waits for TASK-145.13 are revised (no wait on TASK-165.1 or TASK-146.3)
-- [ ] #4 deploy-checks pre and post outputs are recorded in the notes; no app code names the table
+- [x] #4 deploy-checks pre and post outputs are recorded in the notes; no app code names the table
 - [x] #5 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
@@ -67,4 +67,8 @@ AC traceability: enabling work for AC #5 (re-worded) and for the A1 decisions; n
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09 (L0 implemented, In Progress): terraform/dynamodb.tf adds sre_bot_incident_bindings (hash incident_id, range binding_key, attribute conversation_id, GSI by_conversation hash conversation_id projection ALL, read 1/write 2; blocks as the timeline table: no PITR or SSE block, backups through local.dynamodb_table_arns, where its arn is added); terraform/iam.tf grants Query on its index/*. terraform fmt -check and validate (init -backend=false) pass; rg finds no app code naming the table. decisions/incident-management.md A1: Vocabulary (Binding, severity Revision 1, system timeline entries), Bindings paragraph (cardinality, declare commit order, severity-change order), Stored form (record_version 1/2, bindings table and lookup order, source_alert message reference), core/ owns, System selection runtime clause, Checks test line, tolerated by_channel fallback (stale scan line replaced), rules 1 (readers before writers, revert window), 3 (upgrade on write), 4 (marker raise), 6 (legacy writers), the binding step, one Changes line withdrawing 145.13's waits on 165.1 and 146.3. Gates: ruff clean; contracts 13 kept; key ownership OK; package shape OK (3 baselined); test seams OK (47 + 12); mypy 41 errors, all pre-existing in legacy files; pytest 6666 passed. AC #4 waits on the human's deploy-checks pre and post outputs (gates AC #5 added for parity with the other Stack L subtasks).
+
+2026-11-09: deploy-checks pre at 22:32:34Z (tmp/deploy-checks/pre-20261109T223234Z.txt), 30 s after #1841 merged (22:32:04Z, 95e47d46) and before its Terraform Apply finished, so it records the pre-change state: rollback target sre-bot-task:100, image 3075170b-2026-11-09, rollout COMPLETED 2/2; 24 h baseline 12 error lines (10 webhook_posting_error, 1 aws_identity_store_group_memberships_error, 1 payload_validation_error), none from this change. Terraform Apply (run 42712739853) success: 2 added, 1 changed, 1 destroyed = aws_dynamodb_table.sre_bot_incident_bindings created, aws_iam_policy.sre-bot_secrets_manager updated in place (the index Query grant), aws_backup_selection.sre_bot_backup_selection replaced (its resource list gains the table arn). No app deploy for this merge (terraform and docs only). AC #4 waits on deploy-checks post.
+
+2026-11-10: deploy-checks post at 14:49:36Z (tmp/deploy-checks/post-20261110T144936Z.txt), checks=none: running sre-bot-task:100, image 3075170b-2026-11-09 unchanged (terraform-only merge, no app deploy), rollout PASS, boot_errors PASS, slack_up PASS, version PASS (head 3075170b), health 200; runtime_errors FAIL on one aws_identity_store_group_memberships_error (2026-11-09 23:59Z, access module, the same class as the 1 in the pre baseline; unrelated to this change, which no running code reads); non_json_lines WARN (4 known import-time lines). The bindings table and the index Query grant are live per Terraform Apply run 42712739853; git grep on origin/main (95e47d46) finds no app code naming incident_bindings. AC #4 checked; ready for the human to set Done.
 <!-- SECTION:NOTES:END -->

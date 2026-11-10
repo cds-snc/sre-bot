@@ -11,12 +11,15 @@ from typing import Any
 from contracts.operations import OperationResult
 from contracts.records import ExpectedValue, RecordChange, RecordTable
 from contracts.workplace import WorkplaceSystem
+from features.incident.core.adapters.incident_items import END_STATE_VERSION, OPEN_BUCKET
+from features.incident.core.adapters.legacy_items import UpgradedItem, upgrade_legacy_item
 from features.incident.core.legacy_upgrade import LegacyUpgrade
-from features.incident.core.store import incidents_table
+from features.incident.core.store import bindings_table, incidents_table
 from tests.factories.incident import SLACK_TENANT, CountingRecordStore
 from tests.factories.tenant_verifier import FakeTenantVerifier
 
 TABLE = incidents_table("incidents")
+BINDINGS = bindings_table("bindings")
 GOOGLE_TENANT = "C0GOOGLE"
 TENANTS = {WorkplaceSystem.SLACK: SLACK_TENANT, WorkplaceSystem.GOOGLE: GOOGLE_TENANT}
 REPORT_URL = "https://docs.google.com/document/d/doc123/edit"
@@ -46,6 +49,21 @@ def legacy_item(incident_id: str = "inc-legacy", **overrides: Any) -> dict[str, 
         "environment": "prod",
     }
     item.update(overrides)
+    return {key: value for key, value in item.items() if value is not None}
+
+
+def end_state_item(incident_id: str = "inc-v1", version: int = END_STATE_VERSION, **overrides: Any) -> dict[str, Any]:
+    """An end-state incident item at ``version`` without a binding, as the bridge maps ``legacy_item(incident_id)``.
+
+    An override of ``None`` removes the attribute. Open items carry the open index; a ``Closed`` one does not.
+    """
+    upgraded = upgrade_legacy_item(legacy_item(incident_id), TENANTS)
+    assert isinstance(upgraded, UpgradedItem)
+    item: dict[str, Any] = {**upgraded.item, "record_version": version, "channel_id": f"C0{incident_id.upper()}"}
+    item.update(overrides)
+    if item["status"] != "Closed":
+        item.setdefault("open_bucket", OPEN_BUCKET)
+        item.setdefault("opened_at", item["declared_at"])
     return {key: value for key, value in item.items() if value is not None}
 
 
@@ -91,4 +109,6 @@ def legacy_upgrade(
     max_items: int = 100,
 ) -> LegacyUpgrade:
     """The upgrade over ``records`` with the configured tenants and, by default, a verifier confirming the Slack tenant."""
-    return LegacyUpgrade(records, TABLE, tenants, verified_slack() if verifier is None else verifier, max_items)
+    return LegacyUpgrade(
+        records, TABLE, tenants, verified_slack() if verifier is None else verifier, max_items, bindings=BINDINGS
+    )

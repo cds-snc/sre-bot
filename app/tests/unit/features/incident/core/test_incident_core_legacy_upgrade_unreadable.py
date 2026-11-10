@@ -11,7 +11,7 @@ from decimal import Decimal
 
 import pytest
 
-from features.incident.core.store import RECORD_VERSION
+from features.incident.core.adapters.incident_items import RECORD_VERSION
 from tests.factories.legacy_upgrade import TABLE, legacy_item, legacy_upgrade, records_with
 
 pytestmark = pytest.mark.unit

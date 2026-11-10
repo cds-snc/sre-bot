@@ -11,7 +11,8 @@ from pathlib import Path
 import pytest
 
 from contracts.records import KeySchema
-from features.incident.core.store import OPEN_BUCKET, RECORD_VERSION, incidents_table
+from features.incident.core.adapters.incident_items import END_STATE_VERSION, OPEN_BUCKET, RECORD_VERSION
+from features.incident.core.store import incidents_table
 
 pytestmark = pytest.mark.unit
 
@@ -47,5 +48,5 @@ def test_the_indexes_match_the_deployed_table() -> None:
 
 def test_the_writer_constants_are_fixed() -> None:
     """Writers stamp end-state items with this version and open items with this bucket."""
-    assert RECORD_VERSION == 1
+    assert (END_STATE_VERSION, RECORD_VERSION) == (1, 2)
     assert OPEN_BUCKET == "OPEN"

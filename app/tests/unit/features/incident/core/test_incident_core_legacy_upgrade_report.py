@@ -14,7 +14,7 @@ from structlog.testing import capture_logs
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.workplace import WorkplaceSystem
-from tests.factories.legacy_upgrade import MEET_URL, REPORT_URL, legacy_item, legacy_upgrade, records_with
+from tests.factories.legacy_upgrade import MEET_URL, REPORT_URL, end_state_item, legacy_item, legacy_upgrade, records_with
 from tests.factories.tenant_verifier import FakeTenantVerifier
 
 pytestmark = pytest.mark.unit
@@ -30,6 +30,11 @@ KEYS = {
     "upgraded",
     "guard_lost",
     "pending",
+    "bindings_put",
+    "bindings_existing",
+    "marker_raised",
+    "binding_skipped",
+    "unbound",
     "unmatched_status",
     "unreadable",
     "dropped",
@@ -94,5 +99,27 @@ def test_the_event_holds_ids_and_fields_but_no_stored_value_except_the_status() 
     assert event["unmatched_status"] == [{"incident_id": "inc-status", "value": "Resolved"}]
     assert event["unreadable"] == [{"incident_id": "inc-name", "field": "name"}]
     assert event["dropped"] == [{"incident_id": "inc-drop", "field": "report_url"}]
-    for value in ("private-doc", "secret-room", REPORT_URL, MEET_URL, "U0DECLARER", "Incident inc-"):
+    for value in ("private-doc", "secret-room", REPORT_URL, MEET_URL, "U0DECLARER", "Incident inc-", "C0INC"):
         assert value not in text
+
+
+def test_the_event_counts_the_binding_step_and_names_blocking_items_by_id_only() -> None:
+    records = records_with(legacy_item("inc-ok"), legacy_item("inc-open", channel_id=None))
+
+    with capture_logs() as logs:
+        legacy_upgrade(records).run(apply=True)
+
+    [event] = _reports(logs)
+    assert event["unbound"] == ["inc-open"]
+    assert (event["bindings_put"], event["bindings_existing"], event["marker_raised"], event["binding_skipped"]) == (0, 0, 0, 0)
+    assert "C0INC-OPEN" not in repr(event)
+
+
+def test_the_event_of_an_applied_run_counts_puts_and_raises() -> None:
+    records = records_with(legacy_item("inc-1"), end_state_item("inc-2"), legacy_item("inc-3", status="Closed", channel_id=None))
+
+    with capture_logs() as logs:
+        legacy_upgrade(records).run(apply=True)
+
+    [event] = _reports(logs)
+    assert (event["bindings_put"], event["marker_raised"], event["binding_skipped"], event["unbound"]) == (2, 1, 1, [])

@@ -14,7 +14,7 @@ pytestmark = pytest.mark.unit
 
 
 def test_a_dry_run_reports_the_counts_and_writes_nothing() -> None:
-    records = records_with(legacy_item("inc-1"), legacy_item("inc-2"), {**legacy_item("inc-3"), "record_version": Decimal(1)})
+    records = records_with(legacy_item("inc-1"), legacy_item("inc-2"), {**legacy_item("inc-3"), "record_version": Decimal(2)})
 
     report = legacy_upgrade(records).run(apply=False)
 

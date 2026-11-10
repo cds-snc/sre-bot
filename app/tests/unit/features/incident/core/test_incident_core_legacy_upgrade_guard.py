@@ -1,7 +1,7 @@
 """Behavior tests for the incident legacy upgrade's guarded writes.
 
-Each item is written by one update guarded on record_version absent and on every
-attribute the bridge read, at its read value. A concurrent writer is simulated
+Each item is written by one update guarded on record_version at its read value
+(absent, or 1 for an end-state item) and on every attribute the bridge read, at its read value. A concurrent writer is simulated
 by an in-memory store that edits the item just before the upgrade's update: the
 guard must then fail, the item stay untouched and the report count guard_lost.
 """

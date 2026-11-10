@@ -280,8 +280,8 @@ def build_legacy_upgrade(
     """Return the incident legacy upgrade over the resolved ``RecordStore``.
 
     A plain function, called by the upgrade job inside its service scope with the
-    services it resolved there. The table name and the whole-table read cap come
-    from the incident core settings; the tenants are copied from the
+    services it resolved there. The incidents and bindings table names and the
+    whole-table read cap come from the incident core settings; the tenants are copied from the
     configured-systems read, as for the read path's bridge, and the verifier
     confirms the Slack one before any write.
     """
@@ -291,6 +291,7 @@ def build_legacy_upgrade(
         dict(systems.tenants()),
         verifier,
         settings.full_read_max_items,
+        bindings=bindings_table(settings.bindings_table),
     )
 
 
