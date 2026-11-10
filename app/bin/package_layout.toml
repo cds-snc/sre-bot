@@ -2,13 +2,19 @@
 # decisions/feature-packages.md. That record is the authority; amend it and this
 # file together (tests/unit/bin/test_bin_package_layout_load.py fails when the
 # names differ). Read through bin/package_layout.py by the package-shape check
-# (bin/check_package_shape.py) and, from TASK-114.4, by the generator.
+# (bin/check_package_shape.py) and by the generator (bin/new_package.py).
 #
 # Names: a trailing "/" marks a directory. A kind lists its required and
-# optional entries; "extends" starts from another kind's entries, "exclude"
-# drops some of them. An "open" kind allows any name except its "forbidden"
-# ones. Required entries are what the generator always writes; the shape check
-# allows required and optional entries alike.
+# optional entries; "extends" starts from another kind's entries and templates,
+# "exclude" drops inherited entries before the kind's own are added (so an
+# entry can move from required to optional). An "open" kind allows any name
+# except its "forbidden" ones. The shape check allows required and optional
+# entries alike. The generator always writes the required entries, and an
+# optional entry only when its option flag is given; a kind takes exactly the
+# options whose entry it lists as optional. "templates" maps an entry to its
+# file in bin/package_templates/ ("" writes an empty file; a directory's
+# template renders its __init__.py). Which config files a kind edits (entry
+# points, contracts, enablement keys) is generator behaviour, kept in code.
 
 roots = { features = "features", capabilities = "capabilities" }
 
@@ -17,6 +23,27 @@ reserved_subdomains = ["core", "common", "adapters", "entrypoints", "locales", "
 
 # Modules that may each grow into a package of the same name (service/, domain/).
 grows_into_package = ["service.py", "domain.py"]
+
+# Generator flags (--<name>), in the order the interactive mode asks them. "needs"
+# names entries the package must also hold (required, or added by another option).
+[options.hookspecs]
+entry = "hookspecs.py"
+
+[options.service]
+entry = "service.py"
+
+[options.entrypoints]
+entry = "entrypoints/"
+
+[options.interfaces]
+entry = "interfaces.py"
+needs = ["service.py"]
+
+[options.adapters]
+entry = "adapters/"
+
+[options.settings]
+entry = "settings.py"
 
 [capability_readme]
 classification_heading = "## Classification"
@@ -38,15 +65,32 @@ optional = [
     "locales/",
 ]
 
+[kinds.feature.templates]
+"__init__.py" = "plugin_init.py.tmpl"
+"README.md" = "feature_readme.md.tmpl"
+"service.py" = "service.py.tmpl"
+"entrypoints/" = "entrypoints_init.py.tmpl"
+"interfaces.py" = "interfaces.py.tmpl"
+"adapters/" = "adapters_init.py.tmpl"
+"settings.py" = "settings.py.tmpl"
+
 # An umbrella's plugin subdomain: the feature shape.
 [kinds.subdomain]
 extends = "feature"
 
 # A capability: the feature shape plus its public api.py and its own extension points.
+# service.py and entrypoints/ are optional: a driven-port capability is its api.py
+# Protocol and the adapters implementing it.
 [kinds.capability]
 extends = "feature"
+exclude = ["service.py", "entrypoints/"]
 required = ["api.py"]
-optional = ["hookspecs.py"]
+optional = ["service.py", "entrypoints/", "hookspecs.py"]
+
+[kinds.capability.templates]
+"README.md" = "capability_readme.md.tmpl"
+"api.py" = "api.py.tmpl"
+"hookspecs.py" = "hookspecs.py.tmpl"
 
 # An umbrella's core/: not a plugin, so no plugin.py and no entrypoints/; public surface is api.py.
 [kinds.core]
@@ -54,12 +98,27 @@ extends = "feature"
 required = ["api.py"]
 exclude = ["plugin.py", "entrypoints/"]
 
+[kinds.core.templates]
+"__init__.py" = "core_init.py.tmpl"
+"README.md" = "core_readme.md.tmpl"
+"api.py" = "core_api.py.tmpl"
+
 # An umbrella's common/: shared code that does no I/O.
 [kinds.common]
 required = ["__init__.py", "README.md"]
+optional = ["settings.py"]
 open = true
 forbidden = ["adapters/", "store.py", "providers.py"]
+
+[kinds.common.templates]
+"__init__.py" = "common_init.py.tmpl"
+"README.md" = "common_readme.md.tmpl"
+"settings.py" = "settings.py.tmpl"
 
 # An umbrella's root: no code of its own.
 [kinds.umbrella]
 required = ["__init__.py", "README.md"]
+
+[kinds.umbrella.templates]
+"__init__.py" = ""
+"README.md" = "umbrella_readme.md.tmpl"

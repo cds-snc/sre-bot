@@ -2,8 +2,9 @@
 
 bin/package_layout.toml declares each package kind (feature, subdomain,
 capability, core, common, umbrella) with its required, optional and forbidden
-entries, plus the capability README rules and the reserved subdomain names.
-This module reads it with tomllib into frozen dataclasses and refuses a
+entries, plus the capability README rules and the reserved subdomain names,
+and for the generator (bin/new_package.py) each kind's templates and the
+option flags that add an optional entry. This module reads it with tomllib into frozen dataclasses and refuses a
 malformed manifest, naming the key at fault, so a bad edit fails every tool
 that reads it instead of silently widening a check.
 
@@ -21,10 +22,12 @@ from typing import Any
 
 LAYOUT_PATH = Path(__file__).resolve().parent / "package_layout.toml"
 
-TOP_LEVEL_KEYS = frozenset({"roots", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"})
+REQUIRED_TOP_LEVEL_KEYS = frozenset({"roots", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"})
+TOP_LEVEL_KEYS = REQUIRED_TOP_LEVEL_KEYS | {"options"}
 ROOT_KEYS = frozenset({"features", "capabilities"})
 README_KEYS = frozenset({"classification_heading", "consumers_heading", "classifications"})
-KIND_KEYS = frozenset({"extends", "required", "optional", "exclude", "forbidden", "open"})
+KIND_KEYS = frozenset({"extends", "required", "optional", "exclude", "forbidden", "open", "templates"})
+OPTION_KEYS = frozenset({"entry", "needs"})
 DIRECTORY_MARK = "/"
 
 
@@ -42,6 +45,8 @@ class Kind:
     forbidden: frozenset[str]
     open: bool
     grows_into_package: frozenset[str]
+    templates: Mapping[str, str]
+    """Entry -> template file in bin/package_templates/ ('' writes an empty file); a directory's renders its __init__.py."""
 
     @property
     def declared(self) -> frozenset[str]:
@@ -66,6 +71,15 @@ class Kind:
 
 
 @dataclass(frozen=True)
+class Option:
+    """A generator flag (--<name>) that adds one optional entry, when the entries it needs are there."""
+
+    name: str
+    entry: str
+    needs: frozenset[str]
+
+
+@dataclass(frozen=True)
 class Roots:
     """The top-level directories, under app/, that hold packages."""
 
@@ -83,6 +97,12 @@ class Layout:
     classification_heading: str
     consumers_heading: str
     classifications: tuple[str, ...]
+    options: Mapping[str, Option]
+
+    def options_of(self, kind: str) -> tuple[Option, ...]:
+        """The options a kind takes, in manifest order: those whose entry the kind lists as optional."""
+        optional = self.kinds[kind].optional
+        return tuple(option for option in self.options.values() if option.entry in optional)
 
     @property
     def declared_names(self) -> frozenset[str]:
@@ -121,20 +141,21 @@ def _kind(name: str, kinds: Mapping[str, Any], grows: frozenset[str], seen: tupl
 
     required: frozenset[str] = frozenset()
     optional: frozenset[str] = frozenset()
+    templates: dict[str, str] = {}
     if "extends" in table:
         base_name = table["extends"]
         if base_name not in kinds:
             raise LayoutError(f"{where}.extends: no kind '{base_name}'")
         base = _kind(base_name, kinds, grows, (*seen, name))
-        required, optional = base.required, base.optional
-    required |= _names(table.get("required", []), f"{where}.required")
-    optional |= _names(table.get("optional", []), f"{where}.optional")
-
+        required, optional, templates = base.required, base.optional, dict(base.templates)
+    # Exclude drops inherited entries before the kind's own are added, so an entry can move from required to optional.
     exclude = _names(table.get("exclude", []), f"{where}.exclude")
     absent = sorted(exclude - required - optional)
     if absent:
         raise LayoutError(f"{where}.exclude: {', '.join(absent)} is not an entry of this kind")
     required, optional = required - exclude, optional - exclude
+    required |= _names(table.get("required", []), f"{where}.required")
+    optional |= _names(table.get("optional", []), f"{where}.optional")
 
     both = sorted(required & optional)
     if both:
@@ -143,7 +164,38 @@ def _kind(name: str, kinds: Mapping[str, Any], grows: frozenset[str], seen: tupl
     if not isinstance(is_open, bool):
         raise LayoutError(f"{where}.open must be true or false")
     forbidden = _names(table.get("forbidden", []), f"{where}.forbidden")
-    return Kind(name, required, optional, forbidden, is_open, grows)
+    templates = {entry: template for entry, template in templates.items() if entry in required | optional}
+    templates |= _templates(table.get("templates", {}), required | optional, f"{where}.templates")
+    return Kind(name, required, optional, forbidden, is_open, grows, templates)
+
+
+def _templates(value: Any, declared: frozenset[str], where: str) -> dict[str, str]:
+    if not isinstance(value, dict) or not all(isinstance(template, str) for template in value.values()):
+        raise LayoutError(f"{where} must be a table of entry = template file name")
+    undeclared = sorted(set(value) - declared)
+    if undeclared:
+        raise LayoutError(f"{where}: {', '.join(undeclared)} is not an entry of this kind")
+    return dict(value)
+
+
+def _options(value: Any, declared: frozenset[str]) -> dict[str, Option]:
+    if not isinstance(value, dict):
+        raise LayoutError("options must be a table of option tables")
+    options: dict[str, Option] = {}
+    for name, table in value.items():
+        where = f"options.{name}"
+        if not isinstance(table, dict):
+            raise LayoutError(f"{where} must be a table")
+        _check_keys(table, OPTION_KEYS, where)
+        entry = table.get("entry")
+        if entry not in declared:
+            raise LayoutError(f"{where}.entry: '{entry}' is not an entry any kind declares")
+        needs = _names(table.get("needs", []), f"{where}.needs")
+        unknown = sorted(needs - declared)
+        if unknown:
+            raise LayoutError(f"{where}.needs: {', '.join(unknown)} is not an entry any kind declares")
+        options[name] = Option(name, entry, needs)
+    return options
 
 
 def load_layout(path: Path) -> Layout:
@@ -153,7 +205,7 @@ def load_layout(path: Path) -> Layout:
     except tomllib.TOMLDecodeError as error:
         raise LayoutError(f"{path.name}: {error}") from error
     _check_keys(data, TOP_LEVEL_KEYS, path.name)
-    for key in sorted(TOP_LEVEL_KEYS):
+    for key in sorted(REQUIRED_TOP_LEVEL_KEYS):
         if key not in data:
             raise LayoutError(f"{path.name}: missing {key}")
 
@@ -176,13 +228,16 @@ def load_layout(path: Path) -> Layout:
     kinds = data["kinds"]
     if not isinstance(kinds, dict) or not kinds:
         raise LayoutError("kinds must declare at least one kind")
+    parsed = {name: _kind(name, kinds, grows) for name in kinds}
+    declared = frozenset().union(*(kind.declared for kind in parsed.values()))
     return Layout(
         roots=Roots(features=roots["features"], capabilities=roots["capabilities"]),
-        kinds={name: _kind(name, kinds, grows) for name in kinds},
+        kinds=parsed,
         reserved_subdomains=_names(data["reserved_subdomains"], "reserved_subdomains"),
         classification_heading=str(headings["classification_heading"]),
         consumers_heading=str(headings["consumers_heading"]),
         classifications=tuple(classifications),
+        options=_options(data.get("options", {}), declared),
     )
 
 

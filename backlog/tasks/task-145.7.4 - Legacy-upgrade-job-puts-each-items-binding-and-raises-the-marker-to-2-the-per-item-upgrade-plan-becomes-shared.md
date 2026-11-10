@@ -3,10 +3,10 @@ id: TASK-145.7.4
 title: >-
   Legacy upgrade job puts each item's binding and raises the marker to 2; the
   per-item upgrade plan becomes shared
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T15:09:00Z'
+updated_date: '2026-11-10T17:47:00Z'
 labels:
   - incident
   - features

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-09T15:42:00Z'
+updated_date: '2026-11-09T21:18:00Z'
 labels:
   - clients
   - phase-3
@@ -36,7 +36,7 @@ ordinal: 493000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Second slice of TASK-25.10 (migrate). The Summarizer port and its OpenAI implementation leave the vendor package for app/capabilities/text_generation/, the first package under app/capabilities/, and both incident consumers import only its api.py. Behaviour is unchanged; plan it at pickup against main after 25.10.1 merges.
 
-CREATE: make new-package ARGS='capability text_generation --classification generic --consumer features.incident.scribe --consumer features.incident.comms' (no --settings: the slice arrives in 25.10.3). Dry run on a scratch copy (2026-11-09): the generator adds capabilities to root_packages, the wheel packages and every contract that lists features, the entry point text_generation = capabilities.text_generation and the key "text_generation" = true in [plugins.incident_response]. It also emits empty hookspecs.py, interfaces.py, service.py and entrypoints/; this capability has no extension point, no service and no inbound handler, so those are deleted in the same PR (dead code).
+CREATE: make new-package ARGS='capability text_generation --classification generic --consumer features.incident.scribe --consumer features.incident.comms --adapters' (no --settings: the slice arrives in 25.10.3). Dry run on a scratch copy (2026-11-09): the generator adds capabilities to root_packages, the wheel packages and every contract that lists features, the entry point text_generation = capabilities.text_generation and the key "text_generation" = true in [plugins.incident_response]. With TASK-114.4 a capability gets only __init__.py, README.md and api.py by default and --adapters adds adapters/__init__.py; nothing generated is deleted by hand.
 
 PROPOSED SHAPE (review at the 25.10 plan checkpoint, 2026-11-09):
 - api.py: TextGenerator Protocol (named for its role; feature-free): is_available() -> bool, and async generate(source, *, instructions, max_output_tokens=None) -> OperationResult[str], with instructions required (every caller passes its own today; the vendor's incident-worded default is deleted). get_text_generator() provider (cached): the OpenAI adapter when [openai.tenant] is set, else the unconfigured one, which answers is_available() False and TEXT_GENERATION_UNAVAILABLE on generate (plugin-architecture.md: unavailable, never an error).
@@ -59,7 +59,7 @@ SIZE: about 8 new files, most generated or moved, about 12 modified and 3 delete
 - [ ] #5 comms' local TextGenerator Protocol and adapters/text_generation.py are deleted; comms services depend on the capability's Protocol; text_generation_available is gone and the form reads is_available() from the injected generator; the form has no AI section when text generation is unavailable and save and approve still work (existing tests, now on the in-memory fake)
 - [ ] #6 Tests under tests/unit/capabilities/text_generation/ pass make check-test-seams with no strict baseline entry (the adapter is faked at the httpx edge); the comms test_seams_strict.txt entries for text_generation_available are absent
 - [ ] #7 decisions/incident-management.md, outbound-clients.md, feature-packages.md, product-scope.md and plugins.md are updated with dated Changes lines; full gates plus make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams and check-fake-coverage pass, with output in notes
-- [ ] #8 app/capabilities/text_generation/ is created with make new-package (classification generic, consumers features.incident.scribe and features.incident.comms, with --adapters and no other optional entry; TASK-114.3), so no generated file is deleted by hand; its entry point and [plugins.incident_response] key exist; capabilities is an import-linter root package; its README names the feature consumers and states the vocabulary is feature-free; make check-package-shape passes with no new baseline entry
+- [ ] #8 app/capabilities/text_generation/ is created with make new-package (classification generic, consumers features.incident.scribe and features.incident.comms, with --adapters and no other optional entry; TASK-114.4), so no generated file is deleted by hand; its entry point and [plugins.incident_response] key exist; capabilities is an import-linter root package; its README names the feature consumers and states the vocabulary is feature-free; make check-package-shape passes with no new baseline entry
 - [ ] #9 decisions/plugin-architecture.md ('Text generation is a capability') and plugins.md (optional dependencies) state the availability rule: the capability always provides an implementation, a no-op answering is_available() false when unconfigured, and a consumer offering an optional action asks is_available() first; dated Changes lines
 <!-- AC:END -->
 
@@ -74,4 +74,6 @@ Production safety: behaviour unchanged. The unconfigured implementation is today
 2026-11-09 (human): Q3 ruled: the capability always provides an implementation, a no-op when unconfigured, with is_available() on its Protocol; the ADR text rides with this PR (AC added).
 
 2026-11-09: now depends on TASK-114.4 (the generator slice of the 114.3 re-plan) instead of TASK-114.3; AC #8's '--adapters and no other optional entry' comes from 114.4.
+
+2026-11-09 (TASK-114.4 plan, awaiting approval): if approved, a capability gets only __init__.py, README.md and api.py by default, so this task's command becomes: capability text_generation --classification generic --consumer features.incident.scribe --consumer features.incident.comms --adapters; the step deleting the empty hookspecs.py, interfaces.py, service.py and entrypoints/ goes. Re-check at this task's pickup.
 <!-- SECTION:NOTES:END -->
