@@ -360,3 +360,8 @@ def test_a_binding_of_a_known_kind_with_an_unreadable_field_fails_closed() -> No
 def test_the_store_constructor_requires_the_bindings_table() -> None:
     with pytest.raises(TypeError):
         RecordIncidentStore(InMemoryRecordStore(), INCIDENTS, {})  # type: ignore[call-arg]
+
+
+def test_the_store_constructor_requires_the_timeline_store() -> None:
+    with pytest.raises(TypeError):
+        RecordIncidentStore(InMemoryRecordStore(), INCIDENTS, {}, bindings=BINDINGS)  # type: ignore[call-arg]

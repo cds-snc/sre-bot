@@ -49,17 +49,21 @@ from features.incident.core.domain import (
     ExternalCaseReference,
     Incident,
     IncidentBinding,
+    IncidentChanges,
+    Keep,
     MessageReference,
     PostmortemMeetingReference,
     ReferenceKind,
     ReportPlacement,
     ReportReference,
     SectionDraft,
+    SeverityChange,
     StatusUpdate,
     StatusUpdateOrigin,
     StatusUpdateState,
     StatusUpdateText,
     TimelineEntry,
+    TimelineEntryKind,
     TranscriptMessage,
     VideoCallReference,
     incident_conversation_names,
@@ -69,10 +73,13 @@ from features.incident.core.store import (
     IncidentStore,
     RecordIncidentStore,
     RecordStatusUpdateStore,
+    RecordTimelineStore,
     StatusUpdateStore,
+    TimelineStore,
     bindings_table,
     incidents_table,
     status_updates_table,
+    timeline_table,
 )
 
 __all__ = [
@@ -86,10 +93,12 @@ __all__ = [
     "ExternalCaseReference",
     "Incident",
     "IncidentBinding",
+    "IncidentChanges",
     "IncidentConversation",
     "IncidentReport",
     "IncidentStore",
     "IncidentTranscriptReader",
+    "Keep",
     "LegacyUpgrade",
     "MessageReference",
     "PostmortemMeetingReference",
@@ -97,6 +106,7 @@ __all__ = [
     "ReportPlacement",
     "ReportReference",
     "SectionDraft",
+    "SeverityChange",
     "StatusUpdate",
     "StatusUpdateOrigin",
     "StatusUpdateStage",
@@ -104,6 +114,8 @@ __all__ = [
     "StatusUpdateStore",
     "StatusUpdateText",
     "TimelineEntry",
+    "TimelineEntryKind",
+    "TimelineStore",
     "TranscriptMessage",
     "UpgradeReport",
     "VideoCall",
@@ -323,7 +335,7 @@ def build_incident_store(records: RecordStore, systems: ConfiguredSystems, setti
 
     A plain function, called by an entry point inside its service scope with the
     services it resolved there. The table names come from the incident core
-    settings (incidents and bindings); the tenants the legacy item bridge needs are copied from the
+    settings (incidents, bindings and timeline); the tenants the legacy item bridge needs are copied from the
     configured-systems read, so a system not configured has no tenant. The
     new-incident policy is not read: only the declare path resolves it, so
     reading existing incidents never depends on it.
@@ -333,6 +345,7 @@ def build_incident_store(records: RecordStore, systems: ConfiguredSystems, setti
         incidents_table(settings.incidents_table),
         dict(systems.tenants()),
         bindings=bindings_table(settings.bindings_table),
+        timeline=RecordTimelineStore(records, timeline_table(settings.timeline_table)),
     )
 
 

@@ -1,9 +1,10 @@
-"""Behavior tests for the TimelineEntry record and its source-message reference.
+"""Behavior tests for the TimelineEntry record, its kinds and its source-message reference.
 
 Plain value tests. An entry belongs to a named incident, has its own id and a
 timezone-aware time. A captured entry points at the message it came from by
 system, tenant, conversation and message id, so a re-capture can derive the
-same key.
+same key. A message entry carries text; a severity_changed entry carries only
+its structured change, rendered at read time.
 """
 
 import dataclasses
@@ -12,7 +13,8 @@ from datetime import UTC, datetime
 import pytest
 
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.api import MessageReference, TimelineEntry
+from features.incident.common.vocabulary import Severity
+from features.incident.core.api import MessageReference, SeverityChange, TimelineEntry, TimelineEntryKind
 
 pytestmark = pytest.mark.unit
 
@@ -92,3 +94,62 @@ def test_a_source_message_system_must_be_a_member() -> None:
     """The system is validated strictly where it is chosen."""
     with pytest.raises(ValueError, match="system"):
         MessageReference(system="slack", tenant="T0", conversation_id="C0", message_id="1.0")  # type: ignore[arg-type]
+
+
+def test_an_entry_is_a_message_by_default() -> None:
+    """Existing captured and manual entries keep their shape: kind message, no structured payload."""
+    entry = _entry()
+
+    assert (entry.kind, entry.severity_change) == (TimelineEntryKind.MESSAGE, None)
+
+
+def test_a_message_entry_needs_text() -> None:
+    """A message is what a person wrote; an empty one would render as nothing."""
+    with pytest.raises(ValueError, match="text"):
+        _entry(text="  ")
+
+
+def test_a_severity_entry_carries_the_change_and_no_text() -> None:
+    """The change is structured data, rendered per locale at read time, never stored in one language."""
+    change = SeverityChange(previous=Severity.SEV3, current=Severity.SEV1)
+
+    entry = _entry(kind=TimelineEntryKind.SEVERITY_CHANGED, text="", severity_change=change)
+
+    assert entry.severity_change == change
+
+
+def test_a_severity_entry_without_its_change_is_rejected() -> None:
+    """A system entry without its payload says nothing a reader could render."""
+    with pytest.raises(ValueError, match="severity_change"):
+        _entry(kind=TimelineEntryKind.SEVERITY_CHANGED, text="")
+
+
+def test_a_severity_entry_with_text_is_rejected() -> None:
+    """System entries hold no free text, so no language is baked into the record."""
+    change = SeverityChange(previous=None, current=Severity.SEV2)
+
+    with pytest.raises(ValueError, match="text"):
+        _entry(kind=TimelineEntryKind.SEVERITY_CHANGED, text="Severity raised", severity_change=change)
+
+
+def test_a_message_entry_with_a_severity_change_is_rejected() -> None:
+    """The payload belongs to its kind only."""
+    with pytest.raises(ValueError, match="severity_change"):
+        _entry(severity_change=SeverityChange(previous=None, current=Severity.SEV2))
+
+
+@pytest.mark.parametrize(
+    ("previous", "current"),
+    [(Severity.SEV2, Severity.SEV2), (None, None)],
+    ids=["same-level", "both-unset"],
+)
+def test_a_severity_change_must_change_something(previous: Severity | None, current: Severity | None) -> None:
+    """Writing the same severity is a replay, never a change."""
+    with pytest.raises(ValueError, match="differ"):
+        SeverityChange(previous=previous, current=current)
+
+
+def test_a_severity_change_takes_members_only() -> None:
+    """A bare int would store whatever the caller passed."""
+    with pytest.raises(ValueError, match="current"):
+        SeverityChange(previous=None, current=2)  # type: ignore[arg-type]

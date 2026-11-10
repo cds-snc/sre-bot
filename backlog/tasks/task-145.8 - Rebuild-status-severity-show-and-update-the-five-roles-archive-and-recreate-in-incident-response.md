@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T16:52:00Z'
 labels:
   - incident
   - features
@@ -113,6 +113,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-05 (human, TASK-145.6.2 C1): IncidentReport ships in 145.6.2 without set_status_text; this task adds it when it rebuilds the status surface (rule: status fans out to the report's status text) and moves the legacy status mapping from incident_document.py then. The ADR's end surface (decisions/incident-management.md) is unchanged.
 
 2026-11-06 (TASK-36.1.2 pins): legacy bugs pinned as is, to rule in this plan: /sre incident products answers Unknown command (dispatcher key product, help text products); archive sends incident_channel_archived to Sentinel twice (close_incident and archive_channel_action); a refused archive in a non-incident channel still sends it; re-saving roles with no roles line in the purpose leaves a doubled newline. The pins' one internal seam, legacy_sre_web_client_seam, is deleted here.
+
+2026-11-10 (TASK-145.8.1 full plan, human rulings): L3 kept whole under an approved size exception (~530 / 6 incl. the timeline store from OQ13); IncidentChanges has no retrospective link (dropped at L6a, see TASK-145.8.3 notes); close/reopen are one set_status with the bucket rules; the outline's expected_version parameter is replaced by a guard on record_version plus the read values of the changed attributes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
