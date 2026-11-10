@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:16:00Z'
+updated_date: '2026-11-10T20:12:00Z'
 labels:
   - incident
   - features
@@ -45,3 +45,15 @@ Stack L L9a (approved program in TASK-145.7's plan, section 2; outline in the pa
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-10 (TASK-145.7.7 rulings R4-R6, decisions/incident-management.md Bindings): business features are API first; bindings are chat conversations only, zero or more per incident; declare writes the record first, then the conversation and attach_conversation, then resources, each a retriable step whose failure is reported (timeline entry once TASK-145.9) and never rolled back; the incident id is derived from the declare's idempotency key (uuid5 of the Slack request or alert id; the HTTP Idempotency-Key) so a retry reuses it and the orphan-incident residual stays theoretical; the HTTP declare route is folded in here (AC #4). Supersedes the plan's OQ9 'declare unavailable only when no working surface can be bound' and AC #1's 'a failing conversation writes nothing'. Full plan: check the size gate with the route included.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-10T20:12:00Z
+
+---
+
+2026-11-10 scope from TASK-145.7.5 (approved by the human): conversation creation follows incident-management.md one-channel-per-incident rules I1-I5 (TASK-145.7.5 plan 1.a4). Candidates from core/conversation_names.incident_conversation_names (legacy format, Slack-safe slug, bare name then -2..-5). I1 a record that names a conversation never creates one. I2 claim each candidate name for the incident through the IdempotencyStore (key incident:conversation_name:<tenant>:<name>); skip a name another incident claimed. I3 after any non-success create (name_taken, transient, unclassified exception or timeout) call IncidentConversation.find_own(name) first; the bots own channel bound to this incident, or unbound while this incident holds the claim, is bound and reused. I4 the same name may always be retried; the next suffix only when the channel is proven another incidents or not the bots. I5 an unknown outcome with nothing found reports the error (one warning, the pinned invoker message) without moving on; recreate retries the same name. CONVERSATION_NAME_TAKEN is an expected outcome logged at info. Plan this in full at pickup, with tests for each rule.
+
+---
+<!-- COMMENTS:END -->

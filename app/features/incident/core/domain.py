@@ -1,7 +1,9 @@
 """Domain types every incident subdomain works on."""
 
-from dataclasses import dataclass, fields
-from datetime import datetime
+import re
+import unicodedata
+from dataclasses import dataclass, field, fields
+from datetime import date, datetime
 from enum import StrEnum
 
 from contracts.workplace import WorkplaceSystem
@@ -185,6 +187,24 @@ class ConversationReference(ResourceReference):
 @dataclass(frozen=True)
 class ReportReference(ResourceReference):
     """The incident report document."""
+
+
+@dataclass(frozen=True)
+class ReportPlacement(ResourceReference):
+    """A labelled folder a new incident report can be filed in (a Drive folder for Google).
+
+    Read live from the report system, never stored on the record: the record
+    keeps only the created report's ``ReportReference``.
+
+    Attributes:
+        label: The folder's name as people choose it.
+    """
+
+    label: str = field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        _require_text(self, "label")
 
 
 @dataclass(frozen=True)
@@ -439,3 +459,33 @@ class DraftWriteResult:
 
     document_id: str
     created: bool
+
+
+CONVERSATION_NAME_ATTEMPTS = 5
+"""How many names declare and recreate try for one incident's conversation: the bare name, then ``-2`` to ``-5``."""
+
+_CONVERSATION_NAME_MAX = 80  # Slack's channel name limit
+_CONVERSATION_NAME_REFUSED = re.compile(r"[^a-z0-9_-]+")
+
+
+def incident_conversation_names(title: str, opened_on: date, *, production: bool) -> tuple[str, ...]:
+    """Return the names to try, in order, for an incident's conversation.
+
+    The first is ``incident-`` (``incident-dev-`` outside production), the opening
+    date and the title, cut to 80 characters: the format the legacy declare used.
+    The title is lowercased with accents dropped, and every run of characters a
+    Slack channel name refuses becomes one dash. The next names end ``-2`` to
+    ``-5``, the base cut so each still fits. Which name an incident ends up with,
+    and when an existing conversation is its own, is the caller's decision
+    (decisions/incident-management.md, one conversation per incident).
+    """
+    ascii_title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii").lower()
+    slug = _CONVERSATION_NAME_REFUSED.sub("-", ascii_title).strip("-")
+    prefix = "incident-" if production else "incident-dev-"
+    base = f"{prefix}{opened_on.isoformat()}" + (f"-{slug}" if slug else "")
+    first = base[:_CONVERSATION_NAME_MAX]
+    suffixed = tuple(
+        f"{base[: _CONVERSATION_NAME_MAX - len(suffix)].rstrip('-')}{suffix}"
+        for suffix in (f"-{n}" for n in range(2, CONVERSATION_NAME_ATTEMPTS + 1))
+    )
+    return (first, *suffixed)

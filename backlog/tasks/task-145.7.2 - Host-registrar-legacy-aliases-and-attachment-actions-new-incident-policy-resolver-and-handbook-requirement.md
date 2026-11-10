@@ -3,10 +3,10 @@ id: TASK-145.7.2
 title: >-
   Host registrar legacy aliases and attachment actions; new-incident policy
   resolver and handbook requirement
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T18:28:00Z'
+updated_date: '2026-11-10T19:43:00Z'
 labels:
   - incident
   - features
