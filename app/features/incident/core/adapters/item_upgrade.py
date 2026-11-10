@@ -86,7 +86,9 @@ class UnboundOpenItem:
     incident_id: object
 
 
-class _UnguardableError(Exception):
+class UnguardableValueError(Exception):
+    """A stored value that cannot be an equality guard; ``field`` names its attribute."""
+
     def __init__(self, field: str) -> None:
         super().__init__(field)
         self.field = field
@@ -106,9 +108,9 @@ def plan_item_upgrade(
         return _plan_legacy(item, tenants)
     try:
         if isinstance(stored_version, bool):
-            raise _UnguardableError("record_version")
-        version = _guard_value("record_version", stored_version)
-    except _UnguardableError:
+            raise UnguardableValueError("record_version")
+        version = guard_value("record_version", stored_version)
+    except UnguardableValueError:
         return UnreadableLegacyItem(incident_id=item.get("id"), field="record_version", value=None)
     if not isinstance(version, int) or version < END_STATE_VERSION:
         return UnreadableLegacyItem(incident_id=item.get("id"), field="record_version", value=None)
@@ -131,8 +133,8 @@ def _plan_legacy(
         values["opened_at"] = values["declared_at"]
     values["record_version"] = RECORD_VERSION
     try:
-        expected = {attribute: _guard_value(attribute, item.get(attribute)) for attribute in (*_READ_ATTRIBUTES, *values)}
-    except _UnguardableError as exc:
+        expected = {attribute: guard_value(attribute, item.get(attribute)) for attribute in (*_READ_ATTRIBUTES, *values)}
+    except UnguardableValueError as exc:
         return UnreadableLegacyItem(incident_id=incident_id, field=exc.field, value=None)
     binding = _binding_for(upgraded.item)
     if isinstance(binding, UnreadableLegacyItem):
@@ -156,8 +158,8 @@ def _plan_raise(item: Mapping[str, Any], version: int) -> ItemUpgrade | Unreadab
     if binding is None and status != IncidentStatus.CLOSED.value:
         return UnboundOpenItem(incident_id)
     try:
-        expected = {attribute: _guard_value(attribute, item.get(attribute)) for attribute in _END_STATE_GUARDED}
-    except _UnguardableError as exc:
+        expected = {attribute: guard_value(attribute, item.get(attribute)) for attribute in _END_STATE_GUARDED}
+    except UnguardableValueError as exc:
         return UnreadableLegacyItem(incident_id=incident_id, field=exc.field, value=None)
     expected["record_version"] = version
     return ItemUpgrade(incident_id, version, binding, (SetAttribute("record_version", RECORD_VERSION),), expected)
@@ -197,10 +199,10 @@ def _binding_for(item: Mapping[str, Any]) -> IncidentBinding | UnreadableLegacyI
         return UnreadableLegacyItem(incident_id=incident_id, field="conversation", value=None)
 
 
-def _guard_value(attribute: str, value: object) -> ExpectedValue:
+def guard_value(attribute: str, value: object) -> ExpectedValue:
     """Return ``value`` as an equality guard: text, bool, int and None as read, an integral Decimal as int."""
     if value is None or isinstance(value, str | bool | int):
         return value
     if isinstance(value, Decimal) and value.is_finite() and value == value.to_integral_value():
         return int(value)
-    raise _UnguardableError(attribute)
+    raise UnguardableValueError(attribute)

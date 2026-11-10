@@ -18,7 +18,7 @@ from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.api import StatusUpdateStore, build_status_update_store
 from features.incident.core.domain import BindingKind, ConversationReference, Incident, IncidentBinding
-from features.incident.core.store import RecordIncidentStore, bindings_table, incidents_table
+from features.incident.core.store import RecordIncidentStore, RecordTimelineStore, bindings_table, incidents_table, timeline_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 from tests.factories.services import FakeServiceScopeOpener
 
@@ -96,7 +96,8 @@ def record_incident_store(
     """The real incident store over ``records``.
 
     ``tenants`` defaults to Slack under ``SLACK_TENANT``; ``table`` and ``bindings``
-    default to the declared incidents and bindings tables under their configured names.
+    default to the declared incidents and bindings tables under their configured names;
+    timeline entries go to the configured timeline table in ``records``.
     """
     settings = get_incident_core_settings()
     return RecordIncidentStore(
@@ -104,6 +105,7 @@ def record_incident_store(
         incidents_table(settings.incidents_table) if table is None else table,
         {WorkplaceSystem.SLACK: SLACK_TENANT} if tenants is None else dict(tenants),
         bindings=bindings_table(settings.bindings_table) if bindings is None else bindings,
+        timeline=RecordTimelineStore(records, timeline_table(settings.timeline_table)),
     )
 
 
