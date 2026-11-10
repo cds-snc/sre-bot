@@ -9,7 +9,7 @@ from structlog import get_logger
 
 from contracts.configuration import host_info
 from features.incident.core.adapters import google_docs as incident_drive
-from features.incident.meet.adapters import google_meet as meet
+from features.incident.core.adapters import google_meet as meet
 from features.incident.response.settings import get_incident_response_settings
 from integrations.slack.settings import get_slack_settings
 from models.incidents import IncidentPayload

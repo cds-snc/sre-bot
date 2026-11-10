@@ -9,7 +9,8 @@ found, empty document ids refused naming the key, no draft copy without content)
 ``InMemoryIncidentConversation``: the ``SlackIncidentConversation`` rules (Slack
 references only, unknown conversations not found, archived or non-member
 conversations not writable and refusing writes, repeated archives and empty
-invites succeeding).
+invites succeeding). ``InMemoryVideoCall``: the ``GoogleMeetVideoCall`` rules
+(Google references under the tenant, a link only for Google references).
 """
 
 from collections.abc import Mapping, Sequence
@@ -38,6 +39,7 @@ from features.incident.core.domain import (
     SectionDraft,
     StatusUpdate,
     StatusUpdateState,
+    VideoCallReference,
 )
 from features.incident.core.store import (
     IncidentStore,
@@ -627,3 +629,34 @@ def _conversation_unsupported[T](conversation: ConversationReference) -> Operati
 
 def _not_writable[T](slack_code: str) -> OperationResult[T]:
     return OperationResult.permanent_error(f"Slack write failed: {slack_code}", ErrorCode.CONVERSATION_NOT_WRITABLE)
+
+
+class InMemoryVideoCall:
+    """Create video calls under the Google tenant it is built with; every created call is recorded.
+
+    Calls are ``spaces/call-<n>`` with a meet.google.com link. ``fail_with`` makes
+    every create return that error result instead.
+    """
+
+    def __init__(self, *, tenant: str = "C0GOOGLE", fail_with: OperationResult[VideoCallReference] | None = None) -> None:
+        self._tenant = tenant
+        self._fail_with = fail_with
+        self.created: list[VideoCallReference] = []
+
+    async def create(self) -> OperationResult[VideoCallReference]:
+        """Return a new Google call reference, or the configured failure."""
+        if self._fail_with is not None:
+            return self._fail_with
+        n = len(self.created) + 1
+        call = VideoCallReference(
+            system=WorkplaceSystem.GOOGLE,
+            tenant=self._tenant,
+            vendor_id=f"spaces/call-{n}",
+            url=f"https://meet.google.com/call-{n}",
+        )
+        self.created.append(call)
+        return OperationResult.success(call)
+
+    def link(self, call: VideoCallReference) -> str | None:
+        """Return the stored link of a Google call; a call of another system has none here."""
+        return call.url if call.system is WorkplaceSystem.GOOGLE else None

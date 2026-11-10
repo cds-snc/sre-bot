@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-10T18:46:00Z'
+updated_date: '2026-11-10T21:16:00Z'
 labels:
   - incident
   - features
@@ -58,7 +58,7 @@ RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 <!-- AC:BEGIN -->
 - [ ] #1 features/incident/response/ is registered as incident.response and handles /incident, the declare modal, the locale toggle and the alert buttons; the legacy registrations are gone
 - [ ] #2 Declare writes the record first (the commit point), then the conversation and its binding (attach_conversation), then every other reference as it is created (revised 2026-11-10, TASK-145.7.7 R5); a failing resource is logged and leaves its reference empty without aborting the rest; a failing conversation creates no record
-- [ ] #3 features/incident/meet is deleted and the video-call adapter lives in core/adapters/
+- [x] #3 features/incident/meet is deleted and the video-call adapter lives in core/adapters/
 - [ ] #4 The pinned declare and alert-button behaviour passes unchanged
 - [ ] #5 create stamps RECORD_VERSION (2: the end-state shape with its binding) from core/store.py and writes only end-state attribute names, the nested reference maps, channel_id as the lookup copy and security_incident as a bool from the modal; the conversation map and channel_id are set in the record's put
 - [ ] #6 No legacy reader of incident items remains when declare cuts over (TASK-145.8 cuts them over first); declare writes only the end-state shape (no dual-write); source_alert is a MessageReference with a url hint (SourceAlertReference deleted); app/models/incidents.py is deleted with the legacy declare
@@ -211,6 +211,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 
 2026-11-10 (TASK-145.7.7 re-plan, human rulings R4-R6): binding cardinality is 0..n while active (was 1..n), at most one active primary; bindings are chat conversations on enabled chat platforms only (the Backstage plugin is an API caller, never a binding; the reserved backstage_page kind is dropped); declare writes the record first and attaches chat surfaces in retriable steps; OQ9 'declare is unavailable only when no working surface can be bound' is superseded; the HTTP declare route rides with TASK-145.7.9. ADR: decisions/incident-management.md Binding (vocabulary), Bindings, Stored form, Checks, Changes 2026-11-10.
 2026-11-10: ACs #9 and #10 checked by TASK-145.7.2 (startup_warmup resolves the policy, SettingError names incident_core.new_incident_system; production and local set google; Requirement("incident_response.handbook_id")). AC #11: the host-registrar part (legacy aliases on block and attachment actions, listed by the provider's legacy_ids() for TASK-145.13) is in place via TASK-145.7.2; the cutover parts land with 145.7.10 and 145.9.2.
+
+2026-11-10: AC #3 checked by TASK-145.7.6 (L4b): features/incident/meet deleted; GoogleMeetVideoCall in core/adapters/google_meet.py behind VideoCall.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

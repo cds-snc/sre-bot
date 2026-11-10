@@ -17,6 +17,8 @@ reporting an ``UpgradeReport``) from the services its job resolves per run.
 (``ConversationReference``); ``get_incident_conversation`` provides the Slack one,
 and ``conversation_is_writable`` is the check every caller applies before a write.
 ``IncidentTranscriptReader`` reads what was said in a conversation.
+``VideoCall`` creates the incident's video call (``VideoCallReference``);
+``get_video_call`` provides the Google Meet one.
 ``resolve_new_incident_system`` resolves the new-incident policy against the
 configured systems; the declare path's plugin calls it at startup.
 """
@@ -33,6 +35,7 @@ from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSyst
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
+from features.incident.core.adapters.google_meet import GoogleMeetVideoCall
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
@@ -103,6 +106,7 @@ __all__ = [
     "TimelineEntry",
     "TranscriptMessage",
     "UpgradeReport",
+    "VideoCall",
     "VideoCallReference",
     "build_incident_store",
     "build_legacy_upgrade",
@@ -112,6 +116,7 @@ __all__ = [
     "get_incident_conversation",
     "get_incident_report",
     "get_incident_transcript_reader",
+    "get_video_call",
     "incident_conversation_names",
     "resolve_new_incident_system",
     "translate",
@@ -366,6 +371,37 @@ def build_legacy_upgrade(
 def get_incident_report() -> IncidentReport:
     """Return the process-wide Google-Docs-backed ``IncidentReport``."""
     return GoogleDocsIncidentReport()
+
+
+@runtime_checkable
+class VideoCall(Protocol):
+    """Interface creating an incident's video call, named by the record's ``VideoCallReference``.
+
+    Who the calls run as and how the vendor is reached stay behind the interface;
+    no method takes a delegation subject or credentials. ``create`` is async: an
+    implementation over a blocking SDK offloads inside its own methods, callers
+    never do (decisions/outbound-clients.md). Platform failures are classified
+    results, never exceptions.
+    """
+
+    async def create(self) -> OperationResult[VideoCallReference]:
+        """Create a new video call and return its reference, link included.
+
+        One attempt: the vendor offers no idempotency key, so a failed create is
+        not retried behind the caller. No tenant to name the reference with is a
+        PERMANENT_ERROR with ``CONFIG_NOT_CONFIGURED`` whose message names the key.
+        """
+        ...
+
+    def link(self, call: VideoCallReference) -> str | None:
+        """Return the stored link of the call; a reference of a system the implementation does not serve has none."""
+        ...
+
+
+@lru_cache(maxsize=1)
+def get_video_call() -> VideoCall:
+    """Return the process-wide Google-Meet-backed ``VideoCall``."""
+    return GoogleMeetVideoCall()
 
 
 @lru_cache(maxsize=1)

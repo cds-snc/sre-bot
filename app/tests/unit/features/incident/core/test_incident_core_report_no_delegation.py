@@ -1,10 +1,10 @@
 """The incident Google adapter acts as the bot: no delegation subject, no credentials of its own.
 
-Every Docs and Drive service the adapter builds goes through the Google Workspace
+Every Docs, Drive and Meet service the adapters build goes through the Google Workspace
 gateway factories with scopes only, so who the calls run as stays the gateway's
 decision (decisions/workplace-systems.md; TASK-181 decides delegation). The
 factories are replaced by recorders that fail on any argument but ``scopes``,
-then each report operation and each Drive function runs once. A source scan
+then each report operation, each Drive function and the video call create run once. A source scan
 pins that no module under ``core/adapters`` imports Google's credential packages.
 """
 
@@ -18,7 +18,7 @@ import pytest
 
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
-from features.incident.core.adapters import google_docs
+from features.incident.core.adapters import google_docs, google_meet
 from features.incident.core.api import ReportReference, SectionDraft
 
 pytestmark = pytest.mark.unit
@@ -52,10 +52,16 @@ def factories(monkeypatch: pytest.MonkeyPatch) -> list[_ScopesOnly]:
     drive.files.return_value.create.return_value.execute.return_value = {"id": "F0NEW", "name": "n"}
     drive.files.return_value.get.return_value.execute.return_value = {"id": "D0REPORT", "name": "n", "parents": ["F0"]}
     drive.files.return_value.update.return_value.execute.return_value = {"id": "D0REPORT"}
-    recorders = [_ScopesOnly(docs), _ScopesOnly(docs), _ScopesOnly(drive)]
+    meet = MagicMock()
+    meet.spaces.return_value.create.return_value.execute.return_value = {"name": "spaces/a", "meetingUri": "https://m/a"}
+    recorders = [_ScopesOnly(docs), _ScopesOnly(docs), _ScopesOnly(drive), _ScopesOnly(meet)]
     monkeypatch.setattr(google_docs, "get_docs_service", recorders[0])
     monkeypatch.setattr(google_docs.google_workspace_client, "get_docs_service", recorders[1])
     monkeypatch.setattr(google_docs.google_workspace_client, "get_drive_service", recorders[2])
+    monkeypatch.setattr(google_meet, "get_meet_service", recorders[3])
+    monkeypatch.setattr(
+        google_meet, "get_google_workspace_settings", lambda: SimpleNamespace(tenant=SimpleNamespace(customer_id="C0GOOGLE"))
+    )
     monkeypatch.setattr(
         google_docs, "get_incident_core_settings", lambda: IncidentCoreSettings(folder_id="F0", report_template_id="T0")
     )
@@ -87,6 +93,13 @@ def test_every_drive_function_builds_its_service_with_scopes_only(factories: lis
     google_docs.get_metadata("D0")
 
     assert len(factories[2].calls) >= 8
+
+
+async def test_video_call_builds_its_service_with_scopes_only(factories: list[_ScopesOnly]) -> None:
+    await google_meet.GoogleMeetVideoCall().create()
+    google_meet.create_space()
+
+    assert len(factories[3].calls) == 2
 
 
 def test_no_core_adapter_imports_google_credential_packages() -> None:
