@@ -2,13 +2,13 @@
 
 The ``register_slack_commands`` hookspec hands features this Protocol, never
 the Slack SDK runtime (the Bolt app or the platform provider). Through it a
-feature registers commands, and native Bolt listeners for block actions and
-view submissions.
+feature registers commands, and native Bolt listeners for block actions,
+legacy attachment actions and view submissions.
 
 See: decisions/platform-entrypoints.md, decisions/transport-slack.md
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any, Protocol
 
 from contracts.services import ServiceScopeOpener
@@ -65,7 +65,9 @@ class SlackCommandRegistrar(Protocol):
         """
         ...
 
-    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
+    def register_block_action(
+        self, action_id: str, listener: Callable[..., object], *, legacy_action_ids: Sequence[str] = ()
+    ) -> None:
         """Register a native Bolt listener for one block action.
 
         The listener takes Bolt's own arguments by name (``ack``, ``body``,
@@ -75,10 +77,37 @@ class SlackCommandRegistrar(Protocol):
             action_id: Exact ``action_id``, starting with the plugin's
                 entry-point name (e.g. "incident.scribe.approve").
             listener: The Bolt listener.
+            legacy_action_ids: Ids already posted in Slack messages that this
+                listener also answers; exempt from the prefix and removed by the
+                legacy contract task (decisions/transport-slack.md).
 
         Raises:
-            ValueError: The id is blank, lacks the plugin's prefix or is
-                already registered; this aborts boot.
+            ValueError: An id is blank or already registered as a block or
+                attachment action, or the primary id lacks the plugin's prefix;
+                this aborts boot.
+        """
+        ...
+
+    def register_attachment_action(
+        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+    ) -> None:
+        """Register a native Bolt listener for one legacy attachment's buttons (``interactive_message``).
+
+        The listener takes Bolt's own arguments by name and acks first, as a
+        block-action listener does.
+
+        Args:
+            callback_id: Exact attachment ``callback_id``, starting with the
+                plugin's entry-point name (e.g. "incident.response.alert").
+            listener: The Bolt listener.
+            legacy_callback_ids: Callback ids already posted in Slack messages
+                that this listener also answers; exempt from the prefix and
+                removed by the legacy contract task (decisions/transport-slack.md).
+
+        Raises:
+            ValueError: An id is blank or already registered as a block or
+                attachment action, or the primary id lacks the plugin's prefix;
+                this aborts boot.
         """
         ...
 

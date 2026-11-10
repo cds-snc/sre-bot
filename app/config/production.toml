@@ -22,6 +22,11 @@ oncall_group_id = "S0BNW0G8CFK"
 [atip]
 announce_channel_id = "C033L7RGCT0"
 
+[incident_core]
+# Slack and Google are both configured here, so the system that creates a new incident's
+# report and video call is named: an unset policy with several systems fails boot.
+new_incident_system = "google"
+
 [incident_response]
 announcement_channel_id = "CUYR73ESX"
 security_group_id = "S057X3XB5FX"

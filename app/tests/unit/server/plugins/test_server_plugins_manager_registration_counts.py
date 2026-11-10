@@ -16,6 +16,7 @@ from structlog.testing import capture_logs
 
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
+from server.configured_systems import StaticConfiguredSystems
 from server.plugins import manager as manager_module
 
 pytestmark = pytest.mark.unit
@@ -56,6 +57,7 @@ def _register(monkeypatch: pytest.MonkeyPatch, pm: pluggy.PluginManager, *, with
         manager_module.register_feature_integrations(
             app=MagicMock(),
             logger=structlog.stdlib.get_logger(),
+            systems=StaticConfiguredSystems({}),
             slack_provider=MagicMock() if with_slack else None,
         )
     return entries

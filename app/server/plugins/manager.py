@@ -105,6 +105,7 @@ def resolve_plugin_requirements(pm: FeaturePluginManager, logger: BoundLogger, s
 def register_feature_integrations(
     app: FastAPI,
     logger: BoundLogger,
+    systems: ConfiguredSystems,
     slack_provider: SlackCommandRegistrar | None = None,
     event_dispatcher: EventDispatcher | None = None,
 ) -> None:
@@ -117,6 +118,7 @@ def register_feature_integrations(
     Args:
         app: FastAPI application instance passed to register_routes hookimpls.
         logger: Structured logger passed to startup_warmup hookimpls.
+        systems: The configured-systems read passed to startup_warmup hookimpls.
         slack_provider: Slack command registrar (the platform provider), if initialized.
     """
     pm = get_plugin_manager()
@@ -132,7 +134,7 @@ def register_feature_integrations(
     call_hook_per_plugin(pm, "register_routes", logger, app=app)
     logger.debug("feature_routes_registered")
 
-    call_hook_per_plugin(pm, "startup_warmup", logger, logger=logger)
+    call_hook_per_plugin(pm, "startup_warmup", logger, logger=logger, systems=systems)
     logger.debug("feature_startup_warmup_completed")
 
     logger.info(

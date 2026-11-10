@@ -32,7 +32,7 @@ EXPECTED_PARAMS = {
     "register_i18n_resources": ["self", "registry"],
     "register_event_handlers": ["self", "dispatcher"],
     "register_background_jobs": ["self", "registry"],
-    "startup_warmup": ["self", "logger"],
+    "startup_warmup": ["self", "logger", "systems"],
 }
 
 pytestmark = pytest.mark.unit

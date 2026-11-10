@@ -1,4 +1,4 @@
-"""The incident.response plugin: its requirements and the incident legacy upgrade job.
+"""The incident.response plugin: its requirements, the new-incident policy check and the incident legacy upgrade job.
 
 The entry point names this module, not the package, because the host
 configuration phase and the legacy modules read ``response/settings.py`` before
@@ -15,6 +15,9 @@ import structlog
 from contracts.plugins.namespace import hookimpl
 from contracts.plugins.requirements import Requirement
 from contracts.scheduler.registry import BackgroundJobRegistry
+from contracts.workplace import ConfiguredSystems
+from features.incident.common.settings import get_incident_core_settings
+from features.incident.core.api import resolve_new_incident_system
 from features.incident.response.legacy_upgrade_job import run_legacy_upgrade
 from features.incident.response.settings import UpgradeMode, get_incident_response_settings
 
@@ -25,8 +28,27 @@ UPGRADE_JOB_NAME = "incident_legacy_upgrade"
 
 @hookimpl
 def register_requirements() -> tuple[Requirement, ...]:
-    """Require the Slack and Google Workspace tenants: the upgrade writes references in both."""
-    return (Requirement("slack.tenant"), Requirement("google_workspace.tenant"))
+    """Require the Slack and Google Workspace tenants and the handbook id.
+
+    The upgrade writes references in both systems; declare, the feature's core
+    path, links every new incident to the handbook.
+    """
+    return (
+        Requirement("slack.tenant"),
+        Requirement("google_workspace.tenant"),
+        Requirement("incident_response.handbook_id"),
+    )
+
+
+@hookimpl
+def startup_warmup(logger: structlog.stdlib.BoundLogger, systems: ConfiguredSystems) -> None:
+    """Resolve the new-incident policy, so a policy that names no usable system aborts boot naming the key.
+
+    Raises:
+        SettingError: The policy does not resolve against the configured systems.
+    """
+    system = resolve_new_incident_system(get_incident_core_settings().new_incident_system, systems)
+    logger.debug("incident_new_incident_system_resolved", system=system.value)
 
 
 @hookimpl

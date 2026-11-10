@@ -28,6 +28,7 @@ from contracts.services import ServiceScopeOpener
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from integrations.slack.settings import SlackSettings
+from server.configured_systems import StaticConfiguredSystems
 from server.plugins.manager import register_feature_integrations
 
 TEAM_ID = "T0TEAM"
@@ -181,7 +182,9 @@ def harness_fixture(
             "integrations.slack.provider.SocketModeHandler", lambda app, token, logger=None: SimpleNamespace(app=app)
         )
 
-        register_feature_integrations(app=MagicMock(), logger=MagicMock(), slack_provider=provider)
+        register_feature_integrations(
+            app=MagicMock(), logger=MagicMock(), systems=StaticConfiguredSystems({}), slack_provider=provider
+        )
         assert provider.initialize_app().is_success
 
         yield Harness(app=app, plugin=plugin, api_calls=api_calls)

@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import ValidationError
 
-from contracts.configuration import ConfigurationSlice, built_slices
+from contracts.configuration import ConfigurationSlice, SettingError, built_slices
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 
 if TYPE_CHECKING:
@@ -107,6 +107,8 @@ def log_plugin_boot_failed(logger: BoundLogger, *, plugin: str, phase: str, erro
 def _setting_at_fault(error: Exception) -> str | None:
     """Name the configuration setting at fault, from the error's structure only."""
     match error:
+        case SettingError(setting=setting):
+            return setting
         case ValidationError():
             locations = (".".join(str(part) for part in detail["loc"]) for detail in error.errors(include_input=False))
             return ", ".join(f"{error.title}.{location}" if location else error.title for location in locations)

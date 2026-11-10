@@ -16,8 +16,10 @@ import structlog
 from pydantic import BaseModel, ValidationError
 from structlog.testing import capture_logs
 
+from contracts.configuration import SettingError
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
+from server.configured_systems import StaticConfiguredSystems
 from server.plugins.boot import call_hook_per_plugin, log_plugin_boot_failed
 
 pytestmark = pytest.mark.unit
@@ -62,7 +64,9 @@ def test_runner_calls_every_plugin_once_with_the_hook_arguments() -> None:
     calls: list[str] = []
     pm = _manager(first=_recording(calls, "first"), second=_recording(calls, "second"))
 
-    call_hook_per_plugin(pm, "startup_warmup", structlog.get_logger(), logger=structlog.get_logger())
+    call_hook_per_plugin(
+        pm, "startup_warmup", structlog.get_logger(), logger=structlog.get_logger(), systems=StaticConfiguredSystems({})
+    )
 
     assert sorted(calls) == ["first", "second"]
 
@@ -134,3 +138,15 @@ def test_boot_failure_without_a_setting_at_fault_logs_none() -> None:
     (event,) = events
     assert event["setting"] is None
     assert "detail" not in repr(event)
+
+
+def test_boot_failure_names_the_setting_a_setting_error_carries() -> None:
+    error = SettingError("incident_core.new_incident_system", "policy names google, which is not configured s3cr3t")
+
+    with capture_logs() as events:
+        log_plugin_boot_failed(structlog.get_logger(), plugin="incident.response", phase="startup_warmup", error=error)
+
+    (event,) = events
+    assert event["setting"] == "incident_core.new_incident_system"
+    assert event["error_type"] == "SettingError"
+    assert "s3cr3t" not in repr(event)

@@ -109,8 +109,12 @@ def test_the_registered_job_names_its_own_module_for_the_error_boundary(monkeypa
     assert (job.__module__, job.__name__) == ("features.incident.response.plugin", "incident_legacy_upgrade")
 
 
-def test_the_plugin_requires_the_slack_and_google_tenants() -> None:
-    assert plugin.register_requirements() == (Requirement("slack.tenant"), Requirement("google_workspace.tenant"))
+def test_the_plugin_requires_the_slack_and_google_tenants_and_the_handbook_id() -> None:
+    assert plugin.register_requirements() == (
+        Requirement("slack.tenant"),
+        Requirement("google_workspace.tenant"),
+        Requirement("incident_response.handbook_id"),
+    )
 
 
 def test_importing_the_plugin_schedules_nothing(monkeypatch: pytest.MonkeyPatch) -> None:

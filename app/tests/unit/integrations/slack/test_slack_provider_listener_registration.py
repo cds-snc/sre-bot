@@ -20,12 +20,13 @@ pytestmark = pytest.mark.unit
 
 
 class RecordingBoltApp:
-    """Records each listener attached through ``block_action`` and ``view_submission``."""
+    """Records each listener attached through ``block_action``, ``attachment_action`` and ``view_submission``."""
 
     def __init__(self) -> None:
         self.client = object()
         self.block_actions: dict[str, Callable[..., object]] = {}
         self.view_submissions: dict[str, Callable[..., object]] = {}
+        self.attachment_actions: dict[str, Callable[..., object]] = {}
 
     def command(self, command: str) -> Callable[[Callable[..., object]], Callable[..., object]]:
         return lambda listener: listener
@@ -33,6 +34,13 @@ class RecordingBoltApp:
     def block_action(self, action_id: str) -> Callable[[Callable[..., object]], Callable[..., object]]:
         def attach(listener: Callable[..., object]) -> Callable[..., object]:
             self.block_actions[action_id] = listener
+            return listener
+
+        return attach
+
+    def attachment_action(self, callback_id: str) -> Callable[[Callable[..., object]], Callable[..., object]]:
+        def attach(listener: Callable[..., object]) -> Callable[..., object]:
+            self.attachment_actions[callback_id] = listener
             return listener
 
         return attach
@@ -129,3 +137,23 @@ def test_registration_after_listeners_are_attached_raises(provider: SlackPlatfor
         provider.register_view_submission("demo.feature.late", submit)
     assert bolt_app.block_actions == {}
     assert bolt_app.view_submissions == {}
+
+
+def test_aliases_attach_the_same_listener_under_each_id(provider: SlackPlatformProvider, bolt_app: RecordingBoltApp) -> None:
+    provider.register_block_action("demo.feature.approve", approve, legacy_action_ids=("approve_legacy",))
+    provider.register_attachment_action("demo.feature.alert", submit, legacy_callback_ids=("alert_legacy",))
+
+    provider.initialize_app()
+
+    assert bolt_app.block_actions == {"demo.feature.approve": approve, "approve_legacy": approve}
+    assert bolt_app.attachment_actions == {"demo.feature.alert": submit, "alert_legacy": submit}
+
+
+def test_an_attachment_action_may_share_an_id_with_a_view(provider: SlackPlatformProvider, bolt_app: RecordingBoltApp) -> None:
+    provider.register_attachment_action("demo.feature.edit", approve)
+    provider.register_view_submission("demo.feature.edit", submit)
+
+    provider.initialize_app()
+
+    assert bolt_app.attachment_actions == {"demo.feature.edit": approve}
+    assert bolt_app.view_submissions == {"demo.feature.edit": submit}

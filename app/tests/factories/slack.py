@@ -1,6 +1,6 @@
 """Protocol-conformant fakes for the Slack handler contract."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import Any
 
 from contracts.operations import OperationResult
@@ -80,6 +80,8 @@ class FakeSlackRegistrar:
         self.commands: list[dict[str, Any]] = []
         self.block_actions: dict[str, Callable[..., object]] = {}
         self.view_submissions: dict[str, Callable[..., object]] = {}
+        self.attachment_actions: dict[str, Callable[..., object]] = {}
+        self.legacy_ids: dict[str, str] = {}
 
     @property
     def reply(self) -> SlackReplySender:
@@ -126,8 +128,17 @@ class FakeSlackRegistrar:
             }
         )
 
-    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
+    def register_block_action(
+        self, action_id: str, listener: Callable[..., object], *, legacy_action_ids: Sequence[str] = ()
+    ) -> None:
         self.block_actions[action_id] = listener
+        self.legacy_ids.update(dict.fromkeys(legacy_action_ids, action_id))
+
+    def register_attachment_action(
+        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+    ) -> None:
+        self.attachment_actions[callback_id] = listener
+        self.legacy_ids.update(dict.fromkeys(legacy_callback_ids, callback_id))
 
     def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
         self.view_submissions[callback_id] = listener

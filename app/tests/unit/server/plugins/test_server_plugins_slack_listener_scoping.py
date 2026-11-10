@@ -21,6 +21,7 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
 from contracts.slack.registrar import SlackCommandRegistrar
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
+from server.configured_systems import StaticConfiguredSystems
 from server.plugins.manager import register_feature_integrations
 from server.plugins.slack_registrar import PluginSlackRegistrar
 from tests.factories.slack import FakeSlackRegistrar
@@ -68,7 +69,9 @@ def pm(monkeypatch: pytest.MonkeyPatch) -> Iterator[pluggy.PluginManager]:
 
 
 def run_registration(registrar: SlackCommandRegistrar) -> None:
-    register_feature_integrations(app=MagicMock(), logger=MagicMock(), slack_provider=registrar)
+    register_feature_integrations(
+        app=MagicMock(), logger=MagicMock(), systems=StaticConfiguredSystems({}), slack_provider=registrar
+    )
 
 
 def real_provider() -> SlackPlatformProvider:

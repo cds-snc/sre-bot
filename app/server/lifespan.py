@@ -249,7 +249,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     # Any plugin that fails to load stops startup here, before the app serves.
     load_plugins(pm, configuration.disabled_plugins, logger.bind(phase="plugin_loading"))
     # An enabled plugin whose required vendor or capability is not configured stops startup here.
-    resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"), read_configured_systems())
+    systems = read_configured_systems()
+    resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"), systems)
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters
@@ -262,6 +263,7 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     register_feature_integrations(
         app=app,
         logger=logger,
+        systems=systems,
         slack_provider=app.state.slack_provider,
     )
     _log_plugin_configuration_summary(logger)

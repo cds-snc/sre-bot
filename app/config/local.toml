@@ -26,6 +26,11 @@ model = "gpt-5.6-luna"
 # The region of the account whose development key is the repository's Codespaces secret OPSGENIE__INTEGRATIONS_KEY.
 api_url = "https://api.opsgenie.com"
 
+[incident_core]
+# Slack and Google are both configured here, so the system that creates a new incident's
+# report and video call is named: an unset policy with several systems fails boot.
+new_incident_system = "google"
+
 [maxmind.tenant]
 # The database the devcontainer downloads (.devcontainer/maxmind-create.sh).
 database_path = "./geodb/GeoLite2-City.mmdb"
