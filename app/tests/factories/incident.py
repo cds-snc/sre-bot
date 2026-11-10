@@ -51,6 +51,18 @@ def incident_on(
     )
 
 
+def declared_incident(incident_id: str, *, security_incident: bool = False) -> Incident:
+    """An open incident as declare creates it: no conversation yet, since one is attached after the record."""
+    return Incident(
+        id=incident_id,
+        title=f"Incident {incident_id}",
+        status=IncidentStatus.OPEN,
+        declared_by="U0DECLARER",
+        declared_at=DECLARED_AT,
+        security_incident=security_incident,
+    )
+
+
 def binding_on(
     channel_id: str,
     incident_id: str,
@@ -196,17 +208,25 @@ class CountingRecordStore(InMemoryRecordStore):
 
 
 class FlakyRecordStore(InMemoryRecordStore):
-    """In-memory record store whose ``put_if_not_exists`` fails on chosen tables, and that records every write.
+    """In-memory record store whose conditional puts and updates fail on chosen tables, and that records every write.
 
-    ``fail_puts`` maps a table name to how many of its next conditional puts fail
-    with a transient error. With ``landed`` the failing put still stores the item,
+    ``fail_puts`` and ``fail_updates`` map a table name to how many of its next
+    conditional puts or updates fail with a transient error. With ``landed`` a
+    failing put still stores the item,
     standing in for a write that reached the table but whose response was lost
     past the SDK retries. ``writes`` lists each write as (table name, operation).
     """
 
-    def __init__(self, fail_puts: Mapping[str, int] | None = None, *, landed: bool = False) -> None:
+    def __init__(
+        self,
+        fail_puts: Mapping[str, int] | None = None,
+        *,
+        landed: bool = False,
+        fail_updates: Mapping[str, int] | None = None,
+    ) -> None:
         super().__init__()
         self.fail_puts = dict(fail_puts or {})
+        self.fail_updates = dict(fail_updates or {})
         self.landed = landed
         self.writes: list[tuple[str, str]] = []
 
@@ -216,9 +236,7 @@ class FlakyRecordStore(InMemoryRecordStore):
             self.fail_puts[table.name] -= 1
             if self.landed:
                 super().put_if_not_exists(table, item)
-            return OperationResult.error(
-                OperationStatus.TRANSIENT_ERROR, message="backend unavailable", error_code="ServiceUnavailable", retry_after=2
-            )
+            return _unavailable()
         return super().put_if_not_exists(table, item)
 
     def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
@@ -234,4 +252,13 @@ class FlakyRecordStore(InMemoryRecordStore):
         expected: Mapping[str, ExpectedValue] | None = None,
     ) -> OperationResult:
         self.writes.append((table.name, "update"))
+        if self.fail_updates.get(table.name, 0) > 0:
+            self.fail_updates[table.name] -= 1
+            return _unavailable()
         return super().update(table, key, changes, expected=expected)
+
+
+def _unavailable() -> OperationResult:
+    return OperationResult.error(
+        OperationStatus.TRANSIENT_ERROR, message="backend unavailable", error_code="ServiceUnavailable", retry_after=2
+    )

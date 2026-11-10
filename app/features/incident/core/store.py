@@ -135,7 +135,7 @@ class IncidentStore(Protocol):
     a store failure carries the store's status, error code and retry hint with a
     generic message. Only a caller error raises (``ValueError``, nothing written).
 
-    Writes arrive with their slices: create and set_reference with TASK-145.7,
+    Writes arrive with their slices: create, attach_conversation and set_reference with TASK-145.7,
     the field updates with TASK-145.8 and the timeline append with TASK-145.9.
     """
 
@@ -163,16 +163,29 @@ class IncidentStore(Protocol):
         """Return whether the incident was declared as a security incident; a failure is never false."""
         ...
 
-    def create(self, incident: Incident, binding: IncidentBinding) -> OperationResult[Incident]:
-        """Store a new open incident: its primary chat binding first, then its record, the commit point.
+    def create(self, incident: Incident) -> OperationResult[Incident]:
+        """Store a new open incident's record, the commit point; no surface is attached.
 
-        Idempotent on ``incident.id``: a retry with the same id stores each item
-        once, and a replay where the record exists writes nothing and returns the
-        stored incident. A failed record write leaves a binding no lookup returns.
+        Idempotent on ``incident.id``: a retry with the same id stores the record
+        once, and a replay writes nothing and returns the stored incident. Chat
+        conversations are attached afterwards with ``attach_conversation``.
 
         Raises:
-            ValueError: ``incident`` is not open or has no conversation, or
-                ``binding`` is not its active primary chat binding on that conversation.
+            ValueError: ``incident`` is not open or already carries a conversation.
+        """
+        ...
+
+    def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+        """Bind a chat conversation to the incident and return the incident.
+
+        A primary binding's conversation becomes the record's conversation; a
+        non-primary one is another way in and leaves the record unchanged. A
+        primary binding when the record names another conversation, or a record
+        not of the current version, is PERMANENT_ERROR with
+        ``INCIDENT_RECORD_CONFLICT`` and nothing is written. Repeating it is a no-op.
+
+        Raises:
+            ValueError: ``binding`` belongs to another incident or is archived.
         """
         ...
 
@@ -338,20 +351,13 @@ class RecordIncidentStore(IncidentStore):
             return _refusal(incident)
         return OperationResult.success(data=incident.data.security_incident)
 
-    def create(self, incident: Incident, binding: IncidentBinding) -> OperationResult[Incident]:
-        """Put the binding, then the record, each only where nothing is stored.
-
-        A binding already stored under its key is this incident's own from an
-        earlier attempt. A record already stored under the id is a replay: nothing
-        is rewritten and the stored incident is returned.
+    def create(self, incident: Incident) -> OperationResult[Incident]:
+        """Put the record only where none is stored; a stored record under the id is a replay, returned unchanged.
 
         Raises:
             ValueError: see ``IncidentStore.create``.
         """
-        validate_new_incident(incident, binding)
-        bound = self._records.put_if_not_exists(self._bindings, binding_item(binding))
-        if not bound.is_success:
-            return self._failed(bound, operation="create", table=self._bindings)
+        validate_new_incident(incident)
         stored = self._records.put_if_not_exists(self._table, incident_item(incident))
         if not stored.is_success:
             return self._failed(stored, operation="create")
@@ -359,6 +365,51 @@ class RecordIncidentStore(IncidentStore):
             logger.info("incident_create_replayed", incident_id=incident.id)
             return self.get(incident.id)
         return OperationResult.success(data=incident)
+
+    def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+        """Read the record, put the binding, then copy a primary binding's conversation into the record.
+
+        The copy is one update guarded on ``record_version`` and on no stored
+        conversation; when the guard fails the record is read once more, and the
+        attach succeeds only if it now names this conversation.
+
+        Raises:
+            ValueError: see ``IncidentStore.attach_conversation``.
+        """
+        validate_attachment(incident_id, binding)
+        operation = "attach_conversation"
+        conversation = ConversationReference(
+            system=binding.system, tenant=binding.tenant, vendor_id=binding.vendor_id, url=binding.url
+        )
+        current = self._end_state_record(incident_id, operation=operation)
+        if current.data is None:
+            return current
+        stored = current.data
+        if binding.primary and stored.conversation is not None and not _same_place(stored.conversation, conversation):
+            return self._conflict(incident_id, operation=operation)
+        bound = self._records.put_if_not_exists(self._bindings, binding_item(binding))
+        if not bound.is_success:
+            return self._failed(bound, operation=operation, table=self._bindings)
+        if not binding.primary or stored.conversation is not None:
+            return OperationResult.success(data=stored)
+        result = self._records.update(
+            self._table,
+            {"id": incident_id},
+            [SetAttribute("conversation", reference_item(conversation)), SetAttribute("channel_id", conversation.vendor_id)],
+            expected={"record_version": RECORD_VERSION, "conversation": None},
+        )
+        if result.status is OperationStatus.NOT_FOUND and result.error_code is None:
+            return no_such_incident()
+        if not result.is_success:
+            return self._failed(result, operation=operation)
+        if result.data is not None:
+            return self._parse(result.data, operation=operation)
+        reread = self._end_state_record(incident_id, operation=operation)
+        if reread.data is None:
+            return reread
+        if reread.data.conversation is not None and _same_place(reread.data.conversation, conversation):
+            return reread
+        return self._conflict(incident_id, operation=operation)
 
     def set_reference(self, incident_id: str, kind: ReferenceKind, reference: ResourceReference) -> OperationResult[Incident]:
         """Set the reference map in one update guarded on ``record_version``.
@@ -381,9 +432,30 @@ class RecordIncidentStore(IncidentStore):
         if not result.is_success:
             return self._failed(result, operation="set_reference")
         if result.data is None:
-            logger.warning("incident_record_conflict", operation="set_reference", incident_id=incident_id, kind=kind.value)
-            return record_conflict()
+            return self._conflict(incident_id, operation="set_reference", kind=kind.value)
         return self._parse(result.data, operation="set_reference")
+
+    def _end_state_record(self, incident_id: str, *, operation: str) -> OperationResult[Incident]:
+        """Return the incident only when its stored item is an end-state record of the current version.
+
+        A missing item is NOT_AN_INCIDENT; a legacy or other-version item is a
+        conflict, since only the legacy upgrade raises it.
+        """
+        if not incident_id.strip():
+            return no_such_incident()
+        result = self._records.get(self._table, {"id": incident_id})
+        if result.status is OperationStatus.NOT_FOUND and result.error_code is None:
+            return no_such_incident()
+        if not result.is_success:
+            return self._failed(result, operation=operation)
+        item: Mapping[str, Any] = result.data or {}
+        if item.get("record_version") != RECORD_VERSION:
+            return self._conflict(incident_id, operation=operation)
+        return parse_incident_item(item)
+
+    def _conflict[T](self, incident_id: str, *, operation: str, **fields: object) -> OperationResult[T]:
+        logger.warning("incident_record_conflict", operation=operation, incident_id=incident_id, **fields)
+        return record_conflict()
 
     def _parse(self, item: Mapping[str, Any], *, operation: str) -> OperationResult[Incident]:
         end_state = self._end_state(item, operation=operation)
@@ -452,28 +524,38 @@ def select_active_bindings(conversation: ConversationReference, bindings: Sequen
     return active
 
 
-def validate_new_incident(incident: Incident, binding: IncidentBinding) -> None:
+def validate_new_incident(incident: Incident) -> None:
     """Refuse a create the record could not honour; shared by the real store and the fake.
 
     Raises:
-        ValueError: ``incident`` is not open or has no conversation, or
-            ``binding`` is not its active primary chat binding on that conversation.
+        ValueError: ``incident`` is not open, or already carries a conversation,
+            which arrives only through ``attach_conversation`` so the record's copy
+            and the binding cannot disagree.
     """
     if incident.status is not IncidentStatus.OPEN:
         raise ValueError(f"a created incident must be open, got {incident.status}")
-    if incident.conversation is None:
-        raise ValueError("a created incident needs its conversation")
-    if binding.incident_id != incident.id:
-        raise ValueError("binding.incident_id must be the created incident's id")
+    if incident.conversation is not None:
+        raise ValueError("a created incident has no conversation yet: attach it with attach_conversation")
+
+
+def validate_attachment(incident_id: str, binding: IncidentBinding) -> None:
+    """Refuse a binding that cannot be attached to ``incident_id``; shared by the real store and the fake.
+
+    Raises:
+        ValueError: ``binding`` belongs to another incident, is not a chat
+            conversation, or is archived.
+    """
+    if binding.incident_id != incident_id:
+        raise ValueError("binding.incident_id must be the incident it is attached to")
     if binding.kind is not BindingKind.CHAT_CONVERSATION:
-        raise ValueError(f"a created incident's binding must be its chat conversation, got {binding.kind}")
-    if not binding.primary:
-        raise ValueError("a created incident's binding must be primary")
+        raise ValueError(f"only a chat conversation is attached, got {binding.kind}")
     if binding.archived_at is not None:
-        raise ValueError("a created incident's binding must not be archived")
-    conversation = incident.conversation
-    if (binding.system, binding.tenant, binding.vendor_id) != (conversation.system, conversation.tenant, conversation.vendor_id):
-        raise ValueError("the binding must name the incident's conversation")
+        raise ValueError("an archived binding cannot be attached")
+
+
+def _same_place(stored: ConversationReference, conversation: ConversationReference) -> bool:
+    """Whether two conversation references name the same conversation; the url is a hint and not compared."""
+    return (stored.system, stored.tenant, stored.vendor_id) == (conversation.system, conversation.tenant, conversation.vendor_id)
 
 
 def validate_reference(kind: ReferenceKind, reference: ResourceReference) -> None:

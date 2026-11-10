@@ -201,7 +201,7 @@ def test_status_update_store_signatures_carry_only_domain_types_and_operation_re
 
 
 def test_incident_store_signatures_carry_only_domain_types_and_operation_results() -> None:
-    """No table, item or SDK shape crosses the store interface; its only writes are create and set_reference."""
+    """No table, item or SDK shape crosses the store interface; its only writes are create, attach_conversation and set_reference."""
     store = api.IncidentStore
 
     def params(method: object) -> dict[str, object]:
@@ -215,15 +215,18 @@ def test_incident_store_signatures_carry_only_domain_types_and_operation_results
     assert inspect.signature(store.find_by_conversation).return_annotation == OperationResult[api.Incident]
     assert inspect.signature(store.list_open).return_annotation == OperationResult[Sequence[api.Incident]]
     assert inspect.signature(store.read_security_flag).return_annotation == OperationResult[bool]
-    assert params(store.create) == {"incident": api.Incident, "binding": api.IncidentBinding}
+    assert params(store.create) == {"incident": api.Incident}
+    assert params(store.attach_conversation) == {"incident_id": str, "binding": api.IncidentBinding}
     assert params(store.set_reference) == {
         "incident_id": str,
         "kind": api.ReferenceKind,
         "reference": ResourceReference,
     }
     assert inspect.signature(store.create).return_annotation == OperationResult[api.Incident]
+    assert inspect.signature(store.attach_conversation).return_annotation == OperationResult[api.Incident]
     assert inspect.signature(store.set_reference).return_annotation == OperationResult[api.Incident]
     assert sorted(name for name in vars(store) if not name.startswith("_")) == [
+        "attach_conversation",
         "create",
         "find_by_conversation",
         "get",

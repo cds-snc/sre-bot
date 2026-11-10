@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T16:16:00Z'
 labels:
   - incident
   - features
@@ -208,6 +208,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-04 (human approved, coordinated-incidents reconciliation): option C: declare ships without a product. The record's product stays unset until TASK-165.1's catalogue exists; the declare picker becomes a labelled report-folder choice (placement configuration of the report adapter) or a single configured incidents folder, never a product picker over Drive folders. The on-call invite from folder metadata stays on the legacy path until the on-call capability (TASK-146) provides it. Adding the product to declare later is additive (an optional field and a picker over ProductCatalog).
 
 2026-11-06 (TASK-36.1.2 OQ1, human-approved; for the Stack L re-plan): interaction ids follow decisions/transport-slack.md as amended: modal-internal ids (the declare modal, the locale toggle) take the incident.response prefix and the pin reads them from the opened view; ids on messages already posted (the alert buttons under webhook alerts) keep a registered legacy alias until TASK-145.13. 'names unchanged' in this task means command names and posted-message ids.
+
+2026-11-10 (TASK-145.7.7 re-plan, human rulings R4-R6): binding cardinality is 0..n while active (was 1..n), at most one active primary; bindings are chat conversations on enabled chat platforms only (the Backstage plugin is an API caller, never a binding; the reserved backstage_page kind is dropped); declare writes the record first and attaches chat surfaces in retriable steps; OQ9 'declare is unavailable only when no working surface can be bound' is superseded; the HTTP declare route rides with TASK-145.7.9. ADR: decisions/incident-management.md Binding (vocabulary), Bindings, Stored form, Checks, Changes 2026-11-10.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

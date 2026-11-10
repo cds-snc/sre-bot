@@ -4,7 +4,7 @@ title: E7 Workstreams and incident links
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-09T19:04:00Z'
+updated_date: '2026-11-10T16:16:00Z'
 labels:
   - incident
 milestone: m-7
@@ -29,7 +29,7 @@ Extend the MVP from one coordinating incident and engagement edges to a coherent
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Parent, related, and duplicate links are stored consistently on both incidents and repaired safely after partial failure.
-- [ ] #2 An engagement can be fulfilled as a child incident after human confirmation; the child has an initial IncidentBinding (a place responders work it) and its progress is mirrored to the parent.
+- [ ] #2 An engagement can be fulfilled as a child incident after human confirmation; the child has zero or more chat bindings (a conversation attached when the coordinator opens one; the API needs none, incident-management.md Bindings) and its progress is mirrored to the parent.
 - [ ] #3 Promote, attach, detach, merge, and resolve-gating operations preserve authorization, embargo, and incident-link invariants.
 - [ ] #4 Targeted tests exercise the supported link and workstream lifecycle, including repair and failure cases; the epic leaves no temporary parallel relationship model.
 - [ ] #5 Fulfil moves an engagement's action items to the child, and every action item carries its root incident id, kept current by promote, attach, detach, and merge (D37), so references on the item (engagement, repository, later finding) follow the work.
@@ -40,6 +40,8 @@ Extend the MVP from one coordinating incident and engagement edges to a coherent
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (human approved, TASK-145.5.7 reconciliation): legacy and pre-coordination incidents carry no root metadata, and the TASK-145.5.7 legacy upgrade job is deleted by TASK-145.13 before doc-15 row 1 starts. AC6's plan for existing items therefore either reads absent root metadata as a standalone incident (its own root, no backfill, absent from any root index) or builds its own runner per decisions/incident-management.md Migration rule 3; it cannot extend the 145.5.7 job.
+
+2026-11-10 (TASK-145.7.7 rulings R4-R6): AC #2 reworded: a child incident has zero or more chat bindings; bindings are chat conversations only and the API needs none (decisions/incident-management.md Bindings).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

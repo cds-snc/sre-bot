@@ -159,15 +159,13 @@ def incident_item(incident: Incident) -> dict[str, Any]:
     """Return the end-state item for ``incident``, as ``create`` puts it.
 
     Writes only the record's own names, an optional field only when set, plus
-    ``channel_id`` (the by_channel lookup copy), ``record_version`` and, while
-    the incident is open, ``open_bucket`` with ``opened_at`` (the declared time).
-
-    Raises:
-        ValueError: the incident has no conversation, so no lookup copy can be written.
+    ``record_version``; while the incident has a conversation, its vendor id as
+    ``channel_id`` (the by_channel lookup copy); while it is open, ``open_bucket``
+    with ``opened_at`` (the declared time).
     """
-    if incident.conversation is None:
-        raise ValueError("an incident record needs its conversation")
-    item: dict[str, Any] = {"record_version": RECORD_VERSION, "channel_id": incident.conversation.vendor_id}
+    item: dict[str, Any] = {"record_version": RECORD_VERSION}
+    if incident.conversation is not None:
+        item["channel_id"] = incident.conversation.vendor_id
     for field in fields(incident):
         value = getattr(incident, field.name)
         if value is not None:

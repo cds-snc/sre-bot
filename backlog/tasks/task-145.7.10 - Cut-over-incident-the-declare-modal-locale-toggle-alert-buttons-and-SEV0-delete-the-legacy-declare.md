@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T16:16:00Z'
 labels:
   - incident
   - features
@@ -37,3 +38,9 @@ Stack L L9b, size exception approved 2026-11-09 (approved program in TASK-145.7'
 - [ ] #3 decisions/webhooks.md records acknowledged_count as approximate and the interim adapter as tolerated
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 (TASK-145.7.7 rulings R4-R6): the cut-over Slack declare follows the record-first order (create, then the conversation and attach_conversation, then resources); the legacy pins that assert channel-before-record ordering are updated deliberately in this task's plan.
+<!-- SECTION:NOTES:END -->

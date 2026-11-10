@@ -33,7 +33,7 @@ from features.incident.core.domain import (
 )
 from features.incident.core.store import IncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import binding_on, incident_on, record_incident_store, seed_legacy_incident
+from tests.factories.incident import declared_incident, record_incident_store, seed_legacy_incident
 
 pytestmark = pytest.mark.unit
 
@@ -83,7 +83,7 @@ STORES: dict[str, Callable[[], IncidentStore]] = {"real": _real, "fake": InMemor
 def store(request: pytest.FixtureRequest) -> IncidentStore:
     """A real store or fake holding one created incident."""
     created = STORES[request.param]()
-    assert created.create(incident_on(CHANNEL, INCIDENT_ID), binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert created.create(declared_incident(INCIDENT_ID)).is_success
     return created
 
 
@@ -147,7 +147,7 @@ def test_the_update_is_guarded_on_the_record_version() -> None:
     """The guard is the end-state version, so only items the current writers own are changed."""
     records = GuardSpy()
     store = record_incident_store(records)
-    assert store.create(incident_on(CHANNEL, INCIDENT_ID), binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert store.create(declared_incident(INCIDENT_ID)).is_success
 
     assert store.set_reference(INCIDENT_ID, ReferenceKind.REPORT, KINDS[0][1]).is_success
 
@@ -196,7 +196,7 @@ def test_an_item_of_another_record_version_is_a_conflict_and_stays_unchanged() -
     """An end-state item without its binding (version 1) is not the shape this writer owns, so it is refused."""
     records = InMemoryRecordStore()
     store = record_incident_store(records)
-    assert store.create(incident_on(CHANNEL, INCIDENT_ID), binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert store.create(declared_incident(INCIDENT_ID)).is_success
     table = incidents_table(get_incident_core_settings().incidents_table)
     item: dict[str, Any] = records.get(table, {"id": INCIDENT_ID}).data or {}
     assert records.put(table, {**item, "record_version": END_STATE_VERSION}).is_success

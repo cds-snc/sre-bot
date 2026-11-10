@@ -83,8 +83,8 @@ def _full() -> Incident:
 
 
 def test_a_minimal_item_holds_only_the_required_end_state_names() -> None:
-    """Optional fields never captured are absent, not stored as None; the index attributes are written in the same item."""
-    item = incident_item(_minimal())
+    """An incident declared with no surface stores no conversation and no channel_id; nothing is stored as None."""
+    item = incident_item(_minimal(conversation=None))
 
     assert set(item) == {
         "id",
@@ -93,8 +93,6 @@ def test_a_minimal_item_holds_only_the_required_end_state_names() -> None:
         "declared_by",
         "declared_at",
         "security_incident",
-        "conversation",
-        "channel_id",
         "record_version",
         "open_bucket",
         "opened_at",
@@ -102,9 +100,15 @@ def test_a_minimal_item_holds_only_the_required_end_state_names() -> None:
     assert None not in item.values()
     assert item["record_version"] == RECORD_VERSION == 2
     assert item["open_bucket"] == OPEN_BUCKET
-    assert item["channel_id"] == "C0INCIDENT"
-    assert item["conversation"] == {"system": "slack", "tenant": "T0TENANT", "vendor_id": "C0INCIDENT"}
     assert item["status"] == "Open"
+
+
+def test_an_incident_with_a_conversation_also_stores_its_lookup_copy() -> None:
+    """The conversation map and the top-level channel_id the by_channel index reads are written together."""
+    item = incident_item(_minimal())
+
+    assert item["conversation"] == {"system": "slack", "tenant": "T0TENANT", "vendor_id": "C0INCIDENT"}
+    assert item["channel_id"] == "C0INCIDENT"
 
 
 def test_a_full_item_holds_every_record_name_and_no_legacy_name() -> None:
@@ -169,19 +173,13 @@ def test_a_reference_without_a_url_is_stored_without_one() -> None:
     assert "url" not in item["conversation"]
 
 
-@pytest.mark.parametrize("incident", [_minimal(), _full()], ids=["minimal", "full"])
+@pytest.mark.parametrize("incident", [_minimal(conversation=None), _minimal(), _full()], ids=["no-surface", "minimal", "full"])
 def test_the_stored_item_reads_back_as_the_same_incident(incident: Incident) -> None:
     """Writer and parser agree on every field and reference kind; times come back equal in UTC."""
     result = parse_incident_item(incident_item(incident))
 
     assert result.is_success
     assert result.data == incident
-
-
-def test_an_incident_without_a_conversation_is_refused() -> None:
-    """The lookup copy channel_id cannot be written without a conversation, so the writer refuses the record."""
-    with pytest.raises(ValueError, match="conversation"):
-        incident_item(_minimal(conversation=None))
 
 
 @pytest.mark.parametrize(

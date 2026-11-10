@@ -42,7 +42,9 @@ from features.incident.core.store import (
     ambiguous_conversation,
     no_such_incident,
     not_an_incident,
+    record_conflict,
     select_active_bindings,
+    validate_attachment,
     validate_new_incident,
     validate_reference,
 )
@@ -102,8 +104,8 @@ class InMemoryIncidentStore(IncidentStore):
 
     Open incidents are listed by ``declared_at``, a stand-in for the
     ``opened_at`` time the real store orders by and this fake does not hold.
-    ``create`` and ``set_reference`` share the real store's validation; the fake
-    holds no record version, so ``set_reference`` never conflicts.
+    ``create``, ``attach_conversation`` and ``set_reference`` share the real store's
+    validation; the fake holds no record version, so only a different conversation conflicts.
     """
 
     def __init__(self) -> None:
@@ -170,19 +172,49 @@ class InMemoryIncidentStore(IncidentStore):
         incident = self._incidents.get(incident_id)
         return OperationResult.success(data=incident.security_incident) if incident is not None else no_such_incident()
 
-    def create(self, incident: Incident, binding: IncidentBinding) -> OperationResult[Incident]:
-        """Store the binding, then the incident; a stored incident under the id is a replay that changes nothing.
+    def create(self, incident: Incident) -> OperationResult[Incident]:
+        """Store the incident; a stored incident under the id is a replay that changes nothing.
 
         Raises:
             ValueError: see ``IncidentStore.create``.
         """
-        validate_new_incident(incident, binding)
-        self.bind(binding)
+        validate_new_incident(incident)
         stored = self._incidents.get(incident.id)
         if stored is not None:
             return OperationResult.success(data=stored)
         self.seed(incident)
         return OperationResult.success(data=incident)
+
+    def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+        """Store the binding and, for a primary one, make its conversation the incident's.
+
+        Raises:
+            ValueError: see ``IncidentStore.attach_conversation``.
+        """
+        validate_attachment(incident_id, binding)
+        stored = self._incidents.get(incident_id)
+        if stored is None:
+            return no_such_incident()
+        conversation = ConversationReference(
+            system=binding.system, tenant=binding.tenant, vendor_id=binding.vendor_id, url=binding.url
+        )
+        current = stored.conversation
+        if (
+            binding.primary
+            and current is not None
+            and (current.system, current.tenant, current.vendor_id)
+            != (
+                conversation.system,
+                conversation.tenant,
+                conversation.vendor_id,
+            )
+        ):
+            return record_conflict()
+        self.bind(binding)
+        if binding.primary and current is None:
+            stored = replace(stored, conversation=conversation)
+            self._incidents[incident_id] = stored
+        return OperationResult.success(data=stored)
 
     def set_reference(self, incident_id: str, kind: ReferenceKind, reference: ResourceReference) -> OperationResult[Incident]:
         """Replace the incident's reference of ``kind``.
