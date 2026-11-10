@@ -38,6 +38,7 @@ from features.incident.core.adapters.slack import build_incident_conversation, b
 from features.incident.core.domain import (
     CONVERSATION_NAME_ATTEMPTS,
     BindingKind,
+    ConversationName,
     ConversationReference,
     DocumentField,
     DocumentSection,
@@ -74,6 +75,7 @@ from features.incident.core.store import (
 __all__ = [
     "CONVERSATION_NAME_ATTEMPTS",
     "BindingKind",
+    "ConversationName",
     "ConversationReference",
     "DocumentField",
     "DocumentSection",
@@ -174,15 +176,16 @@ class IncidentConversation(Protocol):
     table does not name raises. Writes are not replayed after a failure that
     may have been applied.
 
-    ``create`` makes one attempt under the name it is given and reports a taken
-    name as an expected outcome; ``find_own`` finds the bot's own conversation
-    of a name. Choosing the next name, and deciding that an existing
+    ``create`` makes one attempt under the name it is given, rendered under the
+    platform's own naming rules, and reports a taken name as an expected
+    outcome; ``find_own`` finds the bot's own conversation of a name. Choosing
+    the next name, and deciding that an existing
     conversation is the incident's own, belong to the caller
     (decisions/incident-management.md, one conversation per incident).
     """
 
-    async def create(self, name: str, *, private: bool) -> OperationResult[ConversationReference]:
-        """Create a conversation named ``name``, the bot its first member, private when ``private``.
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
+        """Create a conversation named after ``name``, the bot its first member, private when ``private``.
 
         A name already in use (by any conversation, archived ones included) is a
         PERMANENT_ERROR with ``CONVERSATION_NAME_TAKEN``, logged at info only: the
@@ -192,8 +195,8 @@ class IncidentConversation(Protocol):
         """
         ...
 
-    async def find_own(self, name: str) -> OperationResult[ConversationReference | None]:
-        """Return the bot's own open conversation named exactly ``name``, or ``None``.
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Return the bot's own open conversation named exactly as ``name`` renders, or ``None``.
 
         Run after a create that did not succeed, before trying another name: the
         platform may have created the conversation before the failure.

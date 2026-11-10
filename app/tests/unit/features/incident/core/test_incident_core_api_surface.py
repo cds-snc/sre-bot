@@ -38,6 +38,7 @@ def test_api_exports_exactly_the_public_names() -> None:
     assert sorted(api.__all__) == [
         "BindingKind",
         "CONVERSATION_NAME_ATTEMPTS",
+        "ConversationName",
         "ConversationReference",
         "DocumentField",
         "DocumentSection",
@@ -134,10 +135,12 @@ def test_conversation_interface_is_async_on_the_reference_with_operation_results
 
     create = inspect.signature(api.IncidentConversation.create)
     assert inspect.iscoroutinefunction(api.IncidentConversation.create)
+    assert create.parameters["name"].annotation is api.ConversationName
     assert create.parameters["private"].kind is inspect.Parameter.KEYWORD_ONLY
     assert create.return_annotation == OperationResult[api.ConversationReference]
     find_own = inspect.signature(api.IncidentConversation.find_own)
     assert inspect.iscoroutinefunction(api.IncidentConversation.find_own)
+    assert find_own.parameters["name"].annotation is api.ConversationName
     assert find_own.return_annotation == OperationResult[api.ConversationReference | None]
     assert inspect.signature(methods["group_members"]).return_annotation == OperationResult[tuple[str, ...]]
     assert inspect.signature(methods["post"]).parameters["blocks"].kind is inspect.Parameter.KEYWORD_ONLY

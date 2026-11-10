@@ -8,6 +8,7 @@ caller iterates on; find_own reads the bot's own conversations page by page.
 """
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import pytest
@@ -17,12 +18,15 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.slack import SlackIncidentConversation
-from features.incident.core.api import ConversationReference
+from features.incident.core.api import ConversationName, ConversationReference
 
 pytestmark = pytest.mark.unit
 
 TENANT = "T0SLACK"
 OPEN = ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor_id="C0OPEN")
+OPENED_ON = date(2026, 11, 10)
+PAYMENTS = ConversationName("Payments", OPENED_ON, production=True)
+BREACH = ConversationName("Breach", OPENED_ON, production=True)
 
 
 def _adapter(stub: Any, *, tenant: str | None = TENANT) -> SlackIncidentConversation:
@@ -32,7 +36,7 @@ def _adapter(stub: Any, *, tenant: str | None = TENANT) -> SlackIncidentConversa
 async def test_create_sends_only_the_name_for_a_public_channel_on_the_write_handle(stub_slack: Callable[..., Any]) -> None:
     stub = stub_slack()
 
-    created = await _adapter(stub).create("incident-2026-11-10-payments", private=False)
+    created = await _adapter(stub).create(PAYMENTS, private=False)
 
     assert created.is_success
     stub.writes.conversations_create.assert_awaited_once_with(name="incident-2026-11-10-payments")
@@ -42,7 +46,7 @@ async def test_create_sends_only_the_name_for_a_public_channel_on_the_write_hand
 async def test_create_asks_for_a_private_channel_when_private(stub_slack: Callable[..., Any]) -> None:
     stub = stub_slack()
 
-    await _adapter(stub).create("incident-2026-11-10-breach", private=True)
+    await _adapter(stub).create(BREACH, private=True)
 
     stub.writes.conversations_create.assert_awaited_once_with(name="incident-2026-11-10-breach", is_private=True)
 
@@ -51,7 +55,7 @@ async def test_a_taken_name_is_reported_quietly_after_one_call(stub_slack: Calla
     stub = stub_slack(foreign_names=["incident-2026-11-10-payments"])
 
     with capture_logs() as logs:
-        created = await _adapter(stub).create("incident-2026-11-10-payments", private=False)
+        created = await _adapter(stub).create(PAYMENTS, private=False)
 
     assert created.status is OperationStatus.PERMANENT_ERROR
     assert created.error_code == ErrorCode.CONVERSATION_NAME_TAKEN
@@ -62,20 +66,20 @@ async def test_a_taken_name_is_reported_quietly_after_one_call(stub_slack: Calla
 
 
 async def test_a_workspace_refusing_channel_creation_is_not_writable(stub_slack: Callable[..., Any]) -> None:
-    created = await _adapter(stub_slack(fail_with="restricted_action")).create("incident-x", private=False)
+    created = await _adapter(stub_slack(fail_with="restricted_action")).create(PAYMENTS, private=False)
 
     assert created.status is OperationStatus.PERMANENT_ERROR
     assert created.error_code == ErrorCode.CONVERSATION_NOT_WRITABLE
 
 
 async def test_a_rate_limited_create_is_transient_with_its_retry_after(stub_slack: Callable[..., Any]) -> None:
-    created = await _adapter(stub_slack(fail_with="ratelimited")).create("incident-x", private=False)
+    created = await _adapter(stub_slack(fail_with="ratelimited")).create(PAYMENTS, private=False)
 
     assert created.status is OperationStatus.TRANSIENT_ERROR
     assert created.retry_after is not None
 
 
-@pytest.mark.parametrize("call", [lambda a: a.create("incident-x", private=False), lambda a: a.find_own("incident-x")])
+@pytest.mark.parametrize("call", [lambda a: a.create(PAYMENTS, private=False), lambda a: a.find_own(PAYMENTS)])
 async def test_without_a_slack_tenant_create_and_find_own_are_not_configured_without_a_call(
     stub_slack: Callable[..., Any], call: Callable[[SlackIncidentConversation], Any]
 ) -> None:
@@ -91,9 +95,10 @@ async def test_without_a_slack_tenant_create_and_find_own_are_not_configured_wit
 
 async def test_find_own_reads_every_page_of_the_bots_open_conversations(stub_slack: Callable[..., Any]) -> None:
     channels = {f"C0{n}": {"is_archived": False, "is_member": True} for n in range(3)}
-    stub = stub_slack(channels, names={"incident-a": "C00", "incident-b": "C01", "incident-c": "C02"}, page_size=1)
+    names = {f"incident-2026-11-10-{title}": f"C0{n}" for n, title in enumerate(["a", "b", "c"])}
+    stub = stub_slack(channels, names=names, page_size=1)
 
-    found = await _adapter(stub).find_own("incident-c")
+    found = await _adapter(stub).find_own(ConversationName("c", OPENED_ON, production=True))
 
     assert found.data == ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor_id="C02")
     assert stub.reads.users_conversations.await_count == 3
@@ -103,7 +108,7 @@ async def test_find_own_reads_every_page_of_the_bots_open_conversations(stub_sla
 
 
 async def test_a_failed_lookup_is_classified(stub_slack: Callable[..., Any]) -> None:
-    found = await _adapter(stub_slack(fail_with="ratelimited")).find_own("incident-x")
+    found = await _adapter(stub_slack(fail_with="ratelimited")).find_own(PAYMENTS)
 
     assert found.status is OperationStatus.TRANSIENT_ERROR
 

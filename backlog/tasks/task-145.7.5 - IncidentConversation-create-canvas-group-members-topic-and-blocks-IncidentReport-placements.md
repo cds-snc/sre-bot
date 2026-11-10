@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T20:24:00Z'
+updated_date: '2026-11-10T20:34:00Z'
 labels:
   - incident
   - features
@@ -176,6 +176,9 @@ Tests: conversation parity suite extended (create, taken names, find_own, topic,
 Gates (cd app): ruff check . -> All checks passed; ruff format --check . -> 1173 files already formatted; make check-import-contracts -> 13 kept, 0 broken; make check-package-shape -> OK (3 baselined); make check-test-seams -> OK (47 strict, 12 legacy baselined); make check-fake-coverage -> OK; mypy . -> Found 41 errors in 14 files, none in touched files (the first full run found one new error at core/adapters/slack.py:344, fixed, then one rerun); pytest tests --ignore=tests/smoke -> 7109 passed.
 
 For the human: no config, terraform, IAM or SSM change (no deploy-checks). The commit also carries the TASK-145.7.2 and TASK-145.8.2 Done task files and the TASK-176 note.
+
+2026-11-10 follow-up (human review of the naming placement, fixed in this PR): the name rule mixed incident policy with Slack's rules, against incident-management.md (vendor behaviour once per system in core/adapters/; Slack today and Teams later: Teams allows 50 characters, keeps case, spaces and accents). Split: core/domain.py holds the platform-neutral ConversationName (title, opened_on, production, attempt 1-5; prefix and suffix) and incident_conversation_names returns five of them; core/adapters/slack.py renders one with slack_channel_name (accents dropped, refused characters one dash, cut to 80 before the suffix); IncidentConversation.create and find_own take a ConversationName; the fake renders with the Slack rule it stands in for. Tests: test_incident_core_conversation_names.py now covers the policy; new test_incident_core_conversation_slack_names.py covers Slack rendering; parity, create and api-surface tests take ConversationName. ADR paragraph and Changes line reworded.
+Gates rerun after the change (cd app): ruff check . -> All checks passed; ruff format --check . -> 1174 files already formatted; check-import-contracts 13 kept 0 broken; package shape, test seams, fake coverage OK; mypy . -> Found 41 errors in 14 files, none in touched files; pytest tests --ignore=tests/smoke -> 7119 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -13,6 +13,7 @@ channel the bot can write to, a taken name is ``CONVERSATION_NAME_TAKEN``, and
 """
 
 from collections.abc import Callable
+from datetime import date
 from typing import Any
 
 import pytest
@@ -21,8 +22,8 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.in_memory import InMemoryIncidentConversation
-from features.incident.core.adapters.slack import SlackIncidentConversation
-from features.incident.core.api import ConversationReference, IncidentConversation, MessageReference
+from features.incident.core.adapters.slack import SlackIncidentConversation, slack_channel_name
+from features.incident.core.api import ConversationName, ConversationReference, IncidentConversation, MessageReference
 
 pytestmark = pytest.mark.unit
 
@@ -33,8 +34,18 @@ LEFT = ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor
 UNKNOWN = ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor_id="C0GONE")
 GOOGLE = ConversationReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="spaces/AAA")
 
-_NAMES = {"incident-open": "C0OPEN", "incident-archived": "C0ARCHIVED", "incident-left": "C0LEFT"}
-_FOREIGN = ["general"]
+OPENED_ON = date(2026, 11, 10)
+OPEN_NAME = ConversationName("open", OPENED_ON, production=True)
+ARCHIVED_NAME = ConversationName("archived", OPENED_ON, production=True)
+LEFT_NAME = ConversationName("left", OPENED_ON, production=True)
+FOREIGN_NAME = ConversationName("squatted", OPENED_ON, production=True)
+NEW_NAME = ConversationName("payments", OPENED_ON, production=True)
+_NAMES = {
+    slack_channel_name(OPEN_NAME): "C0OPEN",
+    slack_channel_name(ARCHIVED_NAME): "C0ARCHIVED",
+    slack_channel_name(LEFT_NAME): "C0LEFT",
+}
+_FOREIGN = [slack_channel_name(FOREIGN_NAME)]
 _GROUPS = {"S0SEC": ["U1", "U2"]}
 _CHANNELS = {
     "C0OPEN": {"is_archived": False, "is_member": True},
@@ -154,7 +165,7 @@ NEW = ConversationReference(system=WorkplaceSystem.SLACK, tenant=TENANT, vendor_
 async def test_creating_under_a_new_name_returns_a_writable_conversation(
     conversations: IncidentConversation, private: bool
 ) -> None:
-    created = await conversations.create("incident-2026-11-10-payments", private=private)
+    created = await conversations.create(NEW_NAME, private=private)
 
     assert created.is_success
     assert created.data == NEW
@@ -162,8 +173,8 @@ async def test_creating_under_a_new_name_returns_a_writable_conversation(
     assert (await conversations.post(NEW, "Incident declared")).is_success
 
 
-@pytest.mark.parametrize("name", ["incident-open", "general"])
-async def test_creating_under_a_taken_name_is_name_taken(conversations: IncidentConversation, name: str) -> None:
+@pytest.mark.parametrize("name", [OPEN_NAME, FOREIGN_NAME])
+async def test_creating_under_a_taken_name_is_name_taken(conversations: IncidentConversation, name: ConversationName) -> None:
     created = await conversations.create(name, private=False)
 
     assert created.status is OperationStatus.PERMANENT_ERROR
@@ -172,14 +183,24 @@ async def test_creating_under_a_taken_name_is_name_taken(conversations: Incident
 
 
 async def test_find_own_returns_the_bots_open_channel_of_that_exact_name(conversations: IncidentConversation) -> None:
-    found = await conversations.find_own("incident-open")
+    found = await conversations.find_own(OPEN_NAME)
 
     assert found.is_success
     assert found.data == OPEN
 
 
-@pytest.mark.parametrize("name", ["general", "incident-archived", "incident-left", "incident-ope", "missing"])
-async def test_find_own_returns_none_for_any_other_name(conversations: IncidentConversation, name: str) -> None:
+@pytest.mark.parametrize(
+    "name",
+    [
+        FOREIGN_NAME,
+        ARCHIVED_NAME,
+        LEFT_NAME,
+        ConversationName("ope", OPENED_ON, production=True),
+        ConversationName("open", OPENED_ON, production=False),
+        ConversationName("open", OPENED_ON, production=True, attempt=2),
+    ],
+)
+async def test_find_own_returns_none_for_any_other_name(conversations: IncidentConversation, name: ConversationName) -> None:
     found = await conversations.find_own(name)
 
     assert found.is_success
@@ -187,9 +208,9 @@ async def test_find_own_returns_none_for_any_other_name(conversations: IncidentC
 
 
 async def test_find_own_finds_a_channel_just_created(conversations: IncidentConversation) -> None:
-    await conversations.create("incident-2026-11-10-payments", private=False)
+    await conversations.create(NEW_NAME, private=False)
 
-    assert (await conversations.find_own("incident-2026-11-10-payments")).data == NEW
+    assert (await conversations.find_own(NEW_NAME)).data == NEW
 
 
 async def test_topic_canvas_and_blocks_on_an_open_conversation_succeed(conversations: IncidentConversation) -> None:

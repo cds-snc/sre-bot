@@ -20,8 +20,10 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
+from features.incident.core.adapters.slack import slack_channel_name
 from features.incident.core.domain import (
     BindingKind,
+    ConversationName,
     ConversationReference,
     DocumentField,
     DocumentSection,
@@ -412,9 +414,10 @@ class InMemoryIncidentConversation:
     ``1700000000.00000<n>`` in order. ``checked`` lists the conversations whose
     writability was asked.
 
-    ``names`` names some of those conversations (name to id) and ``foreign_names``
-    are names the bot cannot see; creating under any of them is
-    ``CONVERSATION_NAME_TAKEN``. A created conversation is open, the bot a member,
+    ``names`` names some of those conversations (Slack channel name to id) and
+    ``foreign_names`` are names the bot cannot see; creating under any of them is
+    ``CONVERSATION_NAME_TAKEN``. A ``ConversationName`` is rendered with the Slack
+    adapter's ``slack_channel_name``, the platform this fake stands in for. A created conversation is open, the bot a member,
     with id ``C0NEW<n>``. ``find_own`` finds named conversations that are open and
     where the bot is a member. ``groups`` maps a user group id to its members.
     """
@@ -461,21 +464,22 @@ class InMemoryIncidentConversation:
         """Return the blocks of each post to ``conversation``, in order (empty for a text-only post)."""
         return tuple(self._conversations[conversation.vendor_id].blocks)
 
-    async def create(self, name: str, *, private: bool) -> OperationResult[ConversationReference]:
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
         """Create an open conversation the bot belongs to; a name in use is ``CONVERSATION_NAME_TAKEN``."""
-        if name in self._names or name in self._foreign_names:
-            return OperationResult.permanent_error(f"Slack channel name taken: {name}", ErrorCode.CONVERSATION_NAME_TAKEN)
+        channel_name = slack_channel_name(name)
+        if channel_name in self._names or channel_name in self._foreign_names:
+            return OperationResult.permanent_error(f"Slack channel name taken: {channel_name}", ErrorCode.CONVERSATION_NAME_TAKEN)
         self._created += 1
         vendor_id = f"C0NEW{self._created}"
         self._conversations[vendor_id] = _StoredConversation(archived=False, member=True, private=private)
-        self._names[name] = vendor_id
+        self._names[channel_name] = vendor_id
         return OperationResult.success(
             ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=vendor_id)
         )
 
-    async def find_own(self, name: str) -> OperationResult[ConversationReference | None]:
-        """Return the open conversation named ``name`` where the bot is a member, or ``None``."""
-        vendor_id = self._names.get(name)
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Return the open conversation named as ``name`` renders where the bot is a member, or ``None``."""
+        vendor_id = self._names.get(slack_channel_name(name))
         stored = self._conversations.get(vendor_id) if vendor_id is not None else None
         if vendor_id is None or stored is None or stored.archived or not stored.member:
             return OperationResult.success(None)

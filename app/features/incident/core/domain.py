@@ -1,7 +1,5 @@
 """Domain types every incident subdomain works on."""
 
-import re
-import unicodedata
 from dataclasses import dataclass, field, fields
 from datetime import date, datetime
 from enum import StrEnum
@@ -462,30 +460,53 @@ class DraftWriteResult:
 
 
 CONVERSATION_NAME_ATTEMPTS = 5
-"""How many names declare and recreate try for one incident's conversation: the bare name, then ``-2`` to ``-5``."""
-
-_CONVERSATION_NAME_MAX = 80  # Slack's channel name limit
-_CONVERSATION_NAME_REFUSED = re.compile(r"[^a-z0-9_-]+")
+"""How many names declare and recreate try for one incident's conversation: the first, then attempts 2 to 5."""
 
 
-def incident_conversation_names(title: str, opened_on: date, *, production: bool) -> tuple[str, ...]:
+@dataclass(frozen=True)
+class ConversationName:
+    """The name an incident's conversation is created under, before a chat platform renders it.
+
+    The incident's naming policy, platform-neutral: ``incident-`` (``incident-dev-``
+    outside production), the opening date, the title, and from the second attempt a
+    ``-<attempt>`` suffix. Each conversation adapter renders it under its own
+    platform's rules (length, allowed characters, case) in ``core/adapters/``.
+
+    Attributes:
+        title: The incident title, as declared.
+        opened_on: The day the incident opened.
+        production: Whether this instance is production.
+        attempt: Which candidate this is, 1 to ``CONVERSATION_NAME_ATTEMPTS``.
+    """
+
+    title: str
+    opened_on: date
+    production: bool
+    attempt: int = 1
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.attempt <= CONVERSATION_NAME_ATTEMPTS:
+            raise ValueError(f"attempt must be 1 to {CONVERSATION_NAME_ATTEMPTS}, got {self.attempt}")
+
+    @property
+    def prefix(self) -> str:
+        """``incident-`` in production, ``incident-dev-`` elsewhere, followed by the opening date."""
+        return f"{'incident-' if self.production else 'incident-dev-'}{self.opened_on.isoformat()}"
+
+    @property
+    def suffix(self) -> str:
+        """Empty for the first attempt, ``-<attempt>`` after it."""
+        return "" if self.attempt == 1 else f"-{self.attempt}"
+
+
+def incident_conversation_names(title: str, opened_on: date, *, production: bool) -> tuple[ConversationName, ...]:
     """Return the names to try, in order, for an incident's conversation.
 
-    The first is ``incident-`` (``incident-dev-`` outside production), the opening
-    date and the title, cut to 80 characters: the format the legacy declare used.
-    The title is lowercased with accents dropped, and every run of characters a
-    Slack channel name refuses becomes one dash. The next names end ``-2`` to
-    ``-5``, the base cut so each still fits. Which name an incident ends up with,
-    and when an existing conversation is its own, is the caller's decision
-    (decisions/incident-management.md, one conversation per incident).
+    Which one an incident ends up with, and when an existing conversation is its
+    own, is the caller's decision (decisions/incident-management.md, one
+    conversation per incident).
     """
-    ascii_title = unicodedata.normalize("NFKD", title).encode("ascii", "ignore").decode("ascii").lower()
-    slug = _CONVERSATION_NAME_REFUSED.sub("-", ascii_title).strip("-")
-    prefix = "incident-" if production else "incident-dev-"
-    base = f"{prefix}{opened_on.isoformat()}" + (f"-{slug}" if slug else "")
-    first = base[:_CONVERSATION_NAME_MAX]
-    suffixed = tuple(
-        f"{base[: _CONVERSATION_NAME_MAX - len(suffix)].rstrip('-')}{suffix}"
-        for suffix in (f"-{n}" for n in range(2, CONVERSATION_NAME_ATTEMPTS + 1))
+    return tuple(
+        ConversationName(title=title, opened_on=opened_on, production=production, attempt=attempt)
+        for attempt in range(1, CONVERSATION_NAME_ATTEMPTS + 1)
     )
-    return (first, *suffixed)

@@ -20,6 +20,7 @@ read keeps what it has.
 """
 
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -34,7 +35,7 @@ from slack_sdk.web.async_slack_response import AsyncSlackResponse
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.domain import ConversationReference, MessageReference, TranscriptMessage
+from features.incident.core.domain import ConversationName, ConversationReference, MessageReference, TranscriptMessage
 from integrations.slack.client import (
     classify_slack_error,
     get_async_slack_web_client,
@@ -284,6 +285,23 @@ _CANVAS_DONE = frozenset({"channel_canvas_already_exists"})
 _NAME_TAKEN = "name_taken"
 _OWN_CONVERSATION_TYPES = "public_channel,private_channel"
 _OWN_CONVERSATIONS_PAGE = 200
+_CHANNEL_NAME_MAX = 80
+_CHANNEL_NAME_REFUSED = re.compile(r"[^a-z0-9_-]+")
+
+
+def slack_channel_name(name: ConversationName) -> str:
+    """Render ``name`` under Slack's channel rules: lowercase letters, digits, ``-`` and ``_``, at most 80 characters.
+
+    Accents are dropped and every other run of refused characters becomes one dash.
+    The prefix and title are cut to fit before the attempt suffix, so every attempt
+    keeps its number and stays distinct.
+    """
+    ascii_title = unicodedata.normalize("NFKD", name.title).encode("ascii", "ignore").decode("ascii").lower()
+    slug = _CHANNEL_NAME_REFUSED.sub("-", ascii_title).strip("-")
+    base = name.prefix + (f"-{slug}" if slug else "")
+    if not name.suffix:
+        return base[:_CHANNEL_NAME_MAX]
+    return base[: _CHANNEL_NAME_MAX - len(name.suffix)].rstrip("-") + name.suffix
 
 
 class SlackIncidentConversation:
@@ -302,33 +320,37 @@ class SlackIncidentConversation:
         self._writes = writes
         self._tenant = tenant
 
-    async def create(self, name: str, *, private: bool) -> OperationResult[ConversationReference]:
-        """Create the channel in one call; ``is_private`` is sent only for a private one.
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
+        """Create the channel named ``slack_channel_name(name)`` in one call; ``is_private`` only for a private one.
 
         ``name_taken`` is reported as ``CONVERSATION_NAME_TAKEN`` and logged at
         info: the caller tries its next name.
         """
         if self._tenant is None:
             return _slack_not_configured()
-        arguments: dict[str, Any] = {"name": name}
+        channel_name = slack_channel_name(name)
+        arguments: dict[str, Any] = {"name": channel_name}
         if private:
             arguments["is_private"] = True
         try:
             response = await self._writes.conversations_create(**arguments)
         except SlackApiError as exc:
             if exc.response.get("error") == _NAME_TAKEN:
-                logger.info("incident_conversation_name_taken", name=name)
-                return OperationResult.permanent_error(f"Slack channel name taken: {name}", ErrorCode.CONVERSATION_NAME_TAKEN)
-            return _named_failure("create", name, exc)
+                logger.info("incident_conversation_name_taken", name=channel_name)
+                return OperationResult.permanent_error(
+                    f"Slack channel name taken: {channel_name}", ErrorCode.CONVERSATION_NAME_TAKEN
+                )
+            return _named_failure("create", channel_name, exc)
         channel: Mapping[str, Any] = response.get("channel") or {}
         return OperationResult.success(
             ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=str(channel.get("id")))
         )
 
-    async def find_own(self, name: str) -> OperationResult[ConversationReference | None]:
-        """Page through the bot's non-archived channels, public and private, for one named exactly ``name``."""
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Page through the bot's non-archived channels, public and private, for one named ``slack_channel_name(name)``."""
         if self._tenant is None:
             return _slack_not_configured()
+        channel_name = slack_channel_name(name)
         cursor: str | None = None
         while True:
             try:
@@ -336,9 +358,9 @@ class SlackIncidentConversation:
                     types=_OWN_CONVERSATION_TYPES, exclude_archived=True, limit=_OWN_CONVERSATIONS_PAGE, cursor=cursor
                 )
             except SlackApiError as exc:
-                return _named_failure("find_own", name, exc)
+                return _named_failure("find_own", channel_name, exc)
             for channel in response.get("channels") or []:
-                if channel.get("name") == name:
+                if channel.get("name") == channel_name:
                     return OperationResult.success(
                         ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=str(channel["id"]))
                     )
