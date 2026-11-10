@@ -20,6 +20,7 @@ from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import Severity
 from features.incident.core.store import IncidentStore, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import record_incident_store
 
 pytestmark = pytest.mark.unit
 
@@ -47,7 +48,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE, TENANTS)
+    return record_incident_store(records, table=TABLE, tenants=TENANTS)
 
 
 def test_the_store_satisfies_the_protocol() -> None:
@@ -83,7 +84,7 @@ def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     )
 
     with capture_logs() as logs:
-        result = RecordIncidentStore(records, TABLE, TENANTS).get(INCIDENT_ID)
+        result = record_incident_store(records, table=TABLE, tenants=TENANTS).get(INCIDENT_ID)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "THROTTLED", 2.0)
     assert result.message is not None

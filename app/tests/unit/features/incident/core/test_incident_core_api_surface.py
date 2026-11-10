@@ -35,12 +35,14 @@ def _clear_provider_cache() -> Iterator[None]:
 def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
+        "BindingKind",
         "ConversationReference",
         "DocumentField",
         "DocumentSection",
         "DraftWriteResult",
         "ExternalCaseReference",
         "Incident",
+        "IncidentBinding",
         "IncidentConversation",
         "IncidentReport",
         "IncidentStore",

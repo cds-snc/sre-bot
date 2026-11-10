@@ -199,6 +199,7 @@ announce_channel_id = ""
 incidents_table = "incidents"
 timeline_table = "sre_bot_incident_timeline"
 status_updates_table = "sre_bot_incident_status_updates"
+bindings_table = "sre_bot_incident_bindings"
 # Most incident items a whole-table read (the legacy upgrade job) returns; past it the read fails.
 full_read_max_items = 10000
 folder_id = ""

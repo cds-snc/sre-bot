@@ -16,8 +16,8 @@ from features.incident.common.settings import get_incident_core_settings
 from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.api import StatusUpdateStore, build_status_update_store
-from features.incident.core.domain import ConversationReference, Incident
-from features.incident.core.store import incidents_table
+from features.incident.core.domain import BindingKind, ConversationReference, Incident, IncidentBinding
+from features.incident.core.store import RecordIncidentStore, bindings_table, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 from tests.factories.services import FakeServiceScopeOpener
 
@@ -47,6 +47,50 @@ def incident_on(
         declared_at=DECLARED_AT,
         security_incident=security_incident,
         conversation=slack_conversation(channel_id, tenant=tenant),
+    )
+
+
+def binding_on(
+    channel_id: str,
+    incident_id: str,
+    *,
+    tenant: str = SLACK_TENANT,
+    primary: bool = True,
+    archived_at: datetime | None = None,
+    kind: BindingKind = BindingKind.CHAT_CONVERSATION,
+) -> IncidentBinding:
+    """A binding of ``incident_id`` to the Slack conversation ``channel_id`` under ``tenant``."""
+    return IncidentBinding(
+        incident_id=incident_id,
+        kind=kind,
+        system=WorkplaceSystem.SLACK,
+        tenant=tenant,
+        vendor_id=channel_id,
+        primary=primary,
+        bound_by="U0DECLARER",
+        bound_at=DECLARED_AT,
+        archived_at=archived_at,
+    )
+
+
+def record_incident_store(
+    records: RecordStore,
+    *,
+    tenants: Mapping[WorkplaceSystem, str] | None = None,
+    table: RecordTable | None = None,
+    bindings: RecordTable | None = None,
+) -> RecordIncidentStore:
+    """The real incident store over ``records``.
+
+    ``tenants`` defaults to Slack under ``SLACK_TENANT``; ``table`` and ``bindings``
+    default to the declared incidents and bindings tables under their configured names.
+    """
+    settings = get_incident_core_settings()
+    return RecordIncidentStore(
+        records,
+        incidents_table(settings.incidents_table) if table is None else table,
+        {WorkplaceSystem.SLACK: SLACK_TENANT} if tenants is None else dict(tenants),
+        bindings=bindings_table(settings.bindings_table) if bindings is None else bindings,
     )
 
 

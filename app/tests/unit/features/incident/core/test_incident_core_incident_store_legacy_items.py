@@ -21,6 +21,7 @@ from features.incident.common.vocabulary import IncidentStatus, Severity
 from features.incident.core.domain import ConversationReference
 from features.incident.core.store import OPEN_BUCKET, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import record_incident_store
 
 pytestmark = pytest.mark.unit
 
@@ -67,7 +68,7 @@ def _store(*items: dict[str, Any], tenants: dict[WorkplaceSystem, str] | None = 
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE, TENANTS if tenants is None else tenants)
+    return record_incident_store(records, table=TABLE, tenants=TENANTS if tenants is None else tenants)
 
 
 def test_a_legacy_item_reads_as_the_incident() -> None:

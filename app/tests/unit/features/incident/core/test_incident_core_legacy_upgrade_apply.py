@@ -14,7 +14,8 @@ import pytest
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity
 from features.incident.core.adapters.legacy_items import UpgradedItem, upgrade_legacy_item
-from features.incident.core.store import OPEN_BUCKET, RECORD_VERSION, RecordIncidentStore
+from features.incident.core.store import OPEN_BUCKET, RECORD_VERSION
+from tests.factories.incident import record_incident_store
 from tests.factories.legacy_upgrade import TABLE, TENANTS, legacy_item, legacy_upgrade, records_with
 
 pytestmark = pytest.mark.unit
@@ -66,12 +67,12 @@ def test_the_happy_path_closed_incident_reads_the_same_after_the_upgrade() -> No
     """A single-team Closed incident with every field mappable: no open index, product unset, teams kept."""
     item = legacy_item("inc-closed", status="Closed")
     records = records_with(item)
-    before = RecordIncidentStore(records, TABLE, TENANTS).get("inc-closed").data
+    before = record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed").data
 
     legacy_upgrade(records).run(apply=True)
 
     stored = _stored(records, "inc-closed")
-    after = RecordIncidentStore(records, TABLE, TENANTS).get("inc-closed").data
+    after = record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed").data
     assert after is not None and after == before
     assert (after.status, after.severity, after.product) == (IncidentStatus.CLOSED, Severity.SEV2, None)
     assert after.conversation is not None and after.conversation.tenant == TENANTS[WorkplaceSystem.SLACK]
@@ -99,7 +100,7 @@ def test_the_open_security_incident_most_likely_to_break_upgrades_whole() -> Non
     assert stored["opened_at"] == stored["declared_at"] == "2025-10-15T14:00:00.000000+00:00"
     assert "product" not in stored
     assert stored["teams"] == ["GC Notify", "GC Forms"]
-    listed = RecordIncidentStore(records, TABLE, TENANTS).list_open().data
+    listed = record_incident_store(records, table=TABLE, tenants=TENANTS).list_open().data
     assert [incident.id for incident in listed or []] == ["inc-open"]
 
 

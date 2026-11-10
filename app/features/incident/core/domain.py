@@ -295,6 +295,54 @@ class MessageReference:
         _require_text(self, "tenant", "conversation_id", "message_id")
 
 
+class BindingKind(StrEnum):
+    """The kind of place an incident is bound to; the stored form is the value."""
+
+    CHAT_CONVERSATION = "chat_conversation"
+
+
+@dataclass(frozen=True)
+class IncidentBinding:
+    """One place responders work an incident, a child record of the incident.
+
+    Stored under (``incident_id``, binding key) and never deleted: a replaced
+    place gets ``archived_at``. Visibility is the incident's.
+
+    Attributes:
+        incident_id: The incident this place belongs to.
+        kind: The kind of place.
+        system: The workplace system that holds the place.
+        tenant: The vendor's own tenant id.
+        vendor_id: The place's id in that system (a conversation id for a chat kind).
+        primary: Whether this is the incident's primary place.
+        bound_by: Who bound it.
+        bound_at: When it was bound, timezone-aware.
+        url: A link to the place, a hint only.
+        archived_at: When the place was replaced, timezone-aware; ``None`` while active.
+    """
+
+    incident_id: str
+    kind: BindingKind
+    system: WorkplaceSystem
+    tenant: str
+    vendor_id: str
+    primary: bool
+    bound_by: str
+    bound_at: datetime
+    url: str | None = None
+    archived_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, BindingKind):
+            raise ValueError(f"kind must be a BindingKind member, got {self.kind!r}")
+        _require_system(self.system)
+        _require_text(self, "incident_id", "tenant", "vendor_id", "bound_by")
+        for name in ("tenant", "vendor_id"):
+            if "#" in getattr(self, name):
+                raise ValueError(f"{name} must not contain '#', which separates the parts of the binding key")
+        _require_aware(self, "bound_at", "archived_at")
+
+
 @dataclass(frozen=True)
 class TimelineEntry:
     """One entry of an incident's timeline, stored as its own record.

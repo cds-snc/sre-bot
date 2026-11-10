@@ -25,6 +25,7 @@ from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.domain import ConversationReference, Incident
 from features.incident.core.store import IncidentStore, RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from tests.factories.incident import record_incident_store
 
 pytestmark = pytest.mark.unit
 
@@ -61,7 +62,7 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     records = InMemoryRecordStore()
     for item in items:
         assert records.put(TABLE, item).is_success
-    return RecordIncidentStore(records, TABLE, TENANTS)
+    return record_incident_store(records, table=TABLE, tenants=TENANTS)
 
 
 def _incident(incident_id: str, conversation: ConversationReference | None = CONVERSATION) -> Incident:
@@ -139,7 +140,7 @@ def test_the_index_read_returns_non_key_attributes() -> None:
 
 def test_a_blank_conversation_id_queries_nothing() -> None:
     records = MagicMock(spec=RecordStore)
-    RecordIncidentStore(records, TABLE, TENANTS).find_by_conversation(_blank_conversation())
+    record_incident_store(records, table=TABLE, tenants=TENANTS).find_by_conversation(_blank_conversation())
 
     records.query.assert_not_called()
 
@@ -197,12 +198,13 @@ def test_reaching_the_query_bound_is_ambiguous_without_a_fallback() -> None:
     for number in range(10):
         records.put(TABLE, _item(f"inc-{number}", tenant=OTHER_TENANT))
     spy = MagicMock(wraps=records)
-    store = RecordIncidentStore(spy, TABLE, TENANTS)
+    store = record_incident_store(spy, table=TABLE, tenants=TENANTS)
 
     result = store.find_by_conversation(CONVERSATION)
 
     assert result.error_code == ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION
-    assert spy.query.call_args_list == [((TABLE, RecordQuery(partition=CHANNEL, index="by_channel", limit=10)),)]
+    incident_queries = [call for call in spy.query.call_args_list if call.args[0] is TABLE]
+    assert incident_queries == [((TABLE, RecordQuery(partition=CHANNEL, index="by_channel", limit=10)),)]
 
 
 def test_a_store_failure_is_classified_with_its_retry_hint() -> None:
@@ -211,7 +213,7 @@ def test_a_store_failure_is_classified_with_its_retry_hint() -> None:
         OperationStatus.TRANSIENT_ERROR, message="ThrottlingException", error_code="THROTTLED", retry_after=1.5
     )
 
-    result = RecordIncidentStore(records, TABLE, TENANTS).find_by_conversation(CONVERSATION)
+    result = record_incident_store(records, table=TABLE, tenants=TENANTS).find_by_conversation(CONVERSATION)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "THROTTLED", 1.5)
     assert result.message is not None
