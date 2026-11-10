@@ -1,8 +1,10 @@
-"""Read an end-state incident item into the ``Incident`` record, and format its stored times.
+"""Write an ``Incident`` as an end-state incident item, read one back, and format its stored times.
 
 Pure: no store and no I/O. Stored attributes are named after the record fields
-(decisions/incident-management.md, The incident record); each reference kind is
-one map ``{system, tenant, vendor_id, url}``. Items without ``record_version``
+(decisions/incident-management.md, The incident record); each resource
+reference is one map ``{system, tenant, vendor_id, url}`` and the source alert
+a message map ``{system, tenant, conversation_id, message_id, url}``, the url
+omitted when unset. Items without ``record_version``
 are not end-state items and never reach this parser. The record-version
 constants and the open-index bucket value are defined here, so the store and
 the per-item upgrade plan share them without importing each other.
@@ -15,6 +17,7 @@ the incident id and field; the incident stays readable.
 """
 
 from collections.abc import Mapping
+from dataclasses import fields
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -30,10 +33,10 @@ from features.incident.core.domain import (
     ConversationReference,
     ExternalCaseReference,
     Incident,
+    MessageReference,
     PostmortemMeetingReference,
     ReportReference,
     ResourceReference,
-    SourceAlertReference,
     VideoCallReference,
 )
 
@@ -94,8 +97,7 @@ def parse_incident_item(item: Mapping[str, Any]) -> OperationResult[Incident]:
             video_call=reference("video_call", VideoCallReference),
             postmortem_meeting=reference("postmortem_meeting", PostmortemMeetingReference),
             external_case=reference("external_case", ExternalCaseReference),
-            # Read as a plain reference map until TASK-145.7 decides the source alert's shape.
-            source_alert=reference("source_alert", SourceAlertReference),
+            source_alert=read_message_reference(item, "source_alert", incident_id),
         )
     except _RequiredValueError as exc:
         log_fields: dict[str, object] = {"incident_id": incident_id, "field": exc.field}
@@ -127,6 +129,89 @@ def read_reference[R: ResourceReference](item: Mapping[str, Any], field: str, ki
         # Never log the map: its url may carry a vendor link.
         logger.warning("incident_field_unreadable", incident_id=incident_id, field=field)
         return None
+
+
+def read_message_reference(item: Mapping[str, Any], field: str, incident_id: object) -> MessageReference | None:
+    """Return the message map stored under ``field``, or ``None`` when absent or unreadable."""
+    stored = item.get(field)
+    if stored is None:
+        return None
+    try:
+        if not isinstance(stored, Mapping):
+            raise TypeError("not a map")
+        url = stored.get("url")
+        if url is not None and not isinstance(url, str):
+            raise TypeError("url is not text")
+        return MessageReference(
+            system=WorkplaceSystem(_text(stored.get("system"))),
+            tenant=_text(stored.get("tenant")),
+            conversation_id=_text(stored.get("conversation_id")),
+            message_id=_text(stored.get("message_id")),
+            url=url,
+        )
+    except TypeError, ValueError:
+        # Never log the map: its url may carry a vendor link.
+        logger.warning("incident_field_unreadable", incident_id=incident_id, field=field)
+        return None
+
+
+def incident_item(incident: Incident) -> dict[str, Any]:
+    """Return the end-state item for ``incident``, as ``create`` puts it.
+
+    Writes only the record's own names, an optional field only when set, plus
+    ``record_version``; while the incident has a conversation, its vendor id as
+    ``channel_id`` (the by_channel lookup copy); while it is open, ``open_bucket``
+    with ``opened_at`` (the declared time).
+    """
+    item: dict[str, Any] = {"record_version": RECORD_VERSION}
+    if incident.conversation is not None:
+        item["channel_id"] = incident.conversation.vendor_id
+    for field in fields(incident):
+        value = getattr(incident, field.name)
+        if value is not None:
+            item[field.name] = _stored_value(value)
+    if incident.status.is_open:
+        item["open_bucket"] = OPEN_BUCKET
+        item["opened_at"] = format_stored_time(incident.declared_at)
+    return item
+
+
+def reference_item(reference: ResourceReference) -> dict[str, str]:
+    """Return the stored map of a resource reference; the url only when set."""
+    stored = {"system": reference.system.value, "tenant": reference.tenant, "vendor_id": reference.vendor_id}
+    if reference.url is not None:
+        stored["url"] = reference.url
+    return stored
+
+
+def message_reference_item(reference: MessageReference) -> dict[str, str]:
+    """Return the stored map of a message reference; the url only when set."""
+    stored = {
+        "system": reference.system.value,
+        "tenant": reference.tenant,
+        "conversation_id": reference.conversation_id,
+        "message_id": reference.message_id,
+    }
+    if reference.url is not None:
+        stored["url"] = reference.url
+    return stored
+
+
+def _stored_value(value: object) -> object:
+    """Return the stored form of one record field value."""
+    match value:
+        case ResourceReference():
+            return reference_item(value)
+        case MessageReference():
+            return message_reference_item(value)
+        case datetime():
+            return format_stored_time(value)
+        case Severity():
+            return int(value)
+        case IncidentStatus():
+            return value.value
+        case _:
+            return value
 
 
 def format_stored_time(value: datetime) -> str:

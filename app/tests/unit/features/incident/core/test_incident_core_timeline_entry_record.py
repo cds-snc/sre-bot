@@ -46,6 +46,20 @@ def test_a_captured_entry_keeps_its_source_message() -> None:
     assert entry.source_message == MESSAGE
 
 
+def test_a_message_reference_url_is_an_optional_hint() -> None:
+    """The link is kept when the vendor gave one and absent otherwise; the four ids identify the message."""
+    linked = MessageReference(
+        system=WorkplaceSystem.SLACK,
+        tenant="T0TENANT",
+        conversation_id="C0INCIDENT",
+        message_id="1760536800.000100",
+        url="https://slack.test/archives/C0INCIDENT/p1760536800000100",
+    )
+
+    assert MESSAGE.url is None
+    assert linked.url == "https://slack.test/archives/C0INCIDENT/p1760536800000100"
+
+
 def test_the_entry_is_frozen() -> None:
     """The entry is an immutable value."""
     with pytest.raises(dataclasses.FrozenInstanceError):
