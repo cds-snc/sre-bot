@@ -106,6 +106,37 @@ def test_open_incident_info_view_ignores_stored_legacy_incident_updates(mock_db_
     mock_respond.assert_not_called()
 
 
+@patch("modules.incident.information_display.incident_information_view")
+@patch("modules.incident.information_display.db_operations")
+def test_open_incident_info_view_reads_an_upgraded_item_new_names_first(mock_db_operations, mock_incident_information_view):
+    """An item at the end-state record version opens the modal from its end-state attributes.
+
+    The view builder is faked so the assertion is on the Incident it receives:
+    the integer severity renders as sev-N, a stored ISO time as epoch text and the
+    title wins over the legacy name; end-state-only attributes are ignored.
+    """
+    mock_client = MagicMock()
+    body = {"channel_id": "C12345", "trigger_id": "T12345"}
+    row = _stored_incident_row()
+    row.update(
+        {
+            "record_version": {"N": "2"},
+            "severity": {"N": "1"},
+            "title": {"S": "Renamed"},
+            "detected_at": {"S": "2009-02-13T23:31:30.000000+00:00"},
+            "open_bucket": {"S": "OPEN"},
+            "conversation": {"M": {"id": {"S": "C1234567890"}}},
+        }
+    )
+    mock_db_operations.get_incident_by_channel_id.return_value = row
+    mock_incident_information_view.return_value = {"view": []}
+
+    information_display.open_incident_info_view(mock_client, body, MagicMock())
+
+    expected = {**_expected_incident_data(), "severity": "sev-1", "name": "Renamed", "detection_time": "1234567890.0"}
+    mock_incident_information_view.assert_called_once_with(Incident(**expected))
+
+
 @patch("modules.incident.information_display.db_operations")
 def test_open_incident_view_no_incident_found(mock_db_operations):
     mock_client = MagicMock()

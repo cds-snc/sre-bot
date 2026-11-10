@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-10T18:28:00Z'
+updated_date: '2026-11-10T18:46:00Z'
 labels:
   - incident
   - features
@@ -81,7 +81,7 @@ APPROVED 2026-11-09 (human): the program breakdown and the revised recommendatio
 ## 0. Program rules (human, 2026-11-09)
 - One storage expand: sre_bot_incident_bindings is the only new table in TASK-145; incidents, sre_bot_incident_timeline and sre_bot_incident_status_updates already exist (terraform/dynamodb.tf:91, :153, :73).
 - The final shape is built in core per area, inert until a cutover registers it.
-- Readers before writers: every legacy reader of incident items is cut over (TASK-145.8) before the rebuilt declare writes. Declare writes only the end-state shape: no dual-write, no extra="ignore" and no severity coercion on app/models/incidents.py.
+- Readers before writers: every legacy reader of incident items is cut over (TASK-145.8) before the rebuilt declare writes. Declare writes only the end-state shape: no dual-write and no relaxed model config on app/models/incidents.py (Incident keeps extra="forbid"). The only tolerance is the L5r rollback guard (TASK-145.8.2, approved 2026-11-10): legacy read paths validate with per-call extra="ignore" and prefer end-state attributes; legacy writers on marker-2 items write the end-state attribute (translated write); deleted with the model in L9b.
 - The 145.5.7 job upgrades every item and puts its binding in one pass (marker 2).
 - Each cutover is one git revert. TASK-145.13 contracts only the by_channel fallback, the legacy alert/button aliases and modules/incident.
 
@@ -109,7 +109,7 @@ APPROVED 2026-11-09 (human): the program breakdown and the revised recommendatio
 | L4c | 145.12 | list projection adapter in core (append_row, update_status) over integrations/google_workspace | ~150 / 4 | incident core | - | none | inert |
 | side | 25.6, 146.1 | Opsgenie per-attempt timeout (25.6), then the on-call capability with its Opsgenie adapter (146.1); replaces the dropped interim adapter (OQ1 revised) | per their plans | outbound client; capability | 25.6 before 146.1 | none | inert until L9a |
 | L5 | 145.7 | IncidentStore.create (record first; end-state only), attach_conversation (revised 2026-11-10, R4-R6); set_reference; source_alert = MessageReference + url | ~280 / 6 | incident core | L2a | none | inert |
-| L5r | 145.8 | rollback guard (OQ18, only if approved): Incident model extra="ignore" + int severity rendered as sev-N, test reading an upgraded item; deleted with the model in L9b | ~15 / 1 | legacy model | - (before L6a) | none | makes every reader-cutover revert safe |
+| L5r | 145.8 | rollback guard (OQ18, approved; widened 2026-11-10): prepared legacy path: per-call extra="ignore" reads preferring end-state attributes (int severity as sev-N), translated writes on marker-2 items, ADR Migration rules 1 and 5; deleted with the model in L9b | see TASK-145.8.2 | legacy model | - (before L6a) | none | makes every reader-cutover revert safe |
 | L6a | 145.8 | cutover show + update modal (severity, security flag) | ~380 / 9 | response | L3 | rewires field-update pins | show/update; one revert |
 | L6b | 145.8 | cutover status; IncidentReport.set_status_text (mapping moved) | ~300 / 7 | response + core adapter | L3, L4c | rewires status pins | status; one revert |
 | L7a | 145.8 | cutover roles + archive (alias archive_channel); 36.1.2 rulings | ~350 / 8 | response | L1, L3 | rewires roles and archive pins; deletes legacy_sre_web_client_seam and its baseline entry | roles/archive; one revert |

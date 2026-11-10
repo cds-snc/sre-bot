@@ -5,6 +5,7 @@ from slack_bolt import Respond
 from slack_sdk import WebClient
 from structlog import get_logger
 
+from features.incident.core.adapters.legacy_rollback import legacy_view  # TODO(TASK-145.7.10): remove with the legacy model
 from models.incidents import Incident
 from modules.incident import db_operations
 
@@ -26,7 +27,10 @@ def open_incident_info_view(client: WebClient, body, respond: Respond):
     else:
         deserialize = TypeDeserializer()
         incident_data = {k: deserialize.deserialize(v) for k, v in incident.items()}
-        view = incident_information_view(Incident(**incident_data))
+        view = incident_information_view(
+            # TODO(TASK-145.7.10): remove with the legacy model
+            Incident.model_validate(legacy_view(incident_data), extra="ignore")
+        )
         client.views_open(trigger_id=body["trigger_id"], view=view)
         log.info("incident_info_view_opened", incident_id=incident_data.get("id"))
 

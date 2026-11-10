@@ -3,10 +3,10 @@ id: TASK-145.7.7
 title: >-
   IncidentStore.create writes the record first; attach_conversation binds a chat
   conversation; end-state shape only; source_alert becomes a MessageReference
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:16:00Z'
+updated_date: '2026-11-10T18:33:00Z'
 labels:
   - incident
   - features
