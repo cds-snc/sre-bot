@@ -36,7 +36,9 @@ from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
+    CONVERSATION_NAME_ATTEMPTS,
     BindingKind,
+    ConversationName,
     ConversationReference,
     DocumentField,
     DocumentSection,
@@ -47,6 +49,7 @@ from features.incident.core.domain import (
     MessageReference,
     PostmortemMeetingReference,
     ReferenceKind,
+    ReportPlacement,
     ReportReference,
     SectionDraft,
     StatusUpdate,
@@ -56,6 +59,7 @@ from features.incident.core.domain import (
     TimelineEntry,
     TranscriptMessage,
     VideoCallReference,
+    incident_conversation_names,
 )
 from features.incident.core.legacy_upgrade import LegacyUpgrade, UpgradeReport
 from features.incident.core.store import (
@@ -69,7 +73,9 @@ from features.incident.core.store import (
 )
 
 __all__ = [
+    "CONVERSATION_NAME_ATTEMPTS",
     "BindingKind",
+    "ConversationName",
     "ConversationReference",
     "DocumentField",
     "DocumentSection",
@@ -85,6 +91,7 @@ __all__ = [
     "MessageReference",
     "PostmortemMeetingReference",
     "ReferenceKind",
+    "ReportPlacement",
     "ReportReference",
     "SectionDraft",
     "StatusUpdate",
@@ -105,6 +112,7 @@ __all__ = [
     "get_incident_conversation",
     "get_incident_report",
     "get_incident_transcript_reader",
+    "incident_conversation_names",
     "resolve_new_incident_system",
     "translate",
 ]
@@ -166,12 +174,57 @@ class IncidentConversation(Protocol):
     not a member, read-only) refuses writes with ``CONVERSATION_NOT_WRITABLE``;
     other platform failures are classified results, and an error the platform's
     table does not name raises. Writes are not replayed after a failure that
-    may have been applied. Creating a conversation is not part of the interface
-    yet: it arrives with declare's first working-surface binding.
+    may have been applied.
+
+    ``create`` makes one attempt under the name it is given, rendered under the
+    platform's own naming rules, and reports a taken name as an expected
+    outcome; ``find_own`` finds the bot's own conversation of a name. Choosing
+    the next name, and deciding that an existing
+    conversation is the incident's own, belong to the caller
+    (decisions/incident-management.md, one conversation per incident).
     """
 
-    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
-        """Post ``text`` as the bot and return the posted message's reference."""
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
+        """Create a conversation named after ``name``, the bot its first member, private when ``private``.
+
+        A name already in use (by any conversation, archived ones included) is a
+        PERMANENT_ERROR with ``CONVERSATION_NAME_TAKEN``, logged at info only: the
+        caller tries its next name. Platform refusals to create are
+        ``CONVERSATION_NOT_WRITABLE``; no configured tenant is
+        ``CONFIG_NOT_CONFIGURED``. The call is never replayed.
+        """
+        ...
+
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Return the bot's own open conversation named exactly as ``name`` renders, or ``None``.
+
+        Run after a create that did not succeed, before trying another name: the
+        platform may have created the conversation before the failure.
+        """
+        ...
+
+    async def post(
+        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+    ) -> OperationResult[MessageReference]:
+        """Post ``text`` as the bot and return the posted message's reference.
+
+        ``blocks`` lays the message out; ``text`` stays its notification fallback.
+        """
+        ...
+
+    async def set_topic(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Set the conversation's topic to ``text``."""
+        ...
+
+    async def create_canvas(self, conversation: ConversationReference, markdown: str) -> OperationResult[None]:
+        """Give the conversation its canvas, written from ``markdown``; a conversation that has one counts as done."""
+        ...
+
+    async def group_members(self, conversation: ConversationReference, group_id: str) -> OperationResult[tuple[str, ...]]:
+        """Return the account ids in the user group ``group_id``, in the conversation's system and tenant.
+
+        The ids are ready for ``invite``; an unknown group is NOT_FOUND.
+        """
         ...
 
     async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
@@ -210,13 +263,23 @@ class IncidentReport(Protocol):
     exceptions.
     """
 
-    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
-        """Create a new report titled ``title`` from the configured template, filed in the configured folder.
+    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+        """Return the places a new report can be filed in, sorted by label.
 
-        Returns the new report's reference, link included. An empty
-        [incident_core] ``folder_id`` or ``report_template_id``, or no tenant to
-        name the reference with, is a PERMANENT_ERROR with ``CONFIG_NOT_CONFIGURED``
-        whose message names the key.
+        For Google, the subfolders of [incident_core] ``folder_id`` other than the
+        templates folder, read live. An empty ``folder_id`` is
+        ``CONFIG_NOT_CONFIGURED``; a failed read is a classified result.
+        """
+        ...
+
+    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+        """Create a new report titled ``title`` from the configured template, filed in ``placement``.
+
+        No placement files it in the configured folder. Returns the new report's
+        reference, link included. An empty [incident_core] ``folder_id`` or
+        ``report_template_id``, or no tenant to name the reference with, is a
+        PERMANENT_ERROR with ``CONFIG_NOT_CONFIGURED`` whose message names the key;
+        a placement of another system is ``UNSUPPORTED_OPERATION``.
         """
         ...
 

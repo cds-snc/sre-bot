@@ -44,6 +44,7 @@ from features.incident.core.domain import (
     DocumentField,
     DocumentSection,
     DraftWriteResult,
+    ReportPlacement,
     ReportReference,
     SectionDraft,
 )
@@ -618,6 +619,8 @@ def write_draft_document(
 
 
 _DOCS_LINK = "https://docs.google.com/document/d/{}/edit"
+_FOLDER_LINK = "https://drive.google.com/drive/folders/{}"
+_TEMPLATES_FOLDER = "Templates"
 
 
 class GoogleDocsIncidentReport:
@@ -628,8 +631,45 @@ class GoogleDocsIncidentReport:
     configured-systems read reports for Google.
     """
 
-    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
-        """Copy the configured template into the configured folder as a new report titled ``title``."""
+    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+        """List the incident folder's subfolders, the templates folder left out, as placements sorted by label."""
+        settings = get_incident_core_settings()
+        tenant = _google_tenant()
+        missing = _missing_key(("incident_core.folder_id", settings.folder_id))
+        if missing is None and tenant is None:
+            missing = "google_workspace.tenant"
+        if missing is not None:
+            return _not_configured(missing)
+        listed = _list_all(
+            f"parents in '{settings.folder_id}' and mimeType = '{_FOLDER_MIME_TYPE}' and trashed=false", "list_placements"
+        )
+        if not listed.is_success:
+            return OperationResult.error(
+                status=listed.status,
+                message=listed.message or "The report placements could not be listed",
+                error_code=listed.error_code,
+                retry_after=listed.retry_after,
+            )
+        placements = (
+            ReportPlacement(
+                system=WorkplaceSystem.GOOGLE,
+                tenant=cast("str", tenant),
+                vendor_id=folder["id"],
+                url=_FOLDER_LINK.format(folder["id"]),
+                label=folder["name"],
+            )
+            for folder in listed.data or []
+            if folder["id"] and folder["name"] and folder["name"].strip() and _TEMPLATES_FOLDER not in folder["name"]
+        )
+        return OperationResult.success(tuple(sorted(placements, key=lambda placement: placement.label)))
+
+    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+        """Copy the configured template into ``placement``, or the configured folder, as a new report titled ``title``."""
+        if placement is not None and placement.system is not WorkplaceSystem.GOOGLE:
+            logger.warning("incident_report_system_unsupported", system=placement.system.value)
+            return OperationResult.permanent_error(
+                f"Google Docs cannot file a report on {placement.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+            )
         settings = get_incident_core_settings()
         missing = _missing_key(
             ("incident_core.folder_id", settings.folder_id), ("incident_core.report_template_id", settings.report_template_id)
@@ -639,7 +679,8 @@ class GoogleDocsIncidentReport:
             missing = "google_workspace.tenant"
         if missing is not None:
             return _not_configured(missing)
-        created = _copy_template(title, settings.folder_id, settings.report_template_id)
+        folder_id = placement.vendor_id if placement is not None else settings.folder_id
+        created = _copy_template(title, folder_id, settings.report_template_id)
         if not created.is_success or not created.data or not created.data["id"]:
             _log_failure("incident_drive_create_document_failed", created)
             return OperationResult.error(

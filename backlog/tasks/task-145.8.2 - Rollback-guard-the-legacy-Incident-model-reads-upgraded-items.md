@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.2
 title: 'Rollback guard: the legacy Incident model reads upgraded items'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T19:01:00Z'
+updated_date: '2026-11-10T19:43:00Z'
 labels:
   - incident
   - legacy
@@ -27,7 +27,7 @@ Stack L L5r (approved 2026-11-09, OQ18; widened 2026-11-10 after a program-scope
 - [x] #2 update_incident_field on an item with record_version >= 2 writes the new-name attribute in end-state form (severity int or REMOVE for none, times as ISO UTC, status with open_bucket and opened_at kept right for Closed and reopen) under a ConditionExpression pinning the marker it read, retries once when the condition is lost, and is unchanged for items without the marker (tested at the DynamoDB client edge)
 - [x] #3 Round trips are tested with the real shapes: upgrade, then a legacy translated write, then the new-shape reader (parse_incident_item) sees a valid value; and upgrade, then a rebuilt writer change, then the legacy reader sees the new value
 - [x] #4 _drop_retired_incident_updates is deleted if no strict construction from stored rows remains (otherwise kept and the PR says why); every guard site is tagged # TODO(TASK-145.7.10): remove with the legacy model
-- [ ] #5 The PR body states it is a rollback guard (translated write, never dual-write) deleted with the legacy model by TASK-145.7.10; the PR carries the decisions/incident-management.md Migration edit and the TASK-145.7.7 Done task file
+- [x] #5 The PR body states it is a rollback guard (translated write, never dual-write) deleted with the legacy model by TASK-145.7.10; the PR carries the decisions/incident-management.md Migration edit and the TASK-145.7.7 Done task file
 - [x] #6 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 

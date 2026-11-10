@@ -7,6 +7,8 @@ test runs against both, so a consumer tested on the fake sees the adapter's
 observable rules: a created report is a Google reference under the configured
 tenant with its Docs link, a reference of another system is refused as
 unsupported, an unknown report is not found, and the link is the stored url.
+Both know the same placements (the incident folder's subfolders other than
+Templates), listed by label, and a report can be created in one of them.
 """
 
 from collections.abc import Callable, Iterator
@@ -23,7 +25,7 @@ from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.core.adapters import google_docs
 from features.incident.core.adapters.in_memory import InMemoryIncidentReport
-from features.incident.core.api import DocumentSection, IncidentReport, ReportReference, SectionDraft
+from features.incident.core.api import DocumentSection, IncidentReport, ReportPlacement, ReportReference, SectionDraft
 
 pytestmark = pytest.mark.unit
 
@@ -31,6 +33,21 @@ TENANT = "C0GOOGLE"
 FOLDER_ID = "F0INCIDENTS"
 TEMPLATE_ID = "T0TEMPLATE"
 CREATED_ID = "D0CREATED"
+FOLDERS = [{"id": "F0NOTIFY", "name": "Notify"}, {"id": "F0TEMPLATES", "name": "Templates"}, {"id": "F0APPS", "name": "Apps"}]
+APPS = ReportPlacement(
+    system=WorkplaceSystem.GOOGLE,
+    tenant=TENANT,
+    vendor_id="F0APPS",
+    url="https://drive.google.com/drive/folders/F0APPS",
+    label="Apps",
+)
+NOTIFY = ReportPlacement(
+    system=WorkplaceSystem.GOOGLE,
+    tenant=TENANT,
+    vendor_id="F0NOTIFY",
+    url="https://drive.google.com/drive/folders/F0NOTIFY",
+    label="Notify",
+)
 SLACK_REPORT = ReportReference(system=WorkplaceSystem.SLACK, tenant="T0SLACK", vendor_id="F0FILE")
 
 
@@ -60,6 +77,8 @@ class _StubGoogle:
         self.docs = MagicMock()
         self.drive = MagicMock()
         self.drive.files.return_value.copy.side_effect = self._copy
+        self.drive.files.return_value.list.side_effect = self._list
+        self.drive.files.return_value.list_next.return_value = None
         self.docs.documents.return_value.get.side_effect = self._get
         self.docs.documents.return_value.batchUpdate.side_effect = self._batch_update
 
@@ -70,6 +89,14 @@ class _StubGoogle:
             request.execute.return_value = {"id": CREATED_ID, "name": kwargs["body"]["name"]}
         else:
             request.execute.side_effect = _http_error(404)
+        return request
+
+    def _list(self, **kwargs: Any) -> MagicMock:
+        request = MagicMock()
+        if f"parents in '{FOLDER_ID}'" in kwargs["q"] and "mimeType = " in kwargs["q"]:
+            request.execute.return_value = {"files": FOLDERS}
+        else:
+            request.execute.return_value = {"files": []}
         return request
 
     def _get(self, documentId: str) -> MagicMock:
@@ -111,7 +138,13 @@ def google_adapter(monkeypatch: pytest.MonkeyPatch) -> Iterator[IncidentReport]:
 
 
 def _fake() -> IncidentReport:
-    return InMemoryIncidentReport(tenant=TENANT, folder_id=FOLDER_ID, report_template_id=TEMPLATE_ID, next_ids=[CREATED_ID])
+    return InMemoryIncidentReport(
+        tenant=TENANT,
+        folder_id=FOLDER_ID,
+        report_template_id=TEMPLATE_ID,
+        next_ids=[CREATED_ID],
+        placements=[("F0NOTIFY", "Notify"), ("F0APPS", "Apps")],
+    )
 
 
 @pytest.fixture(params=["google", "in_memory"])
@@ -207,3 +240,29 @@ def test_the_link_is_the_stored_url_and_none_without_one(report_interface: Incid
 
     assert report_interface.link(stored) == "https://example.test/d/D1"
     assert report_interface.link(bare) is None
+
+
+def test_placements_are_the_incident_folders_subfolders_by_label(report_interface: IncidentReport) -> None:
+    placements = report_interface.list_placements()
+
+    assert placements.is_success
+    assert placements.data == (APPS, NOTIFY)
+
+
+@pytest.mark.parametrize("placement", [None, APPS])
+def test_a_report_is_created_with_or_without_a_placement(
+    report_interface: IncidentReport, placement: ReportPlacement | None
+) -> None:
+    result = report_interface.create_from_template("2026-11-10 Incident", placement=placement)
+
+    assert result.is_success and result.data is not None
+    assert result.data.vendor_id == CREATED_ID
+
+
+def test_a_placement_of_another_system_is_unsupported(report_interface: IncidentReport) -> None:
+    slack_placement = ReportPlacement(system=WorkplaceSystem.SLACK, tenant="T0SLACK", vendor_id="C0X", label="Slack")
+
+    result = report_interface.create_from_template("2026-11-10 Incident", placement=slack_placement)
+
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == ErrorCode.UNSUPPORTED_OPERATION

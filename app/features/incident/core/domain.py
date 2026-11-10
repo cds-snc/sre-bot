@@ -1,7 +1,7 @@
 """Domain types every incident subdomain works on."""
 
-from dataclasses import dataclass, fields
-from datetime import datetime
+from dataclasses import dataclass, field, fields
+from datetime import date, datetime
 from enum import StrEnum
 
 from contracts.workplace import WorkplaceSystem
@@ -185,6 +185,24 @@ class ConversationReference(ResourceReference):
 @dataclass(frozen=True)
 class ReportReference(ResourceReference):
     """The incident report document."""
+
+
+@dataclass(frozen=True)
+class ReportPlacement(ResourceReference):
+    """A labelled folder a new incident report can be filed in (a Drive folder for Google).
+
+    Read live from the report system, never stored on the record: the record
+    keeps only the created report's ``ReportReference``.
+
+    Attributes:
+        label: The folder's name as people choose it.
+    """
+
+    label: str = field(kw_only=True)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        _require_text(self, "label")
 
 
 @dataclass(frozen=True)
@@ -439,3 +457,56 @@ class DraftWriteResult:
 
     document_id: str
     created: bool
+
+
+CONVERSATION_NAME_ATTEMPTS = 5
+"""How many names declare and recreate try for one incident's conversation: the first, then attempts 2 to 5."""
+
+
+@dataclass(frozen=True)
+class ConversationName:
+    """The name an incident's conversation is created under, before a chat platform renders it.
+
+    The incident's naming policy, platform-neutral: ``incident-`` (``incident-dev-``
+    outside production), the opening date, the title, and from the second attempt a
+    ``-<attempt>`` suffix. Each conversation adapter renders it under its own
+    platform's rules (length, allowed characters, case) in ``core/adapters/``.
+
+    Attributes:
+        title: The incident title, as declared.
+        opened_on: The day the incident opened.
+        production: Whether this instance is production.
+        attempt: Which candidate this is, 1 to ``CONVERSATION_NAME_ATTEMPTS``.
+    """
+
+    title: str
+    opened_on: date
+    production: bool
+    attempt: int = 1
+
+    def __post_init__(self) -> None:
+        if not 1 <= self.attempt <= CONVERSATION_NAME_ATTEMPTS:
+            raise ValueError(f"attempt must be 1 to {CONVERSATION_NAME_ATTEMPTS}, got {self.attempt}")
+
+    @property
+    def prefix(self) -> str:
+        """``incident-`` in production, ``incident-dev-`` elsewhere, followed by the opening date."""
+        return f"{'incident-' if self.production else 'incident-dev-'}{self.opened_on.isoformat()}"
+
+    @property
+    def suffix(self) -> str:
+        """Empty for the first attempt, ``-<attempt>`` after it."""
+        return "" if self.attempt == 1 else f"-{self.attempt}"
+
+
+def incident_conversation_names(title: str, opened_on: date, *, production: bool) -> tuple[ConversationName, ...]:
+    """Return the names to try, in order, for an incident's conversation.
+
+    Which one an incident ends up with, and when an existing conversation is its
+    own, is the caller's decision (decisions/incident-management.md, one
+    conversation per incident).
+    """
+    return tuple(
+        ConversationName(title=title, opened_on=opened_on, production=production, attempt=attempt)
+        for attempt in range(1, CONVERSATION_NAME_ATTEMPTS + 1)
+    )

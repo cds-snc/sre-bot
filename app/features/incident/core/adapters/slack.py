@@ -20,6 +20,7 @@ read keeps what it has.
 """
 
 import re
+import unicodedata
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -29,11 +30,12 @@ from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web import SlackResponse
 from slack_sdk.web.async_client import AsyncWebClient
+from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.domain import ConversationReference, MessageReference, TranscriptMessage
+from features.incident.core.domain import ConversationName, ConversationReference, MessageReference, TranscriptMessage
 from integrations.slack.client import (
     classify_slack_error,
     get_async_slack_web_client,
@@ -279,26 +281,104 @@ def build_incident_transcript_reader() -> SlackIncidentTranscriptReader:
 # error; for the incident the invite is done.
 _INVITE_DONE = frozenset({"already_in_channel", "cant_invite_self"})
 _ARCHIVE_DONE = frozenset({"already_archived"})
+_CANVAS_DONE = frozenset({"channel_canvas_already_exists"})
+_NAME_TAKEN = "name_taken"
+_OWN_CONVERSATION_TYPES = "public_channel,private_channel"
+_OWN_CONVERSATIONS_PAGE = 200
+_CHANNEL_NAME_MAX = 80
+_CHANNEL_NAME_REFUSED = re.compile(r"[^a-z0-9_-]+")
+
+
+def slack_channel_name(name: ConversationName) -> str:
+    """Render ``name`` under Slack's channel rules: lowercase letters, digits, ``-`` and ``_``, at most 80 characters.
+
+    Accents are dropped and every other run of refused characters becomes one dash.
+    The prefix and title are cut to fit before the attempt suffix, so every attempt
+    keeps its number and stays distinct.
+    """
+    ascii_title = unicodedata.normalize("NFKD", name.title).encode("ascii", "ignore").decode("ascii").lower()
+    slug = _CHANNEL_NAME_REFUSED.sub("-", ascii_title).strip("-")
+    base = name.prefix + (f"-{slug}" if slug else "")
+    if not name.suffix:
+        return base[:_CHANNEL_NAME_MAX]
+    return base[: _CHANNEL_NAME_MAX - len(name.suffix)].rstrip("-") + name.suffix
 
 
 class SlackIncidentConversation:
     """Write to an incident's Slack channel and say whether the bot can.
 
-    ``reads`` is the async bot client (``conversations.info``); ``writes`` is the
-    write handle, which retries only rate-limited requests, so a post is never
-    replayed after Slack may already have applied it.
+    ``reads`` is the async bot client (``conversations.info``, ``users.conversations``,
+    ``usergroups.users.list``); ``writes`` is the write handle, which retries only
+    rate-limited requests, so a create or a post is never replayed after Slack may
+    already have applied it. ``tenant`` is the configured Slack tenant id, which
+    names the channels this adapter creates or finds; ``None`` when Slack has no
+    tenant entry.
     """
 
-    def __init__(self, reads: AsyncWebClient, writes: AsyncWebClient) -> None:
+    def __init__(self, reads: AsyncWebClient, writes: AsyncWebClient, *, tenant: str | None = None) -> None:
         self._reads = reads
         self._writes = writes
+        self._tenant = tenant
 
-    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
-        """Post ``text`` to the channel and return the message's reference (its ``ts``)."""
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
+        """Create the channel named ``slack_channel_name(name)`` in one call; ``is_private`` only for a private one.
+
+        ``name_taken`` is reported as ``CONVERSATION_NAME_TAKEN`` and logged at
+        info: the caller tries its next name.
+        """
+        if self._tenant is None:
+            return _slack_not_configured()
+        channel_name = slack_channel_name(name)
+        arguments: dict[str, Any] = {"name": channel_name}
+        if private:
+            arguments["is_private"] = True
+        try:
+            response = await self._writes.conversations_create(**arguments)
+        except SlackApiError as exc:
+            if exc.response.get("error") == _NAME_TAKEN:
+                logger.info("incident_conversation_name_taken", name=channel_name)
+                return OperationResult.permanent_error(
+                    f"Slack channel name taken: {channel_name}", ErrorCode.CONVERSATION_NAME_TAKEN
+                )
+            return _named_failure("create", channel_name, exc)
+        channel: Mapping[str, Any] = response.get("channel") or {}
+        return OperationResult.success(
+            ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=str(channel.get("id")))
+        )
+
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Page through the bot's non-archived channels, public and private, for one named ``slack_channel_name(name)``."""
+        if self._tenant is None:
+            return _slack_not_configured()
+        channel_name = slack_channel_name(name)
+        cursor: str | None = None
+        while True:
+            try:
+                response = await self._reads.users_conversations(
+                    types=_OWN_CONVERSATION_TYPES, exclude_archived=True, limit=_OWN_CONVERSATIONS_PAGE, cursor=cursor
+                )
+            except SlackApiError as exc:
+                return _named_failure("find_own", channel_name, exc)
+            for channel in response.get("channels") or []:
+                if channel.get("name") == channel_name:
+                    return OperationResult.success(
+                        ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=str(channel["id"]))
+                    )
+            cursor = _next_cursor(response) or None
+            if cursor is None:
+                return OperationResult.success(None)
+
+    async def post(
+        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+    ) -> OperationResult[MessageReference]:
+        """Post ``text`` (with ``blocks`` when given) to the channel and return the message's reference (its ``ts``)."""
         if conversation.system is not WorkplaceSystem.SLACK:
             return _conversation_unsupported(conversation)
+        arguments: dict[str, Any] = {"channel": conversation.vendor_id, "text": text}
+        if blocks:
+            arguments["blocks"] = list(blocks)
         try:
-            response = await self._writes.chat_postMessage(channel=conversation.vendor_id, text=text)
+            response = await self._writes.chat_postMessage(**arguments)
         except SlackApiError as exc:
             return _conversation_failure("post", conversation, exc)
         return OperationResult.success(
@@ -319,6 +399,40 @@ class SlackIncidentConversation:
         except SlackApiError as exc:
             return _conversation_failure("set_purpose", conversation, exc)
         return OperationResult.success()
+
+    async def set_topic(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Set the channel's topic to ``text``."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            await self._writes.conversations_setTopic(channel=conversation.vendor_id, topic=text)
+        except SlackApiError as exc:
+            return _conversation_failure("set_topic", conversation, exc)
+        return OperationResult.success()
+
+    async def create_canvas(self, conversation: ConversationReference, markdown: str) -> OperationResult[None]:
+        """Create the channel canvas from ``markdown``; a channel that has one counts as done."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            await self._writes.conversations_canvases_create(
+                channel_id=conversation.vendor_id, document_content={"type": "markdown", "markdown": markdown}
+            )
+        except SlackApiError as exc:
+            if exc.response.get("error") in _CANVAS_DONE:
+                return OperationResult.success()
+            return _conversation_failure("create_canvas", conversation, exc)
+        return OperationResult.success()
+
+    async def group_members(self, conversation: ConversationReference, group_id: str) -> OperationResult[tuple[str, ...]]:
+        """Read the user group's member ids on the read client."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            response = await self._reads.usergroups_users_list(usergroup=group_id)
+        except SlackApiError as exc:
+            return _conversation_failure("group_members", conversation, exc)
+        return OperationResult.success(tuple(str(user) for user in response.get("users") or []))
 
     async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
         """Add a link bookmark titled ``title`` to the channel."""
@@ -373,8 +487,13 @@ class SlackIncidentConversation:
 
 
 def build_incident_conversation() -> SlackIncidentConversation:
-    """Build the adapter on the bot's async read client and its rate-limit-only write handle."""
-    return SlackIncidentConversation(get_async_slack_web_client(), get_async_slack_write_client())
+    """Build the adapter on the bot's async read client, its rate-limit-only write handle and the Slack tenant id."""
+    tenant = get_slack_settings().tenant
+    return SlackIncidentConversation(
+        get_async_slack_web_client(),
+        get_async_slack_write_client(),
+        tenant=tenant.tenant_id if tenant is not None else None,
+    )
 
 
 def _conversation_unsupported[T](conversation: ConversationReference) -> OperationResult[T]:
@@ -386,13 +505,17 @@ def _conversation_unsupported[T](conversation: ConversationReference) -> Operati
 
 def _conversation_failure[T](operation: str, conversation: ConversationReference, exc: SlackApiError) -> OperationResult[T]:
     """Classify a Slack error on ``operation``; a code the Slack table does not name propagates."""
+    return _classified_failure(operation, exc, conversation_id=conversation.vendor_id)
+
+
+def _named_failure[T](operation: str, name: str, exc: SlackApiError) -> OperationResult[T]:
+    """Classify a Slack error on ``operation`` for the channel name ``name``; an unnamed code propagates."""
+    return _classified_failure(operation, exc, name=name)
+
+
+def _classified_failure[T](operation: str, exc: SlackApiError, **context: str) -> OperationResult[T]:
     status, code, retry_after = classify_slack_error(exc)
-    logger.warning(
-        f"incident_conversation_{operation}_failed",
-        conversation_id=conversation.vendor_id,
-        slack_error=code,
-        status=status.value,
-    )
+    logger.warning(f"incident_conversation_{operation}_failed", **context, slack_error=code, status=status.value)
     not_writable = code in get_slack_settings().not_writable_errors
     return OperationResult(
         status=status,
@@ -401,6 +524,10 @@ def _conversation_failure[T](operation: str, conversation: ConversationReference
         retry_after=retry_after,
         cause=exc,
     )
+
+
+def _slack_not_configured[T]() -> OperationResult[T]:
+    return OperationResult.permanent_error("slack.tenant is not configured", ErrorCode.CONFIG_NOT_CONFIGURED)
 
 
 def _raise_if_unclassified(exc: SlackApiError) -> None:
@@ -464,7 +591,7 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
-def _next_cursor(response: SlackResponse | Mapping[str, Any]) -> str:
+def _next_cursor(response: SlackResponse | AsyncSlackResponse | Mapping[str, Any]) -> str:
     """Return the cursor of the next page, or ``""`` when this was the last one."""
     return str((response.get("response_metadata") or {}).get("next_cursor") or "")
 

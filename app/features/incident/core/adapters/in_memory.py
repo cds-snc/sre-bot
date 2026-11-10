@@ -20,8 +20,10 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
+from features.incident.core.adapters.slack import slack_channel_name
 from features.incident.core.domain import (
     BindingKind,
+    ConversationName,
     ConversationReference,
     DocumentField,
     DocumentSection,
@@ -30,6 +32,7 @@ from features.incident.core.domain import (
     IncidentBinding,
     MessageReference,
     ReferenceKind,
+    ReportPlacement,
     ReportReference,
     ResourceReference,
     SectionDraft,
@@ -257,6 +260,8 @@ class InMemoryIncidentReport:
     Built with the Google tenant and the [incident_core] document ids it stands in
     for. ``next_ids`` fixes the ids of the reports it creates, in order; past them
     ids are ``report-<n>``. ``seed_sections`` makes an existing report known.
+    ``placements`` are the (folder id, label) pairs ``list_placements`` returns,
+    sorted by label.
     """
 
     def __init__(
@@ -266,8 +271,10 @@ class InMemoryIncidentReport:
         folder_id: str = "F0INCIDENTS",
         report_template_id: str = "T0TEMPLATE",
         next_ids: Sequence[str] = (),
+        placements: Sequence[tuple[str, str]] = (),
     ) -> None:
         self._tenant = tenant
+        self._placements = tuple(placements)
         self._folder_id = folder_id
         self._report_template_id = report_template_id
         self._next_ids = list(next_ids)
@@ -288,14 +295,35 @@ class InMemoryIncidentReport:
         """Return the placeholder values applied to ``report`` so far."""
         return dict(self._reports[report.vendor_id].placeholders)
 
-    def create_from_template(self, title: str) -> OperationResult[ReportReference]:
-        """Create a known report filed in the configured folder; an empty document id refuses naming its key."""
+    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+        """Return the seeded placements sorted by label; no incident folder refuses naming its key."""
+        if not self._folder_id:
+            return _report_not_configured("incident_core.folder_id")
+        placements = (
+            ReportPlacement(
+                system=WorkplaceSystem.GOOGLE,
+                tenant=self._tenant,
+                vendor_id=folder_id,
+                url=f"https://drive.google.com/drive/folders/{folder_id}",
+                label=label,
+            )
+            for folder_id, label in self._placements
+        )
+        return OperationResult.success(tuple(sorted(placements, key=lambda placement: placement.label)))
+
+    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+        """Create a known report filed in ``placement`` or the configured folder; an empty document id refuses naming its key."""
+        if placement is not None and placement.system is not WorkplaceSystem.GOOGLE:
+            return OperationResult.permanent_error(
+                f"Google Docs cannot file a report on {placement.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+            )
         if not self._folder_id:
             return _report_not_configured("incident_core.folder_id")
         if not self._report_template_id:
             return _report_not_configured("incident_core.report_template_id")
         document_id = self._next_ids.pop(0) if self._next_ids else f"report-{len(self._reports) + 1}"
-        self._reports[document_id] = _StoredReport(title=title, folder_id=self._folder_id)
+        folder_id = placement.vendor_id if placement is not None else self._folder_id
+        self._reports[document_id] = _StoredReport(title=title, folder_id=folder_id)
         return OperationResult.success(
             data=ReportReference(
                 system=WorkplaceSystem.GOOGLE,
@@ -372,6 +400,10 @@ class _StoredConversation:
     posts: list[str] = field(default_factory=list)
     bookmarks: list[tuple[str, str]] = field(default_factory=list)
     invited: list[str] = field(default_factory=list)
+    topic: str | None = None
+    canvas: str | None = None
+    private: bool = False
+    blocks: list[tuple[Mapping[str, object], ...]] = field(default_factory=list)
 
 
 class InMemoryIncidentConversation:
@@ -381,6 +413,13 @@ class InMemoryIncidentConversation:
     non-member conversations; any other id is not found. Posts get ``ts`` values
     ``1700000000.00000<n>`` in order. ``checked`` lists the conversations whose
     writability was asked.
+
+    ``names`` names some of those conversations (Slack channel name to id) and
+    ``foreign_names`` are names the bot cannot see; creating under any of them is
+    ``CONVERSATION_NAME_TAKEN``. A ``ConversationName`` is rendered with the Slack
+    adapter's ``slack_channel_name``, the platform this fake stands in for. A created conversation is open, the bot a member,
+    with id ``C0NEW<n>``. ``find_own`` finds named conversations that are open and
+    where the bot is a member. ``groups`` maps a user group id to its members.
     """
 
     def __init__(
@@ -390,6 +429,9 @@ class InMemoryIncidentConversation:
         open_ids: Sequence[str] = (),
         archived_ids: Sequence[str] = (),
         non_member_ids: Sequence[str] = (),
+        names: Mapping[str, str] | None = None,
+        foreign_names: Sequence[str] = (),
+        groups: Mapping[str, Sequence[str]] | None = None,
     ) -> None:
         self._tenant = tenant
         self._conversations: dict[str, _StoredConversation] = {}
@@ -400,7 +442,50 @@ class InMemoryIncidentConversation:
         for vendor_id in non_member_ids:
             self._conversations[vendor_id] = _StoredConversation(archived=False, member=False)
         self._posted = 0
+        self._created = 0
+        self._names = dict(names or {})
+        self._foreign_names = frozenset(foreign_names)
+        self._groups = {group_id: tuple(members) for group_id, members in (groups or {}).items()}
         self.checked: list[ConversationReference] = []
+
+    def topic_of(self, conversation: ConversationReference) -> str | None:
+        """Return the topic last set on ``conversation``."""
+        return self._conversations[conversation.vendor_id].topic
+
+    def canvas_of(self, conversation: ConversationReference) -> str | None:
+        """Return the markdown ``conversation``'s canvas was created from."""
+        return self._conversations[conversation.vendor_id].canvas
+
+    def is_private(self, conversation: ConversationReference) -> bool:
+        """Say whether ``conversation`` was created private."""
+        return self._conversations[conversation.vendor_id].private
+
+    def blocks_in(self, conversation: ConversationReference) -> Sequence[tuple[Mapping[str, object], ...]]:
+        """Return the blocks of each post to ``conversation``, in order (empty for a text-only post)."""
+        return tuple(self._conversations[conversation.vendor_id].blocks)
+
+    async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
+        """Create an open conversation the bot belongs to; a name in use is ``CONVERSATION_NAME_TAKEN``."""
+        channel_name = slack_channel_name(name)
+        if channel_name in self._names or channel_name in self._foreign_names:
+            return OperationResult.permanent_error(f"Slack channel name taken: {channel_name}", ErrorCode.CONVERSATION_NAME_TAKEN)
+        self._created += 1
+        vendor_id = f"C0NEW{self._created}"
+        self._conversations[vendor_id] = _StoredConversation(archived=False, member=True, private=private)
+        self._names[channel_name] = vendor_id
+        return OperationResult.success(
+            ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=vendor_id)
+        )
+
+    async def find_own(self, name: ConversationName) -> OperationResult[ConversationReference | None]:
+        """Return the open conversation named as ``name`` renders where the bot is a member, or ``None``."""
+        vendor_id = self._names.get(slack_channel_name(name))
+        stored = self._conversations.get(vendor_id) if vendor_id is not None else None
+        if vendor_id is None or stored is None or stored.archived or not stored.member:
+            return OperationResult.success(None)
+        return OperationResult.success(
+            ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=vendor_id)
+        )
 
     def posts_in(self, conversation: ConversationReference) -> Sequence[str]:
         """Return the texts posted to ``conversation``, in order."""
@@ -418,13 +503,16 @@ class InMemoryIncidentConversation:
         """Return the account ids invited to ``conversation``, in order."""
         return tuple(self._conversations[conversation.vendor_id].invited)
 
-    async def post(self, conversation: ConversationReference, text: str) -> OperationResult[MessageReference]:
-        """Record ``text`` and return its reference; refused where the bot cannot write."""
+    async def post(
+        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+    ) -> OperationResult[MessageReference]:
+        """Record ``text`` and its blocks and return its reference; refused where the bot cannot write."""
         stored = self._writable(conversation)
         if isinstance(stored, OperationResult):
             return stored
         self._posted += 1
         stored.posts.append(text)
+        stored.blocks.append(tuple(blocks))
         return OperationResult.success(
             MessageReference(
                 system=WorkplaceSystem.SLACK,
@@ -441,6 +529,34 @@ class InMemoryIncidentConversation:
             return stored
         stored.purpose = text
         return OperationResult.success()
+
+    async def set_topic(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
+        """Record the topic; refused where the bot cannot write."""
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        stored.topic = text
+        return OperationResult.success()
+
+    async def create_canvas(self, conversation: ConversationReference, markdown: str) -> OperationResult[None]:
+        """Record the canvas once; a conversation that has one keeps it and succeeds."""
+        stored = self._writable(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        if stored.canvas is None:
+            stored.canvas = markdown
+        return OperationResult.success()
+
+    async def group_members(self, conversation: ConversationReference, group_id: str) -> OperationResult[tuple[str, ...]]:
+        """Return the seeded members of ``group_id``; an unknown group is not found."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        members = self._groups.get(group_id)
+        if members is None:
+            return OperationResult.error(
+                OperationStatus.NOT_FOUND, "Slack user group not found: no_such_subteam", "no_such_subteam"
+            )
+        return OperationResult.success(members)
 
     async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
         """Record the bookmark; refused where the bot cannot write."""

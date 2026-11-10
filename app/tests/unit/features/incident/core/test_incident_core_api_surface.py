@@ -37,6 +37,8 @@ def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
         "BindingKind",
+        "CONVERSATION_NAME_ATTEMPTS",
+        "ConversationName",
         "ConversationReference",
         "DocumentField",
         "DocumentSection",
@@ -52,6 +54,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "MessageReference",
         "PostmortemMeetingReference",
         "ReferenceKind",
+        "ReportPlacement",
         "ReportReference",
         "SectionDraft",
         "StatusUpdate",
@@ -72,6 +75,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "get_incident_conversation",
         "get_incident_report",
         "get_incident_transcript_reader",
+        "incident_conversation_names",
         "resolve_new_incident_system",
         "translate",
     ]
@@ -113,13 +117,33 @@ def test_interface_signatures_carry_only_plain_and_domain_types() -> None:
 
 
 def test_conversation_interface_is_async_on_the_reference_with_operation_results() -> None:
-    """Every IncidentConversation method is a coroutine taking the conversation reference; none creates one."""
+    """Every IncidentConversation method is a coroutine; all but create and find_own take the conversation reference."""
     methods = {
         name: getattr(api.IncidentConversation, name)
-        for name in ("post", "set_purpose", "add_bookmark", "invite", "archive", "is_writable")
+        for name in (
+            "post",
+            "set_purpose",
+            "add_bookmark",
+            "invite",
+            "archive",
+            "is_writable",
+            "set_topic",
+            "create_canvas",
+            "group_members",
+        )
     }
 
-    assert not hasattr(api.IncidentConversation, "create")
+    create = inspect.signature(api.IncidentConversation.create)
+    assert inspect.iscoroutinefunction(api.IncidentConversation.create)
+    assert create.parameters["name"].annotation is api.ConversationName
+    assert create.parameters["private"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert create.return_annotation == OperationResult[api.ConversationReference]
+    find_own = inspect.signature(api.IncidentConversation.find_own)
+    assert inspect.iscoroutinefunction(api.IncidentConversation.find_own)
+    assert find_own.parameters["name"].annotation is api.ConversationName
+    assert find_own.return_annotation == OperationResult[api.ConversationReference | None]
+    assert inspect.signature(methods["group_members"]).return_annotation == OperationResult[tuple[str, ...]]
+    assert inspect.signature(methods["post"]).parameters["blocks"].kind is inspect.Parameter.KEYWORD_ONLY
     for method in methods.values():
         signature = inspect.signature(method)
         assert inspect.iscoroutinefunction(method)
