@@ -16,6 +16,7 @@ Assertions read the exact Web API calls (only ``views.update``, never a channel
 post) and the records left in the store.
 """
 
+import asyncio
 import json
 from collections.abc import Iterator
 from dataclasses import replace
@@ -116,7 +117,7 @@ def records() -> InMemoryRecordStore:
 @pytest.fixture
 def store(monkeypatch: pytest.MonkeyPatch, records: InMemoryRecordStore) -> StatusUpdateStore:
     status_updates = status_update_store_in(records)
-    status_updates.append(_PENDING)
+    asyncio.run(status_updates.append(_PENDING))
     monkeypatch.setattr(form, "save_status_update_draft", partial(save_status_update_draft, now=_NOW))
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
     return status_updates
@@ -163,7 +164,7 @@ def test_save_stores_the_typed_values_as_the_next_hand_written_draft(harness: Ha
     """The typed fields, a blank one included, are the next draft by the presser; the AI draft stays below it."""
     harness.dispatch(_save_action())
 
-    assert store.list_for_incident(_INCIDENT).data == (_SAVED, _PENDING)
+    assert asyncio.run(store.list_for_incident(_INCIDENT)).data == (_SAVED, _PENDING)
 
 
 def test_save_shows_the_saved_form_and_posts_nothing(harness: Harness) -> None:
@@ -184,7 +185,7 @@ def test_save_shows_the_saved_form_and_posts_nothing(harness: Harness) -> None:
 
 def test_a_stale_form_shows_the_conflict_view_and_stores_nothing(harness: Harness, store: StatusUpdateStore) -> None:
     """A form opened on an older sequence cannot overwrite the newer draft; the modal shows the conflict view."""
-    store.append(replace(_PENDING, sequence=_SEQUENCE + 1, author="U0OTHER"))
+    asyncio.run(store.append(replace(_PENDING, sequence=_SEQUENCE + 1, author="U0OTHER")))
 
     harness.dispatch(_save_action())
 
@@ -198,4 +199,7 @@ def test_a_stale_form_shows_the_conflict_view_and_stores_nothing(harness: Harnes
             },
         )
     ]
-    assert [record.sequence for record in store.list_for_incident(_INCIDENT).data or ()] == [_SEQUENCE + 1, _SEQUENCE]
+    assert [record.sequence for record in asyncio.run(store.list_for_incident(_INCIDENT)).data or ()] == [
+        _SEQUENCE + 1,
+        _SEQUENCE,
+    ]

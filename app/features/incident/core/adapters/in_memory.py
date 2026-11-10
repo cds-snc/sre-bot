@@ -91,14 +91,14 @@ class InMemoryStatusUpdateStore(StatusUpdateStore):
     def __init__(self) -> None:
         self._updates: dict[tuple[str, int], StatusUpdate] = {}
 
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
         """Store a new update at its sequence; any record already there is a conflict."""
         if (update.incident_id, update.sequence) in self._updates:
             return _conflict()
         self._updates[(update.incident_id, update.sequence)] = update
         return OperationResult.success(data=update)
 
-    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+    async def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
         """Replace the stored update with ``update`` while its stored state is ``expected_state``.
 
         Raises:
@@ -112,12 +112,12 @@ class InMemoryStatusUpdateStore(StatusUpdateStore):
         self._updates[(update.incident_id, update.sequence)] = update
         return OperationResult.success(data=update)
 
-    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+    async def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
         """Return the incident's highest-sequence update, or success with ``None`` when it has none."""
         updates = self._newest_first(incident_id)
         return OperationResult.success(data=updates[0] if updates else None)
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         """Return every update of the incident, newest first."""
         return OperationResult.success(data=self._newest_first(incident_id))
 
@@ -165,12 +165,12 @@ class InMemoryIncidentStore(IncidentStore):
         else:
             self._open.discard(incident.id)
 
-    def get(self, incident_id: str) -> OperationResult[Incident]:
+    async def get(self, incident_id: str) -> OperationResult[Incident]:
         """Return the seeded incident with this id."""
         incident = self._incidents.get(incident_id)
         return OperationResult.success(data=incident) if incident is not None else no_such_incident()
 
-    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+    async def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
         """Return the one incident the lookup order of ``RecordIncidentStore`` finds: bindings first, then the conversation match."""
         if not conversation.vendor_id.strip():
             return not_an_incident()
@@ -201,17 +201,17 @@ class InMemoryIncidentStore(IncidentStore):
             return ambiguous_conversation(conversation, match_count=len(matches))
         return OperationResult.success(data=matches[0])
 
-    def list_open(self) -> OperationResult[Sequence[Incident]]:
+    async def list_open(self) -> OperationResult[Sequence[Incident]]:
         """Return the incidents seeded open, oldest declaration first."""
         incidents = (self._incidents[incident_id] for incident_id in self._open)
         return OperationResult.success(data=sorted(incidents, key=lambda incident: incident.declared_at))
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         """Return the seeded incident's security flag."""
         incident = self._incidents.get(incident_id)
         return OperationResult.success(data=incident.security_incident) if incident is not None else no_such_incident()
 
-    def create(self, incident: Incident) -> OperationResult[Incident]:
+    async def create(self, incident: Incident) -> OperationResult[Incident]:
         """Store the incident; a stored incident under the id is a replay that changes nothing.
 
         Raises:
@@ -224,7 +224,7 @@ class InMemoryIncidentStore(IncidentStore):
         self.seed(incident)
         return OperationResult.success(data=incident)
 
-    def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+    async def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
         """Store the binding and, for a primary one, make its conversation the incident's.
 
         Raises:
@@ -255,7 +255,9 @@ class InMemoryIncidentStore(IncidentStore):
             self._incidents[incident_id] = stored
         return OperationResult.success(data=stored)
 
-    def set_reference(self, incident_id: str, kind: ReferenceKind, reference: ResourceReference) -> OperationResult[Incident]:
+    async def set_reference(
+        self, incident_id: str, kind: ReferenceKind, reference: ResourceReference
+    ) -> OperationResult[Incident]:
         """Replace the incident's reference of ``kind``.
 
         Raises:
@@ -271,7 +273,9 @@ class InMemoryIncidentStore(IncidentStore):
         self._incidents[incident_id] = updated
         return OperationResult.success(data=updated)
 
-    def update_fields(self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime) -> OperationResult[Incident]:
+    async def update_fields(
+        self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime
+    ) -> OperationResult[Incident]:
         """Write the named fields; a severity change appends its entry to ``timeline``.
 
         Raises:
@@ -287,7 +291,7 @@ class InMemoryIncidentStore(IncidentStore):
             self.timeline.append(entry)
         return OperationResult.success(data=updated)
 
-    def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+    async def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
         """Give each named role its holder.
 
         Raises:
@@ -296,7 +300,7 @@ class InMemoryIncidentStore(IncidentStore):
         validate_roles(roles)
         return self._apply(incident_id, lambda stored: apply_roles(stored, roles))
 
-    def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+    async def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
         """Set the status; closing leaves the open list and reopening rejoins it.
 
         Raises:

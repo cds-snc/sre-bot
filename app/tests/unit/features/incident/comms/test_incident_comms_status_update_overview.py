@@ -15,6 +15,7 @@ status, error code and retry hint, the classification callers branch on.
 from collections.abc import Sequence
 from dataclasses import FrozenInstanceError, replace
 from datetime import UTC, datetime, timedelta
+from typing import Self
 
 import pytest
 
@@ -84,51 +85,57 @@ class _CountingIncidents(InMemoryIncidentStore):
         self._result = result
         self.calls: list[ConversationReference] = []
 
-    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+    async def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
         self.calls.append(conversation)
-        return self._result if self._result is not None else super().find_by_conversation(conversation)
+        return self._result if self._result is not None else await super().find_by_conversation(conversation)
 
 
 class _CountingStore:
     """In-memory store wrapper that records every list read."""
 
-    def __init__(self, *updates: StatusUpdate) -> None:
+    def __init__(self) -> None:
         self._inner = InMemoryStatusUpdateStore()
-        for update in updates:
-            self._inner.append(update)
         self.list_calls: list[str] = []
 
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+    @classmethod
+    async def seeded(cls, *updates: StatusUpdate) -> Self:
+        """A store holding ``updates``, seeded without recording a list read."""
+        store = cls()
+        for update in updates:
+            await store._inner.append(update)
+        return store
+
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
         raise AssertionError("the overview must not append")
 
-    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+    async def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
         raise AssertionError("the overview must not transition")
 
-    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+    async def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
         raise AssertionError("the overview reads the list once, not the latest")
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         self.list_calls.append(incident_id)
-        return self._inner.list_for_incident(incident_id)
+        return await self._inner.list_for_incident(incident_id)
 
 
 class _FailingStore:
     """Store whose list read fails with a throttling error."""
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=3)
 
 
 class TestOverview:
-    def test_pending_draft_beside_approved_and_published_newest_first(self) -> None:
+    async def test_pending_draft_beside_approved_and_published_newest_first(self) -> None:
         """A latest draft is the pending one; approved and published records follow newest first."""
-        store = _CountingStore(
+        store = await _CountingStore.seeded(
             _update(1, StatusUpdateState.PUBLISHED),
             _update(2, StatusUpdateState.APPROVED),
             _update(3, StatusUpdateState.DRAFT),
         )
 
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.status == OperationStatus.SUCCESS
         assert result.data == StatusUpdateOverview(
@@ -136,49 +143,49 @@ class TestOverview:
             approved=(_update(2, StatusUpdateState.APPROVED), _update(1, StatusUpdateState.PUBLISHED)),
         )
 
-    def test_no_pending_when_latest_is_approved(self) -> None:
+    async def test_no_pending_when_latest_is_approved(self) -> None:
         """With an approved latest record nothing is pending and every record is listed as approved."""
-        store = _CountingStore(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.APPROVED))
+        store = await _CountingStore.seeded(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.APPROVED))
 
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(
             pending=None,
             approved=(_update(2, StatusUpdateState.APPROVED), _update(1, StatusUpdateState.APPROVED)),
         )
 
-    def test_pending_draft_with_no_approved_updates(self) -> None:
+    async def test_pending_draft_with_no_approved_updates(self) -> None:
         """A lone draft is pending and the approved tuple is empty."""
-        store = _CountingStore(_update(1, StatusUpdateState.DRAFT))
+        store = await _CountingStore.seeded(_update(1, StatusUpdateState.DRAFT))
 
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(pending=_update(1, StatusUpdateState.DRAFT), approved=())
 
-    def test_published_records_count_as_approved(self) -> None:
+    async def test_published_records_count_as_approved(self) -> None:
         """Published records are listed with the approved ones, keeping their published state."""
-        store = _CountingStore(_update(1, StatusUpdateState.PUBLISHED), _update(2, StatusUpdateState.PUBLISHED))
+        store = await _CountingStore.seeded(_update(1, StatusUpdateState.PUBLISHED), _update(2, StatusUpdateState.PUBLISHED))
 
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=store)
 
         assert result.data == StatusUpdateOverview(
             pending=None,
             approved=(_update(2, StatusUpdateState.PUBLISHED), _update(1, StatusUpdateState.PUBLISHED)),
         )
 
-    def test_empty_incident(self) -> None:
+    async def test_empty_incident(self) -> None:
         """An incident with no records has no pending draft and no approved updates."""
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_CountingStore())
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=await _CountingStore.seeded())
 
         assert result.status == OperationStatus.SUCCESS
         assert result.data == StatusUpdateOverview(pending=None, approved=())
 
-    def test_one_incident_read_and_one_list(self) -> None:
+    async def test_one_incident_read_and_one_list(self) -> None:
         """The conversation is resolved once and the resolved incident's records are listed once."""
         incidents = _CountingIncidents()
-        store = _CountingStore(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.DRAFT))
+        store = await _CountingStore.seeded(_update(1, StatusUpdateState.APPROVED), _update(2, StatusUpdateState.DRAFT))
 
-        get_status_update_overview(incidents, _CONVERSATION, store=store)
+        await get_status_update_overview(incidents, _CONVERSATION, store=store)
 
         assert incidents.calls == [_CONVERSATION]
         assert store.list_calls == [_INCIDENT]
@@ -200,18 +207,18 @@ class TestOverviewErrors:
         ],
         ids=["not-an-incident", "ambiguous"],
     )
-    def test_incident_refusal_is_returned_without_listing(self, refusal: OperationResult[Incident]) -> None:
+    async def test_incident_refusal_is_returned_without_listing(self, refusal: OperationResult[Incident]) -> None:
         """An incident-store refusal is returned with its status and code, and the store is never read."""
-        store = _CountingStore()
+        store = await _CountingStore.seeded()
 
-        result = get_status_update_overview(_CountingIncidents(refusal), _CONVERSATION, store=store)
+        result = await get_status_update_overview(_CountingIncidents(refusal), _CONVERSATION, store=store)
 
         assert (result.status, result.error_code) == (refusal.status, refusal.error_code)
         assert store.list_calls == []
 
-    def test_store_error_is_returned_with_its_classification(self) -> None:
+    async def test_store_error_is_returned_with_its_classification(self) -> None:
         """A failed list read is returned with its status, code and retry hint."""
-        result = get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
+        result = await get_status_update_overview(_CountingIncidents(), _CONVERSATION, store=_FailingStore())  # type: ignore[arg-type]
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,

@@ -133,9 +133,9 @@ class _CountingIncidents(InMemoryIncidentStore):
         self._failure = failure
         self.calls: list[str] = []
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return self._failure if self._failure is not None else super().read_security_flag(incident_id)
+        return self._failure if self._failure is not None else await super().read_security_flag(incident_id)
 
 
 class _StubReader:
@@ -187,33 +187,33 @@ class _RacingStore(InMemoryStatusUpdateStore):
         super().__init__()
         self.winner: StatusUpdate | None = None
 
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
         if self.winner is None and update.sequence > _PENDING.sequence:
             self.winner = replace(update, author="U-other", en=_text("en", " other"))
-            super().append(self.winner)
-        return super().append(update)
+            await super().append(self.winner)
+        return await super().append(update)
 
 
 class _FailingListStore(InMemoryStatusUpdateStore):
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=3)
 
 
 class _FailingAppendStore(InMemoryStatusUpdateStore):
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
         if update.sequence > _PENDING.sequence:
             return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=5)
-        return super().append(update)
+        return await super().append(update)
 
 
-def _store[S: InMemoryStatusUpdateStore](store: S, *records: StatusUpdate) -> S:
+async def _store[S: InMemoryStatusUpdateStore](store: S, *records: StatusUpdate) -> S:
     for record in records:
-        store.append(record)
+        await store.append(record)
     return store
 
 
-def _stored(store: InMemoryStatusUpdateStore) -> tuple[StatusUpdate, ...]:
-    result = store.list_for_incident(_INCIDENT)
+async def _stored(store: InMemoryStatusUpdateStore) -> tuple[StatusUpdate, ...]:
+    result = await store.list_for_incident(_INCIDENT)
     assert result.data is not None
     return tuple(result.data)
 
@@ -258,7 +258,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_one_model_call_gets_the_guidance_the_current_draft_and_the_whole_window(self) -> None:
         """The model gets the redraft instructions, the reviewer's current values and every message, bots included."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("rolled back", 50), _bot("RESOLVED: 5xx", 20), _human("vendor confirmed", 10)])
         generator = _StubGenerator()
 
@@ -277,7 +277,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_the_redraft_is_stored_as_the_next_draft_authored_by_the_redrafter(self) -> None:
         """The new record is a DRAFT at the next sequence with the model's fields and the people's provenance."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("rolled back", 50), _bot("RESOLVED: 5xx", 20), _human("vendor confirmed", 10)])
 
         result = await _redraft(store=store, reader=reader)
@@ -297,12 +297,12 @@ class TestRedraft:
             origin=StatusUpdateOrigin.MODEL_INSTRUCTED,
         )
         assert (result.status, result.data) == (OperationStatus.SUCCESS, expected)
-        assert _stored(store) == (expected, _PENDING, _APPROVED)
+        assert await _stored(store) == (expected, _PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_the_window_is_reread_from_the_latest_approved_cutoff(self) -> None:
         """The pending draft does not narrow the window, so the redraft reads what the first draft read and later messages."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("later", 5)])
 
         await _redraft(store=store, reader=reader)
@@ -312,7 +312,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_without_an_approved_update_the_window_opens_at_the_conversation_start(self) -> None:
         """A first draft being redrafted is read from when the conversation started."""
-        store = _store(InMemoryStatusUpdateStore(), _record(1, StatusUpdateState.DRAFT, cutoff_minutes_ago=40))
+        store = await _store(InMemoryStatusUpdateStore(), _record(1, StatusUpdateState.DRAFT, cutoff_minutes_ago=40))
         reader = _StubReader([_human("hello", 50)], started_at=_at(600))
 
         result = await _redraft(store=store, sequence=1, reader=reader)
@@ -324,7 +324,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_the_guidance_is_trimmed_before_it_reaches_the_model(self) -> None:
         """Surrounding whitespace in the reviewer's guidance is dropped from the instructions."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
 
         await _redraft(store=store, instructions=f"  \n{_GUIDANCE} \n", reader=_StubReader([_human("x", 5)]), generator=generator)
@@ -334,7 +334,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_overlong_guidance_is_capped_before_it_reaches_the_model(self) -> None:
         """Guidance longer than the cap is cut to the first 500 characters."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
 
         await _redraft(store=store, instructions="v" * 650, reader=_StubReader([_human("x", 5)]), generator=generator)
@@ -345,7 +345,7 @@ class TestRedraft:
     async def test_on_started_is_called_once_just_before_the_model_call(self) -> None:
         """The caller can show the redrafting state only when a model call follows."""
         events: list[str] = []
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
 
         await _redraft(
             store=store,
@@ -359,7 +359,7 @@ class TestRedraft:
     @pytest.mark.asyncio
     async def test_a_resolved_redraft_has_no_next_update_beyond_its_creation(self) -> None:
         """Resolved means no further update is due, so the next update time is the creation time."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
 
         result = await _redraft(
             store=store,
@@ -382,7 +382,7 @@ class TestNoNewPeople:
         self, messages: list[TranscriptMessage]
     ) -> None:
         """Instructions alone justify a redraft; with no person's message read, cutoff and fingerprint stay the previous draft's."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
 
         result = await _redraft(store=store, reader=_StubReader(messages), generator=generator)
@@ -394,13 +394,13 @@ class TestNoNewPeople:
             _PENDING.transcript_cutoff,
             _PENDING.transcript_fingerprint,
         )
-        assert _stored(store) == (result.data, _PENDING, _APPROVED)
+        assert await _stored(store) == (result.data, _PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_a_carried_forward_draft_is_redrafted_with_an_empty_transcript_input(self) -> None:
         """A draft carried forward with nothing new is still revised: the model gets the draft and an empty transcript."""
         carried = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=90)
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, carried)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, carried)
         generator = _StubGenerator()
 
         result = await _redraft(store=store, reader=_StubReader([]), generator=generator)
@@ -428,7 +428,7 @@ class TestStageFloor:
         self, approved: StatusUpdateStage, drafted: str, expected: StatusUpdateStage
     ) -> None:
         """Guidance cannot move the public stage backwards: code applies the floor after the model answers."""
-        store = _store(
+        store = await _store(
             InMemoryStatusUpdateStore(),
             _record(1, StatusUpdateState.APPROVED, stage=approved, cutoff_minutes_ago=90),
             _PENDING,
@@ -446,7 +446,7 @@ class TestStageFloor:
     @pytest.mark.asyncio
     async def test_the_pending_draft_stage_does_not_set_the_floor(self) -> None:
         """Only an approved stage constrains the redraft; the draft being replaced was never public."""
-        store = _store(
+        store = await _store(
             InMemoryStatusUpdateStore(),
             _record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.INVESTIGATING, cutoff_minutes_ago=90),
             _record(2, StatusUpdateState.DRAFT, stage=StatusUpdateStage.RESOLVED, cutoff_minutes_ago=40),
@@ -472,7 +472,7 @@ class TestRejectedBeforeAnyWork:
         self, incident_ids: tuple[str, ...], refusal: tuple[OperationStatus, ErrorCode]
     ) -> None:
         """Outside an incident, or with two incidents on the channel, nothing is read, redrafted or stored."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("x", 5)])
         generator = _StubGenerator()
 
@@ -482,7 +482,7 @@ class TestRejectedBeforeAnyWork:
 
         assert (result.status, result.error_code) == refusal
         assert (reader.reads, generator.calls) == ([], [])
-        assert _stored(store) == (_PENDING, _APPROVED)
+        assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.parametrize(
         ("records", "sequence"),
@@ -500,8 +500,8 @@ class TestRejectedBeforeAnyWork:
         self, records: tuple[StatusUpdate, ...], sequence: int
     ) -> None:
         """Only the pending draft the reviewer sees can be redrafted; anything else changed under them."""
-        store = _store(InMemoryStatusUpdateStore(), *records)
-        before = _stored(store)
+        store = await _store(InMemoryStatusUpdateStore(), *records)
+        before = await _stored(store)
         reader = _StubReader([_human("x", 5)])
         generator = _StubGenerator()
 
@@ -509,7 +509,7 @@ class TestRejectedBeforeAnyWork:
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
         assert (reader.reads, generator.calls) == ([], [])
-        assert _stored(store) == before
+        assert await _stored(store) == before
 
     @pytest.mark.asyncio
     async def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:
@@ -531,7 +531,7 @@ class TestFailuresKeepThePreviousDraft:
     @pytest.mark.asyncio
     async def test_a_model_failure_passes_through_and_stores_nothing(self) -> None:
         """The generator's classified error, retry hint included, reaches the caller; the pending draft stays latest."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         failure: OperationResult[str] = OperationResult.transient_error(
             message="rate limited", error_code=ErrorCode.RATE_LIMITED, retry_after=7
         )
@@ -543,7 +543,7 @@ class TestFailuresKeepThePreviousDraft:
             ErrorCode.RATE_LIMITED,
             7,
         )
-        assert _stored(store) == (_PENDING, _APPROVED)
+        assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.parametrize(
         "raw",
@@ -559,7 +559,7 @@ class TestFailuresKeepThePreviousDraft:
     @pytest.mark.asyncio
     async def test_unparseable_output_is_refused_with_the_strict_parser_and_stores_nothing(self, raw: str) -> None:
         """The redraft is parsed as strictly as the first draft: any bad field rejects the whole answer."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
 
         result = await _redraft(
             store=store,
@@ -568,12 +568,12 @@ class TestFailuresKeepThePreviousDraft:
         )
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, DRAFT_UNPARSEABLE_CODE)
-        assert _stored(store) == (_PENDING, _APPROVED)
+        assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_a_store_write_failure_passes_through(self) -> None:
         """A failed append returns the store's classified error and leaves the previous records as they were."""
-        store = _store(_FailingAppendStore(), _APPROVED, _PENDING)
+        store = await _store(_FailingAppendStore(), _APPROVED, _PENDING)
 
         result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]))
 
@@ -582,12 +582,12 @@ class TestFailuresKeepThePreviousDraft:
             ErrorCode.RATE_LIMITED,
             5,
         )
-        assert _stored(store) == (_PENDING, _APPROVED)
+        assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_an_append_conflict_is_returned_without_adopting_the_winner(self) -> None:
         """When another writer took the next sequence, the redraft reports the conflict rather than showing their draft."""
-        store = _store(_RacingStore(), _APPROVED, _PENDING)
+        store = await _store(_RacingStore(), _APPROVED, _PENDING)
 
         result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]))
 
@@ -596,7 +596,7 @@ class TestFailuresKeepThePreviousDraft:
             ErrorCode.STATUS_UPDATE_CONFLICT,
             None,
         )
-        assert _stored(store) == (store.winner, _PENDING, _APPROVED)
+        assert await _stored(store) == (store.winner, _PENDING, _APPROVED)
 
 
 class TestSecurityGate:
@@ -611,7 +611,7 @@ class TestSecurityGate:
     @pytest.mark.asyncio
     async def test_a_security_incident_or_unreadable_flag_refuses_before_the_model(self, incident: dict[str, Any]) -> None:
         """Without confirmation, a redraft that may expose a security incident never reaches the model or the store."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
         incidents = _CountingIncidents(**incident)
         started: list[str] = []
@@ -630,12 +630,12 @@ class TestSecurityGate:
         )
         assert incidents.calls == [_INCIDENT]
         assert (generator.calls, started) == ([], [])
-        assert _stored(store) == (_PENDING, _APPROVED)
+        assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_a_non_security_incident_redrafts_after_reading_the_flag_once(self) -> None:
         """A flag that says no lets the redraft through without confirmation."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
         incidents = _CountingIncidents(security_incident=False)
 
@@ -648,7 +648,7 @@ class TestSecurityGate:
     @pytest.mark.asyncio
     async def test_confirmation_skips_the_flag_and_redrafts(self) -> None:
         """The responder's confirmation is explicit consent, so the flag is not read and one model call is made."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         generator = _StubGenerator()
         incidents = _CountingIncidents(security_incident=True)
 
@@ -670,7 +670,7 @@ class TestLogging:
     @pytest.mark.asyncio
     async def test_logs_never_carry_the_guidance_or_the_transcript_text(self) -> None:
         """The reviewer's guidance and the conversation stay out of logs; only their size may be recorded."""
-        store = _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
+        store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
 
         with capture_logs() as logs:
             await _redraft(

@@ -37,7 +37,7 @@ async def get_approved_update(
         is a draft; ``STATUS_UPDATE_CONFLICT`` when the incident has no such
         sequence; otherwise the store's classified error.
     """
-    return _read_approved(store, incident_id, sequence)
+    return await _read_approved(store, incident_id, sequence)
 
 
 async def set_published(
@@ -68,7 +68,7 @@ async def set_published(
     """
     log = logger.bind(operation="set_published", incident_id=incident_id, sequence=sequence, actor=actor, published=published)
     target_state = StatusUpdateState.PUBLISHED if published else StatusUpdateState.APPROVED
-    read = _read_approved(store, incident_id, sequence)
+    read = await _read_approved(store, incident_id, sequence)
     if not read.is_success or read.data is None:
         log.info("incident_status_update_published_refused", error_code=read.error_code)
         return read
@@ -81,7 +81,7 @@ async def set_published(
         changed = replace(current, state=target_state, published_at=now or datetime.now(UTC), published_by=actor)
     else:
         changed = replace(current, state=target_state, published_at=None, published_by=None)
-    moved = store.transition(changed, expected_state=current.state)
+    moved = await store.transition(changed, expected_state=current.state)
     if moved.is_success:
         log.info("incident_status_update_published_set")
         return OperationResult.success(data=changed)
@@ -89,7 +89,7 @@ async def set_published(
         return failure(moved)
 
     # One re-read, no retry loop: a concurrent writer that reached the target state is a success.
-    reread = _read_approved(store, incident_id, sequence)
+    reread = await _read_approved(store, incident_id, sequence)
     if reread.is_success and reread.data is not None and reread.data.state is target_state:
         log.info("incident_status_update_published_replayed")
         return reread
@@ -154,9 +154,9 @@ async def _render(
     return OperationResult.success(data=PublishedRecord(update=read.data, text=rendered.data))
 
 
-def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
+async def _read_approved(store: StatusUpdateStore, incident_id: str, sequence: int) -> OperationResult[StatusUpdate]:
     """Return the record at ``sequence`` when it is approved or published, read from the incident's list."""
-    listed = store.list_for_incident(incident_id)
+    listed = await store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     record = next((update for update in listed.data if update.sequence == sequence), None)

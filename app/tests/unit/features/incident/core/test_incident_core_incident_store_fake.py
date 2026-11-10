@@ -42,33 +42,33 @@ def test_the_fake_explicitly_subclasses_the_protocol() -> None:
     assert isinstance(InMemoryIncidentStore(), IncidentStore)
 
 
-def test_a_seeded_incident_is_read_back() -> None:
+async def test_a_seeded_incident_is_read_back() -> None:
     store = InMemoryIncidentStore()
     incident = _incident("inc-1", security_incident=True)
     store.seed(incident)
 
-    assert store.get("inc-1").data == incident
-    assert store.read_security_flag("inc-1").data is True
+    assert (await store.get("inc-1")).data == incident
+    assert (await store.read_security_flag("inc-1")).data is True
 
 
 @pytest.mark.parametrize("incident_id", ["missing", " "])
-def test_a_missing_incident_is_not_an_incident(incident_id: str) -> None:
+async def test_a_missing_incident_is_not_an_incident(incident_id: str) -> None:
     store = InMemoryIncidentStore()
 
-    for result in (store.get(incident_id), store.read_security_flag(incident_id)):
+    for result in (await store.get(incident_id), await store.read_security_flag(incident_id)):
         assert result.status is OperationStatus.NOT_FOUND
         assert result.error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_another_tenant_sharing_the_channel_id_is_not_matched() -> None:
+async def test_another_tenant_sharing_the_channel_id_is_not_matched() -> None:
     store = InMemoryIncidentStore()
     other = ConversationReference(system=WorkplaceSystem.SLACK, tenant="T0OTHER", vendor_id="C0INCIDENT")
     store.seed(_incident("inc-theirs", conversation=other))
 
-    assert store.find_by_conversation(CONVERSATION).error_code == ErrorCode.NOT_AN_INCIDENT
+    assert (await store.find_by_conversation(CONVERSATION)).error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_open_defaults_to_the_status_and_lists_by_declaration_time() -> None:
+async def test_open_defaults_to_the_status_and_lists_by_declaration_time() -> None:
     """Seeding open puts an incident in the open list; by default that follows its status, like the writers' open_bucket."""
     store = InMemoryIncidentStore()
     store.seed(_incident("late", hours=2))
@@ -77,7 +77,7 @@ def test_open_defaults_to_the_status_and_lists_by_declaration_time() -> None:
     store.seed(_incident("not-indexed"), open=False)
     store.seed(_incident("closed-but-indexed", status=IncidentStatus.CLOSED, hours=3), open=True)
 
-    result = store.list_open()
+    result = await store.list_open()
 
     assert result.data is not None
     assert [incident.id for incident in result.data] == ["early", "late", "closed-but-indexed"]

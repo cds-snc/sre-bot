@@ -3,10 +3,10 @@ id: TASK-145.7.6
 title: >-
   VideoCall in core: features/incident/meet moves to
   core/adapters/google_meet.py
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T21:16:00Z'
+updated_date: '2026-11-10T22:10:00Z'
 labels:
   - incident
   - features

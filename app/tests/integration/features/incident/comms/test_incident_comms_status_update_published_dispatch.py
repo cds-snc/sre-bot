@@ -15,6 +15,7 @@ calls made (one ``views.update`` and nothing posted to a channel) and the record
 left in the store.
 """
 
+import asyncio
 import json
 from collections.abc import Iterator
 from dataclasses import replace
@@ -122,7 +123,7 @@ def _copy_ready_view(update: StatusUpdate) -> dict[str, Any]:
 
 def test_toggle_is_acked(harness: Harness, store: StatusUpdateStore) -> None:
     """Bolt routes the toggle press to the plugin's listener and acks it with HTTP 200."""
-    store.append(_APPROVED)
+    asyncio.run(store.append(_APPROVED))
 
     response = harness.dispatch(_toggle_action(published=True))
 
@@ -131,16 +132,16 @@ def test_toggle_is_acked(harness: Harness, store: StatusUpdateStore) -> None:
 
 def test_publish_stores_the_presser_and_time(harness: Harness, store: StatusUpdateStore) -> None:
     """Marking an approved update published leaves it published by the pressing user at the fixed time."""
-    store.append(_APPROVED)
+    asyncio.run(store.append(_APPROVED))
 
     harness.dispatch(_toggle_action(published=True))
 
-    assert store.latest(_INCIDENT).data == _published()
+    assert asyncio.run(store.latest(_INCIDENT)).data == _published()
 
 
 def test_publish_updates_the_modal_once_in_place(harness: Harness, store: StatusUpdateStore) -> None:
     """The only Web API call is one views.update, by view id and hash, to the published record's copy-ready view."""
-    store.append(_APPROVED)
+    asyncio.run(store.append(_APPROVED))
 
     harness.dispatch(_toggle_action(published=True))
 
@@ -151,18 +152,18 @@ def test_publish_updates_the_modal_once_in_place(harness: Harness, store: Status
 
 def test_undo_clears_the_publication(harness: Harness, store: StatusUpdateStore) -> None:
     """Marking a published update not published leaves it approved with no publication time or person."""
-    store.append(_APPROVED)
-    store.transition(_published(), expected_state=StatusUpdateState.APPROVED)
+    asyncio.run(store.append(_APPROVED))
+    asyncio.run(store.transition(_published(), expected_state=StatusUpdateState.APPROVED))
 
     harness.dispatch(_toggle_action(published=False))
 
-    assert store.latest(_INCIDENT).data == _APPROVED
+    assert asyncio.run(store.latest(_INCIDENT)).data == _APPROVED
 
 
 def test_undo_updates_the_modal_once_in_place(harness: Harness, store: StatusUpdateStore) -> None:
     """The undo's only Web API call is one views.update to the approved record's copy-ready view."""
-    store.append(_APPROVED)
-    store.transition(_published(), expected_state=StatusUpdateState.APPROVED)
+    asyncio.run(store.append(_APPROVED))
+    asyncio.run(store.transition(_published(), expected_state=StatusUpdateState.APPROVED))
 
     harness.dispatch(_toggle_action(published=False))
 

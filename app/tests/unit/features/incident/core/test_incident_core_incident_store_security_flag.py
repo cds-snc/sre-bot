@@ -44,17 +44,17 @@ def _store(security_incident: object) -> RecordIncidentStore:
 
 
 @pytest.mark.parametrize("flag", [True, False])
-def test_the_stored_bool_is_returned(flag: bool) -> None:
-    result = _store(flag).read_security_flag(INCIDENT_ID)
+async def test_the_stored_bool_is_returned(flag: bool) -> None:
+    result = await _store(flag).read_security_flag(INCIDENT_ID)
 
     assert result.is_success
     assert result.data is flag
 
 
 @pytest.mark.parametrize("stored", ["yes", Decimal(0), None])
-def test_a_non_bool_flag_is_unreadable(stored: object) -> None:
+async def test_a_non_bool_flag_is_unreadable(stored: object) -> None:
     """There is no third state on an end-state item; a bad value is fixed by hand, never read as false."""
-    result = _store(stored).read_security_flag(INCIDENT_ID)
+    result = await _store(stored).read_security_flag(INCIDENT_ID)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
@@ -62,19 +62,19 @@ def test_a_non_bool_flag_is_unreadable(stored: object) -> None:
 
 
 @pytest.mark.parametrize("incident_id", ["missing", "", " "])
-def test_a_missing_or_blank_incident_is_not_an_incident(incident_id: str) -> None:
-    result = _store(True).read_security_flag(incident_id)
+async def test_a_missing_or_blank_incident_is_not_an_incident(incident_id: str) -> None:
+    result = await _store(True).read_security_flag(incident_id)
 
     assert result.status is OperationStatus.NOT_FOUND
     assert result.error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_a_store_failure_is_classified_and_never_false() -> None:
+async def test_a_store_failure_is_classified_and_never_false() -> None:
     records = MagicMock(spec=RecordStore)
     records.get.return_value = OperationResult.error(
         OperationStatus.PERMANENT_ERROR, message="AccessDenied", error_code="FORBIDDEN"
     )
 
-    result = record_incident_store(records, table=TABLE, tenants=TENANTS).read_security_flag(INCIDENT_ID)
+    result = await record_incident_store(records, table=TABLE, tenants=TENANTS).read_security_flag(INCIDENT_ID)
 
     assert (result.status, result.error_code, result.data) == (OperationStatus.PERMANENT_ERROR, "FORBIDDEN", None)

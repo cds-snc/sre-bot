@@ -90,58 +90,58 @@ STORES: dict[str, Callable[[], IncidentStore]] = {"real": _real, "fake": InMemor
 
 
 @pytest.fixture(params=sorted(STORES))
-def store(request: pytest.FixtureRequest) -> IncidentStore:
+async def store(request: pytest.FixtureRequest) -> IncidentStore:
     """A real store or fake holding one created incident."""
     created = STORES[request.param]()
-    assert created.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await created.create(declared_incident(INCIDENT_ID))).is_success
     return created
 
 
-def test_the_named_fields_change_and_the_others_stay(store: IncidentStore) -> None:
+async def test_the_named_fields_change_and_the_others_stay(store: IncidentStore) -> None:
     """Only the fields the change names are written; the answer equals a later read."""
-    result = store.update_fields(
+    result = await store.update_fields(
         INCIDENT_ID, IncidentChanges(title="Database failover", detected_at=DETECTED, security_incident=True), by=BY, at=AT
     )
 
     assert result.data is not None
     assert (result.data.title, result.data.detected_at, result.data.security_incident) == ("Database failover", DETECTED, True)
     assert result.data.declared_by == "U0DECLARER"
-    assert store.get(INCIDENT_ID).data == result.data
+    assert (await store.get(INCIDENT_ID)).data == result.data
 
 
-def test_a_time_is_cleared_with_none(store: IncidentStore) -> None:
+async def test_a_time_is_cleared_with_none(store: IncidentStore) -> None:
     """None clears an optional field; KEEP leaves it as stored."""
-    assert store.update_fields(INCIDENT_ID, IncidentChanges(impact_ended_at=AT), by=BY, at=AT).is_success
+    assert (await store.update_fields(INCIDENT_ID, IncidentChanges(impact_ended_at=AT), by=BY, at=AT)).is_success
 
-    result = store.update_fields(INCIDENT_ID, IncidentChanges(impact_ended_at=None), by=BY, at=AT)
+    result = await store.update_fields(INCIDENT_ID, IncidentChanges(impact_ended_at=None), by=BY, at=AT)
 
     assert result.data is not None
     assert result.data.impact_ended_at is None
 
 
-def test_replaying_the_same_change_writes_nothing() -> None:
+async def test_replaying_the_same_change_writes_nothing() -> None:
     """A repeated change finds the values already stored, so no update is sent."""
     records = GuardSpy()
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
     changes = IncidentChanges(title="Database failover")
-    first = store.update_fields(INCIDENT_ID, changes, by=BY, at=AT)
+    first = await store.update_fields(INCIDENT_ID, changes, by=BY, at=AT)
 
-    second = store.update_fields(INCIDENT_ID, changes, by=BY, at=AT)
+    second = await store.update_fields(INCIDENT_ID, changes, by=BY, at=AT)
 
     assert second.is_success
     assert second.data == first.data
     assert len(records.updates) == 1
 
 
-def test_the_update_is_guarded_on_the_version_and_the_changed_attributes_read_values() -> None:
+async def test_the_update_is_guarded_on_the_version_and_the_changed_attributes_read_values() -> None:
     """A concurrent change to the same attribute, or a version change, makes the write miss rather than overwrite."""
     records = GuardSpy()
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
 
-    assert store.update_fields(
-        INCIDENT_ID, IncidentChanges(title="Database failover", severity=Severity.SEV2), by=BY, at=AT
+    assert (
+        await store.update_fields(INCIDENT_ID, IncidentChanges(title="Database failover", severity=Severity.SEV2), by=BY, at=AT)
     ).is_success
 
     changes, expected = records.updates[0]
@@ -149,48 +149,48 @@ def test_the_update_is_guarded_on_the_version_and_the_changed_attributes_read_va
     assert expected == {"record_version": RECORD_VERSION, "title": f"Incident {INCIDENT_ID}", "severity": None}
 
 
-def test_a_lost_guard_is_read_again_and_retried_once() -> None:
+async def test_a_lost_guard_is_read_again_and_retried_once() -> None:
     """Another writer's change lands first; the store re-reads, recomputes and writes on the new values."""
     records = LosingRecordStore(losses=1)
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
 
-    result = store.update_fields(INCIDENT_ID, IncidentChanges(title="Database failover"), by=BY, at=AT)
+    result = await store.update_fields(INCIDENT_ID, IncidentChanges(title="Database failover"), by=BY, at=AT)
 
     assert result.data is not None
     assert result.data.title == "Database failover"
     assert records.attempts == 2
 
 
-def test_a_guard_lost_twice_is_a_conflict_and_the_other_writer_wins() -> None:
+async def test_a_guard_lost_twice_is_a_conflict_and_the_other_writer_wins() -> None:
     """After one retry the store stops; the caller gets INCIDENT_RECORD_CONFLICT and the record keeps the other write."""
     records = LosingRecordStore(losses=2)
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
 
-    result = store.update_fields(INCIDENT_ID, IncidentChanges(title="Database failover"), by=BY, at=AT)
+    result = await store.update_fields(INCIDENT_ID, IncidentChanges(title="Database failover"), by=BY, at=AT)
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INCIDENT_RECORD_CONFLICT)
-    stored = store.get(INCIDENT_ID).data
+    stored = (await store.get(INCIDENT_ID)).data
     assert stored is not None
     assert stored.title == "Renamed by another writer 2"
 
 
-def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
+async def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
     """An unknown id is NOT_FOUND, nothing is written."""
-    result = store.update_fields("inc-missing", IncidentChanges(title="x"), by=BY, at=AT)
+    result = await store.update_fields("inc-missing", IncidentChanges(title="x"), by=BY, at=AT)
 
     assert (result.status, result.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
 
 
-def test_a_store_failure_is_classified_with_a_generic_message() -> None:
+async def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     """The backend's status, code and retry hint are kept; its message is not."""
     records = MagicMock(spec=RecordStore)
     records.get.return_value = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR, message="throttled: arn:aws:...", error_code="Throttling", retry_after=3
     )
 
-    result = record_incident_store(records).update_fields(INCIDENT_ID, IncidentChanges(title="x"), by=BY, at=AT)
+    result = await record_incident_store(records).update_fields(INCIDENT_ID, IncidentChanges(title="x"), by=BY, at=AT)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "Throttling", 3)
     assert result.message == "The incident store is unavailable."
