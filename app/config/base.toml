@@ -192,7 +192,8 @@ announce_channel_id = ""
 
 [incident_core]
 # The incident record tables (terraform/dynamodb.tf) and the system that hosts a new
-# incident (new_incident_system: slack or google; absent means the only configured one).
+# incident (new_incident_system: slack or google; absent means the only configured one, and
+# boot fails when several are configured, so an environment with both names it).
 # The incident folder, report template and list sheet ids are non-public values: set
 # from the environment as INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID and
 # INCIDENT_CORE__LIST_SHEET_ID, never in a configuration file.

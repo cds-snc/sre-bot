@@ -7,8 +7,9 @@ Provides integration with Slack using the Bolt SDK for Socket Mode.
 
 import logging
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Collection, Mapping, Sequence
 from functools import cache
+from types import MappingProxyType
 from typing import Any, cast
 
 import structlog
@@ -220,8 +221,11 @@ class SlackPlatformProvider:
         # Commands stored by full_path (e.g., "sre.dev.aws") as key
         self._commands: dict[str, CommandDefinition] = {}
         # Native Bolt listeners by exact id, attached when the app is initialized.
+        # Block and attachment actions share one id namespace; a legacy alias is another key of the same listener.
         self._block_actions: dict[str, Callable[..., object]] = {}
+        self._attachment_actions: dict[str, Callable[..., object]] = {}
         self._view_submissions: dict[str, Callable[..., object]] = {}
+        self._legacy_ids: dict[str, str] = {}
         self._listeners_attached = False
         self._translator: Translator | None = None
         self._scope_opener: ServiceScopeOpener | None = None
@@ -615,14 +619,31 @@ class SlackPlatformProvider:
                 root=root_command,
             )
 
-    def register_block_action(self, action_id: str, listener: Callable[..., object]) -> None:
-        """Register a native Bolt listener for one block action, by exact ``action_id``.
+    def register_block_action(
+        self, action_id: str, listener: Callable[..., object], *, legacy_action_ids: Sequence[str] = ()
+    ) -> None:
+        """Register a native Bolt listener for one block action, by exact ``action_id`` and each legacy alias.
 
         Raises:
-            ValueError: The id is blank or already registered.
+            ValueError: An id is blank or already registered as a block or attachment action.
             RuntimeError: Listeners were already attached to the Bolt app.
         """
-        self._register_listener("block action", self._block_actions, action_id, listener)
+        self._register_action("block action", self._block_actions, action_id, listener, legacy_action_ids)
+
+    def register_attachment_action(
+        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+    ) -> None:
+        """Register a native Bolt listener for one legacy attachment's ``interactive_message``, by exact ``callback_id`` and each legacy alias.
+
+        Raises:
+            ValueError: An id is blank or already registered as a block or attachment action.
+            RuntimeError: Listeners were already attached to the Bolt app.
+        """
+        self._register_action("attachment action", self._attachment_actions, callback_id, listener, legacy_callback_ids)
+
+    def legacy_ids(self) -> Mapping[str, str]:
+        """Return each registered legacy id with the new id it aliases, for the legacy contract task to remove."""
+        return MappingProxyType(dict(self._legacy_ids))
 
     def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
         """Register a native Bolt listener for one view submission, by exact ``callback_id``.
@@ -633,6 +654,32 @@ class SlackPlatformProvider:
         """
         self._register_listener("view submission", self._view_submissions, callback_id, listener)
 
+    def _register_action(
+        self,
+        kind: str,
+        listeners: dict[str, Callable[..., object]],
+        action_id: str,
+        listener: Callable[..., object],
+        legacy_ids: Sequence[str],
+    ) -> None:
+        """Store an action listener under its id and every legacy alias, or none of them when one is taken."""
+        ids = (action_id, *legacy_ids)
+        taken = self._block_actions.keys() | self._attachment_actions.keys()
+        for listener_id in ids:
+            self._require_free(kind, taken, listener_id)
+            taken.add(listener_id)
+        for listener_id in ids:
+            self._register_listener(kind, listeners, listener_id, listener)
+        self._legacy_ids.update(dict.fromkeys(legacy_ids, action_id))
+
+    def _require_free(self, kind: str, taken: Collection[str], listener_id: str) -> None:
+        if self._listeners_attached:
+            raise RuntimeError(f"Slack {kind} {listener_id!r} registered after startup")
+        if not listener_id.strip():
+            raise ValueError(f"Slack {kind} id must not be blank")
+        if listener_id in taken:
+            raise ValueError(f"Slack {kind} {listener_id!r} is already registered")
+
     def _register_listener(
         self,
         kind: str,
@@ -641,27 +688,25 @@ class SlackPlatformProvider:
         listener: Callable[..., object],
     ) -> None:
         """Store a listener until the app exists; registration is startup-only and each id is unique."""
-        if self._listeners_attached:
-            raise RuntimeError(f"Slack {kind} {listener_id!r} registered after startup")
-        if not listener_id.strip():
-            raise ValueError(f"Slack {kind} id must not be blank")
-        if listener_id in listeners:
-            raise ValueError(f"Slack {kind} {listener_id!r} is already registered")
+        self._require_free(kind, listeners.keys(), listener_id)
         listeners[listener_id] = listener
         self._logger.debug("slack_listener_registered", kind=kind, listener_id=listener_id)
 
     def _attach_interaction_listeners(self) -> None:
-        """Attach the registered block-action and view-submission listeners to the Bolt app, unwrapped."""
+        """Attach the registered block-action, attachment-action and view-submission listeners to the Bolt app, unwrapped."""
         if not self._app:
             return
         for action_id, listener in self._block_actions.items():
             self._app.block_action(action_id)(listener)
+        for callback_id, listener in self._attachment_actions.items():
+            self._app.attachment_action(callback_id)(listener)
         for callback_id, listener in self._view_submissions.items():
             self._app.view_submission(callback_id)(listener)
         self._listeners_attached = True
         self._logger.debug(
             "slack_interaction_listeners_attached",
             block_actions=sorted(self._block_actions),
+            attachment_actions=sorted(self._attachment_actions),
             view_submissions=sorted(self._view_submissions),
         )
 

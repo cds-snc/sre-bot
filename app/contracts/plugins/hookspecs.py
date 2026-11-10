@@ -18,6 +18,7 @@ from contracts.plugins.namespace import hookspec
 from contracts.plugins.requirements import Requirement
 from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.slack.registrar import SlackCommandRegistrar
+from contracts.workplace import ConfiguredSystems
 
 
 class EventHandlerRegistrar(Protocol):
@@ -105,9 +106,14 @@ class FeatureLifecycleSpecs:
         """
 
     @hookspec
-    def startup_warmup(self, logger: BoundLogger) -> None:
+    def startup_warmup(self, logger: BoundLogger, systems: ConfiguredSystems) -> None:
         """Validate feature settings and pre-warm caches at startup.
+
+        A hookimpl takes only the arguments it names. One that cannot resolve a
+        setting raises ``contracts.configuration.SettingError``, which aborts boot
+        naming the setting (decisions/plugins.md).
 
         Args:
             logger: Structured logger for recording initialization events.
+            systems: The configured-systems read, the same the host resolves requirements against.
         """

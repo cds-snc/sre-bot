@@ -124,11 +124,15 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
 
 
 @pytest.mark.parametrize("environment", ["ci", "local", "production"])
-def test_no_environment_file_holds_the_table_or_a_document_id(environment: str) -> None:
-    """Production sets no INCIDENT_CORE__ value and no file names an id: the defaults are the provisioned tables."""
+def test_no_environment_file_holds_a_table_or_a_document_id(environment: str) -> None:
+    """No environment file names a table or an id: the defaults are the provisioned tables and ids come from the environment.
+
+    The new-incident policy is the one [incident_core] key an environment sets, because it depends on which
+    workplace systems that environment configures.
+    """
     values = tomllib.loads((CONFIG_DIR / f"{environment}.toml").read_text(encoding="utf-8"))
 
-    assert "incident_core" not in values
+    assert set(values.get("incident_core", {})) <= {"new_incident_system"}
 
 
 @pytest.mark.parametrize("field", _DOCUMENT_IDS)

@@ -8,6 +8,7 @@ import pytest
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
 from infrastructure.events.service import EventDispatcher
+from server.configured_systems import StaticConfiguredSystems
 from server.plugins.manager import register_feature_integrations
 
 pytestmark = pytest.mark.unit
@@ -53,6 +54,7 @@ def test_hookspec_called_during_feature_integration(monkeypatch) -> None:
     register_feature_integrations(
         app=MagicMock(),
         logger=MagicMock(),
+        systems=StaticConfiguredSystems({}),
         event_dispatcher=dispatcher,
     )
 

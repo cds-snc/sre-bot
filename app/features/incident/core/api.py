@@ -17,6 +17,8 @@ reporting an ``UpgradeReport``) from the services its job resolves per run.
 (``ConversationReference``); ``get_incident_conversation`` provides the Slack one,
 and ``conversation_is_writable`` is the check every caller applies before a write.
 ``IncidentTranscriptReader`` reads what was said in a conversation.
+``resolve_new_incident_system`` resolves the new-incident policy against the
+configured systems; the declare path's plugin calls it at startup.
 """
 
 from collections.abc import Mapping, Sequence
@@ -24,9 +26,10 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
+from contracts.configuration import SettingError
 from contracts.operations.result import OperationResult
 from contracts.records import RecordStore
-from contracts.workplace import ConfiguredSystems, TenantVerifier
+from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import StatusUpdateStage
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
@@ -102,6 +105,7 @@ __all__ = [
     "get_incident_conversation",
     "get_incident_report",
     "get_incident_transcript_reader",
+    "resolve_new_incident_system",
     "translate",
 ]
 
@@ -311,6 +315,33 @@ def get_incident_conversation() -> IncidentConversation:
 def get_incident_transcript_reader() -> IncidentTranscriptReader:
     """Return the process-wide Slack-backed ``IncidentTranscriptReader``."""
     return build_incident_transcript_reader()
+
+
+NEW_INCIDENT_SYSTEM_SETTING = "incident_core.new_incident_system"
+
+
+def resolve_new_incident_system(policy: WorkplaceSystem | None, systems: ConfiguredSystems) -> WorkplaceSystem:
+    """Return the system that creates a new incident's report and video call (decisions/incident-management.md).
+
+    A set policy resolves to that system when it is configured; an unset policy
+    resolves to the only configured system. No implicit choice is made among
+    several configured systems.
+
+    Raises:
+        SettingError: The named system is not configured, no system is configured,
+            or the policy is unset while several are; it names the policy's setting.
+    """
+    configured = list(systems.tenants())
+    if policy is not None:
+        if policy in configured:
+            return policy
+        raise SettingError(NEW_INCIDENT_SYSTEM_SETTING, f"names {policy.value}, which is not configured")
+    if len(configured) == 1:
+        return configured[0]
+    if not configured:
+        raise SettingError(NEW_INCIDENT_SYSTEM_SETTING, "no workplace system is configured")
+    names = ", ".join(sorted(system.value for system in configured))
+    raise SettingError(NEW_INCIDENT_SYSTEM_SETTING, f"is unset while several systems are configured ({names}); name one")
 
 
 def find_incident_for_conversation(store: IncidentStore, conversation: ConversationReference) -> OperationResult[Incident]:

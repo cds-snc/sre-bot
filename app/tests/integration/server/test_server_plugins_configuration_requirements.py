@@ -4,15 +4,17 @@ For each environment the real base file and environment file are installed, the
 plugin switches they set are read (the pytest-env pins, the scheduler pin and every
 environment name the settings declare are removed first, and the working directory
 holds no ``.env``), the feature slices the configuration phase builds before plugin
-boot are built (the [incident_core] slice; a feature requirement resolves only
-against a built slice), the enabled plugins are loaded on a fresh plugin manager with
+boot are built (the [incident_core] and [incident_response] slices; a feature
+requirement resolves only against a built slice), the enabled plugins are loaded on a fresh plugin manager with
 the disabled names blocked, and only ``register_requirements`` is fired. Each declaration
 must resolve against the configured-systems read and the validated slices. Secrets get
 placeholder values only here, and only for the environment-only names the environment
 is known to supply, derived from the settings classes' ``env_only`` declarations:
 production supplies the names in ``terraform/ssm.tf``, local the names whose declared
 source is a Codespaces secret. A requirement on a secret nothing supplies must fail.
-The check cannot see the values held in SSM or in Codespaces.
+The check cannot see the values held in SSM or in Codespaces. The new-incident
+policy must also resolve against each environment's configured systems, as the
+incident.response warmup resolves it at boot.
 """
 
 import os
@@ -29,7 +31,10 @@ from contracts.configuration import ConfigurationError, install_configuration_fi
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.plugins.requirements import Requirement
+from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
+from features.incident.core.api import resolve_new_incident_system
+from features.incident.response.settings import get_incident_response_settings
 from integrations.google_workspace.settings import get_google_workspace_settings
 from integrations.openai.settings import get_openai_settings
 from integrations.opsgenie.settings import get_opsgenie_settings
@@ -51,9 +56,10 @@ SETTINGS_GETTERS = (
     get_openai_settings,
     get_opsgenie_settings,
     get_incident_core_settings,
+    get_incident_response_settings,
 )
 # The feature slices server/configuration/host_configuration.py builds before plugin boot.
-FEATURE_SLICE_GETTERS = (get_incident_core_settings,)
+FEATURE_SLICE_GETTERS = (get_incident_core_settings, get_incident_response_settings)
 PLUGIN_AREAS = ("INCIDENT_RESPONSE", "CLOUD_OPERATIONS", "PLATFORM_ACCESS", "WORKPLACE_UTILITIES")
 
 
@@ -179,3 +185,36 @@ def test_the_check_does_not_leave_its_environment_behind(monkeypatch: pytest.Mon
     monkeypatch.undo()
 
     assert os.environ.get("ENVIRONMENT") == "ci"
+
+
+def test_production_fails_when_the_handbook_id_is_not_in_the_parameter_store(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """incident.response requires its own [incident_response] handbook id, read through the built slice."""
+    entries, _ = collect()
+    supplied = ({entry.name for entry in entries} & terraform_parameters()) - {"INCIDENT_RESPONSE__HANDBOOK_ID"}
+
+    problems = _problems("production", supplied, entries, monkeypatch, tmp_path)
+
+    assert "incident.response requires incident_response.handbook_id, which does not resolve" in problems
+
+
+@pytest.mark.parametrize(
+    ("environment", "source"),
+    [pytest.param("production", "ssm", id="production"), pytest.param("local", "codespaces", id="local")],
+)
+def test_checked_in_files_resolve_the_new_incident_system_to_google(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, environment: str, source: str
+) -> None:
+    """Both environments configure Slack and Google, so each file must name the policy explicitly."""
+    entries, _ = collect()
+    if source == "ssm":
+        supplied = {entry.name for entry in entries} & terraform_parameters()
+    else:
+        supplied = {entry.name for entry in entries if entry.source == "codespaces"}
+
+    assert _problems(environment, supplied, entries, monkeypatch, tmp_path) == []
+    systems = read_configured_systems()
+
+    assert set(systems.tenants()) == {WorkplaceSystem.SLACK, WorkplaceSystem.GOOGLE}
+    assert resolve_new_incident_system(get_incident_core_settings().new_incident_system, systems) is WorkplaceSystem.GOOGLE

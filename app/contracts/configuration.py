@@ -28,6 +28,18 @@ class ConfigurationError(Exception):
     """Invalid or missing configuration; the message names the file, table and key to fix."""
 
 
+class SettingError(ConfigurationError):
+    """One setting does not resolve; ``setting`` is its dotted ``table.key`` path.
+
+    A plugin raises it at boot so the host's ``plugin_boot_failed`` event names the
+    setting at fault (decisions/plugins.md).
+    """
+
+    def __init__(self, setting: str, message: str) -> None:
+        super().__init__(f"{setting}: {message}")
+        self.setting = setting
+
+
 class ConfigurationFiles(Protocol):
     """The configuration files for one environment, base file first."""
 
