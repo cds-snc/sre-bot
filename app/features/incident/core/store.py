@@ -49,6 +49,7 @@ from features.incident.core.adapters.binding_items import (
     SORT_ATTRIBUTE as BINDING_SORT_ATTRIBUTE,
 )
 from features.incident.core.adapters.incident_items import (
+    OPEN_BUCKET,
     incident_record_unreadable,
     parse_incident_item,
     read_reference,
@@ -74,11 +75,6 @@ from features.incident.core.domain import (
 )
 
 logger = structlog.get_logger()
-
-# Written on every end-state item; an item without it predates the end-state shape.
-RECORD_VERSION = 1
-# open_bucket value while an incident is open; the writers remove it on Closed.
-OPEN_BUCKET = "OPEN"
 
 # Far above any real count of incidents sharing one channel id; reaching it fails closed.
 _CONVERSATION_QUERY_BOUND = 10

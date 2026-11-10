@@ -18,6 +18,7 @@ import pytest
 from contracts.records import RecordStore
 from contracts.services import ServiceScopeOpener
 from contracts.workplace import ConfiguredSystems, TenantVerifier
+from features.incident.core.adapters.incident_items import RECORD_VERSION
 from features.incident.response import plugin
 from features.incident.response.settings import get_incident_response_settings
 from tests.factories.incident import FakeConfiguredSystems
@@ -85,8 +86,8 @@ def test_an_apply_run_opens_one_scope_and_upgrades_the_item(monkeypatch: pytest.
     _registered_job(monkeypatch, "apply", scopes)()
 
     stored = records.get(TABLE, {"id": "inc-1"}).data
-    assert (scopes.opened, scopes.closed, records.writes) == (1, 1, ["update"])
-    assert stored is not None and stored["record_version"] == 1
+    assert (scopes.opened, scopes.closed, records.writes) == (1, 1, ["put_if_not_exists", "update"])
+    assert stored is not None and stored["record_version"] == RECORD_VERSION
 
 
 def test_each_run_opens_its_own_scope(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -97,7 +98,7 @@ def test_each_run_opens_its_own_scope(monkeypatch: pytest.MonkeyPatch) -> None:
     job()
     job()
 
-    assert (scopes.opened, scopes.closed, records.writes) == (2, 2, ["update"])
+    assert (scopes.opened, scopes.closed, records.writes) == (2, 2, ["put_if_not_exists", "update"])
 
 
 def test_a_failed_resolution_propagates_and_still_closes_the_scope(monkeypatch: pytest.MonkeyPatch) -> None:

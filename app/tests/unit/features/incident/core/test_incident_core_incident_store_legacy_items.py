@@ -18,8 +18,9 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity
+from features.incident.core.adapters.incident_items import OPEN_BUCKET
 from features.incident.core.domain import ConversationReference
-from features.incident.core.store import OPEN_BUCKET, RecordIncidentStore, incidents_table
+from features.incident.core.store import RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 from tests.factories.incident import record_incident_store
 

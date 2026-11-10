@@ -13,7 +13,7 @@ Most of today's incident behaviour still lives in the legacy
 
 | Folder | Current role | Used today by | Target (`decisions/incident-management.md`) |
 | --- | --- | --- | --- |
-| [`core/`](core/) | Shared kernel. `api.py` exposes `IncidentTranscriptReader` (reads a conversation by its `ConversationReference`; classified `OperationResult`s), `TranscriptMessage` and `get_incident_transcript_reader`, `IncidentConversation` (async writes to the conversation by its reference: post, purpose, link bookmark, invite chat account ids, archive, `is_writable`; no create yet, TASK-145.7 adds it with the first working-surface binding) and `get_incident_conversation`, `conversation_is_writable(conversations, conversation | None)`, the check before every write to a conversation, `IncidentReport` (the report the record's `ReportReference` names: create from template in [incident_core] `folder_id`, placeholders, read sections, draft copy, link) and `get_incident_report`, the command check `find_incident_for_conversation(store, conversation)` over the `IncidentStore`, and `build_incident_store` and `build_status_update_store`, which entry points call per service scope with the resolved `RecordStore` and the incident core settings (the incident store also with the configured systems); `adapters/slack.py` is the Slack transcript reader and `SlackIncidentConversation`, which writes on the Slack write handle (rate-limited requests only are retried) and maps the not-writable Slack codes to `CONVERSATION_NOT_WRITABLE`; `adapters/google_docs.py` is the umbrella's one Google Docs and Drive adapter (report placeholders and revision-guarded edits, Docs URL id extraction, incident folders, files and Drive `appProperties` metadata through the gateway's Drive service, the Drive healthcheck, and scribe's section reader and draft writer) with `GoogleDocsIncidentReport`, the `IncidentReport` over it; every service is built with scopes only, never a delegation subject or credentials; legacy `modules/incident` and `jobs/scheduled_tasks.py` call its module functions until TASK-145.13; `domain.py` holds the shared domain types, including the document section types (`DocumentSection`, `SectionDraft`, `DocumentField`, `DraftWriteResult`), the `Incident` record (with `declared_by` and a required `security_incident` bool), `TimelineEntry` and the typed references (exported by `api.py`); `store.py` holds the `IncidentStore` interface (exported by `api.py`: get, find by conversation, list open, read the security flag) and `RecordIncidentStore`, which reads incident items through the records contract with `adapters/incident_items.py` as the item parser, upgrades items without `record_version` through the legacy item bridge (`adapters/legacy_items.py`), and has `InMemoryIncidentStore` in `adapters/in_memory.py` as the fake (`InMemoryIncidentReport` is the report's, `InMemoryIncidentConversation` the conversation's); `legacy_upgrade.py` holds `LegacyUpgrade`, the legacy upgrade runner (built by `build_legacy_upgrade` in `api.py`; one capped whole-table read, the same bridge, one guarded update per item, one report event per run), registered by `response/` as the incident legacy upgrade job (run procedure below); `store.py` also holds the `StatusUpdateStore` interface and `RecordStatusUpdateStore`, which keeps each public status update (`StatusUpdate`) as its own item under the incident id in the status-updates table through the records contract, with `adapters/status_updates.py` as the item layout and `InMemoryStatusUpdateStore` as the fake. No hookimpl, not an entry point. | `comms/`, `scribe/` | Stays `core/`. Grows the `IncidentStore` writes and the resource interfaces with two or more subdomain consumers still to come (`ProductCatalog`, `ExternalCaseRecorder`), each with one adapter per system in `core/adapters/`. |
+| [`core/`](core/) | Shared kernel. `api.py` exposes `IncidentTranscriptReader` (reads a conversation by its `ConversationReference`; classified `OperationResult`s), `TranscriptMessage` and `get_incident_transcript_reader`, `IncidentConversation` (async writes to the conversation by its reference: post, purpose, link bookmark, invite chat account ids, archive, `is_writable`; no create yet, TASK-145.7 adds it with the first working-surface binding) and `get_incident_conversation`, `conversation_is_writable(conversations, conversation | None)`, the check before every write to a conversation, `IncidentReport` (the report the record's `ReportReference` names: create from template in [incident_core] `folder_id`, placeholders, read sections, draft copy, link) and `get_incident_report`, the command check `find_incident_for_conversation(store, conversation)` over the `IncidentStore`, and `build_incident_store` and `build_status_update_store`, which entry points call per service scope with the resolved `RecordStore` and the incident core settings (the incident store also with the configured systems); `adapters/slack.py` is the Slack transcript reader and `SlackIncidentConversation`, which writes on the Slack write handle (rate-limited requests only are retried) and maps the not-writable Slack codes to `CONVERSATION_NOT_WRITABLE`; `adapters/google_docs.py` is the umbrella's one Google Docs and Drive adapter (report placeholders and revision-guarded edits, Docs URL id extraction, incident folders, files and Drive `appProperties` metadata through the gateway's Drive service, the Drive healthcheck, and scribe's section reader and draft writer) with `GoogleDocsIncidentReport`, the `IncidentReport` over it; every service is built with scopes only, never a delegation subject or credentials; legacy `modules/incident` and `jobs/scheduled_tasks.py` call its module functions until TASK-145.13; `domain.py` holds the shared domain types, including the document section types (`DocumentSection`, `SectionDraft`, `DocumentField`, `DraftWriteResult`), the `Incident` record (with `declared_by` and a required `security_incident` bool), `TimelineEntry` and the typed references (exported by `api.py`); `store.py` holds the `IncidentStore` interface (exported by `api.py`: get, find by conversation, list open, read the security flag) and `RecordIncidentStore`, which reads incident items through the records contract with `adapters/incident_items.py` as the item parser, upgrades items without `record_version` through the legacy item bridge (`adapters/legacy_items.py`), and has `InMemoryIncidentStore` in `adapters/in_memory.py` as the fake (`InMemoryIncidentReport` is the report's, `InMemoryIncidentConversation` the conversation's); `legacy_upgrade.py` holds `LegacyUpgrade`, the legacy upgrade runner (built by `build_legacy_upgrade` in `api.py`; one capped whole-table read, the per-item plan `plan_item_upgrade` in `adapters/item_upgrade.py` over the same bridge, per item the binding put into the bindings table and then one guarded update raising `record_version` to 2, one report event per run), registered by `response/` as the incident legacy upgrade job (run procedure below); `store.py` also holds the `StatusUpdateStore` interface and `RecordStatusUpdateStore`, which keeps each public status update (`StatusUpdate`) as its own item under the incident id in the status-updates table through the records contract, with `adapters/status_updates.py` as the item layout and `InMemoryStatusUpdateStore` as the fake. No hookimpl, not an entry point. | `comms/`, `scribe/` | Stays `core/`. Grows the `IncidentStore` writes and the resource interfaces with two or more subdomain consumers still to come (`ProductCatalog`, `ExternalCaseRecorder`), each with one adapter per system in `core/adapters/`. |
 | [`common/`](common/) | No-I/O vocabulary and settings: `vocabulary.py` (`IncidentStatus`, `Severity`, `IncidentRole`, `StatusUpdateStage`) and `settings.py` (`IncidentCoreSettings`, the `[incident_core]` slice: the incidents, timeline and status-updates table names, the new-incident system policy, unset by default, and the incident folder, report template and list sheet ids, non-public values set from the environment). Imports nothing from `core/` or the subdomains. | `core/`, `comms/` | Stays `common/`: the incident settings tree and vocabulary with two or more consumers. |
 | [`comms/`](comms/) | Subdomain and plugin (entry point `incident.comms`): `/sre incident status-update` and the status-updates modal (public status updates, written by a responder with optional AI help). See [`comms/README.md`](comms/README.md). | Slack users | Stays `comms/`: grows other comms profiles and status-page publishers behind `StatusPagePublisher`. |
 | [`scribe/`](scribe/) | Subdomain and plugin (entry point `incident.scribe`): `/sre incident draft` and `/sre incident summarize`. See [`scribe/README.md`](scribe/README.md). | Slack users | Stays `scribe/`: prompts, templates and incident-specific post-processing over the text-generation capability. |
@@ -49,16 +49,37 @@ Units the decision record names that do not exist yet:
 
 ## Legacy upgrade run procedure
 
-The incident legacy upgrade job upgrades every incident item without `record_version` to the
-end-state shape (`core/legacy_upgrade.py`; decisions/incident-management.md, Migration). It is
-registered by `response/plugin.py` and ships with `[incident_response] upgrade_mode = "off"`, so
-nothing runs until an environment switches it on in its own configuration file.
+The incident legacy upgrade job brings every incident item below `record_version` 2 to it
+(`core/legacy_upgrade.py`, over the per-item plan in `core/adapters/item_upgrade.py`;
+decisions/incident-management.md, Migration). For an item without `record_version` it runs the
+legacy bridge, puts the item's binding and stamps marker 2; for an item at 1 (the end-state shape
+without a binding) it puts the binding and raises the marker to 2; an item at 2 or above is not
+touched. Per item the binding is put first (`put_if_not_exists`, an existing binding is never
+overwritten) and one guarded update, with the marker last, follows, so a crash between the two
+converges on the next run. It is registered by `response/plugin.py` and ships with
+`[incident_response] upgrade_mode = "off"`, so nothing runs until an environment switches it on in
+its own configuration file.
 
 - **When.** The first run in an environment follows TASK-145.8's deploy there: the upgrade writes
   status, severity, `security_incident` and the two legacy roles in their end-state form, and
-  TASK-145.8 removes the last legacy reader of those attributes. Run it again after TASK-145.12
-  removes the sheet import, the last legacy writer. Running it, with a report of nothing pending,
-  is a precondition of TASK-145.9 merging.
+  TASK-145.8 removes the last legacy reader of those attributes. Running it, with a report of
+  nothing pending, is a precondition of TASK-145.9 merging.
+- **Legacy writers.** Each of these still creates legacy-shaped items, so the job must run again
+  after the last one is gone (Migration rule 6):
+  - the legacy declare, `app/modules/incident/core.py:525` (`initiate_resources_creation`), removed
+    by TASK-145.7.10;
+  - recreate, `app/modules/incident/core.py:316` (`_create_database_record`, called from
+    `recreate_missing_resources`), removed by TASK-145.8.6;
+  - the dev add-incident command, `app/modules/dev/incident.py:104`, removed by TASK-145.12.2;
+  - the sheet import, `app/modules/incident/incident_folder.py:541` (`create_missing_incidents`,
+    reached by `load_incidents` at `app/modules/dev/incident.py:47`), removed by TASK-145.12.2.
+
+  All four write through `db_operations.create_incident`. The field updaters
+  (`information_update.py:322`, `incident_status.py:59`, through `update_incident_field`) create no
+  items and are removed by TASK-145.8.3 and TASK-145.8.4.
+- **Rerun rule.** After TASK-145.12.2 deploys, run the job again (`dry_run`, then `apply`) and
+  confirm `pending` 0 and `unbound` empty before TASK-145.13 deletes the job. Items written by a
+  legacy writer after the last run have no marker and no binding.
 - **Where it runs.** `[scheduler] enabled` must be true (production sets it). The job is a
   leased interval job: one replica runs it, every `upgrade_interval_minutes` (30), under a lease
   of `upgrade_lease_ttl_seconds` (900). The first run is one interval after the task starts, so
@@ -66,16 +87,26 @@ nothing runs until an environment switches it on in its own configuration file.
 - **Dry run first, per environment.** A PR sets `upgrade_mode = "dry_run"` under
   `[incident_response]` in that environment's file (production: `config/production.toml`, which
   the deploy workflow ships; never a console change). After the deploy, read the
-  `incident_legacy_upgrade_report` event: `pending`, `unmatched_status`, `unreadable`, `dropped`
-  and `tenant_check` (the verified tenant, or a message naming the expected and received ids). The first production dry run confirms the
-  `auth.test` org-token shape (D10 of TASK-145.5.7): `tenant_check` is verified; a mismatch is
-  fixed in configuration (`[slack.tenant] enterprise_id`), not in code.
-- **A blocked dry run.** Any unmatched status or unreadable item fails the run, logged at error,
-  so the error alarm fires on every run. Switch the mode back to `off`, fix the listed items by
-  hand in the table, then dry run again.
+  `incident_legacy_upgrade_report` event. Report keys: `mode`, `outcome`, `failures`, `cap`,
+  `scanned`, `already_upgraded` (at marker 2 or above), `to_upgrade` (planned: legacy items and
+  items at 1), `upgraded` (legacy items written), `marker_raised` (items at 1 raised),
+  `bindings_put` (bindings created), `bindings_existing` (bindings found already present),
+  `binding_skipped` (planned items with no binding: a Closed item without a conversation),
+  `guard_lost`, `pending` (planned and not written), `unbound`, `unmatched_status`, `unreadable`,
+  `dropped` and `tenant_check` (the verified tenant, or a message naming the expected and received
+  ids). A dry run counts the plan and writes nothing, so its `bindings_put` is 0. The first
+  production dry run confirms the `auth.test` org-token shape (D10 of TASK-145.5.7):
+  `tenant_check` is verified; a mismatch is fixed in configuration (`[slack.tenant]
+  enterprise_id`), not in code.
+- **A blocked dry run.** Any unmatched status, unreadable item or `unbound` item fails the run,
+  logged at error, so the error alarm fires on every run. `unbound` lists, by id only, the open
+  items without a conversation: set their `channel_id` or mark them Closed by hand in the table.
+  Switch the mode back to `off`, fix the listed items, then dry run again. If two items share one
+  `channel_id`, the conversation lookup was already ambiguous and stays so: fix it by hand.
 - **Apply.** A PR sets `upgrade_mode = "apply"`. Confirm that a later report shows `pending` 0
-  (a run cut short by throttling ends `write_failed`, and the next run resumes: every write is
-  guarded on `record_version` absent), then a PR sets the mode back to `off`.
+  (a run cut short by throttling ends `write_failed`, and the next run resumes: each update is
+  guarded on `record_version` at its read value, absent or 1, and a binding already put reports
+  as `bindings_existing`), then a PR sets the mode back to `off`.
 - **Locally.** `INCIDENT_RESPONSE__UPGRADE_MODE=dry_run` and `SCHEDULER__ENABLED=true` in
   `app/.env`; the plugin needs the Slack and Google Workspace tenants, as `incident.scribe` does.
 - **Removal.** TASK-145.13 deletes the job's registration in `plugin.py`, `legacy_upgrade_job.py`

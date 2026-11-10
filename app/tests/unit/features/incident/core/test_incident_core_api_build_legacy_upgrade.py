@@ -9,15 +9,19 @@ service scope and passes them in.
 
 import pytest
 
+from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
+from features.incident.core.adapters.binding_items import binding_key
 from features.incident.core.api import LegacyUpgrade, UpgradeReport, build_legacy_upgrade
-from features.incident.core.store import incidents_table
+from features.incident.core.domain import BindingKind
+from features.incident.core.store import bindings_table, incidents_table
 from tests.factories.incident import SLACK_TENANT, CountingRecordStore, FakeConfiguredSystems
 from tests.factories.legacy_upgrade import TENANTS, legacy_item, verified_slack
 
 pytestmark = pytest.mark.unit
 
 TABLE_NAME = "incidents-under-test"
+BINDINGS_NAME = "bindings-under-test"
 
 
 def _records(*incident_ids: str) -> CountingRecordStore:
@@ -36,6 +40,18 @@ def test_the_built_upgrade_reads_the_configured_table_with_the_configured_cap() 
     assert isinstance(upgrade, LegacyUpgrade)
     assert isinstance(report, UpgradeReport)
     assert (report.failures, report.cap) == (("read_limit_exceeded",), 1)
+
+
+def test_the_built_upgrade_puts_bindings_in_the_configured_bindings_table() -> None:
+    records = _records("inc-1")
+    settings = IncidentCoreSettings(incidents_table=TABLE_NAME, bindings_table=BINDINGS_NAME)
+
+    report = build_legacy_upgrade(records, FakeConfiguredSystems(TENANTS), verified_slack(), settings).run(apply=True)
+
+    key = binding_key(BindingKind.CHAT_CONVERSATION, WorkplaceSystem.SLACK, SLACK_TENANT, "C0INC-1")
+    stored = records.get(bindings_table(BINDINGS_NAME), {"incident_id": "inc-1", "binding_key": key})
+    assert report.bindings_put == 1
+    assert stored.data is not None and stored.data["bound_by"] == "U0DECLARER"
 
 
 def test_the_built_upgrade_stamps_the_configured_slack_tenant() -> None:

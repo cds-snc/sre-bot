@@ -3,7 +3,9 @@
 Pure: no store and no I/O. Stored attributes are named after the record fields
 (decisions/incident-management.md, The incident record); each reference kind is
 one map ``{system, tenant, vendor_id, url}``. Items without ``record_version``
-are not end-state items and never reach this parser.
+are not end-state items and never reach this parser. The record-version
+constants and the open-index bucket value are defined here, so the store and
+the per-item upgrade plan share them without importing each other.
 
 A required value that cannot be read (id, title, status, declared_by,
 declared_at, security_incident) makes the item a classified
@@ -36,6 +38,13 @@ from features.incident.core.domain import (
 )
 
 logger = structlog.get_logger()
+
+# The end-state shape without a binding. No current writer stamps it; the legacy upgrade raises such items to RECORD_VERSION.
+END_STATE_VERSION = 1
+# The end-state shape with its binding: what every writer and the legacy upgrade stamp on an item.
+RECORD_VERSION = 2
+# open_bucket value while an incident is open; the writers remove it on Closed.
+OPEN_BUCKET = "OPEN"
 
 _UNREADABLE_MESSAGE = "A stored incident record could not be read."
 

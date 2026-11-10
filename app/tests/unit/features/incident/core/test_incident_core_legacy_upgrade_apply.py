@@ -13,8 +13,8 @@ import pytest
 
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity
+from features.incident.core.adapters.incident_items import OPEN_BUCKET, RECORD_VERSION
 from features.incident.core.adapters.legacy_items import UpgradedItem, upgrade_legacy_item
-from features.incident.core.store import OPEN_BUCKET, RECORD_VERSION
 from tests.factories.incident import record_incident_store
 from tests.factories.legacy_upgrade import TABLE, TENANTS, legacy_item, legacy_upgrade, records_with
 
@@ -35,6 +35,7 @@ def _stored(records: Any, incident_id: str) -> dict[str, Any]:
         legacy_item("inc-full"),
         legacy_item(
             "inc-minimal",
+            status="Closed",
             channel_id=None,
             report_url=None,
             meet_url=None,
@@ -61,6 +62,10 @@ def test_apply_writes_the_bridge_output_and_the_version_marker(item: dict[str, A
     assert (report.outcome, report.upgraded, report.pending) == ("succeeded", 1, 0)
     assert {key: stored[key] for key in upgraded.item} == upgraded.item
     assert stored["record_version"] == RECORD_VERSION
+    assert (report.bindings_put, report.binding_skipped) == (
+        ("conversation" in upgraded.item) * 1,
+        "conversation" not in upgraded.item,
+    )
 
 
 def test_the_happy_path_closed_incident_reads_the_same_after_the_upgrade() -> None:

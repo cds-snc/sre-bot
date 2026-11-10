@@ -16,7 +16,8 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import RecordStore
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.store import OPEN_BUCKET, RecordIncidentStore, incidents_table
+from features.incident.core.adapters.incident_items import OPEN_BUCKET
+from features.incident.core.store import RecordIncidentStore, incidents_table
 from infrastructure.records.in_memory import InMemoryRecordStore
 from tests.factories.incident import record_incident_store
 
