@@ -395,7 +395,7 @@ name = "(i) Incident subdomains are independent siblings over core"
 type = "layers"
 containers = ["features.incident"]
 layers = [
-    "comms | meet | postmortem | response | scheduling | scribe",
+    "comms | postmortem | response | scheduling | scribe",
     "core",
     "common",
 ]

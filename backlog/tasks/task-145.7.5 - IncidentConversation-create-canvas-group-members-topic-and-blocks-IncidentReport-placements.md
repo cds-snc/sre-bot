@@ -3,10 +3,10 @@ id: TASK-145.7.5
 title: >-
   IncidentConversation create, canvas, group members, topic and blocks;
   IncidentReport placements
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T20:34:00Z'
+updated_date: '2026-11-10T21:06:00Z'
 labels:
   - incident
   - features
