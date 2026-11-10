@@ -17,8 +17,9 @@ from features.incident.common import vocabulary
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core import api
 from features.incident.core.adapters import slack as slack_adapter
-from features.incident.core.adapters.in_memory import InMemoryIncidentStore
+from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
 from features.incident.core.domain import ResourceReference
+from features.incident.core.store import RecordIncidentStore, RecordStatusUpdateStore
 from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
@@ -197,20 +198,20 @@ def test_conversation_provider_reads_on_the_shared_client_and_writes_on_the_writ
     write_factory.assert_called_once_with()
 
 
-def test_find_incident_for_conversation_answers_with_the_store_for_the_reference() -> None:
+async def test_find_incident_for_conversation_answers_with_the_store_for_the_reference() -> None:
     """The command check every command calls asks the given store for the conversation reference it was handed."""
     incident = incident_on("C0INCIDENT", "7f0c3a52-3d0e-4d55-9a4e-6f1f2b9c0a11")
     asked: list[api.ConversationReference] = []
 
     class _RecordingStore(InMemoryIncidentStore):
-        def find_by_conversation(self, conversation: api.ConversationReference) -> OperationResult[api.Incident]:
+        async def find_by_conversation(self, conversation: api.ConversationReference) -> OperationResult[api.Incident]:
             asked.append(conversation)
-            return super().find_by_conversation(conversation)
+            return await super().find_by_conversation(conversation)
 
     store = _RecordingStore()
     store.seed(incident)
 
-    result = api.find_incident_for_conversation(store, slack_conversation("C0INCIDENT"))
+    result = await api.find_incident_for_conversation(store, slack_conversation("C0INCIDENT"))
 
     assert result.data == incident
     assert asked == [slack_conversation("C0INCIDENT")]
@@ -275,6 +276,42 @@ def test_incident_store_signatures_carry_only_domain_types_and_operation_results
         "set_status",
         "update_fields",
     ]
+
+
+INCIDENT_STORE_METHODS = (
+    "get",
+    "find_by_conversation",
+    "list_open",
+    "read_security_flag",
+    "create",
+    "attach_conversation",
+    "set_reference",
+    "update_fields",
+    "set_roles",
+    "set_status",
+)
+STATUS_UPDATE_STORE_METHODS = ("append", "latest", "list_for_incident", "transition")
+
+
+@pytest.mark.parametrize(
+    ("store", "methods"),
+    [
+        (api.IncidentStore, INCIDENT_STORE_METHODS),
+        (RecordIncidentStore, INCIDENT_STORE_METHODS),
+        (InMemoryIncidentStore, INCIDENT_STORE_METHODS),
+        (api.StatusUpdateStore, STATUS_UPDATE_STORE_METHODS),
+        (RecordStatusUpdateStore, STATUS_UPDATE_STORE_METHODS),
+        (InMemoryStatusUpdateStore, STATUS_UPDATE_STORE_METHODS),
+    ],
+    ids=lambda value: getattr(value, "__name__", "methods"),
+)
+def test_the_stores_their_adapters_and_fakes_are_async(store: type, methods: tuple[str, ...]) -> None:
+    """The stores are consumed from async code, so every method is a coroutine (outbound-clients.md async-port rule)."""
+    assert [name for name in methods if not inspect.iscoroutinefunction(getattr(store, name))] == []
+
+
+def test_the_command_check_is_async() -> None:
+    assert inspect.iscoroutinefunction(api.find_incident_for_conversation)
 
 
 def test_core_is_not_a_plugin() -> None:

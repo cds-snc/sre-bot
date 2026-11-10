@@ -20,6 +20,7 @@ record write. Expected views come from the platform
 view builders, so each assertion compares the exact view sent.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -386,7 +387,7 @@ class TestHandlePublishedActionOverRealServices:
         """
         records = CountingRecordStore()
         store = status_update_store_in(records)
-        store.append(_APPROVED)
+        asyncio.run(store.append(_APPROVED))
         records.writes.clear()
         monkeypatch.setattr(publication, "set_published", partial(set_published, now=_NOW))
         monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
@@ -395,7 +396,7 @@ class TestHandlePublishedActionOverRealServices:
 
         copy = render_copy_ready(_published(), build_profile_labels("en-US"), build_profile_labels("fr-FR"))
         assert records.writes == ["update"]
-        assert store.latest(_INCIDENT).data == _published()
+        assert asyncio.run(store.latest(_INCIDENT)).data == _published()
         assert client.views_update.call_args_list == [
             call(view_id=_VIEW_ID, hash=_VIEW_HASH, view=build_copy_ready_view(copy, "en-US", _metadata(), update=_published()))
         ]

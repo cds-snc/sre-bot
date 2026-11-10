@@ -135,9 +135,9 @@ class _CountingIncidents(InMemoryIncidentStore):
         self._failure = failure
         self.calls: list[str] = []
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return self._failure if self._failure is not None else super().read_security_flag(incident_id)
+        return self._failure if self._failure is not None else await super().read_security_flag(incident_id)
 
 
 def _legacy_item_store(**overrides: Any) -> IncidentStore:
@@ -161,11 +161,11 @@ _PENDING = _record(1, StatusUpdateState.DRAFT)
 _CURRENT = StatusUpdateEdit(stage=_PENDING.stage, en=_PENDING.en, fr=_PENDING.fr)
 
 
-def _pending_store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
+async def _pending_store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
     """A store holding ``records``, or only ``_PENDING`` when none are given."""
     store = InMemoryStatusUpdateStore()
     for record in records or (_PENDING,):
-        store.append(record)
+        await store.append(record)
     return store
 
 
@@ -178,8 +178,8 @@ async def _draft(
     incidents: IncidentStore | None = None,
     security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
-    store = store if store is not None else _pending_store()
-    latest = store.latest(_INCIDENT).data
+    store = store if store is not None else await _pending_store()
+    latest = (await store.latest(_INCIDENT)).data
     return await generate_status_update_draft(
         incidents if incidents is not None else _CountingIncidents(),
         slack_conversation(_CHANNEL),
@@ -200,7 +200,7 @@ class TestSecurityGateRefusesASecurityIncident:
     @pytest.mark.asyncio
     async def test_refuses_a_security_incident_with_security_confirmation_required(self) -> None:
         """A security incident with security_confirmed=False refuses before any model call."""
-        store = _pending_store()
+        store = await _pending_store()
         generator = _StubGenerator()
 
         result = await _draft(store=store, incidents=_CountingIncidents(security_incident=True), generator=generator)
@@ -209,7 +209,7 @@ class TestSecurityGateRefusesASecurityIncident:
         assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
         assert generator.calls == []
         # The pending draft is still the only record
-        listed = store.list_for_incident(_INCIDENT)
+        listed = await store.list_for_incident(_INCIDENT)
         assert listed.data == (_PENDING,)
 
     @pytest.mark.asyncio
@@ -230,7 +230,7 @@ class TestSecurityGateRefusesASecurityIncident:
             wording=_WORDING,
             on_started=mock_on_started,
             reader=_StubReader([_human("activity", 20)]),
-            store=_pending_store(),
+            store=await _pending_store(),
             generator=_StubGenerator(),
             security_confirmed=False,
             now=_NOW,
@@ -333,7 +333,7 @@ class TestSecurityGateBypassedByCarriedForward:
     @pytest.mark.asyncio
     async def test_carried_forward_branch_does_not_read_the_flag(self) -> None:
         """With nothing new and no instructions the fields are carried forward without reading the flag."""
-        store = _pending_store(_record(1, StatusUpdateState.APPROVED), replace(_PENDING, sequence=2))
+        store = await _pending_store(_record(1, StatusUpdateState.APPROVED), replace(_PENDING, sequence=2))
         reader = _StubReader([_human("before the approval", 90)])
         incidents = _CountingIncidents(security_incident=True)
 

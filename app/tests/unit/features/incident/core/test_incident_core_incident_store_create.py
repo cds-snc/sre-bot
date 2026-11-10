@@ -63,32 +63,32 @@ def _stored(records: InMemoryRecordStore, key: dict[str, Any]) -> dict[str, Any]
     return result.data if result.is_success else None
 
 
-def test_create_returns_the_incident_and_it_is_readable_and_open(store: IncidentStore) -> None:
+async def test_create_returns_the_incident_and_it_is_readable_and_open(store: IncidentStore) -> None:
     """An incident with no surface is complete: read back by id and listed as open."""
     incident = declared_incident(INCIDENT_ID)
 
-    result = store.create(incident)
+    result = await store.create(incident)
 
     assert result.is_success
     assert result.data == incident
-    assert store.get(INCIDENT_ID).data == incident
-    assert [listed.id for listed in store.list_open().data or []] == [INCIDENT_ID]
+    assert (await store.get(INCIDENT_ID)).data == incident
+    assert [listed.id for listed in (await store.list_open()).data or []] == [INCIDENT_ID]
 
 
-def test_an_incident_without_a_surface_is_matched_to_no_conversation(store: IncidentStore) -> None:
+async def test_an_incident_without_a_surface_is_matched_to_no_conversation(store: IncidentStore) -> None:
     """Nothing binds it, so no conversation lookup returns it."""
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
 
-    lookup = store.find_by_conversation(slack_conversation("C0INCIDENT"))
+    lookup = await store.find_by_conversation(slack_conversation("C0INCIDENT"))
 
     assert (lookup.status, lookup.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
 
 
-def test_create_puts_one_end_state_record_and_no_binding() -> None:
+async def test_create_puts_one_end_state_record_and_no_binding() -> None:
     """One conditional put on the incidents table; the record carries version 2, the open bucket and no conversation copy."""
     records = FlakyRecordStore()
 
-    assert record_incident_store(records).create(declared_incident(INCIDENT_ID)).is_success
+    assert (await record_incident_store(records).create(declared_incident(INCIDENT_ID))).is_success
 
     assert records.writes == [(_incidents().name, "put_if_not_exists")]
     record = _stored(records, {"id": INCIDENT_ID})
@@ -99,11 +99,11 @@ def test_create_puts_one_end_state_record_and_no_binding() -> None:
     assert "channel_id" not in record
 
 
-def test_a_failed_record_write_is_classified_with_a_generic_message() -> None:
+async def test_a_failed_record_write_is_classified_with_a_generic_message() -> None:
     """The store's status, code and retry hint are kept; nothing is stored."""
     records = FlakyRecordStore({_incidents().name: 1})
 
-    result = record_incident_store(records).create(declared_incident(INCIDENT_ID))
+    result = await record_incident_store(records).create(declared_incident(INCIDENT_ID))
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "ServiceUnavailable", 2)
     assert result.message == "The incident store is unavailable."
@@ -111,54 +111,54 @@ def test_a_failed_record_write_is_classified_with_a_generic_message() -> None:
 
 
 @pytest.mark.parametrize("landed", [False, True], ids=["failed", "lost-response"])
-def test_a_same_id_retry_converges_on_one_record(landed: bool) -> None:
+async def test_a_same_id_retry_converges_on_one_record(landed: bool) -> None:
     """Whether the write failed or landed with its response lost, retrying the same id stores the record once."""
     records = FlakyRecordStore({_incidents().name: 1}, landed=landed)
     store = record_incident_store(records)
     incident = declared_incident(INCIDENT_ID)
-    assert not store.create(incident).is_success
+    assert not (await store.create(incident)).is_success
 
-    retry = store.create(incident)
+    retry = await store.create(incident)
 
     assert retry.is_success
     assert retry.data == incident
     assert len(records.read_all(_incidents(), max_items=10).data or []) == 1
 
 
-def test_a_new_id_retry_after_a_lost_response_leaves_an_orphan_open_incident() -> None:
+async def test_a_new_id_retry_after_a_lost_response_leaves_an_orphan_open_incident() -> None:
     """The documented residual: two open records, neither with a surface, so no conversation is made ambiguous."""
     records = FlakyRecordStore({_incidents().name: 1}, landed=True)
     store = record_incident_store(records)
-    assert not store.create(declared_incident(INCIDENT_ID)).is_success
+    assert not (await store.create(declared_incident(INCIDENT_ID))).is_success
 
-    assert store.create(declared_incident(RETRY_ID)).is_success
+    assert (await store.create(declared_incident(RETRY_ID))).is_success
 
-    assert sorted(listed.id for listed in store.list_open().data or []) == [INCIDENT_ID, RETRY_ID]
+    assert sorted(listed.id for listed in (await store.list_open()).data or []) == [INCIDENT_ID, RETRY_ID]
 
 
-def test_a_replay_returns_the_stored_incident_and_rewrites_nothing(store: IncidentStore) -> None:
+async def test_a_replay_returns_the_stored_incident_and_rewrites_nothing(store: IncidentStore) -> None:
     """A second create of the same id answers what is stored, including a reference set in between."""
     incident = declared_incident(INCIDENT_ID)
-    assert store.create(incident).is_success
+    assert (await store.create(incident)).is_success
     report = ReportReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="1DOC")
-    assert store.set_reference(INCIDENT_ID, ReferenceKind.REPORT, report).is_success
+    assert (await store.set_reference(INCIDENT_ID, ReferenceKind.REPORT, report)).is_success
 
-    replay = store.create(dataclasses.replace(incident, title="Changed on replay"))
+    replay = await store.create(dataclasses.replace(incident, title="Changed on replay"))
 
     assert replay.is_success
     assert replay.data == dataclasses.replace(incident, report=report)
-    assert store.get(INCIDENT_ID).data == dataclasses.replace(incident, report=report)
+    assert (await store.get(INCIDENT_ID)).data == dataclasses.replace(incident, report=report)
 
 
-def test_a_replay_on_the_real_store_writes_no_item() -> None:
+async def test_a_replay_on_the_real_store_writes_no_item() -> None:
     """The conditional put finds the item, so the stored record is unchanged."""
     records = FlakyRecordStore()
     store = record_incident_store(records)
     incident = declared_incident(INCIDENT_ID)
-    assert store.create(incident).is_success
+    assert (await store.create(incident)).is_success
     before = _stored(records, {"id": INCIDENT_ID})
 
-    assert store.create(dataclasses.replace(incident, title="Changed")).is_success
+    assert (await store.create(dataclasses.replace(incident, title="Changed"))).is_success
 
     assert _stored(records, {"id": INCIDENT_ID}) == before
 
@@ -173,11 +173,11 @@ def test_a_replay_on_the_real_store_writes_no_item() -> None:
     ids=["closed", "in-progress", "with-conversation"],
 )
 @pytest.mark.parametrize("kind", sorted(STORES))
-def test_a_caller_error_raises_and_writes_nothing(incident: Incident, message: str, kind: str) -> None:
+async def test_a_caller_error_raises_and_writes_nothing(incident: Incident, message: str, kind: str) -> None:
     """Only a new open incident is created; its conversation arrives only through attach_conversation."""
     store = STORES[kind]()
 
     with pytest.raises(ValueError, match=message):
-        store.create(incident)
+        await store.create(incident)
 
-    assert store.get(INCIDENT_ID).status is OperationStatus.NOT_FOUND
+    assert (await store.get(INCIDENT_ID)).status is OperationStatus.NOT_FOUND

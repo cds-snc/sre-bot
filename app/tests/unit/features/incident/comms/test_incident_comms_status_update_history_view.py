@@ -434,7 +434,7 @@ class TestCommandShowsOverview:
         overview = StatusUpdateOverview(pending=_DRAFT, approved=(_APPROVED, _PUBLISHED))
         reads: list[ConversationReference] = []
 
-        def read_overview(
+        async def read_overview(
             _: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
         ) -> OperationResult[StatusUpdateOverview]:
             reads.append(conversation)

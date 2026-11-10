@@ -257,7 +257,7 @@ async def draft_incident_document_from_conversation(
     """
     log = logger.bind(operation="draft_incident_document_from_conversation", conversation_id=conversation.vendor_id)
 
-    found = find_incident_for_conversation(incidents, conversation)
+    found = await find_incident_for_conversation(incidents, conversation)
     if not found.is_success and found.status is not OperationStatus.NOT_FOUND:
         log.warning("incident_draft_incident_lookup_failed", status=found.status, error_code=found.error_code)
         return OperationResult.error(

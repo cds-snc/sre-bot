@@ -52,10 +52,10 @@ def test_build_returns_a_status_update_store() -> None:
     assert isinstance(build_status_update_store(InMemoryRecordStore(), _settings()), StatusUpdateStore)
 
 
-def test_build_writes_to_the_table_named_in_the_settings() -> None:
+async def test_build_writes_to_the_table_named_in_the_settings() -> None:
     records = InMemoryRecordStore()
 
-    assert build_status_update_store(records, _settings()).append(DRAFT).is_success
+    assert (await build_status_update_store(records, _settings()).append(DRAFT)).is_success
 
     key = {"PK": PK, "SK": "UPDATE#000001"}
     assert records.get(status_updates_table(TABLE_NAME), key).is_success

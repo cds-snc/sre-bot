@@ -17,7 +17,7 @@ from features.incident.core.api import (
 )
 
 
-def get_status_update_overview(
+async def get_status_update_overview(
     incidents: IncidentStore,
     conversation: ConversationReference,
     *,
@@ -36,11 +36,11 @@ def get_status_update_overview(
         check's refusal (``NOT_AN_INCIDENT``, ``AMBIGUOUS_INCIDENT_CONVERSATION``) or
         the store's classified error.
     """
-    incident = find_incident_for_conversation(incidents, conversation)
+    incident = await find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return failure(incident)
 
-    listed = store.list_for_incident(incident.data.id)
+    listed = await store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     latest = listed.data[0] if listed.data else None

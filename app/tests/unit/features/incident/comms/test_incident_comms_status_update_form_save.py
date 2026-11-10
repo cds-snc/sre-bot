@@ -85,7 +85,7 @@ class _Calls:
         self.saves: list[dict[str, Any]] = []
         self.reads: list[tuple[str, int, StatusUpdateStore]] = []
 
-    def save(
+    async def save(
         self, incidents: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
     ) -> OperationResult[StatusUpdate]:
         assert isinstance(incidents, IncidentStore)
@@ -192,23 +192,31 @@ async def test_open_passes_on_a_read_error(monkeypatch: pytest.MonkeyPatch) -> N
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
 
 
-def test_start_returns_the_started_draft_with_its_kind(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_start_returns_the_started_draft_with_its_kind(monkeypatch: pytest.MonkeyPatch) -> None:
     """New update shows the started draft, how it came to be, and the AI flag."""
     outcome = StatusUpdateDraftOutcome(update=_STORED, kind=StatusUpdateOutcomeKind.MANUAL)
-    monkeypatch.setattr(form, "start_status_update_draft", lambda *_, **__: OperationResult.success(data=outcome))
+
+    async def started(*_: Any, **__: Any) -> OperationResult[StatusUpdateDraftOutcome]:
+        return OperationResult.success(data=outcome)
+
+    monkeypatch.setattr(form, "start_status_update_draft", started)
     monkeypatch.setattr(form, "text_generation_available", lambda: True)
 
-    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
+    result = await start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
 
     assert result.is_success and result.data is not None
     assert (result.data.update, result.data.kind, result.data.ai_available) == (_STORED, StatusUpdateOutcomeKind.MANUAL, True)
 
 
-def test_start_passes_on_its_error(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_start_passes_on_its_error(monkeypatch: pytest.MonkeyPatch) -> None:
     """A start that fails returns the same classified error."""
     failed: OperationResult[Any] = OperationResult.permanent_error(message="no incident", error_code=ErrorCode.NOT_FOUND)
-    monkeypatch.setattr(form, "start_status_update_draft", lambda *_, **__: failed)
 
-    result = start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
+    async def start_failed(*_: Any, **__: Any) -> OperationResult[Any]:
+        return failed
+
+    monkeypatch.setattr(form, "start_status_update_draft", start_failed)
+
+    result = await start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
 
     assert (result.is_success, result.error_code) == (False, ErrorCode.NOT_FOUND)

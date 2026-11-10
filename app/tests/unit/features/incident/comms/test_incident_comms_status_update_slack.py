@@ -11,7 +11,7 @@ import importlib.util
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from structlog.testing import capture_logs
@@ -123,7 +123,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -140,7 +140,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -167,7 +167,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
+            new=AsyncMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
             handle_status_update_command(payload, {}, reply, incident_scopes())
 
@@ -191,7 +191,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.error(
                     OperationStatus.NOT_FOUND,
                     message="no incident",
@@ -212,7 +212,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.permanent_error(
                     message="multiple incidents",
                     error_code=ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION,
@@ -231,7 +231,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.transient_error(
                     message="throttled",
                     error_code=ErrorCode.RATE_LIMITED,
@@ -257,7 +257,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -285,7 +285,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -302,7 +302,7 @@ class TestHandleStatusUpdateCommand:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -322,7 +322,7 @@ class TestOverviewButtonsInViews:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.success(data=StatusUpdateOverview(pending=_pending_update(), approved=()))
             ),
         ):
@@ -341,7 +341,7 @@ class TestOverviewButtonsInViews:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
+            new=AsyncMock(return_value=OperationResult.success(data=StatusUpdateOverview(pending=None, approved=()))),
         ):
             handle_status_update_command(payload, {}, reply, incident_scopes())
 
@@ -358,7 +358,7 @@ class TestOverviewButtonsInViews:
 
         with patch(
             "features.incident.comms.entrypoints.slack.get_status_update_overview",
-            new=MagicMock(
+            new=AsyncMock(
                 return_value=OperationResult.error(
                     OperationStatus.NOT_FOUND,
                     message="no incident",

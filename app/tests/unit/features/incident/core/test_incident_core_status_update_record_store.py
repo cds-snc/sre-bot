@@ -160,20 +160,20 @@ def test_the_table_is_keyed_by_the_provisioned_partition_and_sort_attributes() -
     assert (TABLE.name, TABLE.key.partition, TABLE.key.sort) == ("sre_bot_incident_status_updates", "PK", "SK")
 
 
-def test_append_stores_the_item_layout_the_provisioned_table_holds() -> None:
+async def test_append_stores_the_item_layout_the_provisioned_table_holds() -> None:
     records = InMemoryRecordStore()
 
-    result = _store(records).append(DRAFT)
+    result = await _store(records).append(DRAFT)
 
     assert result.is_success and result.data == DRAFT
     assert _stored(records) == DRAFT_ITEM
 
 
-def test_optional_attributes_are_written_only_when_set() -> None:
+async def test_optional_attributes_are_written_only_when_set() -> None:
     records = InMemoryRecordStore()
     published = replace(PUBLISHED, origin=StatusUpdateOrigin.MODEL)
 
-    _store(records).append(published)
+    await _store(records).append(published)
 
     assert _stored(records) == {
         **DRAFT_ITEM,
@@ -189,110 +189,110 @@ def test_optional_attributes_are_written_only_when_set() -> None:
 
 
 @pytest.mark.parametrize("origin", [None, *StatusUpdateOrigin])
-def test_a_record_reads_back_with_every_field(origin: StatusUpdateOrigin | None) -> None:
+async def test_a_record_reads_back_with_every_field(origin: StatusUpdateOrigin | None) -> None:
     store = _store()
     record = replace(PUBLISHED, origin=origin)
-    store.append(record)
+    await store.append(record)
 
-    assert store.latest(INCIDENT_ID).data == record
+    assert (await store.latest(INCIDENT_ID)).data == record
 
 
-def test_append_at_a_sequence_taken_by_another_record_is_a_conflict() -> None:
+async def test_append_at_a_sequence_taken_by_another_record_is_a_conflict() -> None:
     records = InMemoryRecordStore()
     store = _store(records)
-    store.append(DRAFT)
+    await store.append(DRAFT)
 
-    result = store.append(replace(DRAFT, author="U0OTHER"))
+    result = await store.append(replace(DRAFT, author="U0OTHER"))
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
     assert _stored(records) == DRAFT_ITEM
 
 
-def test_a_second_append_of_identical_content_is_a_conflict() -> None:
+async def test_a_second_append_of_identical_content_is_a_conflict() -> None:
     """Only the writing call's own SDK retry is resolved as created; another call writing the same content lost the race."""
     store = _store()
-    store.append(DRAFT)
+    await store.append(DRAFT)
 
-    result = store.append(DRAFT)
+    result = await store.append(DRAFT)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
 
 
-def test_latest_for_an_incident_without_updates_is_success_with_nothing() -> None:
-    result = _store().latest(INCIDENT_ID)
+async def test_latest_for_an_incident_without_updates_is_success_with_nothing() -> None:
+    result = await _store().latest(INCIDENT_ID)
 
     assert result.is_success and result.data is None
 
 
-def test_latest_is_the_highest_sequence_of_the_incident() -> None:
+async def test_latest_is_the_highest_sequence_of_the_incident() -> None:
     store = _store()
     for sequence in (1, 2, 3):
-        store.append(replace(DRAFT, sequence=sequence))
-    store.append(replace(DRAFT, incident_id=OTHER_INCIDENT_ID, sequence=9))
+        await store.append(replace(DRAFT, sequence=sequence))
+    await store.append(replace(DRAFT, incident_id=OTHER_INCIDENT_ID, sequence=9))
 
-    result = store.latest(INCIDENT_ID)
+    result = await store.latest(INCIDENT_ID)
 
     assert result.data is not None and result.data.sequence == 3
 
 
-def test_list_is_newest_first_and_scoped_to_the_incident() -> None:
+async def test_list_is_newest_first_and_scoped_to_the_incident() -> None:
     store = _store()
     for sequence in (2, 1, 10):
-        store.append(replace(DRAFT, sequence=sequence))
-    store.append(replace(DRAFT, incident_id=OTHER_INCIDENT_ID, sequence=4))
+        await store.append(replace(DRAFT, sequence=sequence))
+    await store.append(replace(DRAFT, incident_id=OTHER_INCIDENT_ID, sequence=4))
 
-    result = store.list_for_incident(INCIDENT_ID)
+    result = await store.list_for_incident(INCIDENT_ID)
 
     assert result.data is not None and [update.sequence for update in result.data] == [10, 2, 1]
 
 
-def test_reads_skip_other_items_in_the_incident_partition() -> None:
+async def test_reads_skip_other_items_in_the_incident_partition() -> None:
     """The partition may hold per-incident items that are not updates, under another sort-key prefix."""
     records = InMemoryRecordStore()
     store = _store(records)
-    store.append(DRAFT)
+    await store.append(DRAFT)
     records.put(TABLE, {"PK": PK, "SK": "PERIODIC", "state": "on"})
 
-    assert store.latest(INCIDENT_ID).data == DRAFT
-    assert store.list_for_incident(INCIDENT_ID).data == (DRAFT,)
+    assert (await store.latest(INCIDENT_ID)).data == DRAFT
+    assert (await store.list_for_incident(INCIDENT_ID)).data == (DRAFT,)
 
 
-def test_transition_replaces_the_record_while_it_is_in_the_expected_state() -> None:
+async def test_transition_replaces_the_record_while_it_is_in_the_expected_state() -> None:
     store = _store()
-    store.append(DRAFT)
+    await store.append(DRAFT)
 
-    result = store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
+    result = await store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
 
     assert result.is_success and result.data == APPROVED
-    assert store.latest(INCIDENT_ID).data == APPROVED
+    assert (await store.latest(INCIDENT_ID)).data == APPROVED
 
 
-def test_transition_after_the_state_moved_on_is_a_conflict_and_writes_nothing() -> None:
+async def test_transition_after_the_state_moved_on_is_a_conflict_and_writes_nothing() -> None:
     store = _store()
-    store.append(APPROVED)
+    await store.append(APPROVED)
 
-    result = store.transition(replace(APPROVED, approver="U0OTHER"), expected_state=StatusUpdateState.DRAFT)
-
-    assert result.status is OperationStatus.PERMANENT_ERROR
-    assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
-    assert store.latest(INCIDENT_ID).data == APPROVED
-
-
-def test_transition_of_a_missing_record_is_a_conflict() -> None:
-    result = _store().transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
+    result = await store.transition(replace(APPROVED, approver="U0OTHER"), expected_state=StatusUpdateState.DRAFT)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
+    assert (await store.latest(INCIDENT_ID)).data == APPROVED
 
 
-def test_a_repeated_transition_is_a_conflict() -> None:
+async def test_transition_of_a_missing_record_is_a_conflict() -> None:
+    result = await _store().transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
+
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
+
+
+async def test_a_repeated_transition_is_a_conflict() -> None:
     """A write that already landed leaves the guard unmet; the comms callers re-read to recognise their own write."""
     store = _store()
-    store.append(DRAFT)
-    store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
+    await store.append(DRAFT)
+    await store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
 
-    result = store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
+    result = await store.transition(APPROVED, expected_state=StatusUpdateState.DRAFT)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
 
@@ -305,43 +305,43 @@ def test_a_repeated_transition_is_a_conflict() -> None:
         (APPROVED, StatusUpdateState.APPROVED),
     ],
 )
-def test_an_illegal_transition_raises_before_any_write(record: StatusUpdate, expected_state: StatusUpdateState) -> None:
+async def test_an_illegal_transition_raises_before_any_write(record: StatusUpdate, expected_state: StatusUpdateState) -> None:
     records = _FailingRecordStore(OperationResult.success(data=None))
 
     with pytest.raises(ValueError, match="no status update transition"):
-        _store(records).transition(record, expected_state=expected_state)
+        await _store(records).transition(record, expected_state=expected_state)
     assert records.calls == []
 
 
-def test_publishing_writes_who_published_it() -> None:
+async def test_publishing_writes_who_published_it() -> None:
     store = _store()
-    store.append(APPROVED)
+    await store.append(APPROVED)
 
-    result = store.transition(PUBLISHED, expected_state=StatusUpdateState.APPROVED)
+    result = await store.transition(PUBLISHED, expected_state=StatusUpdateState.APPROVED)
 
     assert result.is_success
-    assert store.latest(INCIDENT_ID).data == PUBLISHED
+    assert (await store.latest(INCIDENT_ID)).data == PUBLISHED
 
 
-def test_marking_not_published_removes_who_published_it() -> None:
+async def test_marking_not_published_removes_who_published_it() -> None:
     records = InMemoryRecordStore()
     store = _store(records)
-    store.append(PUBLISHED)
+    await store.append(PUBLISHED)
 
-    result = store.transition(APPROVED, expected_state=StatusUpdateState.PUBLISHED)
+    result = await store.transition(APPROVED, expected_state=StatusUpdateState.PUBLISHED)
 
     assert result.is_success
     stored = _stored(records)
     assert stored is not None and "published_at" not in stored and "published_by" not in stored
-    assert store.latest(INCIDENT_ID).data == APPROVED
+    assert (await store.latest(INCIDENT_ID)).data == APPROVED
 
 
-def test_a_published_item_without_published_by_reads_as_nobody() -> None:
+async def test_a_published_item_without_published_by_reads_as_nobody() -> None:
     records = InMemoryRecordStore()
     store = _store(records)
-    store.append(replace(PUBLISHED, published_by=None))
+    await store.append(replace(PUBLISHED, published_by=None))
 
-    assert store.latest(INCIDENT_ID).data == replace(PUBLISHED, published_by=None)
+    assert (await store.latest(INCIDENT_ID)).data == replace(PUBLISHED, published_by=None)
 
 
 @pytest.mark.parametrize(
@@ -353,21 +353,21 @@ def test_a_published_item_without_published_by_reads_as_nobody() -> None:
         {"en": {"impact": "only one field"}},
     ],
 )
-def test_a_malformed_stored_item_is_unreadable(change: dict[str, Any]) -> None:
+async def test_a_malformed_stored_item_is_unreadable(change: dict[str, Any]) -> None:
     records = InMemoryRecordStore()
     records.put(TABLE, {**DRAFT_ITEM, **change})
     store = _store(records)
 
-    for result in (store.latest(INCIDENT_ID), store.list_for_incident(INCIDENT_ID)):
+    for result in (await store.latest(INCIDENT_ID), await store.list_for_incident(INCIDENT_ID)):
         assert result.status is OperationStatus.PERMANENT_ERROR
         assert result.error_code == ErrorCode.STATUS_UPDATE_UNREADABLE
 
 
-def test_a_stored_item_missing_an_attribute_is_unreadable() -> None:
+async def test_a_stored_item_missing_an_attribute_is_unreadable() -> None:
     records = InMemoryRecordStore()
     records.put(TABLE, {key: value for key, value in DRAFT_ITEM.items() if key != "author"})
 
-    result = _store(records).latest(INCIDENT_ID)
+    result = await _store(records).latest(INCIDENT_ID)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_UNREADABLE
 
@@ -382,12 +382,12 @@ def test_a_stored_item_missing_an_attribute_is_unreadable() -> None:
     ],
     ids=["append", "transition", "latest", "list_for_incident"],
 )
-def test_a_backend_failure_keeps_its_classification_with_a_generic_message(operation: Any) -> None:
+async def test_a_backend_failure_keeps_its_classification_with_a_generic_message(operation: Any) -> None:
     failure = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR, message=BACKEND_DETAIL, error_code="ThrottlingException", retry_after=3
     )
 
-    result = operation(_store(_FailingRecordStore(failure)))
+    result = await operation(_store(_FailingRecordStore(failure)))
 
     assert (result.status, result.error_code, result.retry_after) == (
         OperationStatus.TRANSIENT_ERROR,
@@ -406,10 +406,10 @@ def test_a_backend_failure_keeps_its_classification_with_a_generic_message(opera
     ],
     ids=["latest", "list_for_incident", "transition"],
 )
-def test_a_missing_table_is_a_permanent_error_not_an_empty_history_or_a_conflict(operation: Any) -> None:
+async def test_a_missing_table_is_a_permanent_error_not_an_empty_history_or_a_conflict(operation: Any) -> None:
     missing = OperationResult.error(OperationStatus.NOT_FOUND, message=BACKEND_DETAIL, error_code="ResourceNotFoundException")
 
-    result = operation(_store(_FailingRecordStore(missing)))
+    result = await operation(_store(_FailingRecordStore(missing)))
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == "ResourceNotFoundException"

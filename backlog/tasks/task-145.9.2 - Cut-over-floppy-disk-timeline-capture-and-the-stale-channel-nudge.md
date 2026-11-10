@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:52:00Z'
+updated_date: '2026-11-10T21:47:00Z'
 labels:
   - incident
   - features
@@ -38,4 +38,6 @@ Stack L L10b. Reaction handlers registered by incident.response write timeline r
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-10: captured_entry_id is built here (uuid5 under TIMELINE_NAMESPACE in core/adapters/timeline_items.py from TASK-145.8.1); captured entries are TimelineEntry kind message with source_message, appended through TimelineStore.append.
+
+2026-11-10 (TASK-145.8.7 planning): TimelineStore stays sync after TASK-145.8.7 because only the store bodies call it; when this task (or 145.9.1) gives it an async consumer, it becomes async def with its Record adapter offloading (decisions/outbound-clients.md async-port rule).
 <!-- SECTION:NOTES:END -->

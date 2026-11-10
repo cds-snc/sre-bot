@@ -60,16 +60,16 @@ STORES: dict[str, Callable[[], IncidentStore]] = {"real": _real, "fake": InMemor
 
 
 @pytest.fixture(params=sorted(STORES))
-def store(request: pytest.FixtureRequest) -> IncidentStore:
+async def store(request: pytest.FixtureRequest) -> IncidentStore:
     """A real store or fake holding one created incident with no surface."""
     created = STORES[request.param]()
-    assert created.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await created.create(declared_incident(INCIDENT_ID))).is_success
     return created
 
 
-def _created(records: InMemoryRecordStore) -> IncidentStore:
+async def _created(records: InMemoryRecordStore) -> IncidentStore:
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
     return store
 
 
@@ -77,67 +77,67 @@ def _record(records: InMemoryRecordStore) -> dict[str, Any]:
     return records.get(_incidents(), {"id": INCIDENT_ID}).data or {}
 
 
-def test_a_primary_attach_makes_the_conversation_the_incidents(store: IncidentStore) -> None:
+async def test_a_primary_attach_makes_the_conversation_the_incidents(store: IncidentStore) -> None:
     """The answer, a later read and the conversation lookup all carry the attached conversation."""
     expected = dataclasses.replace(declared_incident(INCIDENT_ID), conversation=slack_conversation(CHANNEL))
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert result.is_success
     assert result.data == expected
-    assert store.get(INCIDENT_ID).data == expected
-    assert store.find_by_conversation(slack_conversation(CHANNEL)).data == expected
+    assert (await store.get(INCIDENT_ID)).data == expected
+    assert (await store.find_by_conversation(slack_conversation(CHANNEL))).data == expected
 
 
-def test_attaching_the_same_conversation_again_is_a_no_op(store: IncidentStore) -> None:
+async def test_attaching_the_same_conversation_again_is_a_no_op(store: IncidentStore) -> None:
     """A retry or a replay answers the same incident."""
-    first = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    first = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
-    second = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    second = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert second.is_success
     assert second.data == first.data
 
 
-def test_another_conversation_on_the_record_is_a_conflict_and_nothing_moves(store: IncidentStore) -> None:
+async def test_another_conversation_on_the_record_is_a_conflict_and_nothing_moves(store: IncidentStore) -> None:
     """Moving the primary conversation is recreate's job; the new channel is not bound."""
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(OTHER_CHANNEL, INCIDENT_ID))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(OTHER_CHANNEL, INCIDENT_ID))
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INCIDENT_RECORD_CONFLICT)
-    assert store.get(INCIDENT_ID).data == dataclasses.replace(
+    assert (await store.get(INCIDENT_ID)).data == dataclasses.replace(
         declared_incident(INCIDENT_ID), conversation=slack_conversation(CHANNEL)
     )
-    lookup = store.find_by_conversation(slack_conversation(OTHER_CHANNEL))
+    lookup = await store.find_by_conversation(slack_conversation(OTHER_CHANNEL))
     assert lookup.error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
+async def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
     """No binding is left for an incident that does not exist."""
-    result = store.attach_conversation("inc-missing", binding_on(CHANNEL, "inc-missing"))
+    result = await store.attach_conversation("inc-missing", binding_on(CHANNEL, "inc-missing"))
 
     assert (result.status, result.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
-    assert store.find_by_conversation(slack_conversation(CHANNEL)).error_code == ErrorCode.NOT_AN_INCIDENT
+    assert (await store.find_by_conversation(slack_conversation(CHANNEL))).error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_a_secondary_conversation_is_bound_without_changing_the_record(store: IncidentStore) -> None:
+async def test_a_secondary_conversation_is_bound_without_changing_the_record(store: IncidentStore) -> None:
     """A non-primary binding is another way in; the record's conversation copy stays the primary's."""
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(OTHER_CHANNEL, INCIDENT_ID, primary=False))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(OTHER_CHANNEL, INCIDENT_ID, primary=False))
 
     assert result.is_success
     assert result.data is not None
     assert result.data.conversation == slack_conversation(CHANNEL)
-    assert store.find_by_conversation(slack_conversation(OTHER_CHANNEL)).data == result.data
+    assert (await store.find_by_conversation(slack_conversation(OTHER_CHANNEL))).data == result.data
 
 
-def test_the_same_channel_under_another_tenant_is_not_matched(store: IncidentStore) -> None:
+async def test_the_same_channel_under_another_tenant_is_not_matched(store: IncidentStore) -> None:
     """The conversation is matched with its system and tenant."""
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
-    lookup = store.find_by_conversation(slack_conversation(CHANNEL, tenant="T0OTHER"))
+    lookup = await store.find_by_conversation(slack_conversation(CHANNEL, tenant="T0OTHER"))
 
     assert (lookup.status, lookup.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
 
@@ -150,34 +150,34 @@ def test_the_same_channel_under_another_tenant_is_not_matched(store: IncidentSto
     ],
     ids=["other-incident", "archived"],
 )
-def test_a_caller_error_raises_and_writes_nothing(store: IncidentStore, binding: IncidentBinding, message: str) -> None:
+async def test_a_caller_error_raises_and_writes_nothing(store: IncidentStore, binding: IncidentBinding, message: str) -> None:
     """Only an active binding of this incident can be attached."""
     with pytest.raises(ValueError, match=message):
-        store.attach_conversation(INCIDENT_ID, binding)
+        await store.attach_conversation(INCIDENT_ID, binding)
 
-    assert store.find_by_conversation(slack_conversation(CHANNEL)).error_code == ErrorCode.NOT_AN_INCIDENT
+    assert (await store.find_by_conversation(slack_conversation(CHANNEL))).error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_the_binding_is_written_before_the_record_copy() -> None:
+async def test_the_binding_is_written_before_the_record_copy() -> None:
     """The lookup reads bindings first, so the binding lands before the record names the conversation."""
     records = FlakyRecordStore()
-    store = _created(records)
+    store = await _created(records)
     records.writes.clear()
 
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
     assert records.writes == [(_bindings().name, "put_if_not_exists"), (_incidents().name, "update")]
     assert _record(records)["conversation"] == {"system": "slack", "tenant": "T0SLACK", "vendor_id": CHANNEL}
     assert _record(records)["channel_id"] == CHANNEL
 
 
-def test_a_failed_binding_write_leaves_the_record_unchanged() -> None:
+async def test_a_failed_binding_write_leaves_the_record_unchanged() -> None:
     """No record copy is written without its binding; the error is classified with a generic message."""
     records = FlakyRecordStore({_bindings().name: 1})
-    store = _created(records)
+    store = await _created(records)
     records.writes.clear()
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert (result.status, result.error_code) == (OperationStatus.TRANSIENT_ERROR, "ServiceUnavailable")
     assert result.message == "The incident store is unavailable."
@@ -185,16 +185,16 @@ def test_a_failed_binding_write_leaves_the_record_unchanged() -> None:
     assert "conversation" not in _record(records)
 
 
-def test_a_failed_record_copy_leaves_a_live_binding_and_a_retry_completes_it() -> None:
+async def test_a_failed_record_copy_leaves_a_live_binding_and_a_retry_completes_it() -> None:
     """Between the steps the lookup already finds the incident through its binding; the retry writes the copy."""
     records = FlakyRecordStore(fail_updates={_incidents().name: 1})
-    store = _created(records)
+    store = await _created(records)
 
-    failed = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    failed = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert failed.status is OperationStatus.TRANSIENT_ERROR
-    assert store.find_by_conversation(slack_conversation(CHANNEL)).data == declared_incident(INCIDENT_ID)
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.find_by_conversation(slack_conversation(CHANNEL))).data == declared_incident(INCIDENT_ID)
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
     assert _record(records)["channel_id"] == CHANNEL
 
 
@@ -222,54 +222,54 @@ class GuardSpy(InMemoryRecordStore):
         return super().update(table, key, changes, expected=expected)
 
 
-def test_the_copy_is_guarded_on_the_version_and_no_stored_conversation() -> None:
+async def test_the_copy_is_guarded_on_the_version_and_no_stored_conversation() -> None:
     """Only an end-state record without a conversation receives the copy."""
     records = GuardSpy()
-    store = _created(records)
+    store = await _created(records)
 
-    assert store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID)).is_success
+    assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
     assert records.guards == [{"record_version": RECORD_VERSION, "conversation": None}]
 
 
-def test_a_concurrent_attach_of_another_conversation_is_a_conflict() -> None:
+async def test_a_concurrent_attach_of_another_conversation_is_a_conflict() -> None:
     """When another writer stores a conversation between the read and the update, the guard fails and the re-read decides."""
     records = GuardSpy()
-    store = _created(records)
+    store = await _created(records)
     records.race_with = OTHER_CHANNEL
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert result.error_code == ErrorCode.INCIDENT_RECORD_CONFLICT
     assert _record(records)["channel_id"] == OTHER_CHANNEL
 
 
-def test_a_concurrent_attach_of_the_same_conversation_succeeds() -> None:
+async def test_a_concurrent_attach_of_the_same_conversation_succeeds() -> None:
     """The guard fails on a copy that already holds this conversation, which the re-read accepts."""
     records = GuardSpy()
-    store = _created(records)
+    store = await _created(records)
     records.race_with = CHANNEL
 
-    result = store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert result.is_success
     assert result.data is not None
     assert result.data.conversation == slack_conversation(CHANNEL)
 
 
-def test_a_legacy_item_is_a_conflict_and_nothing_is_written() -> None:
+async def test_a_legacy_item_is_a_conflict_and_nothing_is_written() -> None:
     """A legacy item is raised by the upgrade job, never patched by attach."""
     records = FlakyRecordStore()
     seed_legacy_incident(records, CHANNEL, incident_id=INCIDENT_ID)
     records.writes.clear()
 
-    result = record_incident_store(records).attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await record_incident_store(records).attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INCIDENT_RECORD_CONFLICT)
     assert records.writes == []
 
 
-def test_a_failed_record_read_is_classified_and_nothing_is_written() -> None:
+async def test_a_failed_record_read_is_classified_and_nothing_is_written() -> None:
     """A store that cannot be read is a classified failure, never a missing incident."""
 
     class Unreadable(FlakyRecordStore):
@@ -278,7 +278,7 @@ def test_a_failed_record_read_is_classified_and_nothing_is_written() -> None:
 
     records = Unreadable()
 
-    result = record_incident_store(records).attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
+    result = await record_incident_store(records).attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))
 
     assert (result.status, result.error_code) == (OperationStatus.TRANSIENT_ERROR, "Throttling")
     assert records.writes == []

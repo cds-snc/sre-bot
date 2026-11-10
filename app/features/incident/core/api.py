@@ -456,7 +456,7 @@ def resolve_new_incident_system(policy: WorkplaceSystem | None, systems: Configu
     raise SettingError(NEW_INCIDENT_SYSTEM_SETTING, f"is unset while several systems are configured ({names}); name one")
 
 
-def find_incident_for_conversation(store: IncidentStore, conversation: ConversationReference) -> OperationResult[Incident]:
+async def find_incident_for_conversation(store: IncidentStore, conversation: ConversationReference) -> OperationResult[Incident]:
     """Resolve the command's conversation to its incident, or a classified refusal.
 
     The command check every incident command applies first. A conversation that
@@ -464,7 +464,7 @@ def find_incident_for_conversation(store: IncidentStore, conversation: Conversat
     to several is PERMANENT_ERROR with ``AMBIGUOUS_INCIDENT_CONVERSATION``; a
     store failure is a classified error result, never an exception.
     """
-    return store.find_by_conversation(conversation)
+    return await store.find_by_conversation(conversation)
 
 
 async def conversation_is_writable(
