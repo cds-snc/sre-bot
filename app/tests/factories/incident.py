@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from contracts.operations import OperationResult
+from contracts.operations.status import OperationStatus
 from contracts.records import ExpectedValue, RecordChange, RecordStore, RecordTable
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
@@ -192,3 +193,45 @@ class CountingRecordStore(InMemoryRecordStore):
     def delete(self, table: RecordTable, key: dict[str, Any]) -> OperationResult:
         self.writes.append("delete")
         return super().delete(table, key)
+
+
+class FlakyRecordStore(InMemoryRecordStore):
+    """In-memory record store whose ``put_if_not_exists`` fails on chosen tables, and that records every write.
+
+    ``fail_puts`` maps a table name to how many of its next conditional puts fail
+    with a transient error. With ``landed`` the failing put still stores the item,
+    standing in for a write that reached the table but whose response was lost
+    past the SDK retries. ``writes`` lists each write as (table name, operation).
+    """
+
+    def __init__(self, fail_puts: Mapping[str, int] | None = None, *, landed: bool = False) -> None:
+        super().__init__()
+        self.fail_puts = dict(fail_puts or {})
+        self.landed = landed
+        self.writes: list[tuple[str, str]] = []
+
+    def put_if_not_exists(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        self.writes.append((table.name, "put_if_not_exists"))
+        if self.fail_puts.get(table.name, 0) > 0:
+            self.fail_puts[table.name] -= 1
+            if self.landed:
+                super().put_if_not_exists(table, item)
+            return OperationResult.error(
+                OperationStatus.TRANSIENT_ERROR, message="backend unavailable", error_code="ServiceUnavailable", retry_after=2
+            )
+        return super().put_if_not_exists(table, item)
+
+    def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        self.writes.append((table.name, "put"))
+        return super().put(table, item)
+
+    def update(
+        self,
+        table: RecordTable,
+        key: dict[str, Any],
+        changes: Sequence[RecordChange],
+        *,
+        expected: Mapping[str, ExpectedValue] | None = None,
+    ) -> OperationResult:
+        self.writes.append((table.name, "update"))
+        return super().update(table, key, changes, expected=expected)

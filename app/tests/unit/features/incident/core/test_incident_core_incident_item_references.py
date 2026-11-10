@@ -21,7 +21,6 @@ from features.incident.core.domain import (
     PostmortemMeetingReference,
     ReportReference,
     ResourceReference,
-    SourceAlertReference,
     VideoCallReference,
 )
 
@@ -34,7 +33,6 @@ KINDS: list[tuple[str, type[ResourceReference]]] = [
     ("video_call", VideoCallReference),
     ("postmortem_meeting", PostmortemMeetingReference),
     ("external_case", ExternalCaseReference),
-    ("source_alert", SourceAlertReference),
 ]
 FIELDS = [field for field, _ in KINDS]
 
@@ -68,7 +66,7 @@ def _read(item: dict[str, Any]) -> Incident:
 
 @pytest.mark.parametrize(("field", "kind"), KINDS)
 def test_each_reference_kind_reads_as_its_type(field: str, kind: type[ResourceReference]) -> None:
-    """Every kind uses the same map shape and reads as its own reference type, the source alert included."""
+    """Every kind uses the same map shape and reads as its own reference type."""
     reference = getattr(_read(_item(**{field: _map(url="https://example.test/x")})), field)
 
     assert type(reference) is kind

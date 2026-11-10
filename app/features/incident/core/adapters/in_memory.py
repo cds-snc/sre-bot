@@ -13,7 +13,7 @@ invites succeeding).
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from contracts.operations.codes import ErrorCode
@@ -29,7 +29,9 @@ from features.incident.core.domain import (
     Incident,
     IncidentBinding,
     MessageReference,
+    ReferenceKind,
     ReportReference,
+    ResourceReference,
     SectionDraft,
     StatusUpdate,
     StatusUpdateState,
@@ -41,6 +43,8 @@ from features.incident.core.store import (
     no_such_incident,
     not_an_incident,
     select_active_bindings,
+    validate_new_incident,
+    validate_reference,
 )
 
 
@@ -98,6 +102,8 @@ class InMemoryIncidentStore(IncidentStore):
 
     Open incidents are listed by ``declared_at``, a stand-in for the
     ``opened_at`` time the real store orders by and this fake does not hold.
+    ``create`` and ``set_reference`` share the real store's validation; the fake
+    holds no record version, so ``set_reference`` never conflicts.
     """
 
     def __init__(self) -> None:
@@ -163,6 +169,36 @@ class InMemoryIncidentStore(IncidentStore):
         """Return the seeded incident's security flag."""
         incident = self._incidents.get(incident_id)
         return OperationResult.success(data=incident.security_incident) if incident is not None else no_such_incident()
+
+    def create(self, incident: Incident, binding: IncidentBinding) -> OperationResult[Incident]:
+        """Store the binding, then the incident; a stored incident under the id is a replay that changes nothing.
+
+        Raises:
+            ValueError: see ``IncidentStore.create``.
+        """
+        validate_new_incident(incident, binding)
+        self.bind(binding)
+        stored = self._incidents.get(incident.id)
+        if stored is not None:
+            return OperationResult.success(data=stored)
+        self.seed(incident)
+        return OperationResult.success(data=incident)
+
+    def set_reference(self, incident_id: str, kind: ReferenceKind, reference: ResourceReference) -> OperationResult[Incident]:
+        """Replace the incident's reference of ``kind``.
+
+        Raises:
+            ValueError: see ``IncidentStore.set_reference``.
+        """
+        validate_reference(kind, reference)
+        stored = self._incidents.get(incident_id)
+        if stored is None:
+            return no_such_incident()
+        # The field is chosen at runtime; validate_reference has checked its type.
+        changes: dict[str, Any] = {kind.value: reference}
+        updated = replace(stored, **changes)
+        self._incidents[incident_id] = updated
+        return OperationResult.success(data=updated)
 
 
 @dataclass

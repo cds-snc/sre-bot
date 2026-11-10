@@ -16,7 +16,6 @@ from features.incident.core.api import (
     ExternalCaseReference,
     PostmortemMeetingReference,
     ReportReference,
-    SourceAlertReference,
     VideoCallReference,
 )
 
@@ -28,7 +27,6 @@ REFERENCE_TYPES = [
     VideoCallReference,
     PostmortemMeetingReference,
     ExternalCaseReference,
-    SourceAlertReference,
 ]
 
 

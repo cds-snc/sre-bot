@@ -17,6 +17,7 @@ from features.incident.common import vocabulary
 from features.incident.core import api
 from features.incident.core.adapters import slack as slack_adapter
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
+from features.incident.core.domain import ResourceReference
 from tests.factories.incident import incident_on, slack_conversation
 
 pytestmark = pytest.mark.unit
@@ -50,9 +51,9 @@ def test_api_exports_exactly_the_public_names() -> None:
         "LegacyUpgrade",
         "MessageReference",
         "PostmortemMeetingReference",
+        "ReferenceKind",
         "ReportReference",
         "SectionDraft",
-        "SourceAlertReference",
         "StatusUpdate",
         "StatusUpdateOrigin",
         "StatusUpdateStage",
@@ -200,7 +201,7 @@ def test_status_update_store_signatures_carry_only_domain_types_and_operation_re
 
 
 def test_incident_store_signatures_carry_only_domain_types_and_operation_results() -> None:
-    """No table, item or SDK shape crosses the store interface, and it has no write operation in this slice."""
+    """No table, item or SDK shape crosses the store interface; its only writes are create and set_reference."""
     store = api.IncidentStore
 
     def params(method: object) -> dict[str, object]:
@@ -214,11 +215,21 @@ def test_incident_store_signatures_carry_only_domain_types_and_operation_results
     assert inspect.signature(store.find_by_conversation).return_annotation == OperationResult[api.Incident]
     assert inspect.signature(store.list_open).return_annotation == OperationResult[Sequence[api.Incident]]
     assert inspect.signature(store.read_security_flag).return_annotation == OperationResult[bool]
+    assert params(store.create) == {"incident": api.Incident, "binding": api.IncidentBinding}
+    assert params(store.set_reference) == {
+        "incident_id": str,
+        "kind": api.ReferenceKind,
+        "reference": ResourceReference,
+    }
+    assert inspect.signature(store.create).return_annotation == OperationResult[api.Incident]
+    assert inspect.signature(store.set_reference).return_annotation == OperationResult[api.Incident]
     assert sorted(name for name in vars(store) if not name.startswith("_")) == [
+        "create",
         "find_by_conversation",
         "get",
         "list_open",
         "read_security_flag",
+        "set_reference",
     ]
 
 
