@@ -127,7 +127,7 @@ class _Services:
     read_calls: list[tuple[str, int]] = field(default_factory=list)
     stores: list[StatusUpdateStore] = field(default_factory=list)
 
-    def save(
+    async def save(
         self,
         incidents: IncidentStore,
         conversation: ConversationReference,

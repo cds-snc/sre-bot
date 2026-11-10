@@ -9,6 +9,7 @@ Each test asserts the view text the
 responder sees, and that the one scope the handler opened was closed.
 """
 
+import asyncio
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -67,7 +68,7 @@ def _seeded[R: InMemoryRecordStore](records: R, *items: dict[str, Any]) -> R:
     """Put the incident ``items`` and one pending draft for the incident into ``records``."""
     for item in items:
         assert records.put(_TABLE, item).is_success
-    assert status_update_store_in(records).append(_pending()).is_success
+    assert asyncio.run(status_update_store_in(records).append(_pending())).is_success
     return records
 
 

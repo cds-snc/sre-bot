@@ -98,11 +98,11 @@ def test_one_pass_gives_the_item_its_binding_and_the_marker() -> None:
     assert stored.data is not None and stored.data["conversation_id"] == "C0INC-1"
 
 
-def test_the_incident_is_found_by_its_conversation_after_the_upgrade() -> None:
+async def test_the_incident_is_found_by_its_conversation_after_the_upgrade() -> None:
     records = records_with(legacy_item("inc-1"))
     legacy_upgrade(records).run(apply=True)
 
-    found = record_incident_store(records, table=TABLE, tenants=TENANTS, bindings=BINDINGS).find_by_conversation(
+    found = await record_incident_store(records, table=TABLE, tenants=TENANTS, bindings=BINDINGS).find_by_conversation(
         ConversationReference(system=SLACK, tenant=SLACK_TENANT, vendor_id="C0INC-1")
     )
 

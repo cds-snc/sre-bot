@@ -17,11 +17,15 @@ timeline table, in the layout of ``adapters/timeline_items.py``.
 ``RecordStatusUpdateStore`` keeps each public status update as its own item in
 the status-updates table, in the layout of ``adapters/status_updates.py``.
 
+Both stores are async: each Record adapter runs a call's blocking ``RecordStore`` work in one
+``asyncio.to_thread``; the timeline store stays sync, since only the incident store's thread calls it.
+
 Entry points build the incident and status-update stores per service scope with ``build_incident_store`` and
 ``build_status_update_store`` in ``core/api.py``, from the resolved
 ``RecordStore`` and the incident core settings.
 """
 
+import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, fields, replace
 from datetime import datetime
@@ -218,11 +222,11 @@ class IncidentStore(Protocol):
     upgraded is ``INCIDENT_RECORD_UNREADABLE``, and one above it is a conflict.
     """
 
-    def get(self, incident_id: str) -> OperationResult[Incident]:
+    async def get(self, incident_id: str) -> OperationResult[Incident]:
         """Return the incident with this id."""
         ...
 
-    def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+    async def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
         """Return the one incident whose conversation is ``conversation``.
 
         The incident's active bindings are read first; only when none names an
@@ -234,15 +238,15 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def list_open(self) -> OperationResult[Sequence[Incident]]:
+    async def list_open(self) -> OperationResult[Sequence[Incident]]:
         """Return every open incident, oldest first by when it was opened."""
         ...
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         """Return whether the incident was declared as a security incident; a failure is never false."""
         ...
 
-    def create(self, incident: Incident) -> OperationResult[Incident]:
+    async def create(self, incident: Incident) -> OperationResult[Incident]:
         """Store a new open incident's record, the commit point; no surface is attached.
 
         Idempotent on ``incident.id``: a retry with the same id stores the record
@@ -254,7 +258,7 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+    async def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
         """Bind a chat conversation to the incident and return the incident.
 
         A primary binding's conversation becomes the record's conversation; a
@@ -268,7 +272,9 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def set_reference(self, incident_id: str, kind: ReferenceKind, reference: ResourceReference) -> OperationResult[Incident]:
+    async def set_reference(
+        self, incident_id: str, kind: ReferenceKind, reference: ResourceReference
+    ) -> OperationResult[Incident]:
         """Replace the incident's reference of ``kind`` whole and return the updated incident.
 
         Only an end-state record of the current version is changed; any other
@@ -279,7 +285,9 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def update_fields(self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime) -> OperationResult[Incident]:
+    async def update_fields(
+        self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime
+    ) -> OperationResult[Incident]:
         """Write the fields ``changes`` names and return the updated incident.
 
         A severity change then appends one ``severity_changed`` timeline entry by
@@ -291,7 +299,7 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+    async def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
         """Give each named role its holder (``None`` unassigns it) and return the updated incident; other roles stay.
 
         Raises:
@@ -299,7 +307,7 @@ class IncidentStore(Protocol):
         """
         ...
 
-    def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+    async def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
         """Set the status and return the updated incident.
 
         Closing removes the incident from the open list; reopening puts it back
@@ -328,8 +336,8 @@ class _PlannedWrite:
     binding: IncidentBinding | None
 
 
-class RecordIncidentStore(IncidentStore):
-    """Read incidents from the incidents table through the records contract.
+class _RecordIncidentStoreCalls:
+    """The incident store's blocking work over the records contract; ``RecordIncidentStore`` runs each call in a thread.
 
     ``tenants`` is the configured tenant per workplace system, which the legacy
     item bridge gives the references of items without ``record_version``.
@@ -738,6 +746,79 @@ class RecordIncidentStore(IncidentStore):
         )
 
 
+class RecordIncidentStore(IncidentStore):
+    """Read and write incidents through the records contract, each call off the event loop.
+
+    ``RecordStore`` is blocking, so every method runs the whole call (every
+    request it makes, including a guarded write's re-read, upgrade on write and
+    timeline append) in one ``asyncio.to_thread``. ``to_thread`` copies the
+    context, so the structlog bindings reach the call's log lines. A running
+    thread cannot be cancelled: the record client's per-attempt timeout and
+    retries bound a call whose awaiting task was cancelled.
+
+    ``tenants`` is the configured tenant per workplace system, which the legacy
+    item bridge gives the references of items without ``record_version``.
+    ``bindings`` is the bindings table ``find_by_conversation`` reads first and
+    upgrade on write puts into; ``timeline`` takes the severity entries. Neither
+    has a default, so no construction can skip them.
+    """
+
+    def __init__(
+        self,
+        records: RecordStore,
+        table: RecordTable,
+        tenants: Mapping[WorkplaceSystem, str],
+        *,
+        bindings: RecordTable,
+        timeline: TimelineStore,
+    ) -> None:
+        self._calls = _RecordIncidentStoreCalls(records, table, tenants, bindings=bindings, timeline=timeline)
+
+    async def get(self, incident_id: str) -> OperationResult[Incident]:
+        """Return the incident with this id."""
+        return await asyncio.to_thread(self._calls.get, incident_id)
+
+    async def find_by_conversation(self, conversation: ConversationReference) -> OperationResult[Incident]:
+        """Return the one incident whose conversation is ``conversation``: bindings first, then the records."""
+        return await asyncio.to_thread(self._calls.find_by_conversation, conversation)
+
+    async def list_open(self) -> OperationResult[Sequence[Incident]]:
+        """Return every open incident, oldest first by when it was opened."""
+        return await asyncio.to_thread(self._calls.list_open)
+
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+        """Return whether the incident was declared as a security incident; a failure is never false."""
+        return await asyncio.to_thread(self._calls.read_security_flag, incident_id)
+
+    async def create(self, incident: Incident) -> OperationResult[Incident]:
+        """Write the end-state record alone; idempotent on the incident id."""
+        return await asyncio.to_thread(self._calls.create, incident)
+
+    async def attach_conversation(self, incident_id: str, binding: IncidentBinding) -> OperationResult[Incident]:
+        """Bind a chat conversation to the incident."""
+        return await asyncio.to_thread(self._calls.attach_conversation, incident_id, binding)
+
+    async def set_reference(
+        self, incident_id: str, kind: ReferenceKind, reference: ResourceReference
+    ) -> OperationResult[Incident]:
+        """Set one of the incident's resource references."""
+        return await asyncio.to_thread(self._calls.set_reference, incident_id, kind, reference)
+
+    async def update_fields(
+        self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime
+    ) -> OperationResult[Incident]:
+        """Apply a field update, guarded on ``record_version`` and the read values it changes."""
+        return await asyncio.to_thread(self._calls.update_fields, incident_id, changes, by=by, at=at)
+
+    async def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+        """Give each named role its holder (``None`` unassigns it); other roles stay."""
+        return await asyncio.to_thread(self._calls.set_roles, incident_id, roles)
+
+    async def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+        """Set the incident's status; closing and reopening move it out of and into the open index."""
+        return await asyncio.to_thread(self._calls.set_status, incident_id, status, at=at)
+
+
 def _log_unreadable(operation: str, incident_id: object, field: str, value: object) -> None:
     """Log an item the store cannot read; the value only for status, since other legacy values may be vendor links."""
     log_fields: dict[str, object] = {"operation": operation, "incident_id": incident_id, "field": field}
@@ -990,7 +1071,7 @@ class StatusUpdateStore(Protocol):
     tell its own write from another writer's re-reads once.
     """
 
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
         """Store a new update at its sequence.
 
         The caller numbers it: the latest update's sequence plus one, or 1.
@@ -998,15 +1079,15 @@ class StatusUpdateStore(Protocol):
         """
         ...
 
-    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+    async def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
         """Return the incident's highest-sequence update in one read; success with ``None`` when it has none."""
         ...
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         """Return every update of the incident, newest first."""
         ...
 
-    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+    async def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
         """Replace the stored update with ``update`` while its stored state is ``expected_state``.
 
         Used to approve (with the approver and edited text), to publish (with
@@ -1019,8 +1100,8 @@ class StatusUpdateStore(Protocol):
         ...
 
 
-class RecordStatusUpdateStore(StatusUpdateStore):
-    """Keep status updates in the status-updates table through the records contract."""
+class _RecordStatusUpdateStoreCalls:
+    """The status-update store's blocking work over the records contract; ``RecordStatusUpdateStore`` runs each call in a thread."""
 
     def __init__(self, records: RecordStore, table: RecordTable) -> None:
         self._records = records
@@ -1126,3 +1207,30 @@ class RecordStatusUpdateStore(StatusUpdateStore):
             error_code=result.error_code,
             retry_after=result.retry_after,
         )
+
+
+class RecordStatusUpdateStore(StatusUpdateStore):
+    """Keep status updates in the status-updates table through the records contract, each call off the event loop.
+
+    Every method runs the whole call in one ``asyncio.to_thread``, as
+    ``RecordIncidentStore`` does.
+    """
+
+    def __init__(self, records: RecordStore, table: RecordTable) -> None:
+        self._calls = _RecordStatusUpdateStoreCalls(records, table)
+
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+        """Store a new update at its sequence."""
+        return await asyncio.to_thread(self._calls.append, update)
+
+    async def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+        """Return the incident's highest-sequence update, or ``None``."""
+        return await asyncio.to_thread(self._calls.latest, incident_id)
+
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+        """Return every update of the incident, newest first."""
+        return await asyncio.to_thread(self._calls.list_for_incident, incident_id)
+
+    async def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+        """Replace the stored update with ``update`` while its stored state is ``expected_state``."""
+        return await asyncio.to_thread(self._calls.transition, update, expected_state=expected_state)

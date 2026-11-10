@@ -63,9 +63,9 @@ class _RecordingPublisher:
 
 
 @pytest.fixture
-def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
+async def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
-    status_updates.append(_DRAFT)
+    await status_updates.append(_DRAFT)
     monkeypatch.setattr(approval, "approve_status_update", partial(approve_status_update, now=_NOW))
     return status_updates
 
@@ -108,7 +108,7 @@ async def test_a_refused_approval_renders_nothing(store: InMemoryStatusUpdateSto
 
 async def test_a_stale_approval_renders_nothing(store: InMemoryStatusUpdateStore) -> None:
     """A newer record makes the approval a conflict, and nothing is rendered."""
-    store.append(replace(_DRAFT, sequence=2))
+    await store.append(replace(_DRAFT, sequence=2))
     publisher = _RecordingPublisher(OperationResult.success(data=_COPY))
 
     result = await _approve(publisher, store)
@@ -125,5 +125,5 @@ async def test_a_rendering_failure_is_returned_as_classified(store: InMemoryStat
     result = await _approve(publisher, store)
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_NOT_APPROVED
-    latest = store.latest("inc-1").data
+    latest = (await store.latest("inc-1")).data
     assert latest is not None and latest.state is StatusUpdateState.APPROVED

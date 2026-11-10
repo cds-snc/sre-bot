@@ -82,18 +82,18 @@ def test_build_returns_an_incident_store() -> None:
     assert isinstance(store, IncidentStore)
 
 
-def test_build_reads_the_incidents_table_named_in_the_settings() -> None:
+async def test_build_reads_the_incidents_table_named_in_the_settings() -> None:
     """An item in the configured table is found; the same id in the default table is not."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-configured"))
     assert records.put(incidents_table("incidents"), _legacy_item("inc-default")).is_success
 
     store = build_incident_store(records, _slack_and_google(), _settings())
 
-    assert store.get("inc-configured").is_success
-    assert store.get("inc-default").status is OperationStatus.NOT_FOUND
+    assert (await store.get("inc-configured")).is_success
+    assert (await store.get("inc-default")).status is OperationStatus.NOT_FOUND
 
 
-def test_build_reads_the_bindings_table_named_in_the_settings() -> None:
+async def test_build_reads_the_bindings_table_named_in_the_settings() -> None:
     """A binding in the configured bindings table finds its incident; one in the default table is not read."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-bound"))
     other = "other_channel"
@@ -107,8 +107,8 @@ def test_build_reads_the_bindings_table_named_in_the_settings() -> None:
     found = build_incident_store(records, _FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT}), configured)
     missed = build_incident_store(records, _FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT}), elsewhere)
 
-    assert found.find_by_conversation(conversation).data is not None
-    assert missed.find_by_conversation(conversation).status is OperationStatus.NOT_FOUND
+    assert (await found.find_by_conversation(conversation)).data is not None
+    assert (await missed.find_by_conversation(conversation)).status is OperationStatus.NOT_FOUND
 
 
 def test_builder_is_a_plain_function_returning_a_new_store_per_call() -> None:
@@ -121,13 +121,13 @@ def test_builder_is_a_plain_function_returning_a_new_store_per_call() -> None:
 
 
 @pytest.mark.parametrize("new_incident_system", [None, WorkplaceSystem.SLACK, WorkplaceSystem.GOOGLE])
-def test_build_ignores_the_new_incident_policy(new_incident_system: WorkplaceSystem | None) -> None:
+async def test_build_ignores_the_new_incident_policy(new_incident_system: WorkplaceSystem | None) -> None:
     """Lookups of existing incidents read the same whatever the policy says."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-policy"))
 
     store = build_incident_store(records, _slack_and_google(), _settings(new_incident_system=new_incident_system))
 
-    found = store.find_by_conversation(CONVERSATION)
+    found = await store.find_by_conversation(CONVERSATION)
     assert found.data is not None
     assert found.data.id == "inc-policy"
 
@@ -136,30 +136,30 @@ def test_builder_source_never_names_the_new_incident_policy() -> None:
     assert "new_incident_system" not in inspect.getsource(build_incident_store)
 
 
-def test_legacy_item_reads_with_the_configured_tenants() -> None:
+async def test_legacy_item_reads_with_the_configured_tenants() -> None:
     """The bridge gives the legacy channel the Slack tenant from the configured-systems read."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-legacy"))
 
     store = build_incident_store(records, _slack_and_google(), _settings())
 
-    result = store.get("inc-legacy")
+    result = await store.get("inc-legacy")
     assert result.data is not None
     assert result.data.conversation == CONVERSATION
-    found = store.find_by_conversation(CONVERSATION)
+    found = await store.find_by_conversation(CONVERSATION)
     assert found.data is not None
     assert found.data.id == "inc-legacy"
 
 
-def test_system_missing_from_the_read_leaves_its_tenant_out() -> None:
+async def test_system_missing_from_the_read_leaves_its_tenant_out() -> None:
     """Without a Slack tenant the bridge cannot place the legacy channel, so the item is unreadable."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-no-slack"))
 
     store = build_incident_store(records, _FakeConfiguredSystems({WorkplaceSystem.GOOGLE: GOOGLE_TENANT}), _settings())
 
-    assert store.get("inc-no-slack").error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
+    assert (await store.get("inc-no-slack")).error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
 
 
-def test_tenants_are_copied_at_build() -> None:
+async def test_tenants_are_copied_at_build() -> None:
     """A later change to the read's mapping does not reach a store already built."""
     records = _records_with(TABLE_NAME, _legacy_item("inc-copied"))
     systems = _slack_and_google()
@@ -167,19 +167,19 @@ def test_tenants_are_copied_at_build() -> None:
     store = build_incident_store(records, systems, _settings())
     systems.mapping.clear()
 
-    result = store.get("inc-copied")
+    result = await store.get("inc-copied")
     assert result.data is not None
     assert result.data.conversation == CONVERSATION
 
 
-def test_build_appends_timeline_entries_to_the_table_named_in_the_settings() -> None:
+async def test_build_appends_timeline_entries_to_the_table_named_in_the_settings() -> None:
     """A severity change through the built store lands its entry in the configured timeline table."""
     records = InMemoryRecordStore()
     settings = IncidentCoreSettings(incidents_table=TABLE_NAME, timeline_table="timeline-under-test")
     store = build_incident_store(records, _slack_and_google(), settings)
-    assert store.create(declared_incident("inc-1")).is_success
+    assert (await store.create(declared_incident("inc-1"))).is_success
 
-    assert store.update_fields("inc-1", IncidentChanges(severity=Severity.SEV1), by="U0EDITOR", at=DECLARED_AT).is_success
+    assert (await store.update_fields("inc-1", IncidentChanges(severity=Severity.SEV1), by="U0EDITOR", at=DECLARED_AT)).is_success
 
     entries = records.read_all(timeline_table("timeline-under-test"), max_items=10).data
     assert entries is not None

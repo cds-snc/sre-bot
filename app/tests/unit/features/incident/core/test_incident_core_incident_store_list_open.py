@@ -50,48 +50,48 @@ def _store(*items: dict[str, Any]) -> RecordIncidentStore:
     return record_incident_store(records, table=TABLE, tenants=TENANTS)
 
 
-def test_only_open_incidents_come_back_oldest_first() -> None:
+async def test_only_open_incidents_come_back_oldest_first() -> None:
     store = _store(
         _item("late", opened_at="2026-10-15T16:00:00.000000+00:00"),
         _item("closed", status="Closed"),
         _item("early", opened_at="2026-10-15T09:00:00.000000+00:00"),
     )
 
-    result = store.list_open()
+    result = await store.list_open()
 
     assert result.is_success
     assert result.data is not None
     assert [incident.id for incident in result.data] == ["early", "late"]
 
 
-def test_no_open_incident_is_an_empty_list() -> None:
-    result = _store(_item("closed", status="Closed")).list_open()
+async def test_no_open_incident_is_an_empty_list() -> None:
+    result = await _store(_item("closed", status="Closed")).list_open()
 
     assert result.is_success
     assert result.data is not None
     assert list(result.data) == []
 
 
-def test_an_open_item_of_neither_shape_makes_the_list_unreadable() -> None:
+async def test_an_open_item_of_neither_shape_makes_the_list_unreadable() -> None:
     """The item has no record_version and no legacy name; a partial list would hide an open incident, so the read refuses."""
     store = _store(
         _item("ok", opened_at="2026-10-15T09:00:00.000000+00:00"),
         _item("legacy", opened_at="2026-10-15T10:00:00.000000+00:00", record_version=None),
     )
 
-    result = store.list_open()
+    result = await store.list_open()
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
 
 
-def test_a_store_failure_is_classified() -> None:
+async def test_a_store_failure_is_classified() -> None:
     records = MagicMock(spec=RecordStore)
     records.query.return_value = OperationResult.error(
         OperationStatus.TRANSIENT_ERROR, message="timeout talking to dynamodb", error_code="TIMEOUT"
     )
 
-    result = record_incident_store(records, table=TABLE, tenants=TENANTS).list_open()
+    result = await record_incident_store(records, table=TABLE, tenants=TENANTS).list_open()
 
     assert (result.status, result.error_code) == (OperationStatus.TRANSIENT_ERROR, "TIMEOUT")
     assert result.message is not None

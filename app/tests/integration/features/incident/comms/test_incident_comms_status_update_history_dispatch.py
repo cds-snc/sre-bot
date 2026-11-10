@@ -105,7 +105,7 @@ class ServiceFakes:
         self.stores.append(store)
         return OperationResult.success(data=_APPROVED)
 
-    def get_status_update_overview(
+    async def get_status_update_overview(
         self, incidents: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
     ) -> OperationResult[StatusUpdateOverview]:
         self.overview_calls.append(conversation)

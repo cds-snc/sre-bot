@@ -13,11 +13,12 @@ assert the stored record.
 Handlers run over a fake scope opener with Slack configured.
 """
 
+import asyncio
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -110,8 +111,8 @@ def _body() -> dict[str, Any]:
     }
 
 
-def _service(kind: StatusUpdateOutcomeKind) -> MagicMock:
-    return MagicMock(return_value=OperationResult.success(data=StatusUpdateDraftOutcome(update=_DRAFT, kind=kind)))
+def _service(kind: StatusUpdateOutcomeKind) -> AsyncMock:
+    return AsyncMock(return_value=OperationResult.success(data=StatusUpdateDraftOutcome(update=_DRAFT, kind=kind)))
 
 
 @pytest.fixture(autouse=True)
@@ -154,15 +155,17 @@ class TestNewUpdateAction:
         client = MagicMock()
         incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-        def service(
+        async def service(
             _: IncidentStore, conversation: ConversationReference, *, author: str, store: StatusUpdateStore
         ) -> OperationResult[StatusUpdateDraftOutcome]:
-            return start_status_update_draft(incidents, conversation, author=author, reader=_StubReader(), store=store, now=_NOW)
+            return await start_status_update_draft(
+                incidents, conversation, author=author, reader=_StubReader(), store=store, now=_NOW
+            )
 
         with patch(_TARGET, new=service):
             handle_new_update_action(MagicMock(), _body(), client, incident_scopes(records))
 
-        listed = store.list_for_incident(_INCIDENT).data
+        listed = asyncio.run(store.list_for_incident(_INCIDENT)).data
         assert listed is not None
         (stored,) = listed
         assert (stored.sequence, stored.state, stored.author, stored.origin) == (
@@ -204,7 +207,7 @@ class TestNewUpdateAction:
         client = MagicMock()
         refusal: OperationResult[Any] = OperationResult.permanent_error(message="empty", error_code=ErrorCode.EMPTY_HISTORY)
 
-        with patch(_TARGET, new=MagicMock(return_value=refusal)):
+        with patch(_TARGET, new=AsyncMock(return_value=refusal)):
             handle_new_update_action(MagicMock(), _body(), client, incident_scopes())
 
         view = _sent_view(client)

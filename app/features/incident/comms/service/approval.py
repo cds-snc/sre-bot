@@ -44,7 +44,7 @@ async def get_draft_for_review(
         Success with the draft. ``STATUS_UPDATE_CONFLICT`` when a newer record
         exists or the target is not a draft; otherwise the store's classified error.
     """
-    listed = store.list_for_incident(incident_id)
+    listed = await store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     latest = listed.data[0] if listed.data else None
@@ -89,7 +89,7 @@ async def approve_status_update(
             error_code=ErrorCode.STATUS_UPDATE_FIELDS_INVALID,
         )
 
-    listed = store.list_for_incident(incident_id)
+    listed = await store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     records = listed.data
@@ -126,7 +126,7 @@ async def approve_status_update(
         approver=approver,
         approved_at=now,
     )
-    moved = store.transition(approved, expected_state=StatusUpdateState.DRAFT)
+    moved = await store.transition(approved, expected_state=StatusUpdateState.DRAFT)
     if moved.is_success:
         log.info("incident_status_update_approved")
         return OperationResult.success(data=approved)
@@ -134,7 +134,7 @@ async def approve_status_update(
         return failure(moved)
 
     # One re-read, no retry loop: an identical winning approval is a success, anything else a conflict.
-    winner = store.latest(incident_id).data
+    winner = (await store.latest(incident_id)).data
     if winner is not None and winner.sequence == sequence and _is_same_approval(winner, approver, edit):
         log.info("incident_status_update_approval_replayed")
         return OperationResult.success(data=winner)

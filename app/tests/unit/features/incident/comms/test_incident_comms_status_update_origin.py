@@ -103,10 +103,10 @@ class _StubGenerator:
         return OperationResult.success(data=_model_answer())
 
 
-def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
+async def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
     store = InMemoryStatusUpdateStore()
     for record in records:
-        store.append(record)
+        await store.append(record)
     return store
 
 
@@ -123,11 +123,11 @@ _CURRENT = StatusUpdateEdit(stage=StatusUpdateStage.IDENTIFIED, en=_text("en"), 
 
 
 @pytest.mark.parametrize("messages", [[_NEW_MESSAGE], []], ids=["new-activity", "nothing-new"])
-def test_starting_by_hand_is_hand(messages: list[TranscriptMessage]) -> None:
+async def test_starting_by_hand_is_hand(messages: list[TranscriptMessage]) -> None:
     """A responder chose to write, so the started draft is HAND whatever the conversation holds."""
-    store = _store(_APPROVED)
+    store = await _store(_APPROVED)
 
-    result = start_status_update_draft(
+    result = await start_status_update_draft(
         incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
         _CONVERSATION,
         author="U0WRITER",
@@ -138,7 +138,7 @@ def test_starting_by_hand_is_hand(messages: list[TranscriptMessage]) -> None:
 
     assert result.data is not None
     assert result.data.update.origin is StatusUpdateOrigin.HAND
-    assert store.latest(_INCIDENT).data == result.data.update
+    assert (await store.latest(_INCIDENT)).data == result.data.update
 
 
 @pytest.mark.parametrize(
@@ -155,7 +155,7 @@ async def test_draft_with_ai_records_how_its_text_came_to_be(
     messages: list[TranscriptMessage], instructions: str, origin: StatusUpdateOrigin
 ) -> None:
     """A model fill is MODEL, a fill steered by guidance MODEL_INSTRUCTED, and a repeat with nothing new CARRIED_FORWARD."""
-    store = _store(_APPROVED, _PENDING)
+    store = await _store(_APPROVED, _PENDING)
 
     result = await generate_status_update_draft(
         incident_store_with(incident_on(_CHANNEL, _INCIDENT)),
@@ -171,4 +171,4 @@ async def test_draft_with_ai_records_how_its_text_came_to_be(
 
     assert result.data is not None
     assert result.data.update.origin is origin
-    assert store.latest(_INCIDENT).data == result.data.update
+    assert (await store.latest(_INCIDENT)).data == result.data.update
