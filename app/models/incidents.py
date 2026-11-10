@@ -1,10 +1,7 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
-
-_RETIRED_INCIDENT_UPDATES_KEY = "incident_updates"
+from pydantic import BaseModel, Field
 
 
 class Incident(BaseModel):
@@ -34,14 +31,6 @@ class Incident(BaseModel):
     model_config = {
         "extra": "forbid",
     }
-
-    @model_validator(mode="before")
-    @classmethod
-    def _drop_retired_incident_updates(cls, data: Any) -> Any:
-        """Tolerate stored rows that still carry the retired ``incident_updates`` attribute."""
-        if isinstance(data, dict) and _RETIRED_INCIDENT_UPDATES_KEY in data:
-            return {key: value for key, value in data.items() if key != _RETIRED_INCIDENT_UPDATES_KEY}
-        return data
 
 
 class IncidentPayload(BaseModel):

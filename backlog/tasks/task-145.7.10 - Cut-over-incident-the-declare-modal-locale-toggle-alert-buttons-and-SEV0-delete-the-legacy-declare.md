@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:16:00Z'
+updated_date: '2026-11-10T19:00:00Z'
 labels:
   - incident
   - features
@@ -34,7 +34,7 @@ Stack L L9b, size exception approved 2026-11-09 (approved program in TASK-145.7'
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 The declare and alert-button pins pass with assertions unchanged except the deliberate SEV0 option; legacy registrations are gone (checks parent ACs #1, #4, #6, #11)
-- [ ] #2 legacy_acknowledged_webhooks_seam and baseline lines 9 and 17 are deleted; app/models/incidents.py is gone
+- [ ] #2 legacy_acknowledged_webhooks_seam and baseline lines 9 and 17 are deleted; app/models/incidents.py is gone (Incident and IncidentPayload) with the L5r rollback guard: features/incident/core/adapters/legacy_rollback.py and every TODO(TASK-145.7.10) site, and their tests tests/unit/models/test_models_incident_legacy_attribute_load.py, tests/factories/legacy_rollback.py, tests/unit/features/incident/core/test_incident_core_legacy_rollback_{view,write,round_trip}.py and tests/unit/modules/incident/test_incident_db_operations_update_field_marker.py; rg finds no importer of models.incidents or legacy_rollback, including tests/modules/incident and tests/integration/legacy_surface
 - [ ] #3 decisions/webhooks.md records acknowledged_count as approximate and the interim adapter as tolerated
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->

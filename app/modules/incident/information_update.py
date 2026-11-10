@@ -6,6 +6,7 @@ from slack_sdk import WebClient
 from structlog import get_logger
 
 from features.incident.core.adapters import google_docs as incident_documents
+from features.incident.core.adapters.legacy_rollback import legacy_view  # TODO(TASK-145.7.10): remove with the legacy model
 from models.incidents import Incident
 from modules.incident import (
     db_operations,
@@ -326,5 +327,8 @@ def handle_update_field_submission(client: WebClient, body, ack: Ack, view):
         )
 
         incident_data[action] = value
-        view = information_display.incident_information_view(Incident(**incident_data))
+        view = information_display.incident_information_view(
+            # TODO(TASK-145.7.10): remove with the legacy model
+            Incident.model_validate(legacy_view(incident_data), extra="ignore")
+        )
         client.views_update(view_id=body["view"]["root_view_id"], view=view)

@@ -4,6 +4,7 @@ title: Cut over roles and archive; legacy_sre_web_client_seam deleted
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T18:46:00Z'
 labels:
   - incident
   - features
@@ -33,4 +34,5 @@ Stack L L7a. Five roles on the record, purpose from the record, no Drive role pr
 - [ ] #1 The roles and archive pins pass with assertions unchanged; the seam fixture and its baseline entry are gone (checks parent ACs #2, #4, #10 and the bug-fix AC)
 - [ ] #2 decisions/migration.md carries the cutover bug-fix rule with a dated Changes line
 - [ ] #3 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
+- [ ] #4 The PR body states the revert target: one git revert restores the legacy surface, and the L5r rollback guard (TASK-145.8.2) keeps it reading and writing upgraded items correctly (decisions/incident-management.md Migration rule 1)
 <!-- AC:END -->

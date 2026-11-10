@@ -421,7 +421,7 @@ class FakeDynamoDbClient:
     """In-memory stand-in for the boto3 DynamoDB client the incidents table adapter wraps.
 
     Understands only the requests the incident module sends: a scan filtered by
-    ``field = :field``, ``put_item``, ``SET #field = :field`` updates and the
+    ``field = :field``, ``put_item``, ``get_item`` of the marker, ``SET #field = :field`` updates (conditions are not evaluated: seeded items have no marker) and the
     ``list_append`` activity-log update. ``unavailable`` makes every request
     fail the way a throttled or unreachable table does.
     """
@@ -452,6 +452,13 @@ class FakeDynamoDbClient:
         self._guard("PutItem")
         self.tables.setdefault(kwargs["TableName"], []).append(dict(kwargs["Item"]))
         return {}
+
+    def get_item(self, **kwargs: Any) -> dict[str, Any]:
+        self._guard("GetItem")
+        item = next((item for item in self.tables.get(kwargs["TableName"], []) if item["id"] == kwargs["Key"]["id"]), None)
+        if item is None:
+            return {}
+        return {"Item": {name: value for name, value in item.items() if name in kwargs["ProjectionExpression"].split(",")}}
 
     def update_item(self, **kwargs: Any) -> dict[str, Any]:
         self._guard("UpdateItem")
