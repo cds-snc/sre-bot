@@ -19,18 +19,26 @@ bin/package_templates/ and makes every edit the package needs elsewhere:
     becomes the first subdomain, settings.py moves to common/ (same table),
     references are rewritten, and its entry point and keys are renamed.
 
-The TOML edits go through bin/package_toml.py, which keeps comments and checks
-the result before writing; any refusal writes nothing. The generated package
-passes bin/check_package_shape.py with an empty baseline.
+Kinds, their entries, templates, option flags, classifications and reserved
+subdomain names come from bin/package_layout.toml (bin/package_layout.py). A
+kind always gets its required entries, and an optional entry only when its
+option flag is given, never an empty placeholder; an option the kind does not
+take, or any option on umbrella or promote, is refused. Which TOML edits a kind
+gets is behaviour, kept here. The TOML edits go through bin/package_toml.py,
+which keeps comments and checks the result before writing; any refusal writes
+nothing. The generated package passes bin/check_package_shape.py with an empty
+baseline.
 
 Usage:
     make new-package                               # asks for each value
-    python3 -m bin.new_package feature <name> --area <area> [--settings]
+    python3 -m bin.new_package feature <name> --area <area> [--interfaces] [--adapters] [--settings]
     python3 -m bin.new_package capability <name> [--area <area>] --classification generic|supporting \
-        --consumer features.<feature>[.<subdomain>] [--consumer ...] [--settings]
+        --consumer features.<feature>[.<subdomain>] [--consumer ...] \
+        [--hookspecs] [--service] [--entrypoints] [--interfaces] [--adapters] [--settings]
     python3 -m bin.new_package umbrella <name> --area <area>
-    python3 -m bin.new_package subdomain <umbrella>.<name> --area <area> [--settings]
-    python3 -m bin.new_package core|common <umbrella> [--settings]
+    python3 -m bin.new_package subdomain <umbrella>.<name> --area <area> [--interfaces] [--adapters] [--settings]
+    python3 -m bin.new_package core <umbrella> [--interfaces] [--adapters] [--settings]
+    python3 -m bin.new_package common <umbrella> [--settings]
     python3 -m bin.new_package promote <feature> --subdomain <name>
 """
 
@@ -47,6 +55,7 @@ from string import Template
 from typing import Any
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, iter_python_files
+from bin.package_layout import DIRECTORY_MARK, Kind, layout
 from bin.package_toml import (
     Edit,
     TomlEditError,
@@ -68,19 +77,15 @@ from bin.package_toml import (
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATES = Path(__file__).resolve().parent / "package_templates"
-FEATURES = "features"
-CAPABILITIES = "capabilities"
-KINDS = ("feature", "capability", "umbrella", "subdomain", "core", "common", "promote")
+PROMOTE = "promote"
+DECISION = "decisions/feature-packages.md"
 PLUGIN_KINDS = frozenset({"feature", "capability", "subdomain"})
 AREA_KINDS = PLUGIN_KINDS | {"umbrella"}
 UMBRELLA_MEMBER_KINDS: dict[str, UmbrellaMember] = {"subdomain": "subdomain", "core": "core", "common": "common"}
-CLASSIFICATIONS = ("generic", "supporting")
 NAME = re.compile(r"^[a-z][a-z0-9_]*$")
 CONSUMER = re.compile(r"^features\.[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$")
-# A subdomain named like a layout-table directory or an umbrella kernel would be read as one.
 COMMON = "common"
 SHARED_AREA = "shared"
-RESERVED_SUBDOMAINS = frozenset({"core", "common", "adapters", "entrypoints", "locales", "service", "domain"})
 
 
 class GeneratorError(Exception):
@@ -97,7 +102,7 @@ class Request:
     area: str | None = None
     classification: str | None = None
     consumers: tuple[str, ...] = ()
-    settings: bool = False
+    options: frozenset[str] = frozenset()
     subdomain: str | None = None
 
 
@@ -111,16 +116,31 @@ class Package:
     name: str
 
 
+def _kinds() -> tuple[str, ...]:
+    """The manifest's kinds, then promote."""
+    return (*layout().kinds, PROMOTE)
+
+
+def _features() -> str:
+    return layout().roots.features
+
+
+def _capabilities() -> str:
+    return layout().roots.capabilities
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="new_package", description="Create a package in the feature-packages shape.")
-    parser.add_argument("kind", choices=KINDS)
+    parser.add_argument("kind", choices=_kinds())
     parser.add_argument(
         "target", help="<name>; <umbrella>.<name> for a subdomain; <umbrella> for core or common; the feature to promote"
     )
     parser.add_argument("--area", help="product area: a [plugins.<area>] table in config/base.toml")
     parser.add_argument("--classification", help="capability only: generic or supporting")
     parser.add_argument("--consumer", action="append", default=[], help="capability only: features.<feature>[.<subdomain>]")
-    parser.add_argument("--settings", action="store_true", help="add settings.py and its [<table>] in base.toml")
+    for option in layout().options.values():
+        extra = " and its [<table>] in base.toml" if option.name == "settings" else ""
+        parser.add_argument(f"--{option.name}", action="store_true", help=f"add {option.entry}{extra}")
     parser.add_argument("--subdomain", help="promote only: the subdomain the flat feature's code becomes")
     parser.add_argument("--root", type=Path, default=APP_ROOT, help=argparse.SUPPRESS)
     return parser
@@ -136,7 +156,7 @@ def parse_request(argv: list[str]) -> Request:
         area=args.area,
         classification=args.classification,
         consumers=tuple(args.consumer),
-        settings=args.settings,
+        options=frozenset(name for name in layout().options if getattr(args, name)),
         subdomain=args.subdomain,
     )
 
@@ -148,7 +168,7 @@ def _check_name(name: str) -> None:
 
 def _umbrella_directory(root: Path, umbrella: str) -> Path:
     _check_name(umbrella)
-    directory = root / FEATURES / umbrella
+    directory = root / _features() / umbrella
     if not directory.is_dir():
         raise GeneratorError(f"no umbrella '{umbrella}' under features/; create it first: new_package umbrella {umbrella}")
     return directory
@@ -159,24 +179,64 @@ def _locate(request: Request) -> Package:
     match request.kind:
         case "feature" | "umbrella" | "capability":
             _check_name(request.target)
-            top = CAPABILITIES if request.kind == "capability" else FEATURES
+            top = _capabilities() if request.kind == "capability" else _features()
             package = Package(root / top / request.target, f"{top}.{request.target}", None, request.target)
         case "subdomain":
             umbrella, _, name = request.target.partition(".")
             if not name or "." in name:
                 raise GeneratorError(f"a subdomain is named <umbrella>.<subdomain>, not '{request.target}'")
             _check_name(name)
-            if name in RESERVED_SUBDOMAINS:
-                raise GeneratorError(f"'{name}' is reserved for an umbrella kernel or a layout-table directory")
+            _check_subdomain(name)
             directory = _umbrella_directory(root, umbrella) / name
-            package = Package(directory, f"{FEATURES}.{umbrella}.{name}", umbrella, name)
+            package = Package(directory, f"{_features()}.{umbrella}.{name}", umbrella, name)
         case _:
             umbrella = request.target
             directory = _umbrella_directory(root, umbrella) / request.kind
-            package = Package(directory, f"{FEATURES}.{umbrella}.{request.kind}", umbrella, request.kind)
+            package = Package(directory, f"{_features()}.{umbrella}.{request.kind}", umbrella, request.kind)
     if package.directory.exists():
         raise GeneratorError(f"{package.directory.relative_to(root)} already exists")
     return package
+
+
+def _check_subdomain(name: str) -> None:
+    # A subdomain named like a layout-table directory or an umbrella kernel would be read as one.
+    if name in layout().reserved_subdomains:
+        raise GeneratorError(f"'{name}' is reserved for an umbrella kernel or a layout-table directory")
+
+
+def _article(kind: str) -> str:
+    return f"an {kind}" if kind[0] in "aeiou" else f"a {kind}"
+
+
+def _check_options(request: Request) -> None:
+    """Refuse an option the kind does not take, or one whose needed entries the package will not hold."""
+    if not request.options:
+        return
+    flags = ", ".join(f"--{name}" for name in sorted(request.options))
+    if request.kind == PROMOTE:
+        raise GeneratorError(f"promote takes no option ({flags}); see {DECISION}")
+    taken = layout().options_of(request.kind)
+    if not taken:
+        raise GeneratorError(f"{_article(request.kind)} takes no option ({flags}); see {DECISION}")
+    names = [option.name for option in taken]
+    for name in sorted(request.options):
+        if name not in names:
+            raise GeneratorError(
+                f"--{name} is not an option of {_article(request.kind)}; it takes "
+                f"{', '.join(f'--{taken_name}' for taken_name in names)}; see {DECISION}"
+            )
+    held = _entries(request)
+    for name in sorted(request.options):
+        option = layout().options[name]
+        for needed in sorted(option.needs - held):
+            flag = next((f"--{other.name}" for other in taken if other.entry == needed), needed)
+            raise GeneratorError(f"--{name} needs {flag} on {_article(request.kind)} ({DECISION})")
+
+
+def _entries(request: Request) -> frozenset[str]:
+    """The kind's required entries plus the entries its chosen options add."""
+    options = layout().options
+    return layout().kinds[request.kind].required | {options[name].entry for name in request.options}
 
 
 def _entry_point_name(package: Package) -> str:
@@ -195,8 +255,9 @@ def _title(text: str) -> str:
 
 
 def _check_capability(request: Request) -> None:
-    if request.classification not in CLASSIFICATIONS:
-        raise GeneratorError(f"a capability's classification must be one of {', '.join(CLASSIFICATIONS)}")
+    classifications = layout().classifications
+    if request.classification not in classifications:
+        raise GeneratorError(f"a capability's classification must be one of {', '.join(classifications)}")
     if not request.consumers:
         raise GeneratorError("a capability names at least one --consumer features.<feature>[.<subdomain>]")
     for consumer in request.consumers:
@@ -254,7 +315,7 @@ def _base_edits(request: Request, package: Package, base: dict[str, Any]) -> lis
     edits: list[Edit] = []
     if request.kind in PLUGIN_KINDS:
         edits += enablement_key(base, request.area or "", _entry_point_name(package))
-    if request.settings:
+    if "settings" in request.options:
         table = _table(package)
         if table in base:
             raise GeneratorError(f"config/base.toml already has a [{table}] table; another slice owns it")
@@ -269,7 +330,7 @@ def _template_values(request: Request, package: Package) -> dict[str, str]:
         "title": _title("_".join(package.module.split(".")[1:])),
         "label": labels.get(request.kind, request.kind),
         "module": package.module,
-        "umbrella": f"{FEATURES}.{package.umbrella}" if package.umbrella else "",
+        "umbrella": f"{_features()}.{package.umbrella}" if package.umbrella else "",
         "table": table,
         "settings_class": "".join(part.capitalize() for part in table.split("_")) + "Settings",
         "env_prefix": f"{table.upper()}__",
@@ -281,31 +342,11 @@ def _template_values(request: Request, package: Package) -> dict[str, str]:
 
 def _files(request: Request) -> dict[str, str]:
     """Generated path (relative to the package) -> template file name; '' writes an empty file."""
-    plugin = {
-        "__init__.py": "plugin_init.py.tmpl",
-        "README.md": "feature_readme.md.tmpl",
-        "service.py": "service.py.tmpl",
-        "interfaces.py": "interfaces.py.tmpl",
-        "entrypoints/__init__.py": "entrypoints_init.py.tmpl",
+    kind: Kind = layout().kinds[request.kind]
+    return {
+        f"{entry}__init__.py" if entry.endswith(DIRECTORY_MARK) else entry: kind.templates[entry]
+        for entry in sorted(_entries(request))
     }
-    files: dict[str, str] = {
-        "feature": plugin,
-        "subdomain": plugin,
-        "capability": plugin
-        | {"README.md": "capability_readme.md.tmpl", "api.py": "api.py.tmpl", "hookspecs.py": "hookspecs.py.tmpl"},
-        "umbrella": {"__init__.py": "", "README.md": "umbrella_readme.md.tmpl"},
-        "core": {
-            "__init__.py": "core_init.py.tmpl",
-            "README.md": "core_readme.md.tmpl",
-            "api.py": "core_api.py.tmpl",
-            "service.py": "service.py.tmpl",
-            "interfaces.py": "interfaces.py.tmpl",
-        },
-        "common": {"__init__.py": "common_init.py.tmpl", "README.md": "common_readme.md.tmpl"},
-    }[request.kind]
-    if request.settings and request.kind != "umbrella":
-        files = files | {"settings.py": "settings.py.tmpl"}
-    return files
 
 
 def _product_scope_line(request: Request, package: Package) -> str | None:
@@ -323,7 +364,8 @@ def _product_scope_line(request: Request, package: Package) -> str | None:
 
 def generate(request: Request) -> list[str]:
     """Create the package and its TOML edits, or raise ``GeneratorError`` having written nothing."""
-    if request.kind == "promote":
+    _check_options(request)
+    if request.kind == PROMOTE:
         return promote(request)
     package = _locate(request)
     pyproject_path = request.root / "pyproject.toml"
@@ -353,8 +395,9 @@ def generate(request: Request) -> list[str]:
         else ""
         for relative, template in _files(request).items()
     }
-    if request.kind == "capability" and not (request.root / CAPABILITIES).is_dir():
-        rendered[request.root / CAPABILITIES / "__init__.py"] = ""
+    capabilities = request.root / _capabilities()
+    if request.kind == "capability" and not capabilities.is_dir():
+        rendered[capabilities / "__init__.py"] = ""
     for path, content in rendered.items():
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
@@ -378,7 +421,7 @@ def _report(request: Request, package: Package) -> list[str]:
     scope_line = _product_scope_line(request, package)
     if scope_line:
         lines.append(f"decisions/product-scope.md, add to the table: {scope_line}")
-    if request.settings:
+    if "settings" in request.options:
         lines.append(
             f"settings.py reads [{_table(package)}] in config/base.toml; add its keys to both. When a plugin requires "
             "one of its keys, build the slice in server/configuration/host_configuration.py (plugins.md 2026-11-05)."
@@ -392,15 +435,16 @@ def _report(request: Request, package: Package) -> list[str]:
 
 def _module_renamer(feature: str, subdomain: str, settings_moved: bool) -> Callable[[str], str]:
     """Rewrite references to a promoted feature: its modules move into the subdomain, settings into common/."""
-    pattern = re.compile(rf"\b{FEATURES}\.{feature}\b(?:\.(\w+))?")
+    features = _features()
+    pattern = re.compile(rf"\b{features}\.{feature}\b(?:\.(\w+))?")
 
     def replace(match: re.Match[str]) -> str:
         tail = match.group(1)
         if tail is None:
-            return f"{FEATURES}.{feature}.{subdomain}"
+            return f"{features}.{feature}.{subdomain}"
         if tail == "settings" and settings_moved:
-            return f"{FEATURES}.{feature}.common.settings"
-        return f"{FEATURES}.{feature}.{subdomain}.{tail}"
+            return f"{features}.{feature}.common.settings"
+        return f"{features}.{feature}.{subdomain}.{tail}"
 
     return lambda text: pattern.sub(replace, text)
 
@@ -428,19 +472,19 @@ def promote(request: Request) -> list[str]:
     """
     root, feature, subdomain = request.root, request.target, request.subdomain
     _check_name(feature)
-    directory = root / FEATURES / feature
+    features = _features()
+    directory = root / features / feature
     if not directory.is_dir():
         raise GeneratorError(f"no feature '{feature}' under features/")
     if not subdomain:
         raise GeneratorError("promote needs --subdomain <name>: the subdomain the feature's code becomes")
     _check_name(subdomain)
-    if subdomain in RESERVED_SUBDOMAINS:
-        raise GeneratorError(f"'{subdomain}' is reserved for an umbrella kernel or a layout-table directory")
+    _check_subdomain(subdomain)
 
     pyproject_path = root / "pyproject.toml"
     pyproject_text = pyproject_path.read_text(encoding="utf-8")
     pyproject = tomllib.loads(pyproject_text)
-    old_module = f"{FEATURES}.{feature}"
+    old_module = f"{features}.{feature}"
     target = pyproject["project"]["entry-points"].get("sre_bot", {}).get(feature, "")
     if target not in (old_module, f"{old_module}.plugin"):
         raise GeneratorError(f"'{feature}' is not a flat plugin named by an entry point; only one can be promoted")
@@ -461,9 +505,7 @@ def promote(request: Request) -> list[str]:
         raise GeneratorError(str(error)) from error
 
     moves = {
-        child: (root / FEATURES / feature / "common" / child.name)
-        if child.name == "settings.py"
-        else directory / subdomain / child.name
+        child: (directory / "common" / child.name) if child.name == "settings.py" else directory / subdomain / child.name
         for child in sorted(directory.iterdir())
         if child.name not in EXCLUDED_DIR_NAMES
     }
@@ -514,20 +556,22 @@ def _ask(prompt: str) -> str:
 
 def prompt_arguments() -> list[str]:
     """Ask for each value on a terminal; return them as command-line arguments."""
-    kind = _ask(f"Kind ({' / '.join(KINDS)})")
+    kind = _ask(f"Kind ({' / '.join(_kinds())})")
     hints = {"subdomain": "<umbrella>.<subdomain>", "core": "umbrella", "common": "umbrella", "promote": "flat feature"}
     argv = [kind, _ask(f"Name ({hints.get(kind, 'lower snake_case')})")]
     if kind in AREA_KINDS:
         base = tomllib.loads((APP_ROOT / "config" / "base.toml").read_text(encoding="utf-8"))
         argv += ["--area", _ask(f"Product area ({' / '.join(plugin_areas(base))})")]
     if kind == "capability":
-        argv += ["--classification", _ask(f"Classification ({' / '.join(CLASSIFICATIONS)})")]
+        argv += ["--classification", _ask(f"Classification ({' / '.join(layout().classifications)})")]
         for consumer in _ask("Feature consumers (features.<feature>[.<subdomain>], comma-separated)").split(","):
             argv += ["--consumer", consumer.strip()]
-    if kind == "promote":
+    if kind == PROMOTE:
         return [*argv, "--subdomain", _ask("Subdomain the feature's code becomes")]
-    if kind != "umbrella" and _ask("Settings slice? (y/N)").lower().startswith("y"):
-        argv.append("--settings")
+    if kind in layout().kinds:
+        for option in layout().options_of(kind):
+            if _ask(f"Include {option.entry}? (y/N)").lower().startswith("y"):
+                argv.append(f"--{option.name}")
     return argv
 
 

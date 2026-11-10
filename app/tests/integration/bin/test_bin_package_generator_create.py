@@ -8,10 +8,13 @@ aimed at the copy, empty baseline), the plugin-enablement check, the rule that
 the protected-plugins contract lists exactly the entry-point modules, ruff over
 the generated files, and a pluggy PluginManager that registers the generated
 ``__init__.py`` (loaded from its file, so it cannot collide with the real
-``features`` package) and calls ``register_requirements``.
+``features`` package) and calls ``register_requirements``. The optional
+entries a kind may gain come from bin/package_layout.toml, so the option
+matrix is checked against the shape guard for every capability combination.
 """
 
 import importlib.util
+import itertools
 import shutil
 import subprocess
 import sys
@@ -25,6 +28,7 @@ import pytest
 from bin import check_package_shape as checker
 from bin import new_package
 from bin.new_package import GeneratorError
+from bin.package_layout import layout
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from server.plugins.settings import PluginsSettings, check_plugin_enablement
@@ -114,7 +118,7 @@ def test_a_feature_is_a_registrable_plugin_with_its_key_and_contracts(root: Path
     _run(root, "feature", "shop", "--area", AREA)
 
     package = root / "features" / "shop"
-    assert {path.name for path in package.iterdir()} == {"__init__.py", "README.md", "service.py", "interfaces.py", "entrypoints"}
+    assert {path.name for path in package.iterdir()} == {"__init__.py", "README.md", "service.py", "entrypoints"}
     assert _entry_points(root)["shop"] == "features.shop"
     assert "features.shop" in _contract(root, "feature-independence")["modules"]
     assert _base(root)["plugins"][AREA]["shop"] is True
@@ -134,7 +138,18 @@ def test_a_feature_with_settings_gets_a_slice_and_its_table(root: Path) -> None:
 
 def test_the_first_capability_creates_the_capabilities_root(root: Path) -> None:
     _run(root, "feature", "shop", "--area", AREA)
-    _run(root, "capability", "pricing", "--area", AREA, "--classification", "supporting", "--consumer", "features.shop")
+    _run(
+        root,
+        "capability",
+        "pricing",
+        "--area",
+        AREA,
+        "--classification",
+        "supporting",
+        "--consumer",
+        "features.shop",
+        "--hookspecs",
+    )
 
     package = root / "capabilities" / "pricing"
     assert (root / "capabilities" / "__init__.py").is_file()
@@ -249,6 +264,88 @@ def test_the_printed_next_steps_name_the_product_scope_row(root: Path, capsys: p
     assert "| Workplace utilities | `talent`, `rant`, `shop` |" in capsys.readouterr().out
 
 
+CAPABILITY_OPTIONS = ("hookspecs", "service", "entrypoints", "interfaces", "adapters", "settings")
+ENTRY = {
+    "hookspecs": "hookspecs.py",
+    "service": "service.py",
+    "entrypoints": "entrypoints",
+    "interfaces": "interfaces.py",
+    "adapters": "adapters",
+    "settings": "settings.py",
+}
+CAPABILITY_COMBINATIONS = [
+    combination
+    for size in range(len(CAPABILITY_OPTIONS) + 1)
+    for combination in itertools.combinations(CAPABILITY_OPTIONS, size)
+    if "interfaces" not in combination or "service" in combination
+]
+
+
+def _names(directory: Path) -> set[str]:
+    return {path.name for path in directory.iterdir() if path.name != "__pycache__"}
+
+
+@pytest.mark.parametrize("options", CAPABILITY_COMBINATIONS, ids=lambda options: "+".join(options) or "none")
+def test_a_capability_holds_its_required_entries_plus_exactly_the_options_given(root: Path, options: tuple[str, ...]) -> None:
+    _run(root, "feature", "shop", "--area", AREA)
+
+    _run(
+        root, "capability", "pricing", "--classification", "generic", "--consumer", "features.shop", *(f"--{o}" for o in options)
+    )
+
+    package = root / "capabilities" / "pricing"
+    assert _names(package) == {"__init__.py", "README.md", "api.py"} | {ENTRY[option] for option in options}
+    for directory in ("entrypoints", "adapters"):
+        if directory in _names(package):
+            assert (package / directory / "__init__.py").is_file()
+    assert checker.find_violations() == set()
+    if len(options) == len(CAPABILITY_OPTIONS):
+        _assert_consistent(root)
+
+
+@pytest.mark.parametrize(
+    ("kind", "target", "options", "expected"),
+    [
+        ("feature", "shop", (), {"__init__.py", "README.md", "service.py", "entrypoints"}),
+        (
+            "feature",
+            "shop",
+            ("interfaces", "adapters", "settings"),
+            {"__init__.py", "README.md", "service.py", "entrypoints", "interfaces.py", "adapters", "settings.py"},
+        ),
+        ("subdomain", "mall.cart", (), {"__init__.py", "README.md", "service.py", "entrypoints"}),
+        (
+            "subdomain",
+            "mall.cart",
+            ("interfaces", "adapters", "settings"),
+            {"__init__.py", "README.md", "service.py", "entrypoints", "interfaces.py", "adapters", "settings.py"},
+        ),
+        ("core", "mall", (), {"__init__.py", "README.md", "api.py", "service.py"}),
+        (
+            "core",
+            "mall",
+            ("interfaces", "adapters"),
+            {"__init__.py", "README.md", "api.py", "service.py", "interfaces.py", "adapters"},
+        ),
+        ("common", "mall", (), {"__init__.py", "README.md"}),
+        ("common", "mall", ("settings",), {"__init__.py", "README.md", "settings.py"}),
+    ],
+)
+def test_a_kind_holds_its_required_entries_plus_exactly_the_options_given(
+    root: Path, kind: str, target: str, options: tuple[str, ...], expected: set[str]
+) -> None:
+    _run(root, "umbrella", "mall", "--area", AREA)
+    area = ["--area", AREA] if kind in ("feature", "subdomain") else []
+
+    _run(root, kind, target, *area, *(f"--{option}" for option in options))
+
+    directory = (
+        root / "features" / target.replace(".", "/") if kind != "core" and kind != "common" else root / "features" / target / kind
+    )
+    assert _names(directory) == expected
+    _assert_consistent(root)
+
+
 @pytest.mark.parametrize(
     ("argv", "message"),
     [
@@ -263,6 +360,24 @@ def test_the_printed_next_steps_name_the_product_scope_row(root: Path, capsys: p
             "features.none",
         ),
         (["feature", "shop"], "--area"),
+        (["feature", "shop", "--area", AREA, "--hookspecs"], "--hookspecs is not an option of a feature"),
+        (["feature", "shop", "--area", AREA, "--service"], "--service is not an option of a feature"),
+        (["umbrella", "shop", "--area", AREA, "--settings"], "an umbrella takes no option"),
+        (
+            [
+                "capability",
+                "pricing",
+                "--area",
+                AREA,
+                "--classification",
+                "generic",
+                "--consumer",
+                "features.shop",
+                "--interfaces",
+            ],
+            "--interfaces needs --service on a capability",
+        ),
+        (["promote", "shop", "--subdomain", "cart", "--settings"], "promote takes no option"),
     ],
 )
 def test_an_invalid_request_writes_nothing(root: Path, argv: list[str], message: str) -> None:
@@ -276,6 +391,26 @@ def test_an_invalid_request_writes_nothing(root: Path, argv: list[str], message:
     assert (root / "config" / "base.toml").read_text(encoding="utf-8") == base_before
     assert sorted(path.name for path in (root / "features").iterdir()) == ["__init__.py"]
     assert not (root / "capabilities").exists()
+
+
+@pytest.mark.parametrize(
+    ("argv", "message"),
+    [
+        (["subdomain", "mall.cart", "--area", AREA, "--entrypoints"], "--entrypoints is not an option of a subdomain"),
+        (["core", "mall", "--entrypoints"], "--entrypoints is not an option of a core"),
+        (["core", "mall", "--hookspecs"], "--hookspecs is not an option of a core"),
+        (["common", "mall", "--interfaces"], "--interfaces is not an option of a common"),
+    ],
+)
+def test_an_option_outside_an_umbrella_members_kind_writes_nothing(root: Path, argv: list[str], message: str) -> None:
+    _run(root, "umbrella", "mall", "--area", AREA)
+    before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file() and "__pycache__" not in path.parts}
+
+    with pytest.raises(GeneratorError, match=f"{message}.*feature-packages.md"):
+        new_package.generate(new_package.parse_request([*argv, "--root", str(root)]))
+
+    after = {path: path.read_bytes() for path in root.rglob("*") if path.is_file() and "__pycache__" not in path.parts}
+    assert after == before
 
 
 def test_an_existing_package_path_is_refused(root: Path) -> None:
@@ -292,7 +427,9 @@ def test_main_reports_a_refused_request_and_exits_non_zero(root: Path, capsys: p
 
 
 def test_the_interactive_prompt_asks_for_the_same_values_the_flags_take(monkeypatch: pytest.MonkeyPatch) -> None:
-    answers = iter(["capability", "pricing", AREA, "generic", "features.shop, features.incident.response", "y"])
+    answers = iter(
+        ["capability", "pricing", AREA, "generic", "features.shop, features.incident.response", "n", "y", "n", "y", "", "y"]
+    )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
 
     assert new_package.prompt_arguments() == [
@@ -306,13 +443,47 @@ def test_the_interactive_prompt_asks_for_the_same_values_the_flags_take(monkeypa
         "features.shop",
         "--consumer",
         "features.incident.response",
+        "--service",
+        "--interfaces",
         "--settings",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("answers", "entries"),
+    [
+        (
+            ["capability", "pricing", AREA, "generic", "features.shop"],
+            ["hookspecs", "service", "entrypoints", "interfaces", "adapters", "settings"],
+        ),
+        (["core", "shop"], ["interfaces", "adapters", "settings"]),
+        (["common", "shop"], ["settings"]),
+        (["umbrella", "shop", AREA], []),
+        (["promote", "shop", "cart"], []),
+    ],
+)
+def test_the_interactive_prompt_asks_each_option_the_kind_takes(
+    monkeypatch: pytest.MonkeyPatch, answers: list[str], entries: list[str]
+) -> None:
+    prompts: list[str] = []
+    replies = iter(answers)
+
+    def answer(prompt: str) -> str:
+        prompts.append(prompt)
+        return next(replies, "n")
+
+    monkeypatch.setattr("builtins.input", answer)
+
+    new_package.prompt_arguments()
+
+    assert [prompt for prompt in prompts if prompt.startswith("Include ")] == [
+        f"Include {layout().options[name].entry}? (y/N): " for name in entries
     ]
 
 
 def _flat_feature_with_importers(root: Path) -> None:
     """A flat plugin feature with settings, imported by host code and a test, and switched off in ci.toml."""
-    _run(root, "feature", "shop", "--area", AREA, "--settings")
+    _run(root, "feature", "shop", "--area", AREA, "--settings", "--interfaces")
     (root / "features" / "shop" / "domain.py").write_text('"""Shop domain."""\n\nCURRENCY = "CAD"\n', encoding="utf-8")
     host = root / "server" / "host.py"
     host.parent.mkdir()
