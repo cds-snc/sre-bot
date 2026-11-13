@@ -1,7 +1,12 @@
 import datetime
 import json
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import ANY, MagicMock, call, patch
 
+import i18n
+import pytest
+from pydantic import ValidationError
 from slack_sdk.errors import SlackApiError
 
 from models.incidents import IncidentPayload
@@ -611,3 +616,266 @@ def helper_generate_view(name="name", locale="en-US", private_metadata=""):
             }
         },
     }
+
+
+# -- policy help: modal, submit and payload ------------------------------------------------------
+
+
+def _policy_modal(locale: str = "en-US") -> dict[str, Any]:
+    previous = i18n.get("locale")
+    i18n.set("locale", locale)
+    try:
+        with patch(
+            "modules.incident.incident.get_incident_response_settings", return_value=SimpleNamespace(handbook_id="HANDBOOK")
+        ):
+            return incident.generate_incident_modal_view({"text": "incident description"}, [], None, locale)
+    finally:
+        i18n.set("locale", previous)
+
+
+def _policy_block(view: dict[str, Any], block_id: str) -> dict[str, Any]:
+    return next(block for block in view["blocks"] if block.get("block_id") == block_id)
+
+
+def _policy_submitted_view(policy: dict[str, Any] | None = None, *, include_block: bool = True) -> dict[str, Any]:
+    view = helper_generate_view()
+    view["state"]["values"]["security_incident"] = {"security_incident": {"selected_option": {"value": "no"}}}
+    if include_block:
+        view["state"]["values"]["policy_help"] = {"policy_help": policy if policy is not None else {"selected_option": None}}
+    return view
+
+
+def _policy_submit(view: dict[str, Any]) -> IncidentPayload:
+    """Submit the view and return the payload handed to the resource-creation step."""
+    body = {"user": {"id": "user_id"}, "trigger_id": "trigger_id", "view": view}
+    previous = i18n.get("locale")
+    try:
+        with (
+            patch("modules.incident.incident.core") as core,
+            patch("modules.incident.incident.log_to_sentinel"),
+            patch("modules.incident.incident.logger"),
+            patch("modules.incident.incident.incident_conversation") as conversation,
+        ):
+            conversation.create_incident_conversation.return_value = {
+                "channel_id": "channel_id",
+                "channel_name": "channel_name",
+                "slug": "slug",
+            }
+            incident.submit(MagicMock(), view, MagicMock(), body, MagicMock())
+    finally:
+        i18n.set("locale", previous)
+    payload: IncidentPayload = core.initiate_resources_creation.call_args.kwargs["incident_payload"]
+    return payload
+
+
+def test_the_modal_asks_the_policy_question_in_english():
+    block = _policy_block(_policy_modal("en-US"), "policy_help")
+
+    assert block["label"]["text"] == "Do you need policy help?"
+    assert block["hint"]["text"] == (
+        "e.g., the incident may involve privacy, personal information, terms of use violations, etc."
+    )
+
+
+def test_the_modal_asks_the_policy_question_in_french():
+    block = _policy_block(_policy_modal("fr-FR"), "policy_help")
+
+    assert block["label"]["text"] == "Avez-vous besoin d'aide en matière de politiques?"
+    assert "vie privée" in block["hint"]["text"]
+
+
+def test_the_policy_question_is_a_required_input_block():
+    """The submitter must answer, so the stored answer is always an explicit yes or no."""
+    block = _policy_block(_policy_modal(), "policy_help")
+
+    assert block["type"] == "input"
+    assert not block.get("optional", False)
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected"),
+    [("en-US", [("Yes", "yes"), ("No", "no")]), ("fr-FR", [("Oui", "yes"), ("Non", "no")])],
+)
+def test_the_policy_question_offers_localized_yes_and_no_in_that_order(locale, expected):
+    element = _policy_block(_policy_modal(locale), "policy_help")["element"]
+
+    assert element["type"] == "static_select"
+    assert [(o["text"]["text"], o["value"]) for o in element["options"]] == expected
+
+
+def test_the_policy_question_has_a_localized_placeholder():
+    assert (
+        _policy_block(_policy_modal("en-US"), "policy_help")["element"]["placeholder"]["text"] == "Select if you need policy help"
+    )
+    assert "politiques" in _policy_block(_policy_modal("fr-FR"), "policy_help")["element"]["placeholder"]["text"]
+
+
+def test_the_policy_block_and_action_ids_match_the_keys_the_submit_reads():
+    block = _policy_block(_policy_modal(), "policy_help")
+
+    assert block["block_id"] == "policy_help"
+    assert block["element"]["action_id"] == "policy_help"
+
+
+def test_the_policy_question_follows_the_security_question():
+    """The policy question sits directly after the security question, ahead of the handbook link."""
+    view = _policy_modal()
+    block_ids = [block.get("block_id") for block in view["blocks"]]
+
+    assert block_ids.index("policy_help") == block_ids.index("security_incident") + 1
+    assert view["blocks"][-1]["type"] == "context"
+
+
+def test_the_security_question_is_unchanged():
+    block = _policy_block(_policy_modal(), "security_incident")
+
+    assert block["label"]["text"] == "Is this a security incident?"
+    assert [o["value"] for o in block["element"]["options"]] == ["yes", "no"]
+
+
+def test_the_locale_button_is_still_the_first_block():
+    """Submit and locale toggling read the locale from the first block, so adding a field must not move it."""
+    view = _policy_modal()
+
+    assert view["blocks"][0]["block_id"] == "locale"
+    assert view["blocks"][0]["elements"][0]["value"] == "en-US"
+
+
+def test_every_block_id_in_the_modal_is_unique():
+    ids = [block["block_id"] for block in _policy_modal()["blocks"] if "block_id" in block]
+
+    assert len(ids) == len(set(ids))
+    assert {"name", "product", "severity", "security_incident", "policy_help"} <= set(ids)
+
+
+@pytest.mark.parametrize("locale", ["en-US", "fr-FR"])
+def test_the_policy_strings_exist_in_both_locales(locale):
+    previous = i18n.get("locale")
+    i18n.set("locale", locale)
+    try:
+        for key in ("policy_help", "policy_help_hint", "policy_help_placeholder"):
+            translated = i18n.t(f"incident.modal.{key}")
+            assert translated and translated != f"incident.modal.{key}"
+    finally:
+        i18n.set("locale", previous)
+
+
+def test_the_locale_toggle_rebuilds_the_modal_with_the_policy_question():
+    """Switching language re-renders the whole modal, so the policy question stays present in the new locale."""
+    client = MagicMock()
+    body = {
+        "trigger_id": "trigger_id",
+        "user_id": "user_id",
+        "actions": [{"value": "en-US"}],
+        "view": helper_generate_view(),
+    }
+    previous = i18n.get("locale")
+
+    try:
+        with (
+            patch("modules.incident.incident.incident_folder.list_incident_folders", return_value=[{"id": "id", "name": "name"}]),
+            patch(
+                "modules.incident.incident.get_incident_response_settings", return_value=SimpleNamespace(handbook_id="HANDBOOK")
+            ),
+        ):
+            incident.handle_change_locale_button(MagicMock(), client, body)
+    finally:
+        i18n.set("locale", previous)
+
+    view = client.views_update.call_args.kwargs["view"]
+    assert _policy_block(view, "policy_help")["label"]["text"] == "Avez-vous besoin d'aide en matière de politiques?"
+
+
+@pytest.mark.parametrize("answer", ["yes", "no"])
+def test_submitting_an_answer_passes_it_to_resource_creation(answer):
+    payload = _policy_submit(_policy_submitted_view({"selected_option": {"value": answer}}))
+
+    assert payload.policy_help == answer
+
+
+def test_a_submission_without_the_policy_block_defaults_to_no():
+    """A modal opened before the field existed submits no policy block and must still create the incident."""
+    payload = _policy_submit(_policy_submitted_view(include_block=False))
+
+    assert payload.policy_help == "no"
+
+
+def test_a_submission_with_no_selected_option_defaults_to_no():
+    payload = _policy_submit(_policy_submitted_view({"selected_option": None}))
+
+    assert payload.policy_help == "no"
+
+
+@pytest.mark.parametrize("security", ["yes", "no"])
+def test_the_policy_answer_is_independent_of_the_security_answer(security):
+    view = _policy_submitted_view({"selected_option": {"value": "yes"}})
+    view["state"]["values"]["security_incident"] = {"security_incident": {"selected_option": {"value": security}}}
+
+    payload = _policy_submit(view)
+
+    assert (payload.security_incident, payload.policy_help) == (security, "yes")
+
+
+def test_the_rest_of_the_payload_is_unaffected_by_the_policy_answer():
+    payload = _policy_submit(_policy_submitted_view({"selected_option": {"value": "yes"}}))
+
+    assert payload == IncidentPayload(
+        name="name",
+        folder="folder",
+        product="product",
+        security_incident="no",
+        policy_help="yes",
+        user_id="user_id",
+        channel_id="channel_id",
+        channel_name="channel_name",
+        slug="slug",
+        severity="sev-1",
+    )
+
+
+def test_an_invalid_name_is_rejected_before_any_resource_is_created():
+    view = _policy_submitted_view({"selected_option": {"value": "yes"}})
+    view["state"]["values"]["name"] = {"name": {"value": "bad/name!"}}
+    ack = MagicMock()
+
+    with (
+        patch("modules.incident.incident.core") as core,
+        patch("modules.incident.incident.incident_conversation") as conversation,
+    ):
+        incident.submit(ack, view, MagicMock(), {"user": {"id": "user_id"}, "view": view}, MagicMock())
+
+    assert "name" in ack.call_args.kwargs["errors"]
+    conversation.create_incident_conversation.assert_not_called()
+    core.initiate_resources_creation.assert_not_called()
+
+
+def _payload_fields(**overrides):
+    return {
+        "name": "name",
+        "folder": "folder",
+        "product": "product",
+        "security_incident": "no",
+        "user_id": "user_id",
+        "channel_id": "channel_id",
+        "channel_name": "channel_name",
+        "slug": "slug",
+    } | overrides
+
+
+def test_payload_policy_help_defaults_to_no():
+    assert IncidentPayload(**_payload_fields()).policy_help == "no"
+
+
+@pytest.mark.parametrize("answer", ["yes", "no"])
+def test_payload_policy_help_keeps_the_submitted_answer(answer):
+    assert IncidentPayload(**_payload_fields(policy_help=answer)).policy_help == answer
+
+
+def test_payload_policy_help_must_be_a_string():
+    with pytest.raises(ValidationError):
+        IncidentPayload(**_payload_fields(policy_help=["yes"]))
+
+
+def test_payload_still_rejects_unknown_fields():
+    with pytest.raises(ValidationError):
+        IncidentPayload(**_payload_fields(), policy_helper="yes")

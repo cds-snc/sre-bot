@@ -30,6 +30,7 @@ class IncidentResponseSettings(ConfigurationSlice):
     Keys of [incident_response]:
         announcement_channel_id: channel new incidents are announced in; empty for none.
         security_group_id: user group invited to a security incident; empty for none.
+        policy_group_id: user group (@incident-policy) invited when policy help is requested; empty for none.
         notify_management_group_id: user group invited to a Notify product incident; empty for none.
         upgrade_mode: the incident legacy upgrade job's mode; off registers nothing.
         upgrade_interval_minutes: minutes between two runs of the upgrade job.
@@ -43,6 +44,9 @@ class IncidentResponseSettings(ConfigurationSlice):
 
     announcement_channel_id: str = Field(default="", description="Slack channel id new incidents are announced in.")
     security_group_id: str = Field(default="", description="Slack user group id invited to a security incident.")
+    policy_group_id: str = Field(
+        default="", description="Slack user group id (@incident-policy) invited when policy help is requested."
+    )
     notify_management_group_id: str = Field(default="", description="Slack user group id invited to a Notify product incident.")
     upgrade_mode: UpgradeMode = Field(
         default=UpgradeMode.OFF, description="Incident legacy upgrade job mode: off (not registered), dry_run or apply."
