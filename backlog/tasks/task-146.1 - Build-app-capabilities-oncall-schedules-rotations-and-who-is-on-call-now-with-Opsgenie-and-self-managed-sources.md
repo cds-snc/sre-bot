@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-09T19:04:00Z'
+updated_date: '2026-11-16T14:06:00Z'
 labels:
   - oncall
   - capabilities
@@ -49,6 +49,8 @@ THIS SLICE
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09 (human, Stack L OQ1): pulled forward as a side PR during Stack L L0-L8; the declare cutover (TASK-145.7 L9b) waits on it. Depends on TASK-25.6 (decisions/oncall.md:39: the Opsgenie adapter follows the outbound-client contract).
+
+2026-11-16 (TASK-25.6 OQ1 R1a, human): OnCallLookup is async def (consumed by the async declare, 145.7.9); adapters/opsgenie.py awaits the async build_opsgenie_client (httpx.AsyncClient) directly, with no asyncio.to_thread (outbound-clients.md async-native rule). Move the reads from packages/oncall_sync/adapters/opsgenie.py, which is already async after TASK-25.6.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
