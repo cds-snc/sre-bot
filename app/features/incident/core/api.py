@@ -316,6 +316,15 @@ class IncidentReport(Protocol):
         """
         ...
 
+    async def set_status_text(self, report: ReportReference, status: IncidentStatus) -> OperationResult[None]:
+        """Rewrite the report's status line to show ``status``.
+
+        An implementation over a blocking SDK offloads inside the method.
+        Success whether or not a line occurred; a report that cannot be found
+        is NOT_FOUND.
+        """
+        ...
+
     async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
         """Return the report's heading-delimited sections in document order; the report is only read."""
         ...

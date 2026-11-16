@@ -38,7 +38,7 @@ import i18n  # type: ignore
 import pluggy
 import pytest
 import structlog
-from boto3.dynamodb.types import TypeSerializer
+from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError
 from googleapiclient.errors import HttpError
 from pydantic import SecretStr
@@ -48,6 +48,7 @@ from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.webhook import WebhookClient
 
 import features.incident.comms as incident_comms_module
+import features.incident.response.plugin as incident_response_module
 import features.incident.scribe as incident_scribe_module
 import packages.access.sync as access_sync_module
 import packages.geolocate as geolocate_module
@@ -84,6 +85,7 @@ SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
     access_sync_module,
     incident_scribe_module,
     incident_comms_module,
+    incident_response_module,
     geolocate_module,
 )
 
@@ -211,7 +213,7 @@ def legacy_scribe_transcript_reader_seam(monkeypatch: pytest.MonkeyPatch) -> Fak
 
 
 def build_harness(monkeypatch: pytest.MonkeyPatch, command_prefix: str, client: FakeSlackClient) -> SlackCommandHarness:
-    """Wire the six hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app.
+    """Wire the seven hookimpls and the legacy sre and dev commands onto a fresh provider and Bolt app.
 
     ``client`` is the fake from ``legacy_scribe_transcript_reader_seam``, so
     scribe's transcript reader and every other Slack lookup share it.
@@ -520,6 +522,14 @@ class FakeIncidentTable:
         """Make every later request to the table fail."""
         self._client.unavailable = True
 
+    def items(self) -> list[dict[str, Any]]:
+        """The stored incidents, as plain values."""
+        deserializer = TypeDeserializer()
+        return [
+            {name: deserializer.deserialize(value) for name, value in item.items()}
+            for item in self._client.tables.get("incidents", [])
+        ]
+
 
 class _Request:
     """A googleapiclient request whose ``execute`` returns a prepared result, or raises a prepared error."""
@@ -811,12 +821,15 @@ class IncidentSurface:
     """The legacy handlers and the ``/sre`` command on one Bolt app, over faked incident edges.
 
     ``slack`` dispatches commands and interactions; ``table``, ``google`` and
-    ``slack.client`` are the faked edges whose state the tests read back.
+    ``slack.client`` are the faked edges whose state the tests read back;
+    ``provider`` is the Slack provider ``/sre`` routes through, on which a
+    rebuilt plugin registers its commands.
     """
 
     slack: LegacyHandlerHarness
     table: FakeIncidentTable
     google: FakeGoogleWorkspace
+    provider: SlackPlatformProvider
 
     def sre(self, text: str, channel_name: str = INCIDENT_CHANNEL_NAME) -> BoltResponse:
         """Send ``/sre <text>`` from the incident channel."""
@@ -867,7 +880,7 @@ def incident_surface(
     _register_legacy_slack_commands(provider, structlog.get_logger())
     provider._auto_register_root_commands()
 
-    yield IncidentSurface(slack=legacy_handler_harness, table=FakeIncidentTable(dynamodb), google=google)
+    yield IncidentSurface(slack=legacy_handler_harness, table=FakeIncidentTable(dynamodb), google=google, provider=provider)
     get_spreadsheet_provider.cache_clear()
 
 

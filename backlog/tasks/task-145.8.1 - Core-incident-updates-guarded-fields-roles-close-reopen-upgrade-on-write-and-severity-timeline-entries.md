@@ -3,10 +3,10 @@ id: TASK-145.8.1
 title: >-
   Core incident updates: guarded fields, roles, close, reopen, upgrade-on-write
   and severity timeline entries
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T17:10:00Z'
+updated_date: '2026-11-16T15:53:00Z'
 labels:
   - incident
   - features

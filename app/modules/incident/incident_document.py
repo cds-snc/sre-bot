@@ -12,11 +12,13 @@ from structlog import get_logger
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.common.settings import get_incident_core_settings
+from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.google_docs import (
     apply_document_edits,
     fetch_document_snapshot,
     replace_placeholders,
+    status_line_replacements,
 )
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
@@ -71,21 +73,11 @@ def update_incident_document_status(document_id, new_status="Closed"):
     Returns:
         bool: True if the status was updated, False otherwise.
     """
-    # List of possible statuses to be replaced
-    possible_statuses = [
-        "In Progress",
-        "Open",
-        "Ready to be Reviewed",
-        "Reviewed",
-        "Closed",
-    ]
-
-    if new_status not in possible_statuses:
+    if new_status not in set(IncidentStatus):
         raise ValueError(f"Invalid status: {new_status}")
 
-    # Replace all possible statuses with the new status
-    replacements = {f"Status: {status}": f"Status: {new_status}" for status in possible_statuses if status != new_status}
-    return replace_placeholders(document_id, replacements, match_case=False)
+    # The mapping lives in core (decisions/migration.md rule 5); TASK-145.8.5 deletes this function.
+    return replace_placeholders(document_id, status_line_replacements(IncidentStatus(new_status)), match_case=False)
 
 
 def timeline_message_key(url: str) -> tuple[str, str]:

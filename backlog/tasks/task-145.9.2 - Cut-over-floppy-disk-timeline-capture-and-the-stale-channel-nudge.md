@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T21:47:00Z'
+updated_date: '2026-11-16T15:51:00Z'
 labels:
   - incident
   - features
@@ -41,3 +41,15 @@ Stack L L10b. Reaction handlers registered by incident.response write timeline r
 
 2026-11-10 (TASK-145.8.7 planning): TimelineStore stays sync after TASK-145.8.7 because only the store bodies call it; when this task (or 145.9.1) gives it an async consumer, it becomes async def with its Record adapter offloading (decisions/outbound-clients.md async-port rule).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-16T15:51:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+<!-- COMMENTS:END -->

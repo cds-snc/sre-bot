@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-06T22:26:00Z'
+updated_date: '2026-11-16T15:51:00Z'
 labels:
   - incident
   - features
@@ -91,3 +91,15 @@ One modal flow; revert restores the legacy registration.
 
 2026-11-06 (TASK-36.1.5 pins): the retro pins capture legacy behaviour to rule on here: a refused calendar insert escapes handle_schedule_retro_submit, so the modal stays on 'Scheduling the retro...' and nothing is posted (its 'did not return a link' failure view is unreachable: insert_event raises, never returns None); schedule_event collects each attendee email twice (harmless); the unavailable-user rule flags only a single busy block within an hour of both range edges. Rewire test_incident_retro_schedule_surface.py to the rebuilt postmortem scheduling.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-16T15:51:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+<!-- COMMENTS:END -->

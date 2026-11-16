@@ -8,7 +8,10 @@ observable rules: a created report is a Google reference under the configured
 tenant with its Docs link, a reference of another system is refused as
 unsupported, an unknown report is not found, and the link is the stored url.
 Both know the same placements (the incident folder's subfolders other than
-Templates), listed by label, and a report can be created in one of them.
+Templates), listed by label, and a report can be created in one of them. Setting
+the status text is async on both and follows the same rules; the adapter's
+Docs request (one replaceAllText per other status line, case-insensitive) is
+asserted on the adapter alone, and the fake's record of the status on the fake.
 """
 
 from collections.abc import Callable, Iterator
@@ -23,6 +26,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
+from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters import google_docs
 from features.incident.core.adapters.in_memory import InMemoryIncidentReport
 from features.incident.core.api import DocumentSection, IncidentReport, ReportPlacement, ReportReference, SectionDraft
@@ -74,6 +78,7 @@ class _StubGoogle:
 
     def __init__(self) -> None:
         self.created = False
+        self.batch_bodies: list[Any] = []
         self.docs = MagicMock()
         self.drive = MagicMock()
         self.drive.files.return_value.copy.side_effect = self._copy
@@ -112,6 +117,7 @@ class _StubGoogle:
 
     def _batch_update(self, documentId: str, body: Any) -> MagicMock:
         request = MagicMock()
+        self.batch_bodies.append(body)
         if self.created and documentId == CREATED_ID:
             request.execute.return_value = {"replies": [{"replaceAllText": {"occurrencesChanged": 1}}]}
         else:
@@ -120,8 +126,13 @@ class _StubGoogle:
 
 
 @pytest.fixture
-def google_adapter(monkeypatch: pytest.MonkeyPatch) -> Iterator[IncidentReport]:
-    stub = _StubGoogle()
+def stub_google() -> _StubGoogle:
+    return _StubGoogle()
+
+
+@pytest.fixture
+def google_adapter(monkeypatch: pytest.MonkeyPatch, stub_google: _StubGoogle) -> Iterator[IncidentReport]:
+    stub = stub_google
     # The module reaches the Docs service under both names: placeholder edits and the section reader.
     monkeypatch.setattr(google_docs, "get_docs_service", lambda scopes: stub.docs)
     monkeypatch.setattr(google_docs.google_workspace_client, "get_docs_service", lambda scopes: stub.docs)
@@ -266,3 +277,57 @@ async def test_a_placement_of_another_system_is_unsupported(report_interface: In
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.UNSUPPORTED_OPERATION
+
+
+async def test_setting_the_status_text_of_a_created_report_succeeds(report_interface: IncidentReport) -> None:
+    report = await _created(report_interface)
+
+    result = await report_interface.set_status_text(report, IncidentStatus.CLOSED)
+
+    assert result.is_success
+
+
+async def test_setting_the_status_text_of_an_unknown_report_is_not_found(report_interface: IncidentReport) -> None:
+    unknown = ReportReference(system=WorkplaceSystem.GOOGLE, tenant=TENANT, vendor_id="D0UNKNOWN")
+
+    result = await report_interface.set_status_text(unknown, IncidentStatus.CLOSED)
+
+    assert result.status is OperationStatus.NOT_FOUND
+
+
+async def test_setting_the_status_text_of_a_report_of_another_system_is_unsupported(report_interface: IncidentReport) -> None:
+    result = await report_interface.set_status_text(SLACK_REPORT, IncidentStatus.CLOSED)
+
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == ErrorCode.UNSUPPORTED_OPERATION
+
+
+async def test_the_adapter_rewrites_every_other_status_line_case_insensitively(
+    google_adapter: IncidentReport, stub_google: _StubGoogle
+) -> None:
+    report = await _created(google_adapter)
+
+    await google_adapter.set_status_text(report, IncidentStatus.READY_TO_BE_REVIEWED)
+
+    [body] = stub_google.batch_bodies
+    assert body == {
+        "requests": [
+            {
+                "replaceAllText": {
+                    "containsText": {"text": f"Status: {other}", "matchCase": False},
+                    "replaceText": "Status: Ready to be Reviewed",
+                }
+            }
+            for other in ("In Progress", "Open", "Reviewed", "Closed")
+        ]
+    }
+
+
+async def test_the_fake_shows_the_status_last_set() -> None:
+    reports = cast(InMemoryIncidentReport, _fake())
+    report = await _created(reports)
+    assert reports.status_text_of(report) is None
+
+    await reports.set_status_text(report, IncidentStatus.REVIEWED)
+
+    assert reports.status_text_of(report) is IncidentStatus.REVIEWED
