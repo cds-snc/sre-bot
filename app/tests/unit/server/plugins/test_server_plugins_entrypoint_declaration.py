@@ -1,7 +1,7 @@
 """Unit tests that every feature plugin is declared as a pyproject entry point.
 
-An AST scan (no imports) finds every module under ``packages/`` and ``features/``
-that defines a
+An AST scan (no imports) finds every module under ``packages/``, ``features/`` and
+``capabilities/`` that defines a
 ``@hookimpl`` function and compares it with the entry points declared in
 ``pyproject.toml`` under the ``PLUGIN_NAMESPACE`` group, in both directions: a
 package with hookimpls but no entry-point line would silently never load. A
@@ -25,7 +25,7 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE
 pytestmark = pytest.mark.unit
 
 APP_ROOT = Path(server.plugins.__file__).resolve().parents[2]
-PLUGIN_ROOTS = (APP_ROOT / "packages", APP_ROOT / "features")
+PLUGIN_ROOTS = (APP_ROOT / "packages", APP_ROOT / "features", APP_ROOT / "capabilities")
 SKIPPED_TOP_LEVEL = {"tests", ".venv"}
 PLUGIN_MODULE_FILES = {"__init__.py", "plugin.py"}
 NEVER_ENTRY_POINTS = {"access", "access.common", "incident", "incident.core", "aws_platform"}

@@ -267,6 +267,7 @@ sheet_id = ""
 "incident.scribe" = true
 oncall_sync = true
 user_rotations = true
+oncall = true
 
 [plugins.cloud_operations]
 # No plugin yet: the AWS surfaces are still legacy modules (TASK-88).

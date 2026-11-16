@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-09T15:12:00Z'
+updated_date: '2026-11-16T17:08:00Z'
 labels:
   - identity
 dependencies:
@@ -63,6 +63,8 @@ Nothing consumes it yet, so it can merge without changing behavior.
 2026-09-25 (people-and-accounts.md amendment): the domain also needs verified link provenance and a merged_into tombstone on Person, so a merged person still resolves to its survivor. The join flow itself is TASK-83.14.
 
 2026-11-09 (TASK-114.3 plan): 114.3 does not add a planned-consumer option; this task's plan adds it to the generator (with the readme-consumers baseline entry under the migration.md rule 3 named expand-step exception). The layout options it needs (--hookspecs, --service, --adapters) come from 114.3.
+
+2026-11-16 (TASK-146.1 rulings, human): the on-call capability ships Account(platform, tenant, account_id) in capabilities/oncall/api.py shaped as this task specifies, inside OnCallPerson(email | None, account | None). This task moves Account to capabilities/people/api.py and repoints oncall to import it (a capability may import a lower capability's api, plugin-architecture.md:39).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
