@@ -144,10 +144,10 @@ class _StubReader:
         self._started_at = started_at
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         return OperationResult.success(self._started_at)
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,

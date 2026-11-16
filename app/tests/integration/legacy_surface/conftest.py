@@ -27,7 +27,7 @@ capabilities/ or modules/ target anywhere else (decisions/testing.md).
 
 import json
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Coroutine, Iterator
 from dataclasses import dataclass, field
 from types import ModuleType, SimpleNamespace
 from typing import Any, cast
@@ -44,6 +44,7 @@ from googleapiclient.errors import HttpError
 from pydantic import SecretStr
 from slack_bolt import App, BoltRequest, BoltResponse
 from slack_sdk import WebClient
+from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.webhook import WebhookClient
 
 import features.incident.comms as incident_comms_module
@@ -177,18 +178,34 @@ def capture_response_url_posts(monkeypatch: pytest.MonkeyPatch, responses: list[
     monkeypatch.setattr(WebhookClient, "send_dict", capture_send_dict)
 
 
+class _AwaitedSlackClient:
+    """Async view of the harness's ``FakeSlackClient``: each Web API method is awaited and delegates to the fake, which records it."""
+
+    def __init__(self, client: FakeSlackClient) -> None:
+        self._client = client
+
+    def __getattr__(self, name: str) -> Callable[..., Coroutine[Any, Any, dict[str, Any]]]:
+        method = getattr(self._client, name)
+
+        async def awaited(**kwargs: Any) -> dict[str, Any]:
+            response: dict[str, Any] = method(**kwargs)
+            return response
+
+        return awaited
+
+
 @pytest.fixture
 def legacy_scribe_transcript_reader_seam(monkeypatch: pytest.MonkeyPatch) -> FakeSlackClient:
     """Internal legacy seam: scribe's transcript reader factory, over the harness's Slack client.
 
     Scribe resolves its reader through ``core/api.py``, not a provider, so the
-    real Slack reader is built over the returned fake client and handed to
+    real Slack reader is built over an awaited view of the returned fake client and handed to
     scribe's service module. Owning rebuild task: TASK-145.11, which moves the
     report draft into incident/postmortem and deletes scribe; this fixture is
     deleted there (or earlier if TASK-145.9 moves summarize off it).
     """
     client = FakeSlackClient()
-    reader = SlackIncidentTranscriptReader(cast(WebClient, client))
+    reader = SlackIncidentTranscriptReader(cast(AsyncWebClient, _AwaitedSlackClient(client)))
     monkeypatch.setattr(incident_scribe_service, "get_incident_transcript_reader", lambda: reader)
     return client
 

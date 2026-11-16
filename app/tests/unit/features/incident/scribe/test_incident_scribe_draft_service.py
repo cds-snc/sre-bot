@@ -78,10 +78,10 @@ class _StubIncidentReport:
         self.written_fields: list = []
         self.written_links: dict = {}
 
-    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+    async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
         return OperationResult.success(data=self._sections)
 
-    def write_draft_copy(self, report: ReportReference, drafts, fields, links) -> OperationResult[DraftWriteResult]:
+    async def write_draft_copy(self, report: ReportReference, drafts, fields, links) -> OperationResult[DraftWriteResult]:
         self.created_from = report
         self.created_drafts = list(drafts)
         self.written_fields = list(fields)

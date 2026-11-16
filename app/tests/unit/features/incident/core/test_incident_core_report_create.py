@@ -54,12 +54,12 @@ def _configure(
     )
 
 
-def test_a_new_report_is_a_copy_of_the_template_filed_in_the_configured_folder(
+async def test_a_new_report_is_a_copy_of_the_template_filed_in_the_configured_folder(
     drive: MagicMock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     _configure(monkeypatch)
 
-    result = google_docs.GoogleDocsIncidentReport().create_from_template("2026-11-05 Database outage")
+    result = await google_docs.GoogleDocsIncidentReport().create_from_template("2026-11-05 Database outage")
 
     assert result.is_success and result.data is not None
     assert result.data.vendor_id == "D0NEW"
@@ -77,12 +77,12 @@ def test_a_new_report_is_a_copy_of_the_template_filed_in_the_configured_folder(
         pytest.param({"report_template_id": ""}, "incident_core.report_template_id", id="template"),
     ],
 )
-def test_an_empty_document_id_refuses_naming_the_key_and_calls_no_drive(
+async def test_an_empty_document_id_refuses_naming_the_key_and_calls_no_drive(
     drive: MagicMock, monkeypatch: pytest.MonkeyPatch, configured: dict[str, str], key: str
 ) -> None:
     _configure(monkeypatch, **configured)
 
-    result = google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
+    result = await google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.CONFIG_NOT_CONFIGURED
@@ -90,22 +90,22 @@ def test_an_empty_document_id_refuses_naming_the_key_and_calls_no_drive(
     drive.files.return_value.copy.assert_not_called()
 
 
-def test_no_google_tenant_refuses_naming_the_tenant_entry(drive: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_no_google_tenant_refuses_naming_the_tenant_entry(drive: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
     _configure(monkeypatch)
     monkeypatch.setattr(google_docs, "get_google_workspace_settings", lambda: SimpleNamespace(tenant=None))
 
-    result = google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
+    result = await google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
 
     assert result.error_code == ErrorCode.CONFIG_NOT_CONFIGURED
     assert "google_workspace.tenant" in (result.message or "")
     drive.files.return_value.copy.assert_not_called()
 
 
-def test_a_drive_refusal_comes_back_as_its_classified_status(drive: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_a_drive_refusal_comes_back_as_its_classified_status(drive: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
     _configure(monkeypatch)
     drive.files.return_value.copy.return_value.execute.side_effect = _http_error(403)
 
-    result = google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
+    result = await google_docs.GoogleDocsIncidentReport().create_from_template("Incident")
 
     assert result.status is OperationStatus.UNAUTHORIZED
     assert result.error_code == "403"

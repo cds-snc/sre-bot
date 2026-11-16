@@ -4,7 +4,7 @@
 transcript: the history and thread-replies calls, their cursor paging and
 timestamp format, display-name resolution, chronological ordering, and the
 optional filtering of this bot's own posts and Slack system events. It reads on
-the synchronous Web client its callers still use.
+the async read client, awaiting each page in turn.
 
 ``SlackIncidentConversation`` writes to an incident's conversation on the async
 write handle, which retries only rate-limited requests, and checks writability
@@ -27,9 +27,7 @@ from typing import Any
 from urllib.parse import urlencode
 
 import structlog
-from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
-from slack_sdk.web import SlackResponse
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
@@ -47,7 +45,6 @@ from integrations.slack.client import (
     classify_slack_error,
     get_async_slack_web_client,
     get_async_slack_write_client,
-    get_slack_web_client,
 )
 from integrations.slack.settings import get_slack_settings
 
@@ -74,10 +71,10 @@ _SYSTEM_SUBTYPES = frozenset(
 class SlackIncidentTranscriptReader:
     """Read an incident conversation's start time and transcript from Slack."""
 
-    def __init__(self, client: WebClient) -> None:
+    def __init__(self, client: AsyncWebClient) -> None:
         self._client = client
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         """Return the channel's creation time; ``None`` when Slack gives none.
 
         A failed ``conversations.info`` call (a missing ``channels:read`` or
@@ -87,7 +84,7 @@ class SlackIncidentTranscriptReader:
             return _transcript_unsupported(conversation)
         log = logger.bind(conversation_id=conversation.vendor_id)
         try:
-            response = self._client.conversations_info(channel=conversation.vendor_id)
+            response = await self._client.conversations_info(channel=conversation.vendor_id)
         except SlackApiError as exc:
             return _transcript_failure(exc, "incident_transcript_conversation_info_failed", log)
         created = (response.get("channel") or {}).get("created")
@@ -96,7 +93,7 @@ class SlackIncidentTranscriptReader:
         except TypeError, ValueError:
             return OperationResult.success(None)
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,
@@ -116,17 +113,16 @@ class SlackIncidentTranscriptReader:
         conversation_id = conversation.vendor_id
         log = logger.bind(conversation_id=conversation_id)
         try:
-            top_level = self._read_history(conversation_id, since=since, limit=limit, log=log)
+            top_level = await self._read_history(conversation_id, since=since, limit=limit, log=log)
         except SlackApiError as exc:
             return _transcript_failure(exc, "incident_transcript_history_fetch_failed", log)
 
-        raw_messages = _merge_chronologically(top_level, self._read_thread_replies(conversation_id, top_level, limit, log))[
-            -limit:
-        ]
+        replies = await self._read_thread_replies(conversation_id, top_level, limit, log)
+        raw_messages = _merge_chronologically(top_level, replies)[-limit:]
 
         name_cache: dict[str, str] = {}
         messages: list[TranscriptMessage] = []
-        identity = self._resolve_self_identity(log) if exclude_own_and_system_messages else {}
+        identity = await self._resolve_self_identity(log) if exclude_own_and_system_messages else {}
         skipped = 0
 
         for raw in raw_messages:
@@ -141,7 +137,7 @@ class SlackIncidentTranscriptReader:
                 continue
             # Webhook and alerting posts carry only a bot id; they are named
             # from their bot fields rather than looked up as a user.
-            author = self._resolve_display_name(user_id, name_cache, log) if user_id else _bot_name(raw)
+            author = await self._resolve_display_name(user_id, name_cache, log) if user_id else _bot_name(raw)
             if _is_own_message(raw, author, identity):
                 # This bot's own posts (topic changes, hangout links, "an incident
                 # report has been created at...") are scaffolding. Other bots are
@@ -160,7 +156,7 @@ class SlackIncidentTranscriptReader:
         )
         return OperationResult.success(messages)
 
-    def _read_history(
+    async def _read_history(
         self,
         conversation_id: str,
         *,
@@ -184,7 +180,7 @@ class SlackIncidentTranscriptReader:
             if cursor:
                 kwargs["cursor"] = cursor
             try:
-                response = self._client.conversations_history(**kwargs)
+                response = await self._client.conversations_history(**kwargs)
             except SlackApiError as exc:
                 if not cursor:
                     raise
@@ -198,7 +194,7 @@ class SlackIncidentTranscriptReader:
         # conversations_history returns newest-first; the transcript is chronological.
         return list(reversed(newest_first[:limit]))
 
-    def _read_thread_replies(
+    async def _read_thread_replies(
         self,
         conversation_id: str,
         top_level: Sequence[Mapping[str, Any]],
@@ -220,7 +216,7 @@ class SlackIncidentTranscriptReader:
                     kwargs: dict[str, Any] = {"channel": conversation_id, "ts": thread_ts, "limit": limit}
                     if cursor:
                         kwargs["cursor"] = cursor
-                    response = self._client.conversations_replies(**kwargs)
+                    response = await self._client.conversations_replies(**kwargs)
                     # Slack repeats the parent as the first message of every thread read.
                     replies.extend(m for m in response.get("messages") or [] if m.get("ts") != thread_ts)
                     cursor = _next_cursor(response)
@@ -231,7 +227,7 @@ class SlackIncidentTranscriptReader:
                 log.warning("incident_transcript_replies_fetch_failed", thread_ts=thread_ts, error=str(exc))
         return replies
 
-    def _resolve_self_identity(self, log: structlog.stdlib.BoundLogger) -> dict[str, str]:
+    async def _resolve_self_identity(self, log: structlog.stdlib.BoundLogger) -> dict[str, str]:
         """Return this bot's own ``user_id``, ``bot_id`` and name from ``auth.test``.
 
         Matching on the user id alone proved unreliable -- depending on how a
@@ -242,7 +238,7 @@ class SlackIncidentTranscriptReader:
         rather than failing the read.
         """
         try:
-            response = self._client.auth_test()
+            response = await self._client.auth_test()
         except SlackApiError as exc:
             _raise_if_unclassified(exc)
             log.warning("incident_transcript_auth_test_failed", error=str(exc))
@@ -256,7 +252,7 @@ class SlackIncidentTranscriptReader:
         log.info("incident_transcript_self_identity", **identity)
         return identity
 
-    def _resolve_display_name(
+    async def _resolve_display_name(
         self,
         user_id: str,
         cache: dict[str, str],
@@ -268,7 +264,7 @@ class SlackIncidentTranscriptReader:
 
         name = user_id
         try:
-            user: Mapping[str, Any] = self._client.users_info(user=user_id).get("user") or {}
+            user: Mapping[str, Any] = (await self._client.users_info(user=user_id)).get("user") or {}
             profile: Mapping[str, Any] = user.get("profile") or {}
             name = profile.get("display_name") or profile.get("real_name") or user.get("real_name") or user_id
         except SlackApiError as exc:
@@ -280,8 +276,8 @@ class SlackIncidentTranscriptReader:
 
 
 def build_incident_transcript_reader() -> SlackIncidentTranscriptReader:
-    """Build the adapter on the bot's Web client."""
-    return SlackIncidentTranscriptReader(get_slack_web_client())
+    """Build the adapter on the bot's async read client."""
+    return SlackIncidentTranscriptReader(get_async_slack_web_client())
 
 
 # Slack answers an invite of someone already there, or of the bot itself, with an
@@ -623,7 +619,7 @@ def _normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", name.lower())
 
 
-def _next_cursor(response: SlackResponse | AsyncSlackResponse | Mapping[str, Any]) -> str:
+def _next_cursor(response: AsyncSlackResponse | Mapping[str, Any]) -> str:
     """Return the cursor of the next page, or ``""`` when this was the last one."""
     return str((response.get("response_metadata") or {}).get("next_cursor") or "")
 

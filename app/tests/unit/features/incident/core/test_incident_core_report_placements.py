@@ -65,10 +65,10 @@ def configured(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 @pytest.mark.usefixtures("configured")
 @pytest.mark.parametrize(("placement", "parent"), [(None, FOLDER_ID), (APPS, "F0APPS")])
-def test_the_google_copy_is_filed_in_the_placement_or_the_incident_folder(
+async def test_the_google_copy_is_filed_in_the_placement_or_the_incident_folder(
     drive: MagicMock, placement: ReportPlacement | None, parent: str
 ) -> None:
-    result = google_docs.GoogleDocsIncidentReport().create_from_template("2026-11-10 Incident", placement=placement)
+    result = await google_docs.GoogleDocsIncidentReport().create_from_template("2026-11-10 Incident", placement=placement)
 
     assert result.is_success
     body = drive.files.return_value.copy.call_args.kwargs["body"]
@@ -76,39 +76,41 @@ def test_the_google_copy_is_filed_in_the_placement_or_the_incident_folder(
 
 
 @pytest.mark.parametrize(("placement", "folder"), [(None, FOLDER_ID), (APPS, "F0APPS")])
-def test_the_fake_files_the_report_in_the_placement_or_the_incident_folder(
+async def test_the_fake_files_the_report_in_the_placement_or_the_incident_folder(
     placement: ReportPlacement | None, folder: str
 ) -> None:
     fake = InMemoryIncidentReport(tenant=TENANT, folder_id=FOLDER_ID, report_template_id=TEMPLATE_ID)
 
-    result = fake.create_from_template("2026-11-10 Incident", placement=placement)
+    result = await fake.create_from_template("2026-11-10 Incident", placement=placement)
 
     assert result.data is not None
     assert fake.filed_in(result.data) == folder
 
 
 @pytest.mark.usefixtures("configured")
-def test_a_failed_drive_listing_is_a_classified_result_not_an_empty_list(drive: MagicMock) -> None:
+async def test_a_failed_drive_listing_is_a_classified_result_not_an_empty_list(drive: MagicMock) -> None:
     drive.files.return_value.list.return_value.execute.side_effect = _http_error(503)
 
-    result = google_docs.GoogleDocsIncidentReport().list_placements()
+    result = await google_docs.GoogleDocsIncidentReport().list_placements()
 
     assert result.status is OperationStatus.TRANSIENT_ERROR
     assert result.data is None
 
 
-def test_placements_without_an_incident_folder_are_not_configured(drive: MagicMock, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_placements_without_an_incident_folder_are_not_configured(
+    drive: MagicMock, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(google_docs, "get_incident_core_settings", lambda: IncidentCoreSettings(folder_id=""))
 
-    result = google_docs.GoogleDocsIncidentReport().list_placements()
+    result = await google_docs.GoogleDocsIncidentReport().list_placements()
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.CONFIG_NOT_CONFIGURED
     drive.files.return_value.list.assert_not_called()
 
 
-def test_the_fake_without_an_incident_folder_is_not_configured() -> None:
-    result = InMemoryIncidentReport(folder_id="").list_placements()
+async def test_the_fake_without_an_incident_folder_is_not_configured() -> None:
+    result = await InMemoryIncidentReport(folder_id="").list_placements()
 
     assert result.error_code == ErrorCode.CONFIG_NOT_CONFIGURED
 

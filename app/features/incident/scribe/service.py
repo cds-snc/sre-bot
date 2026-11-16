@@ -283,9 +283,9 @@ async def draft_incident_document_from_conversation(
     recorded = found.data.conversation if found.data is not None else None
     messages: Sequence[TranscriptMessage] = ()
     if recorded is not None:
-        read = reader.read_transcript(
+        read = await reader.read_transcript(
             recorded,
-            since=_resolve_draft_window_start(reader, recorded, settings),
+            since=await _resolve_draft_window_start(reader, recorded, settings),
             limit=_resolve_draft_limit(limit, settings),
             exclude_own_and_system_messages=True,
         )
@@ -330,7 +330,7 @@ async def draft_incident_document(
 
     reports = reports or get_incident_report()
 
-    read = reports.read_sections(report)
+    read = await reports.read_sections(report)
     sections = [s for s in (read.data or ()) if not _is_human_only(s.heading)] if read.is_success else []
     if not sections:
         log.warning("incident_draft_document_unreadable")
@@ -408,7 +408,7 @@ async def draft_incident_document(
     # model supplied still ends up hyperlinking its "PR <number>".
     links = _resolve_pr_links(messages, drafts)
     drafts = _collapse_pr_references(drafts)
-    written = reports.write_draft_copy(report, drafts, fields, links).data
+    written = (await reports.write_draft_copy(report, drafts, fields, links)).data
     if written is None:
         log.warning("incident_draft_write_failed", section_count=len(drafts))
         return OperationResult.transient_error(
@@ -546,7 +546,7 @@ def _resolve_draft_limit(limit: int | None, settings: IncidentDraftSettings) -> 
     return min(limit, settings.MAX_HISTORY_LIMIT)
 
 
-def _resolve_draft_window_start(
+async def _resolve_draft_window_start(
     reader: IncidentTranscriptReader,
     conversation: ConversationReference,
     settings: IncidentDraftSettings,
@@ -557,7 +557,7 @@ def _resolve_draft_window_start(
     incident, and falls back to the configured default window when the reader
     cannot say or the lookup fails.
     """
-    started = reader.conversation_started_at(conversation)
+    started = await reader.conversation_started_at(conversation)
     if started.is_success and started.data is not None:
         return started.data
     return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
@@ -933,8 +933,8 @@ async def summarize_incident_conversation(
     settings = get_incident_summary_settings()
     reader = reader or get_incident_transcript_reader()
 
-    start = _resolve_summary_window_start(reader, conversation, since, settings)
-    read = reader.read_transcript(
+    start = await _resolve_summary_window_start(reader, conversation, since, settings)
+    read = await reader.read_transcript(
         conversation,
         since=start,
         limit=_resolve_summary_limit(limit, settings),
@@ -1011,7 +1011,7 @@ def _resolve_summary_limit(limit: int | None, settings: IncidentSummarySettings)
     return min(limit, settings.MAX_HISTORY_LIMIT)
 
 
-def _resolve_summary_window_start(
+async def _resolve_summary_window_start(
     reader: IncidentTranscriptReader,
     conversation: ConversationReference,
     since: timedelta | None,
@@ -1025,7 +1025,7 @@ def _resolve_summary_window_start(
     """
     if since is not None:
         return _now() - since
-    started = reader.conversation_started_at(conversation)
+    started = await reader.conversation_started_at(conversation)
     if started.is_success and started.data is not None:
         return started.data
     return _now() - timedelta(hours=settings.DEFAULT_SINCE_HOURS)

@@ -154,8 +154,8 @@ def report_interface(request: pytest.FixtureRequest) -> IncidentReport:
     return _fake()
 
 
-def _created(report_interface: IncidentReport) -> ReportReference:
-    result = report_interface.create_from_template("2026-11-05 Incident")
+async def _created(report_interface: IncidentReport) -> ReportReference:
+    result = await report_interface.create_from_template("2026-11-05 Incident")
     assert result.is_success and result.data is not None
     return result.data
 
@@ -164,10 +164,10 @@ def test_both_implement_the_protocol(report_interface: IncidentReport) -> None:
     assert isinstance(report_interface, IncidentReport)
 
 
-def test_a_created_report_is_a_google_reference_under_the_configured_tenant_with_its_docs_link(
+async def test_a_created_report_is_a_google_reference_under_the_configured_tenant_with_its_docs_link(
     report_interface: IncidentReport,
 ) -> None:
-    report = _created(report_interface)
+    report = await _created(report_interface)
 
     assert report == ReportReference(
         system=WorkplaceSystem.GOOGLE,
@@ -177,21 +177,21 @@ def test_a_created_report_is_a_google_reference_under_the_configured_tenant_with
     )
 
 
-def test_a_created_report_reads_back_its_template_sections_in_order(report_interface: IncidentReport) -> None:
-    report = _created(report_interface)
+async def test_a_created_report_reads_back_its_template_sections_in_order(report_interface: IncidentReport) -> None:
+    report = await _created(report_interface)
     if isinstance(report_interface, InMemoryIncidentReport):
         report_interface.seed_sections(report, [DocumentSection("Summary", "What happened.\n"), DocumentSection("Impact", "")])
 
-    sections = report_interface.read_sections(report)
+    sections = await report_interface.read_sections(report)
 
     assert sections.is_success
     assert [section.heading for section in sections.data or ()] == ["Summary", "Impact"]
 
 
-def test_placeholders_on_a_created_report_succeed(report_interface: IncidentReport) -> None:
-    report = _created(report_interface)
+async def test_placeholders_on_a_created_report_succeed(report_interface: IncidentReport) -> None:
+    report = await _created(report_interface)
 
-    assert report_interface.replace_placeholders(report, {"{{title}}": "Incident"}).is_success
+    assert (await report_interface.replace_placeholders(report, {"{{title}}": "Incident"})).is_success
 
 
 @pytest.mark.parametrize(
@@ -201,12 +201,12 @@ def test_placeholders_on_a_created_report_succeed(report_interface: IncidentRepo
         pytest.param(lambda r, ref: r.read_sections(ref), id="read_sections"),
     ],
 )
-def test_an_unknown_google_report_is_not_found(
+async def test_an_unknown_google_report_is_not_found(
     report_interface: IncidentReport, call: Callable[[IncidentReport, ReportReference], Any]
 ) -> None:
     unknown = ReportReference(system=WorkplaceSystem.GOOGLE, tenant=TENANT, vendor_id="D0UNKNOWN")
 
-    result = call(report_interface, unknown)
+    result = await call(report_interface, unknown)
 
     assert result.status is OperationStatus.NOT_FOUND
 
@@ -219,19 +219,19 @@ def test_an_unknown_google_report_is_not_found(
         pytest.param(lambda r, ref: r.write_draft_copy(ref, [SectionDraft("Summary", "x", True)], (), {}), id="write_draft_copy"),
     ],
 )
-def test_a_report_of_another_system_is_unsupported(
+async def test_a_report_of_another_system_is_unsupported(
     report_interface: IncidentReport, call: Callable[[IncidentReport, ReportReference], Any]
 ) -> None:
-    result = call(report_interface, SLACK_REPORT)
+    result = await call(report_interface, SLACK_REPORT)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.UNSUPPORTED_OPERATION
 
 
-def test_a_draft_copy_with_nothing_to_write_fails(report_interface: IncidentReport) -> None:
-    report = _created(report_interface)
+async def test_a_draft_copy_with_nothing_to_write_fails(report_interface: IncidentReport) -> None:
+    report = await _created(report_interface)
 
-    assert not report_interface.write_draft_copy(report, [], (), {}).is_success
+    assert not (await report_interface.write_draft_copy(report, [], (), {})).is_success
 
 
 def test_the_link_is_the_stored_url_and_none_without_one(report_interface: IncidentReport) -> None:
@@ -242,27 +242,27 @@ def test_the_link_is_the_stored_url_and_none_without_one(report_interface: Incid
     assert report_interface.link(bare) is None
 
 
-def test_placements_are_the_incident_folders_subfolders_by_label(report_interface: IncidentReport) -> None:
-    placements = report_interface.list_placements()
+async def test_placements_are_the_incident_folders_subfolders_by_label(report_interface: IncidentReport) -> None:
+    placements = await report_interface.list_placements()
 
     assert placements.is_success
     assert placements.data == (APPS, NOTIFY)
 
 
 @pytest.mark.parametrize("placement", [None, APPS])
-def test_a_report_is_created_with_or_without_a_placement(
+async def test_a_report_is_created_with_or_without_a_placement(
     report_interface: IncidentReport, placement: ReportPlacement | None
 ) -> None:
-    result = report_interface.create_from_template("2026-11-10 Incident", placement=placement)
+    result = await report_interface.create_from_template("2026-11-10 Incident", placement=placement)
 
     assert result.is_success and result.data is not None
     assert result.data.vendor_id == CREATED_ID
 
 
-def test_a_placement_of_another_system_is_unsupported(report_interface: IncidentReport) -> None:
+async def test_a_placement_of_another_system_is_unsupported(report_interface: IncidentReport) -> None:
     slack_placement = ReportPlacement(system=WorkplaceSystem.SLACK, tenant="T0SLACK", vendor_id="C0X", label="Slack")
 
-    result = report_interface.create_from_template("2026-11-10 Incident", placement=slack_placement)
+    result = await report_interface.create_from_template("2026-11-10 Incident", placement=slack_placement)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.UNSUPPORTED_OPERATION
