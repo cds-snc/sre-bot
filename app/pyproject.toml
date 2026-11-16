@@ -47,6 +47,7 @@ geolocate = "packages.geolocate"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
 user_rotations = "packages.user_rotations"
+oncall = "capabilities.oncall.plugin"
 
 [tool.ruff]
 target-version = "py314"
@@ -132,7 +133,7 @@ env = [
     'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
     # Likewise the plugins that declare a requirement (scribe, oncall_sync, user_rotations, rant): switched on
     # from app/.env they would abort every lifespan test boot. Each table is pinned whole, as the ci files set it.
-    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.response": false, "incident.scribe": false, "oncall_sync": false, "user_rotations": false}}',
+    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.response": false, "incident.scribe": false, "oncall": true, "oncall_sync": false, "user_rotations": false}}',
     'PLUGINS__WORKPLACE_UTILITIES={{"geolocate": true, "rant": false}}',
     # Likewise the scheduler: SCHEDULER__ENABLED=true in app/.env would start the real
     # jobs thread in every lifespan test. Tests that need it enable it explicitly.
@@ -229,14 +230,14 @@ dev = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["api", "contracts", "features", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
+packages = ["api", "capabilities", "contracts", "features", "infrastructure", "integrations", "jobs", "models", "modules", "packages", "server", "utils"]
 
 [tool.importlinter]
 # Enforces decisions/plugin-architecture.md (six layers) with the transitional
 # packages from decisions/migration.md. capabilities is listed as an optional
 # layer; add it to root_packages in the PR that creates it
 # (import-linter rejects a root package that does not exist).
-root_packages = ["server", "packages", "features", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts"]
+root_packages = ["server", "packages", "features", "infrastructure", "integrations", "modules", "api", "jobs", "models", "utils", "contracts", "capabilities"]
 # Third-party packages join the graph so contract (j) can name slack_bolt.
 include_external_packages = true
 
@@ -266,7 +267,7 @@ ignore_imports = [
 id = "no-host-imports"
 name = "(b) Packages, features and capabilities never import infrastructure or server"
 type = "forbidden"
-source_modules = ["packages", "features"]
+source_modules = ["packages", "features", "capabilities"]
 forbidden_modules = ["infrastructure", "server"]
 # Direct imports only: chains through integrations are tracked by contract (d).
 allow_indirect_imports = true
@@ -333,7 +334,7 @@ ignore_imports = [
 id = "integrations-via-adapters"
 name = "(e) packages and features import integrations only from adapters/ modules"
 type = "forbidden"
-source_modules = ["packages", "features"]
+source_modules = ["packages", "features", "capabilities"]
 forbidden_modules = ["integrations"]
 # Direct imports only: chains through infrastructure are tracked by contracts (a) and (b).
 allow_indirect_imports = true
@@ -375,7 +376,7 @@ ignore_imports = [
 id = "no-legacy-imports"
 name = "(g) Nothing outside the legacy tree imports modules"
 type = "forbidden"
-source_modules = ["packages", "features", "infrastructure", "integrations"]
+source_modules = ["packages", "features", "infrastructure", "integrations", "capabilities"]
 forbidden_modules = ["modules"]
 
 [[tool.importlinter.contracts]]
@@ -410,7 +411,7 @@ protected_modules = ["slack_bolt"]
 # the Bolt app; a feature's Slack entry point handles interactions with Bolt's own
 # listener arguments (decisions/platform-entrypoints.md rule 3, transport-slack.md
 # Checks). Direct imports only: chains through integrations are tracked by (e).
-allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack", "features.**.entrypoints.slack"]
+allowed_importers = ["server", "integrations", "modules", "packages.**.entrypoints.slack", "features.**.entrypoints.slack", "capabilities.**.entrypoints.slack"]
 
 [[tool.importlinter.contracts]]
 id = "no-provider-imports"
@@ -421,7 +422,7 @@ type = "forbidden"
 # A service family joins forbidden_modules when its contract is registered. The
 # infrastructure siblings are listed one by one: "infrastructure" as a source would
 # flag a family importing its own modules. Direct imports only.
-source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.security", "infrastructure.spreadsheets"]
+source_modules = ["packages", "features", "api", "jobs", "models", "utils", "modules", "integrations", "contracts", "infrastructure.audit", "infrastructure.configuration", "infrastructure.directory", "infrastructure.drive", "infrastructure.events", "infrastructure.i18n", "infrastructure.logging", "infrastructure.security", "infrastructure.spreadsheets", "capabilities"]
 forbidden_modules = ["infrastructure.records", "infrastructure.coordination"]
 allow_indirect_imports = true
 unmatched_ignore_imports_alerting = "error"
@@ -461,6 +462,7 @@ protected_modules = [
     "packages.oncall_sync",
     "packages.rant",
     "packages.user_rotations",
+    "capabilities.oncall.plugin",
 ]
 allowed_importers = []
 unmatched_ignore_imports_alerting = "error"
@@ -472,4 +474,20 @@ ignore_imports = [
     "packages.oncall_sync.providers -> packages.user_rotations.providers",
     # TASK-124.6 moves or retires the legacy GET /geolocate/{ip} route.
     "api.v1.routes.geolocate -> packages.geolocate.schemas",
+]
+
+[[tool.importlinter.contracts]]
+id = "opsgenie-importers"
+name = "(n) integrations.opsgenie is imported only by the on-call Opsgenie adapter, besides the host"
+# decisions/oncall.md: replacing Opsgenie (support ends 2027-04-05) touches one adapter. The host
+# (server) reads the settings slice for the configuration phase and the plugin requirements.
+type = "protected"
+protected_modules = ["integrations.opsgenie"]
+allowed_importers = ["server", "capabilities.oncall.adapters.opsgenie"]
+unmatched_ignore_imports_alerting = "error"
+ignore_imports = [
+    # Seeded 2026-11-16 by TASK-146.1.1. Shrink-only: remove an entry when its import is gone; never add one.
+    "jobs.scheduled_tasks -> integrations.opsgenie",  # TASK-127
+    "modules.incident.on_call -> integrations.opsgenie",  # TASK-145.7.10
+    "packages.oncall_sync.adapters.opsgenie -> integrations.opsgenie",  # TASK-146.2
 ]

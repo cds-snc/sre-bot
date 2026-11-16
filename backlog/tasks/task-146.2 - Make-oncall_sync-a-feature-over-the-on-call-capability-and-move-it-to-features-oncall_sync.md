@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-16T14:06:00Z'
+updated_date: '2026-11-16T17:08:00Z'
 labels:
   - oncall
   - capabilities
@@ -49,6 +49,8 @@ THIS SLICE
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 
 2026-11-16 (TASK-25.6 R1a): sync_all is already async and the job entry bridges once per run with asyncio.run; keep that edge.
+
+2026-11-16 (TASK-146.1 rulings, human): TASK-146.1.2 already points oncall_sync's self-managed rotations at capabilities.oncall.api and deletes packages/user_rotations (the user_rotations half of AC #1). This task deletes oncall_sync's Opsgenie adapter and its shrink-only ignore in the integrations.opsgenie protected contract. Lookups return OperationResult: an error result skips that usergroup, never writes it empty.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

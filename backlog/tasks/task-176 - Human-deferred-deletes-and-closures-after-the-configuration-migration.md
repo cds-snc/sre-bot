@@ -4,7 +4,7 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
-updated_date: '2026-11-16T13:38:00Z'
+updated_date: '2026-11-16T16:40:00Z'
 labels:
   - configuration
   - human
@@ -59,6 +59,8 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 2026-11-16: TASK-145.12.1 resumed after approval; TASK-176 unchanged per the 2026-11-10 answer (#1 and #4 open, #2 waits on TASK-182).
 
 2026-11-16: asked at TASK-25.6 (row 18c) planning start; unchanged (human). Human asked whether any deletes are now safe. Assessment against main f5176b80: AC #1 safe: nothing reads the blobs (no reference in app/, terraform/, .github/, bin/ outside docs and test docstrings; entry.sh deleted by 111.15.1; the task-role SSM read in terraform/iam.tf is scoped to the /sre-bot/<NAME> parameters only; images 175857b6 and older fetch the blobs and do not start, so they are no rollback target). AC #2 not safe: the key is the live production key (comment #1), deleted by TASK-182 after 180.1, parked. AC #4: app/bin has no secret- or configuration-fetching logic (audit_env_coverage and bin/env-checks.zsh only list parameter names and states, operator audit); TASK-54 ACs #1-#2 already hold in decisions/migration.md (bin/ row), so TASK-54 can be closed right after the blob delete.
+
+2026-11-16: asked at TASK-146.1 (row 18d) planning start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

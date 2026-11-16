@@ -4,7 +4,7 @@ title: E5 Engagement and triage MVP
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-03T20:45:00Z'
+updated_date: '2026-11-16T17:08:00Z'
 labels:
   - incident
 milestone: m-7
@@ -35,3 +35,9 @@ Deliver the first coordinated-incident workflow before workstreams or playbooks 
 - [ ] #6 A scripted staging dry run demonstrates a CVE workflow end to end through Slack and the API; a full tabletop is optional.
 - [ ] #7 The engagement and triage HTTP routes pass the TASK-163 edge test with no terraform change, and request bodies stay under the WAF Common Rule Set 8 KB body limit or a recorded scope-down decision covers them
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-16 (TASK-146.1 rulings, human): lead assignment from on-call (doc-15:23, :42) consumes capabilities.oncall.api on_call_now, which returns OperationResult; an error result or no source falls back to manual assignment.
+<!-- SECTION:NOTES:END -->

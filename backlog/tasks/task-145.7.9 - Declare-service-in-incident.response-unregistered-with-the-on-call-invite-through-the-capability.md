@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T13:16:00Z'
+updated_date: '2026-11-16T17:08:00Z'
 labels:
   - incident
   - features
@@ -47,6 +47,8 @@ Stack L L9a (approved program in TASK-145.7's plan, section 2; outline in the pa
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-10 (TASK-145.7.7 rulings R4-R6, decisions/incident-management.md Bindings): business features are API first; bindings are chat conversations only, zero or more per incident; declare writes the record first, then the conversation and attach_conversation, then resources, each a retriable step whose failure is reported (timeline entry once TASK-145.9) and never rolled back; the incident id is derived from the declare's idempotency key (uuid5 of the Slack request or alert id; the HTTP Idempotency-Key) so a retry reuses it and the orphan-incident residual stays theoretical; the HTTP declare route is folded in here (AC #4). Supersedes the plan's OQ9 'declare unavailable only when no working surface can be bound' and AC #1's 'a failing conversation writes nothing'. Full plan: check the size gate with the route included.
+
+2026-11-16 (TASK-146.1 rulings, human): OnCallLookup.on_call_now is async and returns OperationResult[tuple[OnCallPerson, ...]]; the declare maps an error result to inviting nobody and saying so (oncall.md:20). The reference is ScheduleReference(OPSGENIE, genie_schedule). OnCallPerson carries an email or an Account (rotations: Slack user id). Needs TASK-146.1.1 only.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

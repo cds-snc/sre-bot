@@ -29,7 +29,7 @@ scope: Who is on call, where schedules come from, and how the incident feature a
 
 ## Checks
 
-- import-linter: `integrations.opsgenie` is imported only by `capabilities/oncall/adapters/opsgenie.py`; `features/oncall_sync` and `features/incident` import the capability only through `capabilities.oncall.api`.
+- import-linter: `integrations.opsgenie` is imported only by `capabilities/oncall/adapters/opsgenie.py`, besides the host's settings reads in `server/`; `features/oncall_sync` and `features/incident` import the capability only through `capabilities.oncall.api`.
 - grep: no module outside `capabilities/oncall/` names Opsgenie or a rotation file format.
 - Test: the lookup selects the adapter from `ScheduleReference.system`; the in-memory fake covers both sources.
 - Boot test: with no Opsgenie settings the capability registers and the self-managed source answers.
@@ -46,3 +46,4 @@ Tolerated until then:
 **Changes:**
 - 2026-10-09: Accepted (TASK-146). On-call is a capability with two schedule sources; rotations are a source, not a capability; Opsgenie's end is a one-adapter change.
 - 2026-10-27: Opsgenie's end of support recorded (2027-04-05). Opsgenie is only an adapter behind on-call and user rotations; TASK-146 is re-cut before planning to re-architect both features, choosing the replacement source before that date (human, TASK-111.12 planning).
+- 2026-11-16: Built (TASK-146.1.1). Lookups return `OperationResult` (an unknown system is `ADAPTER_NOT_FOUND`, no custom exception); `Account` is shaped as TASK-83.4 specifies; the host's settings reads of `integrations.opsgenie` in `server/` are allowed beside the one adapter.
