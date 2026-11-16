@@ -1,6 +1,6 @@
 """Protocol-conformant fakes for the Slack handler contract."""
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any
 
 from contracts.operations import OperationResult
@@ -82,6 +82,7 @@ class FakeSlackRegistrar:
         self.view_submissions: dict[str, Callable[..., object]] = {}
         self.attachment_actions: dict[str, Callable[..., object]] = {}
         self.legacy_ids: dict[str, str] = {}
+        self.legacy_callback_values: dict[tuple[str, str], str] = {}
 
     @property
     def reply(self) -> SlackReplySender:
@@ -135,10 +136,17 @@ class FakeSlackRegistrar:
         self.legacy_ids.update(dict.fromkeys(legacy_action_ids, action_id))
 
     def register_attachment_action(
-        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+        self,
+        callback_id: str,
+        listener: Callable[..., object],
+        *,
+        legacy_callback_ids: Sequence[str] = (),
+        legacy_callback_values: Mapping[str, Collection[str]] | None = None,
     ) -> None:
         self.attachment_actions[callback_id] = listener
         self.legacy_ids.update(dict.fromkeys(legacy_callback_ids, callback_id))
+        for legacy_id, values in (legacy_callback_values or {}).items():
+            self.legacy_callback_values.update(dict.fromkeys(((legacy_id, value) for value in values), callback_id))
 
     def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
         self.view_submissions[callback_id] = listener

@@ -8,7 +8,7 @@ legacy attachment actions and view submissions.
 See: decisions/platform-entrypoints.md, decisions/transport-slack.md
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any, Protocol
 
 from contracts.services import ServiceScopeOpener
@@ -89,7 +89,12 @@ class SlackCommandRegistrar(Protocol):
         ...
 
     def register_attachment_action(
-        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+        self,
+        callback_id: str,
+        listener: Callable[..., object],
+        *,
+        legacy_callback_ids: Sequence[str] = (),
+        legacy_callback_values: Mapping[str, Collection[str]] | None = None,
     ) -> None:
         """Register a native Bolt listener for one legacy attachment's buttons (``interactive_message``).
 
@@ -103,11 +108,18 @@ class SlackCommandRegistrar(Protocol):
             legacy_callback_ids: Callback ids already posted in Slack messages
                 that this listener also answers; exempt from the prefix and
                 removed by the legacy contract task (decisions/transport-slack.md).
+            legacy_callback_values: Posted callback ids whose buttons are shared
+                between listeners, each with the button values this listener
+                answers (e.g. ``{"archive_channel": ("archive",)}``). A click with
+                any other value goes on to a listener attached later, such as the
+                legacy one. Exempt from the prefix; each (callback id, value) is
+                claimed once; removed by the legacy contract task.
 
         Raises:
-            ValueError: An id is blank or already registered as a block or
-                attachment action, or the primary id lacks the plugin's prefix;
-                this aborts boot.
+            ValueError: An id or value is blank, a value set is empty or a bare
+                string, an id is already registered as a block or attachment
+                action, a value is already claimed for its callback id, or the
+                primary id lacks the plugin's prefix; this aborts boot.
         """
         ...
 
