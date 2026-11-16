@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, Any, cast
 import structlog
 from googleapiclient.errors import HttpError
 
-from contracts.operations import OperationResult
+from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
@@ -170,13 +170,12 @@ def fetch_document_snapshot(document_id: str) -> DocumentSnapshot | None:
     return DocumentSnapshot(content=cast("list[dict[str, Any]]", content), revision_id=revision_id)
 
 
-def apply_document_edits(document_id: str, requests: list[dict[str, Any]], required_revision_id: str) -> bool:
+def apply_document_edits(document_id: str, requests: list[dict[str, Any]], required_revision_id: str) -> OperationResult[None]:
     """Apply a batchUpdate only if the document is still at required_revision_id.
 
     Callers send index-based edits computed from a snapshot, so applying them to any other
-    revision corrupts the document. Returns True once Google confirms the edit. False means
-    it was rejected or its outcome is unknown (a timeout can still land later); the caller
-    must take a new snapshot before deciding to send anything again.
+    revision corrupts the document. A timeout is unconfirmed: callers must take a new
+    snapshot and reconcile the intent before deciding to send anything again.
     """
     service = get_docs_service(scopes=_DOCS_SCOPES)
     body = cast("Any", {"requests": requests, "writeControl": {"requiredRevisionId": required_revision_id}})
@@ -186,12 +185,16 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]], requi
         service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
     except TimeoutError:
         logger.warning("incident_document_edit_unconfirmed", document_id=document_id)
-        return False
+        return OperationResult.transient_error("Document edit unconfirmed", error_code=ErrorCode.TIMEOUT)
     except HttpError as exc:
+        if int(exc.resp.status) == _STALE_REVISION_STATUS and re.search(
+            r"revision.*(?:does not match|not the latest)", exc.reason, re.IGNORECASE
+        ):
+            logger.warning("incident_document_edit_rejected", document_id=document_id)
+            return OperationResult.transient_error("Document revision changed", error_code=ErrorCode.DOCUMENT_REVISION_CONFLICT)
         if int(exc.resp.status) == _STALE_REVISION_STATUS:
-            # Google answers 400 when the document moved past the required revision.
-            logger.warning("incident_document_edit_rejected", document_id=document_id, reason=exc.reason)
-            return False
+            logger.warning("incident_document_edit_failed", document_id=document_id, error_code=ErrorCode.HTTP_ERROR, status=400)
+            return OperationResult.error(OperationStatus.PERMANENT_ERROR, "Invalid document edit", error_code=ErrorCode.HTTP_ERROR)
         status, error_code, retry_after = classify_google_error(exc)
         logger.warning(
             "incident_document_edit_failed",
@@ -200,8 +203,10 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]], requi
             error_code=error_code,
             retry_after=retry_after,
         )
-        return False
-    return True
+        return OperationResult.error(
+            status=status, message="Document edit failed", error_code=error_code, retry_after=retry_after
+        )
+    return OperationResult.success()
 
 
 # --- Drive ---

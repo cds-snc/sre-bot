@@ -3,10 +3,16 @@
 import datetime
 import re
 from collections.abc import Callable
+from itertools import groupby
+from random import uniform
+from time import sleep
 from typing import Any
+from urllib.parse import urlsplit
 
 from structlog import get_logger
 
+from contracts.operations import OperationResult, OperationStatus
+from contracts.operations.codes import ErrorCode
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.google_docs import (
@@ -14,10 +20,14 @@ from features.incident.core.adapters.google_docs import (
     fetch_document_snapshot,
     replace_placeholders,
 )
+from features.incident.response.settings import get_incident_response_settings
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
-TIMELINE_UPDATE_ATTEMPTS = 3
+TIMELINE_ENTRY_PATTERN = re.compile(
+    r"^[ \t]*➡️[ \t]*\[(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((?P<url>https?://[^\s)]+)\)",
+    re.MULTILINE,
+)
 
 logger = get_logger()
 
@@ -79,7 +89,13 @@ def update_incident_document_status(document_id, new_status="Closed"):
     return replace_placeholders(document_id, replacements, match_case=False)
 
 
-def update_timeline_section(document_id: str, rewrite: Callable[[str], str | None]) -> bool:
+def timeline_message_key(url: str) -> tuple[str, str]:
+    """Identify a Slack message independently of permalink query parameters."""
+    match = re.fullmatch(r"/archives/([^/]+)/p(\d{16,})/?", urlsplit(url).path)
+    return (match[1], match[2]) if match else ("", url)
+
+
+def update_timeline_section(document_id: str, rewrite: Callable[[str], str | None]) -> OperationResult[None]:
     """Rewrite the timeline section from a single document snapshot.
 
     rewrite receives the current timeline text and returns the new text, or None when
@@ -88,12 +104,19 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
     written over newer content. After a rejected or unconfirmed write the document is read
     again and rewrite is re-evaluated, which lets it see an edit that already landed.
 
-    Returns True when the timeline is in the requested state, False otherwise.
+    A final read reconciles an unconfirmed last write without replaying stale edits.
     """
-    for attempt in range(1, TIMELINE_UPDATE_ATTEMPTS + 1):
+    settings = get_incident_response_settings()
+    write_limit = settings.timeline_update_attempts
+    waited = 0.0
+    result: OperationResult[None] = OperationResult.transient_error(
+        "Document could not be read", error_code=ErrorCode.DOCUMENT_UNREADABLE
+    )
+    for attempt in range(1, write_limit + 2):
         snapshot = fetch_document_snapshot(document_id)
         if snapshot is None:
-            return False
+            logger.error("incident_timeline_update_failed", document_id=document_id, error="Document unreadable", attempt=attempt)
+            return result
 
         timeline_content = extract_timeline_section(snapshot.content)
         if timeline_content is None:
@@ -102,31 +125,58 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
                 document_id=document_id,
                 error="Headings not found",
             )
-            return False
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Timeline unavailable", error_code=ErrorCode.RANGE_NOT_FOUND
+            )
 
         new_content = rewrite(timeline_content)
         if new_content is None:
-            return True
+            return OperationResult.success()
+        if attempt > write_limit:
+            break
 
         requests = build_timeline_replacement(snapshot.content, new_content, START_HEADING, END_HEADING)
         if requests is None:
-            return False
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Timeline boundaries unavailable", error_code=ErrorCode.RANGE_NOT_FOUND
+            )
 
-        if apply_document_edits(document_id, requests, snapshot.revision_id):
-            return True
+        result = apply_document_edits(document_id, requests, snapshot.revision_id)
+        if result.is_success:
+            return result
+        if result.status is not OperationStatus.TRANSIENT_ERROR:
+            logger.error(
+                "incident_timeline_update_failed", document_id=document_id, attempt=attempt, error_code=result.error_code
+            )
+            return result
         logger.warning(
             "incident_timeline_update_not_applied",
             document_id=document_id,
             attempt=attempt,
+            error_code=result.error_code,
         )
+        if attempt < write_limit:
+            delay = (
+                result.retry_after
+                if result.retry_after is not None
+                else uniform(  # noqa: S311 -- retry jitter
+                    0, min(settings.timeline_retry_cap_seconds, settings.timeline_retry_base_seconds * 2 ** (attempt - 1))
+                )
+            )
+            if delay > settings.timeline_retry_wait_seconds - waited:
+                write_limit = attempt
+            else:
+                sleep(delay)
+                waited += delay
 
     logger.error(
         "incident_timeline_update_failed",
         document_id=document_id,
         error="Edit not confirmed",
-        attempts=TIMELINE_UPDATE_ATTEMPTS,
+        attempts=write_limit,
+        error_code=result.error_code,
     )
-    return False
+    return result
 
 
 def extract_timeline_section(content):
@@ -134,36 +184,39 @@ def extract_timeline_section(content):
     timeline_content = ""
     record = False
     found_start = False
-    found_end = False
 
     # Iterate through the elements of the document
     for element in content:
         if "paragraph" in element:
             paragraph_elements = element.get("paragraph").get("elements")
-            for elem in paragraph_elements:
-                text_run = elem.get("textRun")
-                if text_run:
-                    text = text_run.get("content")
-                    textStyle = text_run.get("textStyle", {})
-                    if "link" in textStyle:
-                        # Extract link URL
-                        link = textStyle["link"].get("url")
-                        # Format the text with the link as Markdown
-                        formatted_text = f"[{text.strip()}]({link})"
-                        # Replace the text with the formatted text
-                        text = formatted_text
-                    if START_HEADING in text:
-                        record = True
-                        found_start = True
-                    elif END_HEADING in text:
-                        found_end = True
-                        if found_start:
-                            return timeline_content
-                    elif record:
-                        timeline_content += text
+            paragraph_text = "".join(elem.get("textRun", {}).get("content", "") for elem in paragraph_elements).strip()
+            if paragraph_text == START_HEADING:
+                record = found_start = True
+                continue
+            if paragraph_text == END_HEADING and found_start:
+                return timeline_content
+            if not record:
+                continue
+            for link, group in groupby(
+                paragraph_elements,
+                key=lambda elem: elem.get("textRun", {}).get("textStyle", {}).get("link", {}).get("url"),
+            ):
+                runs = list(group)
+                if any("textRun" not in elem for elem in runs):
+                    logger.warning("incident_timeline_unsupported_content")
+                    return None
+                text = "".join(elem["textRun"]["content"] for elem in runs)
+                if link and text.strip():
+                    leading = text[: len(text) - len(text.lstrip())]
+                    trailing = text[len(text.rstrip()) :]
+                    text = f"{leading}[{text.strip()}]({link}){trailing}"
+                timeline_content += text
+        elif record:
+            logger.warning("incident_timeline_unsupported_content")
+            return None
 
     # Return None if either START_HEADING or END_HEADING not found
-    return None if not (found_start and found_end) else timeline_content
+    return None
 
 
 def find_heading_indices(content, start_heading, end_heading):
@@ -172,13 +225,11 @@ def find_heading_indices(content, start_heading, end_heading):
     for element in content:
         if "paragraph" in element:
             text_runs = element["paragraph"].get("elements", [])
-            for text_run in text_runs:
-                text = text_run.get("textRun", {}).get("content", "")
-                if start_heading in text:
-                    start_index = text_run.get("endIndex")
-                elif end_heading in text and start_index is not None:
-                    end_index = text_run.get("startIndex")
-                    return start_index, end_index
+            text = "".join(run.get("textRun", {}).get("content", "") for run in text_runs).strip()
+            if text == start_heading:
+                start_index = text_runs[-1].get("endIndex")
+            elif text == end_heading and start_index is not None:
+                return start_index, text_runs[0].get("startIndex")
     return start_index, end_index
 
 
@@ -191,108 +242,44 @@ def build_timeline_replacement(content, new_content, start_heading, end_heading)
     start_index, end_index = find_heading_indices(content, start_heading, end_heading)
 
     if start_index is not None and end_index is not None:
-        # Delete the existing content from the document
-        requests: list[dict[str, Any]] = [{"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}}]
-
-        # split the formatted content by the emoji
-        line = new_content.split(" ➡ ")
-        pattern = r"\[([^\]]+)\]\(([^)]+)\)\s([^:]+):\s(.+)"
-        insert_index = start_index
-        inserted_content = ""
-
-        # Insert an empty line before the new content and after the placeholder text
-        text_to_insert = "\n"
-        text_len = len(text_to_insert)
-        requests.append(
-            {
-                "insertText": {
-                    "location": {"index": insert_index},
-                    "text": text_to_insert,
-                }
-            }
-        )
-        # udpate the insert index
-        insert_index += text_len
-
-        for item in line:
-            # split the item by the emoji and strip out any empty strings
-            original_entries = item.split("➡️ ")
-            entries = [entry for entry in original_entries if entry.strip()]
-
-            for entry in entries:
-                # Regular expression to match the entry pattern
-                pattern = r"\[(?P<date>.+?) ET\]\((?P<url>.+?)\) (?P<name>.+?): (?P<message>.+)$"
-
-                # Use re.DOTALL to make '.' match newline characters as well. This is needed for multi-line messages
-                match = re.match(pattern, entry, re.DOTALL)
-
-                if match:
-                    # Extract components from the match object
-                    date = match.group("date") + " ET"
-                    url = match.group("url")
-                    name = match.group("name")
-                    message = match.group("message").strip()  # Remove leading/trailing whitespace
-
-                    # Construct the text to be inserted with the date as a link
-                    text_to_insert = f" ➡️ {date} {name}: {message}\n"
-                    text_len = len(text_to_insert)
-                    inserted_content += text_to_insert
-
-                    # Insert text request
-                    requests.append(
-                        {
-                            "insertText": {
-                                "location": {"index": insert_index},
-                                "text": text_to_insert,
-                            }
-                        }
-                    )
-                    # Update link style for date_text
-                    requests.append(
-                        {
-                            "updateTextStyle": {
-                                "range": {
-                                    "startIndex": insert_index + 4,
-                                    "endIndex": insert_index + len(date) + 4,
-                                },
-                                "textStyle": {"link": {"url": url}},
-                                "fields": "link",
-                            }
-                        }
-                    )
-                    # Update for next insertion
-                    insert_index += text_len
-                else:
-                    # if we don't match the above pattern, just insert the entry as is
-                    text_to_insert = f" ➡️ {item}\n"
-                    inserted_content += text_to_insert
-                    text_len = len(text_to_insert)
-                    # Insert text request for the entire block of formatted_content
-                    requests.append(
-                        {
-                            "insertText": {
-                                "location": {"index": insert_index},
-                                "text": text_to_insert,
-                            }
-                        }
-                    )
-
-                    # Update insert_index as needed, assuming formatted_content is a single block of text
-                    insert_index += text_len
-
-                # Make sure that we do normal formatting for the inserted content
-                requests.append(
-                    {
-                        "updateParagraphStyle": {
-                            "range": {
-                                "startIndex": start_index,
-                                "endIndex": (start_index + len(inserted_content)),
-                            },
-                            "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
-                            "fields": "namedStyleType",
-                        }
+        new_content = new_content.strip("\n")
+        links: list[dict[str, Any]] = []
+        pieces = ["\n"]
+        end = 0
+        for match in re.finditer(r"\[([^\]\n]+)\]\((https?://[^\s)]+)\)", new_content):
+            pieces.append(new_content[end : match.start()])
+            index = start_index + incident_drive._utf16_len("".join(pieces))
+            pieces.append(match[1])
+            links.append(
+                {
+                    "updateTextStyle": {
+                        "range": {"startIndex": index, "endIndex": index + incident_drive._utf16_len(match[1])},
+                        "textStyle": {"link": {"url": match[2]}},
+                        "fields": "link",
                     }
-                )
+                }
+            )
+            end = match.end()
+        pieces.extend([new_content[end:], "\n"])
+        text = "".join(pieces)
+        span = {"startIndex": start_index, "endIndex": start_index + incident_drive._utf16_len(text)}
+        requests: list[dict[str, Any]] = []
+        if end_index > start_index:
+            requests.append({"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}})
+        requests.extend(
+            [
+                {"insertText": {"location": {"index": start_index}, "text": text}},
+                {"updateTextStyle": {"range": span, "textStyle": {}, "fields": "link"}},
+                {
+                    "updateParagraphStyle": {
+                        "range": span,
+                        "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                        "fields": "namedStyleType",
+                    }
+                },
+                *links,
+            ]
+        )
         return requests
 
     logger.warning(

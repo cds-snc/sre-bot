@@ -1,6 +1,5 @@
-import re
 from datetime import datetime
-from typing import Any
+from zoneinfo import ZoneInfo
 
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
@@ -9,11 +8,14 @@ from slack_sdk.web import SlackResponse  # type: ignore
 from structlog import get_logger
 
 from contracts.configuration import host_info
+from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters import google_docs as incident_documents
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from modules.incident import incident_helper, schedule_retro
 from modules.incident.incident_document import (
+    TIMELINE_ENTRY_PATTERN,
+    timeline_message_key,
     update_timeline_section,
 )
 
@@ -114,43 +116,26 @@ def is_incident_channel(client: WebClient, channel_id: str, notify: bool = True)
     return is_incident, is_dev_incident
 
 
-def rearrange_by_datetime_ascending(text):
-    lines = text.split("\n")
-    entries = []
-
-    pattern = (
-        r"\s*➡️\s*\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((https?://[\w./-]+(?:\?\w+=\d+\.\d+&\w+=\w+)?)\)\s([\w\s]+):\s"
+def rearrange_by_datetime_ascending(text: str) -> str:
+    matches = list(TIMELINE_ENTRY_PATTERN.finditer(text))
+    if not matches:
+        return text
+    entries: dict[tuple[str, str], tuple[int, str]] = {}
+    for index, match in enumerate(matches):
+        key = timeline_message_key(match["url"])
+        posted_at = (
+            int(key[1])
+            if key[0]
+            else int(datetime.strptime(match["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("US/Eastern")).timestamp())
+            * 1_000_000
+        )
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        entries[key] = (posted_at, text[match.start() : end].rstrip("\n"))
+    return (
+        text[: matches[0].start()]
+        + "\n".join(entry for _, entry in sorted(entries.values(), key=lambda entry: entry[0]))
+        + "\n"
     )
-
-    current_message: list[Any] = []
-    for line in lines:
-        match = re.match(pattern, line)
-        if match:
-            if current_message:  # If there's a current message, finalize it before starting a new one
-                entries.append(current_message)
-                current_message = []
-            date_str, url, name = match.groups()
-            dt = datetime.strptime(date_str.strip(), "%Y-%m-%d %H:%M:%S")
-            msg_start = line[match.end() :].strip(" ")
-            current_message = [dt, url, f"{name}:", msg_start]
-        elif current_message:  # If it's a continuation of the current message
-            current_message[-1] += "\n" + f"{line.strip()}"
-
-    if current_message:  # Don't forget to append the last message
-        entries.append(current_message)
-
-    # A Slack message is identified by its time and permalink: keep one entry per message
-    unique_entries = {(entry[0], entry[1]): entry for entry in entries}
-
-    # Sort the entries by datetime in ascending order
-    sorted_entries = sorted(unique_entries.values(), key=lambda x: x[0])
-
-    # Reformat the entries back into strings, including 'ET' and the full message
-    sorted_text = "\n\n".join(
-        [f"➡️ [{entry[0].strftime('%Y-%m-%d %H:%M:%S')} ET]({entry[1]}) {entry[2]} {entry[3]}" for entry in sorted_entries]
-    )
-
-    return sorted_text
 
 
 def convert_epoch_to_datetime_est(epoch_time):
@@ -263,17 +248,26 @@ def handle_reaction_added(client, ack, body):
     # get the channel in which the reaction was used
     channel_id = body["event"]["item"]["channel"]
     # Get the channel name which requires us to use the conversations_info API call
-    channel_name = client.conversations_info(channel=channel_id)["channel"]["name"]
+    try:
+        channel_name = client.conversations_info(channel=channel_id)["channel"]["name"]
+    except SlackApiError:
+        logger.error("incident_document_update_failed", channel=channel_id, action="save", message_ts=body["event"]["item"]["ts"])
+        _notify_timeline_failure(client, body, "save", "")
+        return
 
     # if the emoji added is a floppy disk emoji and we are in an incident channel, then add the message to the incident timeline
     if channel_name.startswith("incident-"):
+        link = ""
         # get the message from the conversation
         try:
             # get the messages from the conversation and incident channel
+            link = client.chat_getPermalink(channel=channel_id, message_ts=body["event"]["item"]["ts"])["permalink"]
             messages = return_messages(client, body, channel_id)
 
             # get the incident report document id from the incident channel
             document_id = get_incident_document_id(client, channel_id)
+            if not document_id:
+                raise ValueError("Incident report not found")
 
             for message in messages:
                 # get the forwarded message and get the attachments appending the forwarded message to the original message
@@ -284,9 +278,6 @@ def handle_reaction_added(client, ack, body):
 
                 # convert the time which is now in epoch time to standard ET Time
                 message_date_time = convert_epoch_to_datetime_est(message_ts)
-
-                # get a link to the message
-                link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)["permalink"]
 
                 # get the user name from the message
                 user = client.users_profile_get(user=message["user"])
@@ -299,23 +290,30 @@ def handle_reaction_added(client, ack, body):
                 # if the message contains mentions to other slack users, replace those mentions with their name
                 message = slack_users.replace_user_id_with_handle(client, message["text"])
 
-                new_entry = f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}"
+                new_entry = f"\n ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
 
-                def add_entry(content, message_date_time=message_date_time, new_entry=new_entry):
+                def add_entry(content, link=link, new_entry=new_entry):
                     # if the message already exists in the timeline, then don't put it there again
-                    if not content or message_date_time in content:
+                    if any(
+                        timeline_message_key(match["url"]) == timeline_message_key(link)
+                        for match in TIMELINE_ENTRY_PATTERN.finditer(content)
+                    ):
                         return None
                     # append the new message and sort all the messages in ascending chronological order
                     return rearrange_by_datetime_ascending(content + new_entry)
 
                 # rewrite the timeline section from the current state of the document
-                update_timeline_section(document_id, add_entry)
-        except Exception as e:
+                result = update_timeline_section(document_id, add_entry)
+                if not result.is_success:
+                    _notify_timeline_failure(client, body, "save", link, result.error_code)
+        except SlackApiError, ValueError:
             logger.error(
                 "incident_document_update_failed",
                 channel=channel_name,
-                error=str(e),
+                action="save",
+                message_ts=body["event"]["item"]["ts"],
             )
+            _notify_timeline_failure(client, body, "save", link)
 
 
 # Execute this function when a reaction was removed
@@ -325,11 +323,20 @@ def handle_reaction_removed(client, ack, body):
     channel_id = body["event"]["item"]["channel"]
 
     # Get the channel name which requires us to use the conversations_info API call
-    result = client.conversations_info(channel=channel_id)
-    channel_name = result["channel"]["name"]
+    try:
+        result = client.conversations_info(channel=channel_id)
+        channel_name = result["channel"]["name"]
+    except SlackApiError:
+        logger.error(
+            "incident_document_update_failed", channel=channel_id, action="remove", message_ts=body["event"]["item"]["ts"]
+        )
+        _notify_timeline_failure(client, body, "remove", "")
+        return
 
     if channel_name.startswith("incident-"):
+        link = ""
         try:
+            link = client.chat_getPermalink(channel=channel_id, message_ts=body["event"]["item"]["ts"])["permalink"]
             messages = return_messages(client, body, channel_id)
 
             if not messages:
@@ -338,93 +345,84 @@ def handle_reaction_removed(client, ack, body):
                     channel=channel_name,
                     error="No messages found",
                 )
+                _notify_timeline_failure(client, body, "remove", link)
                 return
-            # get the message we want to delete
-            message = messages[0]
-
-            # get the forwarded message and get the attachments appeending the forwarded message to the original message
-            message = handle_forwarded_messages(message)
-
-            # get the message ts time
-            message_ts = message["ts"]
-
-            # convert the epoch time to standard ET day/time
-            message_date_time = convert_epoch_to_datetime_est(message_ts)
-
-            # get the user of the person that send the message
-            user = client.users_profile_get(user=message["user"])
-            # get the user's full name
-            user_full_name = user["profile"]["real_name"]
-
             # get the incident report document id from the incident channel
             document_id = get_incident_document_id(client, channel_id)
-
-            # handle any images in the message
-            message = handle_images_in_message(message)
-
-            # if the message contains mentions to other slack users, replace those mentions with their name
-            message = slack_users.replace_user_id_with_handle(client, message["text"])
-
-            # get a link to the message
-            link = client.chat_getPermalink(channel=channel_id, message_ts=message_ts)["permalink"]
-
-            # Construct the message to remove
-            message_to_remove = f" ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
+            if not document_id:
+                raise ValueError("Incident report not found")
 
             message_found = False
 
             def remove_entry(content):
                 nonlocal message_found
-                if message_to_remove not in content:
+                matches = list(TIMELINE_ENTRY_PATTERN.finditer(content))
+                spans = [
+                    (match.start(), matches[index + 1].start() if index + 1 < len(matches) else len(content))
+                    for index, match in enumerate(matches)
+                    if timeline_message_key(match["url"]) == timeline_message_key(link)
+                ]
+                if not spans:
                     return None
                 message_found = True
-                return content.replace(message_to_remove, "\n")
+                for start, end in reversed(spans):
+                    content = content[:start] + content[end:]
+                return content
 
             # Remove the message and update the timeline content
             updated = update_timeline_section(document_id, remove_entry)
-            if updated and not message_found:
+            if not updated.is_success:
+                _notify_timeline_failure(client, body, "remove", link, updated.error_code)
+            elif not message_found:
                 logger.warning(
                     "handle_reaction_removed_message_not_found",
                     channel=channel_name,
                     error="Message not found in the timeline",
                 )
                 return
-        except Exception as e:
+        except SlackApiError, ValueError:
             logger.error(
                 "incident_document_update_failed",
                 channel=channel_name,
-                error=str(e),
+                action="remove",
+                message_ts=body["event"]["item"]["ts"],
             )
+            _notify_timeline_failure(client, body, "remove", link)
 
 
 # Function to return the messages from the conversation
-def return_messages(client, body, channel_id):
-    # Fetch the message that had the reaction added or removed
-    result = client.conversations_history(
-        channel=channel_id,
-        limit=1,
-        inclusive=True,
-        include_all_metadata=True,
-        ts=body["event"]["item"]["ts"],
+def return_messages(client: WebClient, body: dict, channel_id: str) -> list[dict]:
+    item = body["event"]["item"]
+    if item.get("type", "message") != "message":
+        raise ValueError("Reaction is not on a message")
+    result = client.reactions_get(channel=channel_id, timestamp=item["ts"])
+    message = result.get("message")
+    if (
+        not result.get("ok")
+        or result.get("type") != "message"
+        or not isinstance(message, dict)
+        or message.get("ts") != item["ts"]
+    ):
+        raise ValueError("Reacted-to message unavailable")
+    return [message]
+
+
+def _notify_timeline_failure(client: WebClient, body: dict, action: str, link: str, error_code: str | None = None) -> None:
+    event = body["event"]
+    if not event.get("user"):
+        logger.error("incident_timeline_notice_failed", channel=event["item"]["channel"], action=action, error="Missing actor")
+        return
+    text = (
+        f"I could not confirm the timeline {action} for {link}. Check the report before you retry."
+        if error_code == ErrorCode.TIMEOUT
+        else f"I could not {action} {link} in the incident timeline. Check the report, then retry or update it manually."
     )
-    # get the messages
-    messages = result["messages"]
-
-    # if there are more messages in the conversation, get them
-    if result["has_more"]:
-        result = client.conversations_replies(
-            channel=channel_id,
-            ts=body["event"]["item"]["ts"],
-            inclusive=True,
-            limit=1,
+    try:
+        client.chat_postEphemeral(channel=event["item"]["channel"], user=event["user"], text=text)
+    except SlackApiError:
+        logger.error(
+            "incident_timeline_notice_failed", channel=event["item"]["channel"], message_ts=event["item"]["ts"], action=action
         )
-        messages = result["messages"]
-
-        # get the parent massages if there are more threads
-        if messages.__len__() > 1:
-            return [messages[0]]
-
-    return messages
 
 
 def archive_channel_action(client: WebClient, body, ack, respond):

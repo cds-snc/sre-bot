@@ -34,6 +34,10 @@ class IncidentResponseSettings(ConfigurationSlice):
         upgrade_mode: the incident legacy upgrade job's mode; off registers nothing.
         upgrade_interval_minutes: minutes between two runs of the upgrade job.
         upgrade_lease_ttl_seconds: lease one run holds, sized to the job's longest run.
+        timeline_update_attempts: bounded legacy timeline write attempts.
+        timeline_retry_base_seconds: initial full-jitter retry window.
+        timeline_retry_cap_seconds: maximum full-jitter retry window.
+        timeline_retry_wait_seconds: total inline retry sleep budget (not an I/O deadline).
 
     Environment only (non-public values):
         INCIDENT_RESPONSE__HANDBOOK_ID.
@@ -51,6 +55,10 @@ class IncidentResponseSettings(ConfigurationSlice):
     upgrade_lease_ttl_seconds: int = Field(
         default=900, ge=1, description="Seconds one upgrade run holds its lease; longer than the job's longest run."
     )
+    timeline_update_attempts: int = Field(default=6, ge=1, le=10, description="Maximum revision-guarded timeline write attempts.")
+    timeline_retry_base_seconds: float = Field(default=0.1, gt=0, le=1, description="Initial timeline retry jitter window.")
+    timeline_retry_cap_seconds: float = Field(default=1, gt=0, le=2, description="Maximum timeline retry jitter window.")
+    timeline_retry_wait_seconds: float = Field(default=3, ge=0, le=5, description="Total inline timeline retry sleep budget.")
     handbook_id: str = env_only("Google Docs id of the incident management handbook.", "codespaces", default="")
 
 

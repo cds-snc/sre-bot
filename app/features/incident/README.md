@@ -29,6 +29,36 @@ Units the decision record names that do not exist yet:
 | `retrospective/` (entry point `incident.retrospective`) | Attendee selection, availability search and the retro meeting through the calendar capability; later rescheduling, reminders and action items. |
 | `features/incident/` | Where this whole umbrella moves (TASK-124.5). |
 
+## Legacy floppy-disk timeline capture
+
+The legacy reaction handlers still save directly to the bookmarked Google Doc,
+not the record-based timeline. They require the installed bot's `reactions:read`
+scope to resolve the exact message, including thread replies. Captures are keyed
+by the Slack channel and full message timestamp; late saves are sorted by that
+timestamp, with ET retained for display. Removal targets that identity even if
+the author profile or message text has changed.
+
+Each rewrite is guarded by the snapshot's `requiredRevisionId`. Under
+`[incident_response]`, `timeline_update_attempts` defaults to 6,
+`timeline_retry_base_seconds` to 0.1, `timeline_retry_cap_seconds` to 1, and
+`timeline_retry_wait_seconds` to 3. Retries take a fresh snapshot after capped
+exponential full jitter. The total sleep budget does not include Google API
+latency. A longer `Retry-After` ends inline retries rather than being shortened.
+An unconfirmed final write is checked with a final read.
+
+Failed captures/removals produce an ephemeral notice to the reacting user.
+After a failure, check the report before retrying or updating it manually;
+after a timeout, the write may already have landed. A missing `reactions:read`
+grant must be fixed in the Slack installation, not worked around with a
+nearby-message lookup. Inspect `incident_timeline_update_failed` and
+`incident_timeline_notice_failed` for exhausted updates or failed notifications.
+Non-text timeline elements cannot safely be rewritten and are left unchanged.
+
+This is bounded retry, not durable delivery: an acknowledged reaction can still
+be lost if the process exits. No queue, automatic historical repair, or change
+to multi-user reaction-removal semantics is introduced. Recover missing
+historical entries by comparing Slack and document version history first.
+
 ## Rules that hold today
 
 - **Layers.** The import-linter contract `incident-umbrella` in

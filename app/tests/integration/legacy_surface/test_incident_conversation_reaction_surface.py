@@ -50,10 +50,10 @@ def surface(incident_surface: IncidentSurface) -> IncidentSurface:
     client.replies["bookmarks_list"] = {"ok": True, "bookmarks": [{"title": "Incident report", "link": REPORT_URL}]}
     client.replies["users_profile_get"] = {"ok": True, "profile": {"real_name": "Jane Doe", "display_name": "jane"}}
     messages = {message["ts"]: message for message in (ROLLBACK, ALERT)}
-    client.replies["conversations_history"] = lambda **request: {
+    client.replies["reactions_get"] = lambda **request: {
         "ok": True,
-        "messages": [dict(messages[request["ts"]])],
-        "has_more": False,
+        "type": "message",
+        "message": dict(messages[request["timestamp"]]),
     }
     client.replies["chat_getPermalink"] = lambda **request: {"ok": True, "permalink": permalink(request["message_ts"])}
     return incident_surface

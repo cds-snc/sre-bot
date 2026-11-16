@@ -46,7 +46,14 @@ def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def test_base_declares_every_id_empty_and_the_upgrade_keys_at_their_defaults() -> None:
     base = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))
 
-    assert base["incident_response"] == {**dict.fromkeys((*_SLACK_IDS, *_FIELDS), ""), **_UPGRADE_KEYS}
+    assert base["incident_response"] == {
+        **dict.fromkeys((*_SLACK_IDS, *_FIELDS), ""),
+        **_UPGRADE_KEYS,
+        "timeline_update_attempts": 6,
+        "timeline_retry_base_seconds": 0.1,
+        "timeline_retry_cap_seconds": 1.0,
+        "timeline_retry_wait_seconds": 3.0,
+    }
     assert "incident" not in base
 
 
@@ -74,7 +81,17 @@ def test_the_upgrade_mode_is_read_from_the_environment(monkeypatch: pytest.Monke
 
 @pytest.mark.parametrize(
     ("key", "value"),
-    [("upgrade_mode", "nonsense"), ("upgrade_interval_minutes", "0"), ("upgrade_lease_ttl_seconds", "0")],
+    [
+        ("upgrade_mode", "nonsense"),
+        ("upgrade_interval_minutes", "0"),
+        ("upgrade_lease_ttl_seconds", "0"),
+        ("timeline_update_attempts", "0"),
+        ("timeline_update_attempts", "11"),
+        ("timeline_retry_base_seconds", "0"),
+        ("timeline_retry_cap_seconds", "3"),
+        ("timeline_retry_wait_seconds", "-1"),
+        ("timeline_retry_wait_seconds", "6"),
+    ],
 )
 def test_an_upgrade_key_out_of_range_fails_naming_it(monkeypatch: pytest.MonkeyPatch, key: str, value: str) -> None:
     install_configuration_files(load_configuration_files("ci"))
