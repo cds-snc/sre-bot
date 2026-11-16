@@ -1,7 +1,7 @@
 """Opsgenie vendor settings slice: the [opsgenie] table of the configuration files.
 
 Exposes ``OpsGenieSettings``, its tenant entry ``OpsGenieTenant``, and the cached
-``get_opsgenie_settings()`` provider, read at use by ``integrations.opsgenie.client``.
+``get_opsgenie_settings()`` provider, read at use by ``build_opsgenie_client``.
 
 Opsgenie serves each account from one region (api.opsgenie.com or api.eu.opsgenie.com), so the
 tenant entry is the regional API host. The integration key is a secret read from the
@@ -38,7 +38,8 @@ class OpsGenieSettings(ConfigurationSlice):
     """Vendor credential, endpoint and timeout settings for the Opsgenie API.
 
     Keys of [opsgenie]:
-        timeout_seconds.
+        timeout_seconds: the per-attempt timeout.
+        connect_retries: retries of a connection that never opened, set once on the transport.
         [opsgenie.tenant] api_url: the regional API host. Default: none (Opsgenie not configured).
 
     Environment only:
@@ -50,7 +51,12 @@ class OpsGenieSettings(ConfigurationSlice):
 
     tenant: OpsGenieTenant | None = Field(default=None, description="The Opsgenie API region this instance works with.")
     integrations_key: SecretStr = env_only("API key sent as the GenieKey authorization.", "codespaces", default=SecretStr(""))
-    timeout_seconds: float = Field(default=30.0, gt=0, description="Per-request HTTP timeout in seconds.")
+    timeout_seconds: float = Field(default=30.0, gt=0, description="Per-attempt HTTP timeout in seconds.")
+    connect_retries: int = Field(
+        default=2,
+        ge=0,
+        description="Retries of a connection that never opened (connect error or timeout); a sent request is never repeated.",
+    )
 
     @model_validator(mode="after")
     def _tenant_and_key_go_together(self) -> OpsGenieSettings:

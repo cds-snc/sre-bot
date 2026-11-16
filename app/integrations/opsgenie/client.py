@@ -1,94 +1,72 @@
+"""Opsgenie vendor client: an authenticated async httpx client factory and its error classifier.
+
+The on-call reads live with their consumers (decisions/outbound-clients.md): the oncall_sync
+schedule adapter, the legacy declare helper in ``modules/incident/on_call.py`` and the
+scheduler's health-check probe. Every Opsgenie call is a GET.
+"""
+
 import json
-from datetime import UTC, datetime
-from urllib.request import Request, urlopen
 
-import structlog
+import httpx
 
-from integrations.opsgenie.settings import get_opsgenie_settings
-
-logger = structlog.get_logger()
+from contracts.operations.codes import ErrorCode
+from contracts.operations.status import OperationStatus
+from integrations.opsgenie.settings import OpsGenieSettings, get_opsgenie_settings
 
 
-class OpsGenieAPIError(Exception):
-    """Raised when an OpsGenie API call fails or returns an unparseable response."""
+def build_opsgenie_client(settings: OpsGenieSettings | None = None) -> httpx.AsyncClient:
+    """Build an authenticated httpx client for the tenant's regional Opsgenie API.
 
-
-def get_on_call_users(schedule):
-    log = logger.bind(schedule=schedule)
-    content = api_get_request(f"/v2/schedules/{schedule}/on-calls")
-    try:
-        data = json.loads(content)
-        return [x["name"] for x in data["data"]["onCallParticipants"]]
-    except Exception as e:
-        log.exception(
-            "get_on_call_users_error",
-            schedule=schedule,
-            error=str(e),
-        )
-        return []
-
-
-def get_on_call_user_for_rotation(schedule_id: str, rotation_name: str) -> str | None:
-    """Return the email of the user currently on-call for ``rotation_name``.
-
-    Returns ``None`` when the rotation does not exist on the schedule, has no
-    current coverage (gap), or the active recipient is not a user
-    (team/escalation). Raises :class:`OpsGenieAPIError` on transport or
-    response-parsing failures, and when Opsgenie is not configured.
+    The retry policy is set here, once: the transport retries a connection that never opened
+    ([opsgenie] connect_retries), so a sent request is never repeated, beside the per-attempt
+    timeout ([opsgenie] timeout_seconds). The caller checks the tenant first and manages the
+    client's lifecycle (use it as an async context manager). No network I/O at construction.
     """
-    # With no `date` param, OpsGenie anchors `finalTimeline` at "now", so the
-    # first period of the matching rotation is the active one — unless its
-    # startDate is in the future, which indicates a coverage gap.
-    path = f"/v2/schedules/{schedule_id}/timeline?identifierType=id&interval=1&intervalUnit=days"
-    try:
-        content = api_get_request(path)
-        rotations = json.loads(content)["data"]["finalTimeline"]["rotations"]
-    except Exception as exc:
-        raise OpsGenieAPIError(f"OpsGenie timeline request failed for schedule {schedule_id!r}") from exc
-
-    rotation = next((r for r in rotations if r.get("name") == rotation_name), None)
-    if not rotation:
-        return None
-    periods = rotation.get("periods") or []
-    if not periods:
-        return None
-    period = periods[0]
-    if datetime.fromisoformat(period["startDate"]) > datetime.now(UTC):
-        return None
-    recipient = period.get("recipient") or {}
-    return recipient.get("name") if recipient.get("type") == "user" else None
-
-
-def healthcheck():
-    """Check if the bot can interact with the Opsgenie API."""
-    if get_opsgenie_settings().tenant is None:
-        logger.warning("opsgenie_not_configured")
-        return False
-    healthy = False
-    try:
-        content = api_get_request("/v1/services")
-        result = json.loads(content)
-        healthy = "data" in result
-        logger.info(
-            "opsgenie_healthcheck_success",
-            status="healthy" if healthy else "unhealthy",
-            result=result,
-        )
-    except Exception as error:
-        logger.exception(
-            "opsgenie_healthcheck_error",
-            error=str(error),
-        )
-    return healthy
-
-
-def api_get_request(path: str) -> str:
-    """GET ``path`` on the tenant's Opsgenie API with the integration key; raises when not configured."""
-    settings = get_opsgenie_settings()
+    settings = settings or get_opsgenie_settings()
     if settings.tenant is None:
-        raise OpsGenieAPIError("Opsgenie is not configured")
-    req = Request(settings.tenant.api_url.rstrip("/") + path)  # noqa: S310 -- the tenant validator requires https
-    req.add_header("Authorization", f"GenieKey {settings.integrations_key.get_secret_value()}")
-    conn = urlopen(req, timeout=settings.timeout_seconds)  # noqa: S310 -- the tenant validator requires https
-    body: bytes = conn.read()
-    return body.decode("utf-8")
+        raise ValueError("Opsgenie is not configured: [opsgenie.tenant] is unset")
+    return httpx.AsyncClient(
+        base_url=settings.tenant.api_url,
+        headers={"Authorization": f"GenieKey {settings.integrations_key.get_secret_value()}"},
+        timeout=settings.timeout_seconds,
+        transport=httpx.AsyncHTTPTransport(retries=settings.connect_retries),
+    )
+
+
+def classify_opsgenie_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify expected httpx and body-parse failures from the Opsgenie API; propagate unknown exceptions.
+
+    ``retry_after`` is the 429 response's Retry-After delay in seconds, or ``None`` when the
+    header is absent (Opsgenie documents only X-RateLimit-State) or not a number of seconds.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        if status_code == 401:
+            return OperationStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED, None
+        if status_code == 403:
+            return OperationStatus.UNAUTHORIZED, ErrorCode.FORBIDDEN, None
+        if status_code == 404:
+            return OperationStatus.NOT_FOUND, ErrorCode.NOT_FOUND, None
+        if status_code == 429:
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.RATE_LIMITED, _retry_after(exc.response)
+        if 500 <= status_code < 600:
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.SERVER_ERROR, None
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR, None
+    if isinstance(exc, httpx.TimeoutException):
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.TIMEOUT, None
+    if isinstance(exc, httpx.HTTPError):
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.CONNECTION_ERROR, None
+    if isinstance(exc, json.JSONDecodeError):
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE, None
+    raise exc
+
+
+def _retry_after(response: httpx.Response) -> int | None:
+    """Return the Retry-After delay in seconds, or ``None`` when absent or an HTTP-date."""
+    value = response.headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None

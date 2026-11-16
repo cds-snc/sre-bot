@@ -1,9 +1,12 @@
+import asyncio
+import json
 import threading
 import time
 from collections.abc import Callable
 from datetime import timedelta
 from typing import Any
 
+import httpx
 import schedule
 from structlog import get_logger
 
@@ -11,7 +14,8 @@ from contracts.scheduler.registry import BackgroundJobRegistry
 from contracts.services import ServiceScopeOpener
 from features.incident.core.adapters import google_docs as incident_drive
 from infrastructure.coordination import get_lease_store, run_if_leased
-from integrations import maxmind, opsgenie
+from integrations import maxmind
+from integrations.opsgenie import build_opsgenie_client, classify_opsgenie_error, get_opsgenie_settings
 from integrations.slack.client import get_slack_web_client
 from integrations.slack.settings import get_slack_settings
 from jobs.settings import get_scheduler_settings
@@ -171,13 +175,41 @@ def scheduler_heartbeat():
     logger.info("running_scheduler_heartbeat", module="scheduled_tasks", time=time.ctime())
 
 
+def _opsgenie_healthcheck() -> bool:
+    """Probe Opsgenie with one services listing; the scheduler thread runs it with one asyncio.run.
+
+    Not configured or a classified failure is unhealthy; unexpected exceptions propagate to the
+    per-check handler. TASK-127 decides whether this probe survives.
+    """
+    return asyncio.run(_probe_opsgenie())
+
+
+async def _probe_opsgenie() -> bool:
+    settings = get_opsgenie_settings()
+    if settings.tenant is None:
+        logger.warning("opsgenie_not_configured")
+        return False
+    try:
+        async with build_opsgenie_client(settings) as client:
+            response = await client.get("/v1/services")
+            response.raise_for_status()
+            body = response.json()
+    except (httpx.HTTPError, json.JSONDecodeError) as exc:
+        status, error_code, _ = classify_opsgenie_error(exc)
+        logger.error("opsgenie_healthcheck_error", status=status.value, error_code=error_code)
+        return False
+    healthy = isinstance(body, dict) and "data" in body
+    logger.info("opsgenie_healthcheck_success", status="healthy" if healthy else "unhealthy")
+    return healthy
+
+
 def integration_healthchecks():
     """Run integration healthchecks."""
     logger.info("running_integration_healthchecks", module="scheduled_tasks", time=time.ctime())
     healthchecks: dict[str, Callable[[], bool]] = {
         "google_drive": incident_drive.incident_drive_healthcheck,
         "maxmind": lambda: maxmind.get_maxmind_client().healthcheck().is_success,
-        "opsgenie": opsgenie.healthcheck,
+        "opsgenie": _opsgenie_healthcheck,
         "aws": lambda: build_identity_center_adapter().healthcheck().is_success,
     }
     for key, healthcheck in healthchecks.items():

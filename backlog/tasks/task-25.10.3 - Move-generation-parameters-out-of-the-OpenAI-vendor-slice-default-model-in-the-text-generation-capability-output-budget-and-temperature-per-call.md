@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-09T15:09:00Z'
+updated_date: '2026-11-16T14:06:00Z'
 labels:
   - clients
   - phase-3
@@ -53,6 +53,7 @@ Blast radius: production.toml changes the configuration production boots with. A
 - [ ] #3 generate requires max_output_tokens and takes an optional temperature that is omitted from the request when unset; scribe's draft (4000), scribe's catch-up summary (new INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS, 3000) and comms (2000) each pass their own budget, so production sends the same parameters as before
 - [ ] #4 With the tenant set and the model unset, the capability reports unavailable (the no-op implementation, text_generation_model_unset logged once at build); scribe declares Requirement('text_generation.model') beside 'openai.tenant' and aborts boot naming text_generation.model; comms falls back to the hand-written form
 - [ ] #5 decisions/configuration.md no longer tolerates generation parameters in the vendor slice; full gates plus make check-import-contracts, check-settings-key-ownership, check-package-shape and check-test-seams pass, with output in notes
+- [ ] #6 classify_openai_error maps json.JSONDecodeError (an unparseable body) to PERMANENT_ERROR INVALID_RESPONSE, per the outbound-clients.md rule added by TASK-25.6
 <!-- AC:END -->
 
 ## Implementation Notes
