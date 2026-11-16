@@ -19,6 +19,8 @@ and ``conversation_is_writable`` is the check every caller applies before a writ
 ``IncidentTranscriptReader`` reads what was said in a conversation.
 ``VideoCall`` creates the incident's video call (``VideoCallReference``);
 ``get_video_call`` provides the Google Meet one.
+``IncidentListProjection`` writes the incident list sheet (append a row, update the status
+cell); ``get_incident_list_projection`` provides the Google Sheets one.
 ``resolve_new_incident_system`` resolves the new-incident policy against the
 configured systems; the declare path's plugin calls it at startup.
 """
@@ -33,9 +35,10 @@ from contracts.operations.result import OperationResult
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
-from features.incident.common.vocabulary import StatusUpdateStage
+from features.incident.common.vocabulary import IncidentStatus, StatusUpdateStage
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.google_meet import GoogleMeetVideoCall
+from features.incident.core.adapters.google_sheets import GoogleSheetsIncidentListProjection
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
@@ -95,6 +98,7 @@ __all__ = [
     "IncidentBinding",
     "IncidentChanges",
     "IncidentConversation",
+    "IncidentListProjection",
     "IncidentReport",
     "IncidentStore",
     "IncidentTranscriptReader",
@@ -126,6 +130,7 @@ __all__ = [
     "conversation_is_writable",
     "find_incident_for_conversation",
     "get_incident_conversation",
+    "get_incident_list_projection",
     "get_incident_report",
     "get_incident_transcript_reader",
     "get_video_call",
@@ -415,6 +420,38 @@ class VideoCall(Protocol):
 def get_video_call() -> VideoCall:
     """Return the process-wide Google-Meet-backed ``VideoCall``."""
     return GoogleMeetVideoCall()
+
+
+@runtime_checkable
+class IncidentListProjection(Protocol):
+    """Write-only view of the incident list sheet, one row per incident keyed by its id; never read back as a source of truth.
+
+    Both methods upsert on ``incident.id``, so a retried or repeated write
+    converges and a missing row is written in full. An incident without a
+    report, conversation or product is written with blank or plain cells, never
+    refused. ``append_row`` and ``update_status`` are async: an implementation
+    over a blocking SDK offloads inside its own methods (decisions/outbound-clients.md).
+    Platform failures are classified results, never exceptions.
+    """
+
+    async def append_row(self, incident: Incident) -> OperationResult[None]:
+        """Write the incident's full row: in place when it has one, otherwise appended.
+
+        No sheet id or Google tenant configured is a PERMANENT_ERROR with
+        ``CONFIG_NOT_CONFIGURED``; a conversation of another chat system is a
+        PERMANENT_ERROR with ``UNSUPPORTED_OPERATION``.
+        """
+        ...
+
+    async def update_status(self, incident: Incident, status: IncidentStatus) -> OperationResult[None]:
+        """Set the Status cell of the incident's row; with no row, write the full row carrying ``status``."""
+        ...
+
+
+@lru_cache(maxsize=1)
+def get_incident_list_projection() -> IncidentListProjection:
+    """Return the process-wide Google-Sheets-backed ``IncidentListProjection``."""
+    return GoogleSheetsIncidentListProjection()
 
 
 @lru_cache(maxsize=1)

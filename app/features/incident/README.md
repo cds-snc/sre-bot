@@ -123,6 +123,7 @@ its own configuration file.
 | Reading what was said in an incident channel | Use `IncidentTranscriptReader` from `core/api.py` with the record's `conversation` | Do not read Slack history in a subdomain. |
 | Writing to an incident channel (post, purpose, bookmark, invite, archive) | `IncidentConversation` from `core/api.py`, after `conversation_is_writable` on the record's conversation | Do not call Slack's write methods in a subdomain; feature writes use the rate-limit-only write handle. |
 | Google Docs, Drive or Meet operations for an incident | `core/adapters/google_docs.py`, `core/adapters/google_meet.py` | New report work goes behind the `IncidentReport` interface, video-call work behind `VideoCall`; `create_space` takes fixes, not new operations. |
+| The incident list sheet (a row per incident, its status cell) | `core/adapters/google_sheets.py`, `core/adapters/list_rows.py` | Behind `IncidentListProjection`: write-only, rows keyed by incident id; nothing reads the sheet back. |
 | Calendar, availability or meeting scheduling | Not `scheduling/` | The `calendar` capability (TASK-138); the incident side of the retro goes to `retrospective/`. |
 | Declare, status, roles, archive, timeline, canvas, alert buttons, nudges | `lifecycle/` (target) | Rebuilt surface by surface in TASK-38; until then that behaviour is in legacy `modules/incident`. |
 | Retro attendees, retro meeting, retro action items | `retrospective/` (target) | Expansion drafts under TASK-97. |

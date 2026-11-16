@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-16T13:16:00Z'
 labels:
   - incident
   - features
@@ -39,7 +39,7 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No code reads the incident list sheet as input to a decision; the projection adapter exposes only append and update-status
+- [ ] #1 No code reads the incident list sheet as input to a decision; the projection adapter exposes only append and update-status (both upsert on the incident id)
 - [ ] #2 The sheet import (create_missing_incidents and its caller) is deleted with its tests; no code writes a legacy-shape incident item; the rerun of the TASK-145.5.7 job (dry run then apply, per environment) after deploy is recorded in the notes
 - [ ] #3 /sre incident list (active and stale) reads IncidentStore.list_open over the open index; the sheet's duplicate-row check before the append is removed because the declare appends the projection row once inside its idempotent write; the rebuild job is the only whole-table read, through RecordStore.read_all with max_items from [incident_core] full_read_max_items (features/incident/common/settings.py, added by TASK-145.5.7) (decisions/cloud-portability.md contract 4: a whole-table read is never a lookup or a listing)
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
@@ -79,6 +79,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-05: no longer waits on TASK-121; it owns its sheet port and 121 deletes infrastructure/spreadsheets after it (TASK-169 ruling, 2026-11-05 (human), D5).
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
+
+2026-11-16 (TASK-145.12.1 rulings, human): rows keyed by incident id in column F; append and update-status upsert on it (AC #1 reworded); the rebuild job is its own subtask TASK-145.12.3 (145.12.2 had no rebuild in scope).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

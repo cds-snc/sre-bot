@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T21:00:00Z'
+updated_date: '2026-11-16T13:16:00Z'
 labels:
   - incident
   - features
@@ -39,6 +39,7 @@ Stack L L9a (approved program in TASK-145.7's plan, section 2; outline in the pa
 - [ ] #2 decisions/incident-management.md lists the schedule-source adapter and the Notify trigger key as tolerated with owner TASK-165.1; no umbrella module imports integrations.opsgenie
 - [ ] #3 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 - [ ] #4 The HTTP declare route POST /incidents runs the declare service (rides here per the TASK-145.7.7 ruling R6, 2026-11-10): Idempotency-Key required and mapped to the incident id, one router tag, explicit non-2xx mapping, declared permission (authorization.md); success and error-mapping tests; whether it registers here or with the 145.7.10 cutover is decided in this task's full plan
+- [ ] #5 The declared record's initial status is stated (Open, matching the legacy database, or In Progress, matching the legacy sheet) and recorded in decisions/incident-management.md; the list row shows that value. The declare upserts the list row (IncidentListProjection.append_row) even when the conversation or report step failed, and a retried step re-upserts (TASK-145.12.1 rulings R3, R6, 2026-11-16)
 <!-- AC:END -->
 
 ## Implementation Notes

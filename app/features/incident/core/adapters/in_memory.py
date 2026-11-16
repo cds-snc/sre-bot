@@ -25,7 +25,8 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
-from features.incident.core.adapters.slack import slack_channel_name
+from features.incident.core.adapters.list_rows import list_row
+from features.incident.core.adapters.slack import slack_channel_name, slack_conversation_label, slack_conversation_link
 from features.incident.core.adapters.timeline_items import entry_key
 from features.incident.core.domain import (
     BindingKind,
@@ -740,3 +741,44 @@ class InMemoryVideoCall:
     def link(self, call: VideoCallReference) -> str | None:
         """Return the stored link of a Google call; a call of another system has none here."""
         return call.url if call.system is WorkplaceSystem.GOOGLE else None
+
+
+class InMemoryIncidentListProjection:
+    """Hold the incident list rows in memory, one per incident id, built as the Sheets adapter builds them.
+
+    Both methods upsert on the incident id. A conversation of another chat system
+    is refused as the adapter refuses it. ``fail_with`` makes every call return
+    that error result instead.
+    """
+
+    def __init__(self, *, fail_with: OperationResult[None] | None = None) -> None:
+        self._fail_with = fail_with
+        self.rows: list[list[str]] = []
+
+    async def append_row(self, incident: Incident) -> OperationResult[None]:
+        """Write the incident's full row, in place when it has one, or return the configured failure."""
+        return self._upsert(incident, status_only=False)
+
+    async def update_status(self, incident: Incident, status: IncidentStatus) -> OperationResult[None]:
+        """Set the status of the incident's row, or write its full row with ``status``, or return the configured failure."""
+        return self._upsert(replace(incident, status=status), status_only=True)
+
+    def _upsert(self, incident: Incident, *, status_only: bool) -> OperationResult[None]:
+        if self._fail_with is not None:
+            return self._fail_with
+        conversation = incident.conversation
+        if conversation is not None and conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        row = list_row(
+            incident,
+            channel_link=slack_conversation_link(conversation) if conversation is not None else None,
+            channel_label=slack_conversation_label(incident) if conversation is not None else None,
+        )
+        index = next((i for i, existing in enumerate(self.rows) if existing[5] == incident.id), None)
+        if index is None:
+            self.rows.append(row)
+        elif status_only:
+            self.rows[index][3] = row[3]
+        else:
+            self.rows[index] = row
+        return OperationResult.success(None)

@@ -4,7 +4,7 @@ title: Cut over recreate (create resources)
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T20:12:00Z'
+updated_date: '2026-11-16T13:16:00Z'
 labels:
   - incident
   - features
@@ -34,6 +34,7 @@ Stack L L7b. `incident create resources` fills each missing reference through co
 - [ ] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 - [ ] #3 A recreated channel moves the primary: the old primary binding is archived, the new one attached, and the record's conversation copy and channel_id move in one update guarded on record_version (attach_conversation refuses moving a primary, so this task adds the move) (tested)
 - [ ] #4 The PR body states the revert target: one git revert restores the legacy surface, and the L5r rollback guard (TASK-145.8.2) keeps it reading and writing upgraded items correctly (decisions/incident-management.md Migration rule 1)
+- [ ] #5 A recreated channel or a filled-in report re-upserts the incident's list row (IncidentListProjection.append_row updates column E or B in place, or writes the missing row), replacing the legacy recreate's append of a missing row (modules/incident/core.py:251-266) (TASK-145.12.1 rulings, 2026-11-16)
 <!-- AC:END -->
 
 ## Implementation Notes
