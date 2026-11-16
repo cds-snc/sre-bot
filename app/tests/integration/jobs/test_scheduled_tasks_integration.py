@@ -87,7 +87,7 @@ class TestIntegrationHealthchecksWorkflow:
 
     @patch("jobs.scheduled_tasks.logger")
     @patch("jobs.scheduled_tasks.build_identity_center_adapter")
-    @patch("jobs.scheduled_tasks.opsgenie")
+    @patch("jobs.scheduled_tasks._opsgenie_healthcheck")
     @patch("jobs.scheduled_tasks.maxmind")
     @patch("jobs.scheduled_tasks.incident_drive")
     def test_healthcheck_all_healthy(
@@ -113,7 +113,7 @@ class TestIntegrationHealthchecksWorkflow:
         mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.success(
             data={"status": "healthy"}, message="MaxMind database is accessible"
         )
-        mock_opsgenie.healthcheck.return_value = True
+        mock_opsgenie.return_value = True
         mock_build_adapter.return_value.healthcheck.return_value = OperationResult.success(data=True)
 
         scheduled_tasks.integration_healthchecks()
@@ -121,7 +121,7 @@ class TestIntegrationHealthchecksWorkflow:
         # Verify all healthchecks were called
         assert mock_incident_drive.incident_drive_healthcheck.call_count == 1
         assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
-        assert mock_opsgenie.healthcheck.call_count == 1
+        assert mock_opsgenie.call_count == 1
         assert mock_build_adapter.return_value.healthcheck.call_count == 1
 
         # Verify no errors logged
@@ -130,7 +130,7 @@ class TestIntegrationHealthchecksWorkflow:
 
     @patch("jobs.scheduled_tasks.logger")
     @patch("jobs.scheduled_tasks.build_identity_center_adapter")
-    @patch("jobs.scheduled_tasks.opsgenie")
+    @patch("jobs.scheduled_tasks._opsgenie_healthcheck")
     @patch("jobs.scheduled_tasks.maxmind")
     @patch("jobs.scheduled_tasks.incident_drive")
     def test_healthcheck_partial_failures(
@@ -154,7 +154,7 @@ class TestIntegrationHealthchecksWorkflow:
         mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.permanent_error(
             message="MaxMind healthcheck failed", error_code="HEALTHCHECK_FAILED"
         )
-        mock_opsgenie.healthcheck.return_value = False
+        mock_opsgenie.return_value = False
         mock_build_adapter.return_value.healthcheck.return_value = OperationResult.permanent_error(
             message="User is not authorized", error_code="AccessDeniedException"
         )
@@ -164,7 +164,7 @@ class TestIntegrationHealthchecksWorkflow:
         # All checks should be called
         assert mock_incident_drive.incident_drive_healthcheck.call_count == 1
         assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
-        assert mock_opsgenie.healthcheck.call_count == 1
+        assert mock_opsgenie.call_count == 1
         assert mock_build_adapter.return_value.healthcheck.call_count == 1
 
         # Each unhealthy check is logged under its integration key
@@ -177,7 +177,7 @@ class TestIntegrationHealthchecksWorkflow:
 
     @patch("jobs.scheduled_tasks.logger")
     @patch("jobs.scheduled_tasks.build_identity_center_adapter")
-    @patch("jobs.scheduled_tasks.opsgenie")
+    @patch("jobs.scheduled_tasks._opsgenie_healthcheck")
     @patch("jobs.scheduled_tasks.maxmind")
     @patch("jobs.scheduled_tasks.incident_drive")
     def test_healthcheck_logs_unhealthy_and_continues_when_a_check_raises(
@@ -203,13 +203,13 @@ class TestIntegrationHealthchecksWorkflow:
         mock_maxmind.get_maxmind_client.return_value.healthcheck.return_value = OperationResult.success(
             data={"status": "healthy"}, message="MaxMind database is accessible"
         )
-        mock_opsgenie.healthcheck.return_value = True
+        mock_opsgenie.return_value = True
         mock_build_adapter.side_effect = RuntimeError("AssumeRole denied")
 
         scheduled_tasks.integration_healthchecks()
 
         assert mock_maxmind.get_maxmind_client.return_value.healthcheck.call_count == 1
-        assert mock_opsgenie.healthcheck.call_count == 1
+        assert mock_opsgenie.call_count == 1
 
         unhealthy = {
             call.kwargs["integration"]: call.kwargs.get("error")

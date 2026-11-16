@@ -3,10 +3,10 @@ id: TASK-25.6
 title: >-
   Bring Opsgenie onto the outbound-client contract: factory with explicit
   timeout, classify_opsgenie_error, business calls moved to their adapters
-status: To Do
+status: In Progress
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-16T14:06:00Z'
+updated_date: '2026-11-16T14:30:00Z'
 labels:
   - clients
   - phase-3
@@ -44,12 +44,12 @@ TARGET. The vendor package exports an async httpx client factory (explicit per-a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 integrations/opsgenie/ exports only an async client factory (explicit per-attempt timeout, connect-only retry configured once at construction), classify_opsgenie_error and its settings; no business operation and no import-time settings read remain in the vendor package
-- [ ] #2 Each consumer calls the client inside try/except + classify_opsgenie_error at its boundary and reaches it through one asyncio.run at its sync edge; classified failures in the legacy declare helper return [] and never fail the declare; unexpected exceptions propagate instead of being logged and swallowed
-- [ ] #3 The vendor package has no write helper and every Opsgenie call is a GET (rg evidence in notes), so no non-idempotent write needs replay protection
-- [ ] #4 Classification tests cover each mapped failure family (including an unparseable body as INVALID_RESPONSE) plus one unmapped exception propagating; factory tests assert the timeout and retry settings; the oncall_sync adapter, legacy helper and health-check probe each have success, classified-failure and not-configured tests
-- [ ] #5 decisions/outbound-clients.md: the Opsgenie Migration line is removed, an unparseable vendor body is named as an expected failure family, and oncall_sync's Slack usergroup port is listed as a sync port with an async consumer until TASK-146.2
-- [ ] #6 ruff, mypy, pytest tests --ignore=tests/smoke, make check-vendor-package-contract, check-import-contracts, check-settings-key-ownership, check-package-shape and check-test-seams pass, with output recorded in notes
+- [x] #1 integrations/opsgenie/ exports only an async client factory (explicit per-attempt timeout, connect-only retry configured once at construction), classify_opsgenie_error and its settings; no business operation and no import-time settings read remain in the vendor package
+- [x] #2 Each consumer calls the client inside try/except + classify_opsgenie_error at its boundary and reaches it through one asyncio.run at its sync edge; classified failures in the legacy declare helper return [] and never fail the declare; unexpected exceptions propagate instead of being logged and swallowed
+- [x] #3 The vendor package has no write helper and every Opsgenie call is a GET (rg evidence in notes), so no non-idempotent write needs replay protection
+- [x] #4 Classification tests cover each mapped failure family (including an unparseable body as INVALID_RESPONSE) plus one unmapped exception propagating; factory tests assert the timeout and retry settings; the oncall_sync adapter, legacy helper and health-check probe each have success, classified-failure and not-configured tests
+- [x] #5 decisions/outbound-clients.md: the Opsgenie Migration line is removed, an unparseable vendor body is named as an expected failure family, and oncall_sync's Slack usergroup port is listed as a sync port with an async consumer until TASK-146.2
+- [x] #6 ruff, mypy, pytest tests --ignore=tests/smoke, make check-vendor-package-contract, check-import-contracts, check-settings-key-ownership, check-package-shape and check-test-seams pass, with output recorded in notes
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -129,4 +129,13 @@ OQ8 Opsgenie documents 429 and X-RateLimit-State, not Retry-After (docs.opsgenie
 Scope changes proposed: TASK-146.1 note (OnCallLookup async def; the Opsgenie adapter awaits the async client, no to_thread); TASK-146.2 AC (the Slack usergroup port goes async or offloads inside its adapter, and its Migration entry is removed); TASK-25.10.3 AC (OQ6).
 
 2026-11-16 (human): R1a approved with the size-gate rule 3 exception (~11 production files), and the OQ6 ADR fix approved. Plan v2 written; ACs reworded (old #3 and #4 tightened, ADR AC added, gates widened) and description TODAY corrected.
+
+2026-11-16 implemented (TDD) on task-25.6-opsgenie-outbound-client from main f5176b80, In Progress; ACs #1-#6 checked one by one against the evidence below.
+#1 integrations/opsgenie/: client.py holds build_opsgenie_client (httpx.AsyncClient, base_url from [opsgenie.tenant] api_url, GenieKey header, timeout=timeout_seconds per attempt, AsyncHTTPTransport(retries=connect_retries); ValueError without a tenant, a programmer-error guard) and classify_opsgenie_error (OpenAI table + json.JSONDecodeError -> PERMANENT_ERROR INVALID_RESPONSE); __init__ exports those two plus OpsGenieSettings, OpsGenieTenant, get_opsgenie_settings; OpsGenieAPIError, get_on_call_users, get_on_call_user_for_rotation, healthcheck, api_get_request and urllib deleted. New [opsgenie] connect_retries (int >= 0, default 2; base.toml). New ErrorCode.INVALID_RESPONSE.
+#2 Consumers: packages/oncall_sync/adapters/opsgenie.py (async; settings and client factory injectable; classified failures, unexpected shape and not configured -> OnCallSyncError with the code and cause; unexpected exceptions propagate); ports.py OnCallScheduleProvider async; service.py sync_all/_sync_schedule/_sync_rotation async; __init__._run_oncall_sync runs asyncio.run once per job run. modules/incident/on_call.py: module-local get_on_call_users (one asyncio.run; not configured, classified failure and wrong shape -> [] with a warning; unexpected propagates); callers are sync Bolt handlers (incident.submit, incident_helper.recreate_missing_incident_resources). jobs/scheduled_tasks.py: _opsgenie_healthcheck (asyncio.run over _probe_opsgenie; GET /v1/services; the old log of the whole response body dropped).
+#3 rg: no .post/.put/.patch/.delete/.request on the Opsgenie client; the three calls are client.get (jobs/scheduled_tasks.py:194 /v1/services, modules/incident/on_call.py:37 on-calls, packages/oncall_sync/adapters/opsgenie.py:50 timeline). Exports test pins no write helper.
+#4 Tests: tests/unit/integrations/opsgenie/test_opsgenie_client_build.py, test_opsgenie_client_classify_error.py, test_opsgenie_package_exports.py, settings load (+connect_retries); tests/unit/packages/oncall_sync/test_oncall_sync_opsgenie_adapter.py (rewritten over httpx.MockTransport), test_oncall_sync_service.py (async fakes); tests/modules/incident/test_incident_on_call.py (+6 helper tests); tests/unit/jobs/test_jobs_opsgenie_healthcheck_run.py; tests/integration/jobs/test_scheduled_tasks_integration.py (patch target); legacy pin test_oncall_sync_job_run.py (its fake source async, assertions unchanged); test_configuration_files_vendors.py base pin (+connect_retries). tests/integrations/opsgenie/test_opsgenie_client.py deleted (cases moved).
+#5 decisions/outbound-clients.md: item 2 names an unparseable vendor body (PERMANENT_ERROR INVALID_RESPONSE; wrong shape is the adapter's); Migration: Opsgenie line removed, oncall_sync UserGroupSyncTarget added to sync ports with async consumers until TASK-146.2; Changes 2026-11-16.
+#6 Gates (from app/): ruff check . -> All checks passed!; make check-vendor-package-contract -> OK (15 baselined, no Opsgenie entry); check-import-contracts -> 13 kept, 0 broken; check-settings-key-ownership -> OK; check-package-shape -> OK (3 baselined); check-test-seams -> OK (47 strict, 12 legacy baselined); mypy . -> first run 41 errors / 14 files, one new in modules/incident/on_call.py:60 (fixed), rerun Found 40 errors in 13 files = the main baseline, none in touched files; pytest tests --ignore=tests/smoke -> 7258 passed, 194 warnings in 228.47s.
+Size: 11 production files (+ADR), size-gate rule 3 exception approved 2026-11-16. Rollout: no env-name, terraform, IAM or SSM change, so no deploy-checks; connect_retries has a default. After deploy, read the opsgenie_healthcheck_success / integration_healthcheck_result lines and an oncall_sync_rotation_synced line.
 <!-- SECTION:NOTES:END -->

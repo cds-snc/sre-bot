@@ -26,7 +26,7 @@ class FakeOnCallSource:
     def __init__(self) -> None:
         self.on_call: dict[str, str | Exception | None] = {}
 
-    def get_current_on_call_email(self, rotation: OnCallRotation) -> str | None:
+    async def get_current_on_call_email(self, rotation: OnCallRotation) -> str | None:
         outcome = self.on_call.get(rotation.opsgenie_rotation_name)
         if isinstance(outcome, Exception):
             raise outcome

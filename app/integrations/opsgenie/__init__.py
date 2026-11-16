@@ -1,17 +1,12 @@
-"""Opsgenie integration module."""
+"""Opsgenie vendor package: the client factory, its error classifier and the settings slice."""
 
-from .client import (
-    OpsGenieAPIError,
-    api_get_request,
-    get_on_call_user_for_rotation,
-    get_on_call_users,
-    healthcheck,
-)
+from .client import build_opsgenie_client, classify_opsgenie_error
+from .settings import OpsGenieSettings, OpsGenieTenant, get_opsgenie_settings
 
 __all__ = [
-    "OpsGenieAPIError",
-    "get_on_call_users",
-    "get_on_call_user_for_rotation",
-    "healthcheck",
-    "api_get_request",
+    "OpsGenieSettings",
+    "OpsGenieTenant",
+    "build_opsgenie_client",
+    "classify_opsgenie_error",
+    "get_opsgenie_settings",
 ]

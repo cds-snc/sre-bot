@@ -4,6 +4,10 @@ Iterates the configured schedules. For each schedule, syncs each rotation's
 user group to its single on-call user, then syncs the schedule's aggregate
 user group to the union of all on-call users. If any rotation fails, the
 schedule group update is skipped and an error is logged.
+
+The service is async: it awaits the schedule source, and the job entry point runs one
+``sync_all`` per run with ``asyncio.run``. The user-group target is still sync (until
+TASK-146.2), which blocks only this job's own loop on the scheduler thread.
 """
 
 from __future__ import annotations
@@ -43,10 +47,10 @@ class OnCallSyncService:
         self._schedules = list(schedules)
         self._user_rotations = user_rotations
 
-    def sync_all(self) -> None:
+    async def sync_all(self) -> None:
         """Sync every configured schedule; isolate per-schedule failures."""
         for schedule in self._schedules:
-            self._sync_schedule(schedule)
+            await self._sync_schedule(schedule)
         if self._user_rotations is not None:
             for rotation in self._user_rotations.get_current_rotations():
                 self._sync_user_rotation(rotation.slack_usergroup_handle, rotation.slack_usergroup_name, rotation.slack_user_id)
@@ -65,7 +69,7 @@ class OnCallSyncService:
             return
         log.info("oncall_sync_user_rotation_synced", slack_user_id=user_id)
 
-    def _sync_schedule(self, schedule: OnCallScheduleConfig) -> None:
+    async def _sync_schedule(self, schedule: OnCallScheduleConfig) -> None:
         log = logger.bind(slack_handle=schedule.slack_handle)
         on_call_emails: list[str] = []
         any_rotation_failed = False
@@ -73,7 +77,7 @@ class OnCallSyncService:
         for rotation_config in schedule.rotations:
             rotation = _resolve_rotation(schedule, rotation_config)
             try:
-                email = self._sync_rotation(rotation)
+                email = await self._sync_rotation(rotation)
             except OnCallSyncError:
                 any_rotation_failed = True
                 continue
@@ -112,7 +116,7 @@ class OnCallSyncService:
             return
         log.info("oncall_sync_schedule_group_synced")
 
-    def _sync_rotation(self, rotation: OnCallRotation) -> str | None:
+    async def _sync_rotation(self, rotation: OnCallRotation) -> str | None:
         """Sync one rotation's user group.
 
         Returns the on-call email on success, or ``None`` if the rotation has
@@ -125,7 +129,7 @@ class OnCallSyncService:
             opsgenie_rotation_name=rotation.opsgenie_rotation_name,
         )
         try:
-            email = self._on_call.get_current_on_call_email(rotation)
+            email = await self._on_call.get_current_on_call_email(rotation)
         except OnCallSyncError as exc:
             cause = exc.__cause__
             log.error(

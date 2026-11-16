@@ -19,7 +19,7 @@ from packages.user_rotations.service import CurrentUserRotation
 class OnCallScheduleProvider(Protocol):
     """Source of truth for the current on-call user of a rotation."""
 
-    def get_current_on_call_email(self, rotation: OnCallRotation) -> str | None:
+    async def get_current_on_call_email(self, rotation: OnCallRotation) -> str | None:
         """Return the email of the user currently on-call for ``rotation``.
 
         Return ``None`` when the rotation has no current participant
@@ -30,7 +30,11 @@ class OnCallScheduleProvider(Protocol):
 
 
 class UserGroupSyncTarget(Protocol):
-    """Messaging-platform user group that should mirror on-call membership."""
+    """Messaging-platform user group that should mirror on-call membership.
+
+    Sync while the async service calls it: listed in decisions/outbound-clients.md Migration
+    as a sync port with an async consumer until TASK-146.2.
+    """
 
     def sync_user_group(
         self,
