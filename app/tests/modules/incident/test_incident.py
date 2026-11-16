@@ -699,15 +699,24 @@ def test_the_policy_question_is_a_required_input_block():
 def test_the_policy_question_offers_localized_yes_and_no_in_that_order(locale, expected):
     element = _policy_block(_policy_modal(locale), "policy_help")["element"]
 
-    assert element["type"] == "static_select"
+    assert element["type"] == "radio_buttons"
     assert [(o["text"]["text"], o["value"]) for o in element["options"]] == expected
 
 
-def test_the_policy_question_has_a_localized_placeholder():
-    assert (
-        _policy_block(_policy_modal("en-US"), "policy_help")["element"]["placeholder"]["text"] == "Select if you need policy help"
-    )
-    assert "politiques" in _policy_block(_policy_modal("fr-FR"), "policy_help")["element"]["placeholder"]["text"]
+def test_the_security_question_is_radio_buttons_with_yes_and_no():
+    element = _policy_block(_policy_modal(), "security_incident")["element"]
+
+    assert element["type"] == "radio_buttons"
+    assert element["action_id"] == "security_incident"
+    assert [o["value"] for o in element["options"]] == ["yes", "no"]
+
+
+@pytest.mark.parametrize("block_id", ["security_incident", "policy_help"])
+def test_the_security_and_policy_questions_default_to_no(block_id):
+    element = _policy_block(_policy_modal(), block_id)["element"]
+
+    assert element["initial_option"] == element["options"][1]
+    assert element["initial_option"]["value"] == "no"
 
 
 def test_the_policy_block_and_action_ids_match_the_keys_the_submit_reads():
@@ -753,7 +762,7 @@ def test_the_policy_strings_exist_in_both_locales(locale):
     previous = i18n.get("locale")
     i18n.set("locale", locale)
     try:
-        for key in ("policy_help", "policy_help_hint", "policy_help_placeholder"):
+        for key in ("policy_help", "policy_help_hint"):
             translated = i18n.t(f"incident.modal.{key}")
             assert translated and translated != f"incident.modal.{key}"
     finally:
@@ -784,6 +793,25 @@ def test_the_locale_toggle_rebuilds_the_modal_with_the_policy_question():
 
     view = client.views_update.call_args.kwargs["view"]
     assert _policy_block(view, "policy_help")["label"]["text"] == "Avez-vous besoin d'aide en matière de politiques?"
+
+
+def _modal_submission(security: str | None = None, policy: str | None = None) -> dict[str, Any]:
+    """The view Slack submits for the built modal: each radio holds its initial option unless an answer is picked."""
+    modal = _policy_modal()
+    view = helper_generate_view()
+    for block_id, answer in (("security_incident", security), ("policy_help", policy)):
+        element = _policy_block(modal, block_id)["element"]
+        picked = next(o for o in element["options"] if o["value"] == answer) if answer else element["initial_option"]
+        view["state"]["values"][block_id] = {block_id: {"type": "radio_buttons", "selected_option": picked}}
+    return view
+
+
+@pytest.mark.parametrize(("security", "policy"), [("yes", "yes"), ("yes", "no"), ("no", "yes"), ("no", "no"), (None, None)])
+def test_the_radio_answers_the_modal_offers_reach_resource_creation(security, policy):
+    """Submitting the built radios yields the payload values that drive the group invites; untouched radios mean no and no."""
+    payload = _policy_submit(_modal_submission(security, policy))
+
+    assert (payload.security_incident, payload.policy_help) == (security or "no", policy or "no")
 
 
 @pytest.mark.parametrize("answer", ["yes", "no"])
