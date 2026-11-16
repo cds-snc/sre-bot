@@ -25,6 +25,7 @@ number of model calls and what reaches the model are asserted at the listener.
 Every handler runs over a fake scope opener with Slack configured.
 """
 
+import asyncio
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass, field, replace
@@ -663,9 +664,9 @@ class _CountingIncidents(InMemoryIncidentStore):
         self.seed(incident_on(_CHANNEL, _INCIDENT, security_incident=security_incident))
         self.calls: list[str] = []
 
-    def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
+    async def read_security_flag(self, incident_id: str) -> OperationResult[bool]:
         self.calls.append(incident_id)
-        return super().read_security_flag(incident_id)
+        return await super().read_security_flag(incident_id)
 
 
 class _RecordingGenerator:
@@ -702,8 +703,8 @@ def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessa
         _RecordingGenerator(),
         _CountingIncidents(security_incident=security_incident),
     )
-    world.store.append(_APPROVED)
-    world.store.append(_PENDING)
+    asyncio.run(world.store.append(_APPROVED))
+    asyncio.run(world.store.append(_PENDING))
 
     async def service(
         _: IncidentStore, conversation: ConversationReference, sequence: int, **kwargs: Any
@@ -723,7 +724,7 @@ def _bind(monkeypatch: pytest.MonkeyPatch, *, messages: Sequence[TranscriptMessa
 
 
 def _latest(world: _World) -> StatusUpdate:
-    latest = world.store.latest(_INCIDENT).data
+    latest = asyncio.run(world.store.latest(_INCIDENT)).data
     assert latest is not None
     return latest
 

@@ -79,7 +79,7 @@ logger = structlog.get_logger()
 DRAFT_UNPARSEABLE_CODE = "DRAFT_UNPARSEABLE"
 
 
-def start_status_update_draft(
+async def start_status_update_draft(
     incidents: IncidentStore,
     conversation: ConversationReference,
     *,
@@ -114,13 +114,13 @@ def start_status_update_draft(
     now = now or datetime.now(UTC)
     log = logger.bind(operation="start_status_update_draft", conversation_id=conversation.vendor_id)
 
-    incident = find_incident_for_conversation(incidents, conversation)
+    incident = await find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return failure(incident)
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
-    listed = store.list_for_incident(incident_id)
+    listed = await store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     records = listed.data
@@ -152,10 +152,10 @@ def start_status_update_draft(
         previous=last_public,
         origin=StatusUpdateOrigin.HAND,
     )
-    return _append(store, started, StatusUpdateOutcomeKind.MANUAL, log)
+    return await _append(store, started, StatusUpdateOutcomeKind.MANUAL, log)
 
 
-def save_status_update_draft(
+async def save_status_update_draft(
     incidents: IncidentStore,
     conversation: ConversationReference,
     sequence: int,
@@ -192,12 +192,12 @@ def save_status_update_draft(
     now = now or datetime.now(UTC)
     log = logger.bind(operation="save_status_update_draft", conversation_id=conversation.vendor_id, sequence=sequence)
 
-    incident = find_incident_for_conversation(incidents, conversation)
+    incident = await find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return failure(incident)
     log = log.bind(incident_id=incident.data.id)
 
-    listed = store.list_for_incident(incident.data.id)
+    listed = await store.list_for_incident(incident.data.id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     latest = listed.data[0] if listed.data else None
@@ -219,7 +219,7 @@ def save_status_update_draft(
         created_at=now,
         origin=StatusUpdateOrigin.HAND,
     )
-    appended = store.append(saved)
+    appended = await store.append(saved)
     if appended.is_success:
         log.info("incident_status_update_saved", sequence=saved.sequence)
         return OperationResult.success(data=saved)
@@ -228,7 +228,7 @@ def save_status_update_draft(
         return failure(appended)
 
     # One re-read, no retry loop: a winning draft is what the responder would see on reopening.
-    winner = store.latest(saved.incident_id).data
+    winner = (await store.latest(saved.incident_id)).data
     if winner is not None and winner.state is StatusUpdateState.DRAFT and winner.sequence >= saved.sequence:
         log.info("incident_status_update_save_superseded", winner_sequence=winner.sequence)
         return OperationResult.success(data=winner)
@@ -297,13 +297,13 @@ async def generate_status_update_draft(
         instructions_length=len(guidance),
     )
 
-    incident = find_incident_for_conversation(incidents, conversation)
+    incident = await find_incident_for_conversation(incidents, conversation)
     if not incident.is_success or incident.data is None:
         return failure(incident)
     incident_id = incident.data.id
     log = log.bind(incident_id=incident_id)
 
-    listed = store.list_for_incident(incident_id)
+    listed = await store.list_for_incident(incident_id)
     if not listed.is_success or listed.data is None:
         return failure(listed)
     records = listed.data
@@ -345,11 +345,11 @@ async def generate_status_update_draft(
             en=replace(current.en, current_action=wording.en),
             fr=replace(current.fr, current_action=wording.fr),
         )
-        return _append_new(
+        return await _append_new(
             store, record(carried, StatusUpdateOrigin.CARRIED_FORWARD, ()), StatusUpdateOutcomeKind.CARRIED_FORWARD, log
         )
 
-    refusal = _security_gate(incidents, incident_id, security_confirmed, log)
+    refusal = await _security_gate(incidents, incident_id, security_confirmed, log)
     if refusal is not None:
         return refusal
 
@@ -365,7 +365,7 @@ async def generate_status_update_draft(
     if not generated.is_success or generated.data is None:
         return failure(generated)
     origin = StatusUpdateOrigin.MODEL_INSTRUCTED if guidance else StatusUpdateOrigin.MODEL
-    return _append_new(store, record(generated.data, origin, people), StatusUpdateOutcomeKind.DRAFTED, log)
+    return await _append_new(store, record(generated.data, origin, people), StatusUpdateOutcomeKind.DRAFTED, log)
 
 
 async def _generate_fields(
@@ -407,7 +407,7 @@ def _holds(update: StatusUpdate, fields: DraftedFields) -> bool:
     )
 
 
-def _security_gate(
+async def _security_gate(
     incidents: IncidentStore,
     incident_id: str,
     security_confirmed: bool,
@@ -422,7 +422,7 @@ def _security_gate(
     """
     if security_confirmed:
         return None
-    flag = incidents.read_security_flag(incident_id)
+    flag = await incidents.read_security_flag(incident_id)
     if flag.is_success and flag.data is False:
         return None
     if flag.is_success:
@@ -517,14 +517,14 @@ def _draft_record(
     )
 
 
-def _append(
+async def _append(
     store: StatusUpdateStore,
     update: StatusUpdate,
     kind: StatusUpdateOutcomeKind,
     log: structlog.stdlib.BoundLogger,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Store ``update``; when another writer's draft took its sequence, return that draft instead."""
-    appended = store.append(update)
+    appended = await store.append(update)
     if appended.is_success:
         log.info(f"incident_status_update_{kind}", sequence=update.sequence, kind=kind)
         return OperationResult.success(data=StatusUpdateDraftOutcome(update=update, kind=kind))
@@ -532,7 +532,7 @@ def _append(
         return failure(appended)
 
     # One re-read, no retry loop: a winning draft is what a rerun would return anyway.
-    winner = store.latest(update.incident_id).data
+    winner = (await store.latest(update.incident_id)).data
     if winner is not None and winner.state is StatusUpdateState.DRAFT and winner.sequence >= update.sequence:
         log.info("incident_status_update_pending", sequence=winner.sequence, kind=StatusUpdateOutcomeKind.PENDING)
         return OperationResult.success(data=StatusUpdateDraftOutcome(update=winner, kind=StatusUpdateOutcomeKind.PENDING))
@@ -540,14 +540,14 @@ def _append(
     return failure(appended)
 
 
-def _append_new(
+async def _append_new(
     store: StatusUpdateStore,
     update: StatusUpdate,
     kind: StatusUpdateOutcomeKind,
     log: structlog.stdlib.BoundLogger,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Store ``update``; another writer's record at its sequence is a conflict, never adopted."""
-    appended = store.append(update)
+    appended = await store.append(update)
     if not appended.is_success:
         log.warning("incident_status_update_store_failed", status=appended.status, error_code=appended.error_code)
         return failure(appended)

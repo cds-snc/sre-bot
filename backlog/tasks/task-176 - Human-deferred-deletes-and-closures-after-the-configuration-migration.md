@@ -52,6 +52,8 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-10: asked at TASK-145.7.6 (Stack L L4b) implementation start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 
+2026-11-10: asked at TASK-145.8.7 (Stack L L3b) planning start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
+
 2026-11-10: asked at TASK-145.12.1 (Stack L row 18.L4c) planning start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 
 2026-11-16: TASK-145.12.1 resumed after approval; TASK-176 unchanged per the 2026-11-10 answer (#1 and #4 open, #2 waits on TASK-182).

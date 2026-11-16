@@ -68,16 +68,16 @@ def test_apply_writes_the_bridge_output_and_the_version_marker(item: dict[str, A
     )
 
 
-def test_the_happy_path_closed_incident_reads_the_same_after_the_upgrade() -> None:
+async def test_the_happy_path_closed_incident_reads_the_same_after_the_upgrade() -> None:
     """A single-team Closed incident with every field mappable: no open index, product unset, teams kept."""
     item = legacy_item("inc-closed", status="Closed")
     records = records_with(item)
-    before = record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed").data
+    before = (await record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed")).data
 
     legacy_upgrade(records).run(apply=True)
 
     stored = _stored(records, "inc-closed")
-    after = record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed").data
+    after = (await record_incident_store(records, table=TABLE, tenants=TENANTS).get("inc-closed")).data
     assert after is not None and after == before
     assert (after.status, after.severity, after.product) == (IncidentStatus.CLOSED, Severity.SEV2, None)
     assert after.conversation is not None and after.conversation.tenant == TENANTS[WorkplaceSystem.SLACK]
@@ -85,7 +85,7 @@ def test_the_happy_path_closed_incident_reads_the_same_after_the_upgrade() -> No
     assert stored["teams"] == ["GC Notify"]
 
 
-def test_the_open_security_incident_most_likely_to_break_upgrades_whole() -> None:
+async def test_the_open_security_incident_most_likely_to_break_upgrades_whole() -> None:
     """Several teams, lowercase status, no stored flag and a numeric created_at: open index set, flag false, product unset."""
     item = legacy_item(
         "inc-open",
@@ -105,7 +105,7 @@ def test_the_open_security_incident_most_likely_to_break_upgrades_whole() -> Non
     assert stored["opened_at"] == stored["declared_at"] == "2025-10-15T14:00:00.000000+00:00"
     assert "product" not in stored
     assert stored["teams"] == ["GC Notify", "GC Forms"]
-    listed = record_incident_store(records, table=TABLE, tenants=TENANTS).list_open().data
+    listed = (await record_incident_store(records, table=TABLE, tenants=TENANTS).list_open()).data
     assert [incident.id for incident in listed or []] == ["inc-open"]
 
 

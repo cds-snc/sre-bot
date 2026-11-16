@@ -65,48 +65,48 @@ _DRAFT_3 = replace(_DRAFT_1, sequence=3, stage=StatusUpdateStage.MONITORING)
 class _FailingStore:
     """Store whose list read fails with a throttling error."""
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=3)
 
 
-def _store(*updates: StatusUpdate) -> InMemoryStatusUpdateStore:
+async def _store(*updates: StatusUpdate) -> InMemoryStatusUpdateStore:
     store = InMemoryStatusUpdateStore()
     for update in updates:
-        store.append(update)
+        await store.append(update)
     return store
 
 
 async def test_returns_an_approved_update() -> None:
     """An approved record at the sequence is returned unchanged, though a newer draft exists."""
-    result = await get_approved_update(_INCIDENT, 2, store=_store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
+    result = await get_approved_update(_INCIDENT, 2, store=await _store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, _APPROVED_2)
 
 
 async def test_returns_a_published_update() -> None:
     """A published record at an older sequence is returned unchanged."""
-    result = await get_approved_update(_INCIDENT, 1, store=_store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
+    result = await get_approved_update(_INCIDENT, 1, store=await _store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, _PUBLISHED_1)
 
 
 async def test_draft_is_not_approved() -> None:
     """A draft at the sequence is refused as not approved."""
-    result = await get_approved_update(_INCIDENT, 3, store=_store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
+    result = await get_approved_update(_INCIDENT, 3, store=await _store(_PUBLISHED_1, _APPROVED_2, _DRAFT_3))
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_NOT_APPROVED)
 
 
 async def test_missing_sequence_is_a_conflict() -> None:
     """A sequence the incident does not have is refused as a conflict."""
-    result = await get_approved_update(_INCIDENT, 9, store=_store(_PUBLISHED_1, _APPROVED_2))
+    result = await get_approved_update(_INCIDENT, 9, store=await _store(_PUBLISHED_1, _APPROVED_2))
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
 
 
 async def test_other_incident_is_a_conflict() -> None:
     """A sequence held only by another incident is refused as a conflict for this one."""
-    result = await get_approved_update("inc-uuid-other", 2, store=_store(_PUBLISHED_1, _APPROVED_2))
+    result = await get_approved_update("inc-uuid-other", 2, store=await _store(_PUBLISHED_1, _APPROVED_2))
 
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
 

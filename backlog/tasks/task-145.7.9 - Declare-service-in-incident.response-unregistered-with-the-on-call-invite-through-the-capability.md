@@ -18,6 +18,7 @@ dependencies:
   - TASK-145.7.7
   - TASK-146.1
   - TASK-145.8.7
+  - TASK-145.8.8
 references:
   - decisions/incident-management.md
   - decisions/oncall.md

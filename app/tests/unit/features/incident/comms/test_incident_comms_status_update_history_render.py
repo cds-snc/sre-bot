@@ -68,10 +68,10 @@ class _RecordingPublisher:
 
 
 @pytest.fixture
-def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
+async def store(monkeypatch: pytest.MonkeyPatch) -> InMemoryStatusUpdateStore:
     status_updates = InMemoryStatusUpdateStore()
-    status_updates.append(_APPROVED)
-    status_updates.append(_DRAFT)
+    await status_updates.append(_APPROVED)
+    await status_updates.append(_DRAFT)
     monkeypatch.setattr(publication, "set_published", partial(set_published, now=_NOW))
     return status_updates
 
@@ -135,5 +135,5 @@ async def test_toggle_passes_on_a_rendering_failure(store: InMemoryStatusUpdateS
     )
 
     assert result.error_code == ErrorCode.STATUS_UPDATE_NOT_APPROVED
-    stored = store.list_for_incident("inc-1").data
+    stored = (await store.list_for_incident("inc-1")).data
     assert stored is not None and any(update.state is StatusUpdateState.PUBLISHED for update in stored)

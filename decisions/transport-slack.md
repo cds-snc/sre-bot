@@ -70,7 +70,7 @@ Tolerated until then:
 - dual registration: the legacy `register(bot)` list in `server/lifespan.py` beside the `register_slack_commands(registrar: SlackCommandRegistrar)` hookspec;
 - `slack_sdk.WebClient` imported outside `adapters/` in `packages/oncall_sync/providers.py` and `packages/rant/platforms/slack.py`;
 - legacy modules building command names from `COMMAND_PREFIX` in their own `bot.command()` calls;
-- the incident `IncidentTranscriptReader` on the synchronous `WebClient`, until TASK-145.8.7 moves it to the async clients (its `scribe/` caller is already async; [outbound-clients.md](outbound-clients.md) async-port rule); `IncidentConversation` already uses the async clients.
+- the incident `IncidentTranscriptReader` on the synchronous `WebClient`, until TASK-145.8.8 moves it to the async clients (its `scribe/` and `comms/` callers are already async; [outbound-clients.md](outbound-clients.md) async-port rule); `IncidentConversation` already uses the async clients.
 
 **Changes:**
 - 2026-09-24: runtime moves to `server/slack/`, hookspecs and the outbound Protocol to `contracts/`, per plugin-architecture.md; dropped the closed `PREFIX` retirement; Migration names epic tickets only; shared Slack helpers never wrap Bolt or `slack_sdk`, and a standard toolkit is an open Draft.
@@ -88,3 +88,4 @@ Tolerated until then:
 - 2026-11-05: an outbound-only Slack caller holds two async handles, reads on `get_async_slack_web_client` and non-idempotent writes on the rate-limit-only write handle ([outbound-clients.md](outbound-clients.md)); first user `IncidentConversation` (TASK-145.6.3); the transcript reader's synchronous client is tolerated.
 - 2026-11-06: legacy ids at rebuild: modal-internal ids take the plugin prefix; ids on posted messages keep a legacy alias until the legacy contract task (TASK-36.1.2 OQ1, human; resolves the conflict with [migration.md](migration.md) recipe step 4 and TASK-145.7 vs TASK-145.10).
 - 2026-11-10: the `IncidentTranscriptReader` tolerance ends with TASK-145.8.7 (async incident core ports, outbound-clients.md async-port rule).
+- 2026-11-10: the `IncidentTranscriptReader` tolerance moves to TASK-145.8.8 (TASK-145.8.7 was split by the size gate; it converts the incident stores only).

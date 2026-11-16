@@ -34,7 +34,7 @@ from features.incident.comms.service.draft import (
 from features.incident.core.api import ConversationReference, IncidentStore, StatusUpdate, StatusUpdateStore
 
 
-def start_status_update_form(
+async def start_status_update_form(
     incidents: IncidentStore, conversation: ConversationReference, *, author: str, store: StatusUpdateStore
 ) -> OperationResult[StatusUpdateFormState]:
     """Return the form for the pending draft, starting a hand-written draft when none is pending.
@@ -48,7 +48,7 @@ def start_status_update_form(
     Returns:
         Success with the draft and how it came to be; otherwise the start's classified error.
     """
-    started = start_status_update_draft(incidents, conversation, author=author, store=store)
+    started = await start_status_update_draft(incidents, conversation, author=author, store=store)
     if not started.is_success or started.data is None:
         return failure(started)
     return OperationResult.success(
@@ -100,7 +100,7 @@ async def save_status_update_form(
     if edit is None:
         failure_code: str | None = ErrorCode.STATUS_UPDATE_FIELDS_INVALID
     else:
-        saved = save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author, store=store)
+        saved = await save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author, store=store)
         if saved.is_success and saved.data is not None:
             return OperationResult.success(
                 data=StatusUpdateFormState(update=saved.data, ai_available=text_generation_available())

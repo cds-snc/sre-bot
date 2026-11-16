@@ -21,6 +21,7 @@ whole.
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
+from typing import Self
 
 import pytest
 
@@ -80,44 +81,50 @@ class _RecordingStore:
     transition's answer without touching the inner store.
     """
 
-    def __init__(self, *updates: StatusUpdate) -> None:
+    def __init__(self) -> None:
         self._inner = InMemoryStatusUpdateStore()
-        for update in updates:
-            self._inner.append(update)
         self.calls: list[str] = []
         self.transitions: list[tuple[StatusUpdate, StatusUpdateState]] = []
         self.race: tuple[StatusUpdate, StatusUpdateState] | None = None
         self.transition_result: OperationResult[StatusUpdate] | None = None
         self.list_result: OperationResult[Sequence[StatusUpdate]] | None = None
 
-    def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
-        self.calls.append("append")
-        return self._inner.append(update)
+    @classmethod
+    async def seeded(cls, *updates: StatusUpdate) -> Self:
+        """A store holding ``updates``, seeded without logging a call."""
+        store = cls()
+        for update in updates:
+            await store._inner.append(update)
+        return store
 
-    def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
+    async def append(self, update: StatusUpdate) -> OperationResult[StatusUpdate]:
+        self.calls.append("append")
+        return await self._inner.append(update)
+
+    async def transition(self, update: StatusUpdate, *, expected_state: StatusUpdateState) -> OperationResult[StatusUpdate]:
         self.calls.append("transition")
         self.transitions.append((update, expected_state))
         if self.race is not None:
             winner, winner_expected = self.race
             self.race = None
-            self._inner.transition(winner, expected_state=winner_expected)
+            await self._inner.transition(winner, expected_state=winner_expected)
         if self.transition_result is not None:
             return self.transition_result
-        return self._inner.transition(update, expected_state=expected_state)
+        return await self._inner.transition(update, expected_state=expected_state)
 
-    def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
+    async def latest(self, incident_id: str) -> OperationResult[StatusUpdate | None]:
         self.calls.append("latest")
-        return self._inner.latest(incident_id)
+        return await self._inner.latest(incident_id)
 
-    def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
+    async def list_for_incident(self, incident_id: str) -> OperationResult[Sequence[StatusUpdate]]:
         self.calls.append("list_for_incident")
         if self.list_result is not None:
             return self.list_result
-        return self._inner.list_for_incident(incident_id)
+        return await self._inner.list_for_incident(incident_id)
 
-    def stored(self, sequence: int = 1) -> StatusUpdate | None:
+    async def stored(self, sequence: int = 1) -> StatusUpdate | None:
         """The record held by the inner store at ``sequence``, read without logging a call."""
-        listed = self._inner.list_for_incident(_INCIDENT).data or ()
+        listed = (await self._inner.list_for_incident(_INCIDENT)).data or ()
         return next((update for update in listed if update.sequence == sequence), None)
 
     def writes(self) -> list[str]:
@@ -127,18 +134,18 @@ class _RecordingStore:
 class TestPublish:
     async def test_records_the_actor_and_the_time(self) -> None:
         """Publishing an approved update stores it as published at ``now`` by the actor and returns that record."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
 
         result = await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, now=_NOW, store=store)
 
         expected = _published(publisher=_ACTOR, at=_NOW)
         assert result.is_success
         assert result.data == expected
-        assert store.stored() == expected
+        assert (await store.stored()) == expected
 
     async def test_is_one_transition_from_approved(self) -> None:
         """The only write is one transition of the published record, conditioned on the approved state read."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
 
         await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, now=_NOW, store=store)
 
@@ -148,18 +155,18 @@ class TestPublish:
     async def test_repeat_is_success_without_a_write(self) -> None:
         """A publish of an update that is already published returns the stored record and writes nothing."""
         stored = _published()
-        store = _RecordingStore(stored)
+        store = await _RecordingStore.seeded(stored)
 
         result = await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, now=_NOW, store=store)
 
         assert result.is_success
         assert result.data == stored
         assert store.writes() == []
-        assert store.stored() == stored
+        assert (await store.stored()) == stored
 
     async def test_now_defaults_to_the_current_time(self) -> None:
         """Without ``now`` the publication time is the current, timezone-aware time."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         before = datetime.now(UTC)
 
         result = await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, store=store)
@@ -173,17 +180,17 @@ class TestPublish:
 class TestMarkNotPublished:
     async def test_clears_the_publication_time_and_person(self) -> None:
         """Undo stores the update as approved again, with neither published_at nor published_by."""
-        store = _RecordingStore(_published())
+        store = await _RecordingStore.seeded(_published())
 
         result = await set_published(_INCIDENT, 1, published=False, actor=_ACTOR, now=_NOW, store=store)
 
         assert result.is_success
         assert result.data == _APPROVED
-        assert store.stored() == _APPROVED
+        assert (await store.stored()) == _APPROVED
 
     async def test_is_one_transition_from_published(self) -> None:
         """The only write is one transition of the approved record, conditioned on the published state read."""
-        store = _RecordingStore(_published())
+        store = await _RecordingStore.seeded(_published())
 
         await set_published(_INCIDENT, 1, published=False, actor=_ACTOR, now=_NOW, store=store)
 
@@ -192,7 +199,7 @@ class TestMarkNotPublished:
 
     async def test_repeat_is_success_without_a_write(self) -> None:
         """Marking an update that is already not published returns the stored record and writes nothing."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
 
         result = await set_published(_INCIDENT, 1, published=False, actor=_ACTOR, now=_NOW, store=store)
 
@@ -205,26 +212,26 @@ class TestRefusals:
     @pytest.mark.parametrize("published", [True, False], ids=["publish", "undo"])
     async def test_a_draft_is_refused_as_not_approved(self, published: bool) -> None:
         """A draft has no copy-ready text to publish; the request is refused and nothing is written."""
-        store = _RecordingStore(_DRAFT)
+        store = await _RecordingStore.seeded(_DRAFT)
 
         result = await set_published(_INCIDENT, 1, published=published, actor=_ACTOR, now=_NOW, store=store)
 
         assert result.status is OperationStatus.PERMANENT_ERROR
         assert result.error_code == ErrorCode.STATUS_UPDATE_NOT_APPROVED
         assert store.writes() == []
-        assert store.stored() == _DRAFT
+        assert (await store.stored()) == _DRAFT
 
     @pytest.mark.parametrize("published", [True, False], ids=["publish", "undo"])
     async def test_a_missing_sequence_is_a_conflict(self, published: bool) -> None:
         """A sequence the incident does not have means the view is stale; nothing is written or created."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
 
         result = await set_published(_INCIDENT, 9, published=published, actor=_ACTOR, now=_NOW, store=store)
 
         assert result.status is OperationStatus.PERMANENT_ERROR
         assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
         assert store.writes() == []
-        assert store.stored(9) is None
+        assert (await store.stored(9)) is None
 
 
 class TestLostRace:
@@ -235,7 +242,7 @@ class TestLostRace:
         marked it published, and the transition is not retried.
         """
         winner = _published(publisher=_OTHER, at=_EARLIER_PUBLISH)
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         store.race = (winner, StatusUpdateState.APPROVED)
 
         result = await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, now=_NOW, store=store)
@@ -243,11 +250,11 @@ class TestLostRace:
         assert result.is_success
         assert result.data == winner
         assert store.writes() == ["transition"]
-        assert store.stored() == winner
+        assert (await store.stored()) == winner
 
     async def test_another_undo_that_landed_first_is_success(self) -> None:
         """Someone else marked it not published first; the stored record is the one requested, so the undo succeeds."""
-        store = _RecordingStore(_published())
+        store = await _RecordingStore.seeded(_published())
         store.race = (_APPROVED, StatusUpdateState.PUBLISHED)
 
         result = await set_published(_INCIDENT, 1, published=False, actor=_ACTOR, now=_NOW, store=store)
@@ -258,7 +265,7 @@ class TestLostRace:
 
     async def test_a_lost_write_whose_record_is_not_in_the_target_state_is_a_conflict(self) -> None:
         """The store reports a conflict and the re-read still shows approved, so the publish is refused, not retried."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         store.transition_result = OperationResult.permanent_error(
             message="The status update was changed or taken by another writer.",
             error_code=ErrorCode.STATUS_UPDATE_CONFLICT,
@@ -269,11 +276,11 @@ class TestLostRace:
         assert result.status is OperationStatus.PERMANENT_ERROR
         assert result.error_code == ErrorCode.STATUS_UPDATE_CONFLICT
         assert store.writes() == ["transition"]
-        assert store.stored() == _APPROVED
+        assert (await store.stored()) == _APPROVED
 
     async def test_a_lost_write_rereads_exactly_once(self) -> None:
         """One read before the write and one re-read after the conflict; no retry loop."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         store.transition_result = OperationResult.permanent_error(
             message="The status update was changed or taken by another writer.",
             error_code=ErrorCode.STATUS_UPDATE_CONFLICT,
@@ -287,7 +294,7 @@ class TestLostRace:
 class TestStoreErrors:
     async def test_a_failed_read_keeps_its_classification(self) -> None:
         """A throttled list read is returned with its status, code and retry hint, and nothing is written."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         store.list_result = OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=3)
 
         result = await set_published(_INCIDENT, 1, published=True, actor=_ACTOR, now=_NOW, store=store)
@@ -301,7 +308,7 @@ class TestStoreErrors:
 
     async def test_a_failed_write_keeps_its_classification_without_a_reread(self) -> None:
         """A throttled transition is returned as is; only a conflict earns the re-read."""
-        store = _RecordingStore(_APPROVED)
+        store = await _RecordingStore.seeded(_APPROVED)
         store.transition_result = OperationResult.transient_error(
             message="throttled", error_code=ErrorCode.RATE_LIMITED, retry_after=3
         )

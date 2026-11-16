@@ -29,19 +29,19 @@ STORES: dict[str, Callable[[], IncidentStore]] = {"real": _real, "fake": InMemor
 
 
 @pytest.fixture(params=sorted(STORES))
-def store(request: pytest.FixtureRequest) -> IncidentStore:
+async def store(request: pytest.FixtureRequest) -> IncidentStore:
     """A real store or fake holding one created incident with a commander and an operations lead."""
     created = STORES[request.param]()
-    assert created.create(declared_incident(INCIDENT_ID)).is_success
-    assert created.set_roles(
-        INCIDENT_ID, {IncidentRole.INCIDENT_COMMANDER: "U0IC", IncidentRole.OPERATIONS_LEAD: "U0OPS"}
+    assert (await created.create(declared_incident(INCIDENT_ID))).is_success
+    assert (
+        await created.set_roles(INCIDENT_ID, {IncidentRole.INCIDENT_COMMANDER: "U0IC", IncidentRole.OPERATIONS_LEAD: "U0OPS"})
     ).is_success
     return created
 
 
-def test_a_role_is_set_and_the_others_stay(store: IncidentStore) -> None:
+async def test_a_role_is_set_and_the_others_stay(store: IncidentStore) -> None:
     """Naming the communications lead leaves the commander and operations lead as they were."""
-    result = store.set_roles(INCIDENT_ID, {IncidentRole.COMMUNICATIONS_LEAD: "U0COMMS"})
+    result = await store.set_roles(INCIDENT_ID, {IncidentRole.COMMUNICATIONS_LEAD: "U0COMMS"})
 
     assert result.data is not None
     assert (result.data.incident_commander, result.data.operations_lead, result.data.communications_lead) == (
@@ -49,42 +49,42 @@ def test_a_role_is_set_and_the_others_stay(store: IncidentStore) -> None:
         "U0OPS",
         "U0COMMS",
     )
-    assert store.get(INCIDENT_ID).data == result.data
+    assert (await store.get(INCIDENT_ID)).data == result.data
 
 
-def test_a_role_is_replaced(store: IncidentStore) -> None:
+async def test_a_role_is_replaced(store: IncidentStore) -> None:
     """A new holder replaces the old one."""
-    result = store.set_roles(INCIDENT_ID, {IncidentRole.INCIDENT_COMMANDER: "U0NEWIC"})
+    result = await store.set_roles(INCIDENT_ID, {IncidentRole.INCIDENT_COMMANDER: "U0NEWIC"})
 
     assert result.data is not None
     assert result.data.incident_commander == "U0NEWIC"
 
 
-def test_a_role_is_cleared_with_none(store: IncidentStore) -> None:
+async def test_a_role_is_cleared_with_none(store: IncidentStore) -> None:
     """None unassigns the role; the others keep their holders."""
-    result = store.set_roles(INCIDENT_ID, {IncidentRole.OPERATIONS_LEAD: None})
+    result = await store.set_roles(INCIDENT_ID, {IncidentRole.OPERATIONS_LEAD: None})
 
     assert result.data is not None
     assert (result.data.incident_commander, result.data.operations_lead) == ("U0IC", None)
 
 
-def test_setting_the_same_holders_again_writes_nothing() -> None:
+async def test_setting_the_same_holders_again_writes_nothing() -> None:
     """A replay finds every named role already held, so no update is sent."""
     records = CountingRecordStore()
     store = record_incident_store(records)
-    assert store.create(declared_incident(INCIDENT_ID)).is_success
+    assert (await store.create(declared_incident(INCIDENT_ID))).is_success
     roles: dict[IncidentRole, str | None] = {IncidentRole.POLICY_LEAD: "U0POLICY"}
-    assert store.set_roles(INCIDENT_ID, roles).is_success
+    assert (await store.set_roles(INCIDENT_ID, roles)).is_success
     writes = list(records.writes)
 
-    assert store.set_roles(INCIDENT_ID, roles).is_success
+    assert (await store.set_roles(INCIDENT_ID, roles)).is_success
 
     assert records.writes == writes
 
 
-def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
+async def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
     """An unknown id is NOT_FOUND."""
-    result = store.set_roles("inc-missing", {IncidentRole.POLICY_LEAD: "U0POLICY"})
+    result = await store.set_roles("inc-missing", {IncidentRole.POLICY_LEAD: "U0POLICY"})
 
     assert (result.status, result.error_code) == (OperationStatus.NOT_FOUND, ErrorCode.NOT_AN_INCIDENT)
 
@@ -94,7 +94,9 @@ def test_a_missing_incident_is_not_an_incident(store: IncidentStore) -> None:
     [({}, "at least one"), ({IncidentRole.POLICY_LEAD: "  "}, "policy_lead"), ({"policy_lead": "U0"}, "IncidentRole")],
     ids=["nothing", "blank-holder", "bare-string-role"],
 )
-def test_roles_the_record_cannot_hold_raise(store: IncidentStore, roles: dict[IncidentRole, str | None], match: str) -> None:
+async def test_roles_the_record_cannot_hold_raise(
+    store: IncidentStore, roles: dict[IncidentRole, str | None], match: str
+) -> None:
     """Caller errors are refused before any read or write."""
     with pytest.raises(ValueError, match=match):
-        store.set_roles(INCIDENT_ID, roles)
+        await store.set_roles(INCIDENT_ID, roles)

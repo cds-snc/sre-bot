@@ -55,8 +55,8 @@ def test_the_store_satisfies_the_protocol() -> None:
     assert isinstance(_store(), IncidentStore)
 
 
-def test_a_stored_end_state_item_reads_as_the_incident() -> None:
-    result = _store(_item()).get(INCIDENT_ID)
+async def test_a_stored_end_state_item_reads_as_the_incident() -> None:
+    result = await _store(_item()).get(INCIDENT_ID)
 
     assert result.is_success
     assert result.data is not None
@@ -66,14 +66,14 @@ def test_a_stored_end_state_item_reads_as_the_incident() -> None:
 
 
 @pytest.mark.parametrize("incident_id", ["missing", "", "  "])
-def test_a_missing_or_blank_id_is_not_an_incident(incident_id: str) -> None:
-    result = _store(_item()).get(incident_id)
+async def test_a_missing_or_blank_id_is_not_an_incident(incident_id: str) -> None:
+    result = await _store(_item()).get(incident_id)
 
     assert result.status is OperationStatus.NOT_FOUND
     assert result.error_code == ErrorCode.NOT_AN_INCIDENT
 
 
-def test_a_store_failure_is_classified_with_a_generic_message() -> None:
+async def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     """The records store's status, code and retry hint pass through; its provider text does not."""
     records = MagicMock(spec=RecordStore)
     records.get.return_value = OperationResult.error(
@@ -84,7 +84,7 @@ def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     )
 
     with capture_logs() as logs:
-        result = record_incident_store(records, table=TABLE, tenants=TENANTS).get(INCIDENT_ID)
+        result = await record_incident_store(records, table=TABLE, tenants=TENANTS).get(INCIDENT_ID)
 
     assert (result.status, result.error_code, result.retry_after) == (OperationStatus.TRANSIENT_ERROR, "THROTTLED", 2.0)
     assert result.message is not None
@@ -93,10 +93,10 @@ def test_a_store_failure_is_classified_with_a_generic_message() -> None:
     assert [(log["operation"], log["table"], log["error_code"]) for log in failures] == [("get", "incidents", "THROTTLED")]
 
 
-def test_an_item_of_neither_shape_is_unreadable() -> None:
+async def test_an_item_of_neither_shape_is_unreadable() -> None:
     """Without record_version the item goes through the legacy bridge, which finds no legacy name either."""
     with capture_logs() as logs:
-        result = _store(_item(record_version=None)).get(INCIDENT_ID)
+        result = await _store(_item(record_version=None)).get(INCIDENT_ID)
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
@@ -104,9 +104,9 @@ def test_an_item_of_neither_shape_is_unreadable() -> None:
     assert [(log["operation"], log["incident_id"], log["field"]) for log in unreadable] == [("get", INCIDENT_ID, "name")]
 
 
-def test_an_unreadable_status_is_unreadable_with_the_stored_value_logged() -> None:
+async def test_an_unreadable_status_is_unreadable_with_the_stored_value_logged() -> None:
     with capture_logs() as logs:
-        result = _store(_item(status="closed")).get(INCIDENT_ID)
+        result = await _store(_item(status="closed")).get(INCIDENT_ID)
 
     assert result.error_code == ErrorCode.INCIDENT_RECORD_UNREADABLE
     assert [(log["field"], log["value"]) for log in logs if log["event"] == "incident_record_unreadable"] == [

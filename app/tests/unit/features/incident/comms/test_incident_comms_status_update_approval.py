@@ -63,10 +63,10 @@ def _record(
     )
 
 
-def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
+async def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
     store = InMemoryStatusUpdateStore()
     for record in records:
-        store.append(record)
+        await store.append(record)
     return store
 
 
@@ -180,7 +180,7 @@ class TestGetDraftForReview:
         """When the latest record at the sequence is a draft, it is returned."""
 
         draft = _record(1, StatusUpdateState.DRAFT)
-        store = _store(draft)
+        store = await _store(draft)
 
         result = await get_draft_for_review(_INCIDENT, 1, store=store)
 
@@ -191,7 +191,7 @@ class TestGetDraftForReview:
     async def test_refuses_non_draft_target(self) -> None:
         """An approved record at the sequence is not a pending draft."""
 
-        store = _store(_record(1, StatusUpdateState.APPROVED))
+        store = await _store(_record(1, StatusUpdateState.APPROVED))
 
         result = await get_draft_for_review(_INCIDENT, 1, store=store)
 
@@ -202,7 +202,7 @@ class TestGetDraftForReview:
     async def test_refuses_stale_sequence(self) -> None:
         """If the latest record is newer than the given sequence, the request is stale."""
 
-        store = _store(
+        store = await _store(
             _record(1, StatusUpdateState.APPROVED),
             _record(2, StatusUpdateState.DRAFT),
         )
@@ -217,7 +217,7 @@ class TestGetDraftForReview:
         """A store read failure is returned."""
 
         class FailingStore(InMemoryStatusUpdateStore):
-            def list_for_incident(self, incident_id: str):
+            async def list_for_incident(self, incident_id: str):
                 return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
 
         result = await get_draft_for_review(_INCIDENT, 1, store=FailingStore())
@@ -234,7 +234,7 @@ class TestApproveStatusUpdate:
         """Approval stores the record as APPROVED with approver, approved_at, and edited fields."""
 
         draft = _record(1, StatusUpdateState.DRAFT)
-        store = _store(draft)
+        store = await _store(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.MONITORING,
             en=StatusUpdateText(
@@ -274,17 +274,17 @@ class TestApproveStatusUpdate:
                 self.list_calls = 0
                 self.transition_calls = 0
 
-            def list_for_incident(self, incident_id: str):
+            async def list_for_incident(self, incident_id: str):
                 self.list_calls += 1
-                return super().list_for_incident(incident_id)
+                return await super().list_for_incident(incident_id)
 
-            def transition(self, update, *, expected_state):
+            async def transition(self, update, *, expected_state):
                 self.transition_calls += 1
-                return super().transition(update, expected_state=expected_state)
+                return await super().transition(update, expected_state=expected_state)
 
         draft = _record(1, StatusUpdateState.DRAFT)
         store = CountingStore()
-        store.append(draft)
+        await store.append(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.IDENTIFIED,
             en=StatusUpdateText(
@@ -308,7 +308,7 @@ class TestApproveStatusUpdate:
     async def test_stale_sequence_refused(self) -> None:
         """If the latest record has a newer sequence, the approval is stale."""
 
-        store = _store(
+        store = await _store(
             _record(1, StatusUpdateState.APPROVED),
             _record(2, StatusUpdateState.DRAFT),
         )
@@ -327,7 +327,7 @@ class TestApproveStatusUpdate:
     async def test_non_draft_target_refused(self) -> None:
         """An approved record at the sequence cannot be re-approved."""
 
-        store = _store(_record(1, StatusUpdateState.APPROVED))
+        store = await _store(_record(1, StatusUpdateState.APPROVED))
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.IDENTIFIED,
             en=_text("en"),
@@ -344,7 +344,7 @@ class TestApproveStatusUpdate:
         """Approving the same record again with identical fields succeeds with the stored record."""
 
         stored = _record(1, StatusUpdateState.APPROVED, approver="U-approver")
-        store = _store(stored)
+        store = await _store(stored)
         edit = StatusUpdateEdit(
             stage=stored.stage,
             en=stored.en,
@@ -365,17 +365,17 @@ class TestApproveStatusUpdate:
                 super().__init__()
                 self.transition_called = False
 
-            def transition(self, update, *, expected_state):
+            async def transition(self, update, *, expected_state):
                 if not self.transition_called:
                     self.transition_called = True
                     winner = _record(1, StatusUpdateState.APPROVED, approver="U-other")
-                    self.append(winner)
+                    await self.append(winner)
                     return OperationResult.permanent_error(message="conflict", error_code=ErrorCode.STATUS_UPDATE_CONFLICT)
-                return super().transition(update, expected_state=expected_state)
+                return await super().transition(update, expected_state=expected_state)
 
         draft = _record(1, StatusUpdateState.DRAFT)
         store = RacingStore()
-        store.append(draft)
+        await store.append(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.IDENTIFIED,
             en=_text("en"),
@@ -391,9 +391,9 @@ class TestApproveStatusUpdate:
     async def test_stage_below_floor_refused(self) -> None:
         """A stage below the latest non-draft record's stage is refused."""
 
-        store = _store(_record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING))
+        store = await _store(_record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING))
         draft = _record(2, StatusUpdateState.DRAFT, stage=StatusUpdateStage.IDENTIFIED)
-        store.append(draft)
+        await store.append(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.IDENTIFIED,
             en=_text("en"),
@@ -409,9 +409,9 @@ class TestApproveStatusUpdate:
     async def test_equal_stage_accepted(self) -> None:
         """A stage equal to the latest non-draft record's stage is accepted."""
 
-        store = _store(_record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING))
+        store = await _store(_record(1, StatusUpdateState.APPROVED, stage=StatusUpdateStage.MONITORING))
         draft = _record(2, StatusUpdateState.DRAFT, stage=StatusUpdateStage.MONITORING)
-        store.append(draft)
+        await store.append(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.MONITORING,
             en=_text("en"),
@@ -428,7 +428,7 @@ class TestApproveStatusUpdate:
 
         old_next = datetime(2026, 10, 8, 15, 0, tzinfo=UTC)
         draft = _record(1, StatusUpdateState.DRAFT, stage=StatusUpdateStage.MONITORING, next_update_at=old_next)
-        store = _store(draft)
+        store = await _store(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.MONITORING,
             en=_text("en"),
@@ -446,7 +446,7 @@ class TestApproveStatusUpdate:
         """When the stage changes, next_update_at is recomputed."""
 
         draft = _record(1, StatusUpdateState.DRAFT, stage=StatusUpdateStage.IDENTIFIED, next_update_at=_NOW)
-        store = _store(draft)
+        store = await _store(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.MONITORING,
             en=_text("en"),
@@ -464,7 +464,7 @@ class TestApproveStatusUpdate:
         """When the stage is RESOLVED, next_update_at is the current time."""
 
         draft = _record(1, StatusUpdateState.DRAFT, stage=StatusUpdateStage.MONITORING)
-        store = _store(draft)
+        store = await _store(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.RESOLVED,
             en=_text("en"),
@@ -482,7 +482,7 @@ class TestApproveStatusUpdate:
         """A store list error is returned."""
 
         class FailingStore(InMemoryStatusUpdateStore):
-            def list_for_incident(self, incident_id: str):
+            async def list_for_incident(self, incident_id: str):
                 return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
 
         edit = StatusUpdateEdit(
@@ -501,12 +501,12 @@ class TestApproveStatusUpdate:
         """A store transition error is returned."""
 
         class FailingStore(InMemoryStatusUpdateStore):
-            def transition(self, update, *, expected_state):
+            async def transition(self, update, *, expected_state):
                 return OperationResult.transient_error(message="throttled", error_code=ErrorCode.RATE_LIMITED)
 
         draft = _record(1, StatusUpdateState.DRAFT)
         store = FailingStore()
-        store.append(draft)
+        await store.append(draft)
         edit = StatusUpdateEdit(
             stage=StatusUpdateStage.IDENTIFIED,
             en=_text("en"),

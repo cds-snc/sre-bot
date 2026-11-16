@@ -241,7 +241,7 @@ def handle_status_update_command(
     view_id = opened.data
 
     with _incident_scope(scopes, payload.channel_id) as (incidents, conversation, updates):
-        overview = get_status_update_overview(incidents, conversation, store=updates)
+        overview = asyncio.run(get_status_update_overview(incidents, conversation, store=updates))
     if overview.is_success and overview.data is not None:
         view = build_overview_view(overview.data, locale, private_metadata)
     else:
@@ -275,7 +275,7 @@ def handle_new_update_action(ack: Callable[[], Any], body: dict[str, Any], clien
     log = action.bind("incident_status_update_new")
 
     with _incident_scope(scopes, action.channel_id) as (incidents, conversation, updates):
-        result = start_status_update_form(incidents, conversation, author=action.user_id, store=updates)
+        result = asyncio.run(start_status_update_form(incidents, conversation, author=action.user_id, store=updates))
     if result.is_success and result.data is not None:
         update = result.data.update
         metadata = action.review_metadata(update.incident_id, update.sequence)
@@ -446,7 +446,7 @@ def handle_history_action(ack: Callable[[], Any], body: dict[str, Any], client: 
     metadata = action.list_metadata(channel_id)
 
     with _incident_scope(scopes, channel_id) as (incidents, conversation, updates):
-        result = get_status_update_overview(incidents, conversation, store=updates)
+        result = asyncio.run(get_status_update_overview(incidents, conversation, store=updates))
     if result.is_success and result.data is not None:
         next_view = build_overview_view(result.data, action.locale, metadata)
     else:

@@ -19,6 +19,7 @@ come from the platform view builders, so each assertion compares the exact view
 sent.
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
@@ -145,7 +146,7 @@ class _Services:
         self.approved_calls.append((incident_id, sequence))
         return self.approved_result
 
-    def get_status_update_overview(
+    async def get_status_update_overview(
         self, incidents: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
     ) -> OperationResult[StatusUpdateOverview]:
         self.events.append("get_status_update_overview")
@@ -378,8 +379,8 @@ class TestHandleOpenActionOverRealServices:
         """
         records = CountingRecordStore()
         store = status_update_store_in(records)
-        store.append(_APPROVED)
-        store.append(_DRAFT)
+        asyncio.run(store.append(_APPROVED))
+        asyncio.run(store.append(_DRAFT))
         records.writes.clear()
         monkeypatch.setattr(providers, "get_status_page_publisher", CopyReadyPublisher)
 
@@ -472,15 +473,15 @@ class TestHandleHistoryActionOverRealServices:
         """Over the real overview read, the store sees no write and the list shows the stored records."""
         records = CountingRecordStore()
         store = status_update_store_in(records)
-        store.append(_APPROVED)
-        store.append(_DRAFT)
+        asyncio.run(store.append(_APPROVED))
+        asyncio.run(store.append(_DRAFT))
         records.writes.clear()
         incidents = incident_store_with(incident_on(_CHANNEL, _INCIDENT))
 
-        def overview(
+        async def overview(
             _: IncidentStore, conversation: ConversationReference, *, store: StatusUpdateStore
         ) -> OperationResult[StatusUpdateOverview]:
-            return get_status_update_overview(incidents, conversation, store=store)
+            return await get_status_update_overview(incidents, conversation, store=store)
 
         monkeypatch.setattr(slack_entrypoints, "get_status_update_overview", overview)
 
