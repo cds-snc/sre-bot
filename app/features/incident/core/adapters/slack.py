@@ -24,6 +24,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlencode
 
 import structlog
 from slack_sdk import WebClient
@@ -35,7 +36,13 @@ from slack_sdk.web.async_slack_response import AsyncSlackResponse
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.domain import ConversationName, ConversationReference, MessageReference, TranscriptMessage
+from features.incident.core.domain import (
+    ConversationName,
+    ConversationReference,
+    Incident,
+    MessageReference,
+    TranscriptMessage,
+)
 from integrations.slack.client import (
     classify_slack_error,
     get_async_slack_web_client,
@@ -302,6 +309,31 @@ def slack_channel_name(name: ConversationName) -> str:
     if not name.suffix:
         return base[:_CHANNEL_NAME_MAX]
     return base[: _CHANNEL_NAME_MAX - len(name.suffix)].rstrip("-") + name.suffix
+
+
+def slack_conversation_link(conversation: ConversationReference) -> str:
+    """Return the link to a Slack conversation: its stored url, else Slack's deep link naming the workspace when there is one.
+
+    Raises:
+        ValueError: The conversation is not on Slack.
+    """
+    if conversation.system is not WorkplaceSystem.SLACK:
+        raise ValueError(f"Slack cannot link a conversation on {conversation.system.value}")
+    if conversation.url:
+        return conversation.url
+    tenant = get_slack_settings().tenant
+    query = {"channel": conversation.vendor_id} | ({"team": tenant.team_id} if tenant and tenant.team_id else {})
+    return f"https://slack.com/app_redirect?{urlencode(query)}"
+
+
+def slack_conversation_label(incident: Incident) -> str:
+    """Return the incident channel's name without its ``incident-`` prefix, derived from the title and declared day.
+
+    Display only: the record stores no channel name, so this is the first
+    candidate name, not a lookup of the channel's current one.
+    """
+    name = ConversationName(title=incident.title, opened_on=incident.declared_at.astimezone(UTC).date(), production=True)
+    return slack_channel_name(name).removeprefix("incident-")
 
 
 class SlackIncidentConversation:

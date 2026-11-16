@@ -47,6 +47,7 @@ Current state:
 5. **Records of truth live in the app**, behind the records contract. Workplace documents and spreadsheets are one of two things:
    - **Collaboration spaces:** people work in them, and the app stores a reference.
    - **Projections:** the app writes derived views of stored records, such as an incident metrics sheet. A projection is never read back as a source of truth and can be rebuilt from the stored records.
+   - A projection row carries the record's id and is found by it; a writer upserts on that key, so a retried or repeated write converges and a missing row is re-written in full. Locating a row by its key is not reading the projection back. A projection is rebuildable by a job that rewrites it from the stored records. Free text written to a spreadsheet is never evaluated: a value starting with `=`, `+`, `-`, `@`, tab, carriage return or line feed (or their full-width forms) is written as text, and text placed inside a formula has its quotes doubled.
 
 ## Consequences
 
@@ -88,3 +89,4 @@ Tolerated until then:
 - 2026-11-03: the tenant claim checked on each request is the installation's, not the acting user's, so shared-channel users are not refused (TASK-157).
 - 2026-11-04: a batch writer's tenant check is host-owned, beside the inbound guard and with its verdict, offered as `TenantVerifier` in `contracts/workplace/`; vendor packages keep their three exports (TASK-145.5.7 planning, human).
 - 2026-11-05: the Google gateway (`integrations/google_workspace/`) holds what [outbound-clients.md](outbound-clients.md) gives a vendor package, the authenticated client factories, the error classifier and the settings, with the credential sources and which calls delegate inside client construction; it carries no shared helpers. Drive and Sheets dissolve into consumer-owned ports; calendar stays incident-owned until a second suite or consumer needs it (TASK-169, human).
+- 2026-11-16: rule 5 gains the projection row key, upsert, rebuild and spreadsheet-injection rules (TASK-145.12.1).
