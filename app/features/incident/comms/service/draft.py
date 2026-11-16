@@ -131,7 +131,7 @@ async def start_status_update_draft(
     last_public = latest
 
     reader = reader or get_incident_transcript_reader()
-    messages = _read_window(reader, incident.data.conversation, last_public, settings, now, log)
+    messages = await _read_window(reader, incident.data.conversation, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     if last_public is None and not people:
         log.info("incident_status_update_empty_history")
@@ -313,7 +313,7 @@ async def generate_status_update_draft(
     last_public = next((record for record in records if record.state is not StatusUpdateState.DRAFT), None)
 
     reader = reader or get_incident_transcript_reader()
-    messages = _read_window(reader, incident.data.conversation, last_public, settings, now, log)
+    messages = await _read_window(reader, incident.data.conversation, last_public, settings, now, log)
     people = [message for message in messages if not message.is_bot and message.posted_at is not None]
     new_from_people = [
         message for message in people if last_public is None or _posted_at(message) > last_public.transcript_cutoff
@@ -439,7 +439,7 @@ async def _security_gate(
     return OperationResult.permanent_error(message=message, error_code=ErrorCode.SECURITY_CONFIRMATION_REQUIRED)
 
 
-def _read_window(
+async def _read_window(
     reader: IncidentTranscriptReader,
     conversation: ConversationReference | None,
     last_public: StatusUpdate | None,
@@ -458,13 +458,13 @@ def _read_window(
     if last_public is not None:
         since = last_public.transcript_cutoff
     else:
-        started = reader.conversation_started_at(conversation)
+        started = await reader.conversation_started_at(conversation)
         since = (
             started.data
             if started.is_success and started.data is not None
             else now - timedelta(hours=settings.DEFAULT_SINCE_HOURS)
         )
-    read = reader.read_transcript(
+    read = await reader.read_transcript(
         conversation,
         since=since,
         limit=settings.MAX_HISTORY_LIMIT,

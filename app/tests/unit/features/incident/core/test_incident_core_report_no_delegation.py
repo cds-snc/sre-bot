@@ -71,13 +71,13 @@ def factories(monkeypatch: pytest.MonkeyPatch) -> list[_ScopesOnly]:
     return recorders
 
 
-def test_every_report_operation_builds_its_services_with_scopes_only(factories: list[_ScopesOnly]) -> None:
+async def test_every_report_operation_builds_its_services_with_scopes_only(factories: list[_ScopesOnly]) -> None:
     report = google_docs.GoogleDocsIncidentReport()
 
-    report.create_from_template("Incident")
-    report.replace_placeholders(REPORT, {"a": "b"})
-    report.read_sections(REPORT)
-    report.write_draft_copy(REPORT, [SectionDraft("Summary", "x", True)], (), {})
+    await report.create_from_template("Incident")
+    await report.replace_placeholders(REPORT, {"a": "b"})
+    await report.read_sections(REPORT)
+    await report.write_draft_copy(REPORT, [SectionDraft("Summary", "x", True)], (), {})
 
     assert sum(len(factory.calls) for factory in factories) >= 4
 

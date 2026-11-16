@@ -151,10 +151,10 @@ def _records() -> InMemoryRecordStore:
 
 
 class _StubReader:
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         return OperationResult.success(_NOW - timedelta(hours=10))
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,
@@ -294,7 +294,13 @@ def test_nothing_new_carries_the_typed_values_forward_without_a_model_call(
     harness: Harness, generator: _StubGenerator, store: StatusUpdateStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """With only messages from before the approved cutoff, the new draft repeats the typed values with the wording."""
-    monkeypatch.setattr(_StubReader, "read_transcript", lambda self, conversation, **kwargs: OperationResult.success(()))
+
+    async def read_nothing(
+        self: _StubReader, conversation: ConversationReference, **kwargs: Any
+    ) -> OperationResult[Sequence[TranscriptMessage]]:
+        return OperationResult.success(())
+
+    monkeypatch.setattr(_StubReader, "read_transcript", read_nothing)
 
     harness.dispatch(_generate_action(""))
 

@@ -86,10 +86,10 @@ class _StubReader:
     def __init__(self, messages: list[TranscriptMessage] | None = None) -> None:
         self._messages = messages or [_human("activity", 20)]
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         return OperationResult.success(_at(600))
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,

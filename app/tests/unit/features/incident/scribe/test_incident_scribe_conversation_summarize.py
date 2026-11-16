@@ -54,13 +54,13 @@ class FakeTranscriptReader:
         self.start_lookups: list[ConversationReference] = []
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         self.start_lookups.append(conversation)
         if self._start_fails:
             return OperationResult.transient_error("Slack transcript read failed: ratelimited", "ratelimited")
         return OperationResult.success(self._started_at)
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,

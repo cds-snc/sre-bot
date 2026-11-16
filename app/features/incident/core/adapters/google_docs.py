@@ -20,13 +20,16 @@ Sections, in order:
   produce new draft documents rather than rewriting one in place. The source
   incident report is only ever read;
 - GoogleDocsIncidentReport: the core ``IncidentReport`` over the functions
-  above, for references of the Google system.
+  above, for references of the Google system; each awaited method runs its
+  one blocking call with ``asyncio.to_thread`` (the functions stay sync for
+  their legacy callers).
 
 Every service is built through the gateway factories with scopes only: no
 function passes a delegation subject or builds credentials, so who the calls
 run as stays the gateway's decision.
 """
 
+import asyncio
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
@@ -631,7 +634,7 @@ class GoogleDocsIncidentReport:
     configured-systems read reports for Google.
     """
 
-    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+    async def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
         """List the incident folder's subfolders, the templates folder left out, as placements sorted by label."""
         settings = get_incident_core_settings()
         tenant = _google_tenant()
@@ -640,8 +643,10 @@ class GoogleDocsIncidentReport:
             missing = "google_workspace.tenant"
         if missing is not None:
             return _not_configured(missing)
-        listed = _list_all(
-            f"parents in '{settings.folder_id}' and mimeType = '{_FOLDER_MIME_TYPE}' and trashed=false", "list_placements"
+        listed = await asyncio.to_thread(
+            _list_all,
+            f"parents in '{settings.folder_id}' and mimeType = '{_FOLDER_MIME_TYPE}' and trashed=false",
+            "list_placements",
         )
         if not listed.is_success:
             return OperationResult.error(
@@ -663,7 +668,9 @@ class GoogleDocsIncidentReport:
         )
         return OperationResult.success(tuple(sorted(placements, key=lambda placement: placement.label)))
 
-    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+    async def create_from_template(
+        self, title: str, placement: ReportPlacement | None = None
+    ) -> OperationResult[ReportReference]:
         """Copy the configured template into ``placement``, or the configured folder, as a new report titled ``title``."""
         if placement is not None and placement.system is not WorkplaceSystem.GOOGLE:
             logger.warning("incident_report_system_unsupported", system=placement.system.value)
@@ -680,7 +687,7 @@ class GoogleDocsIncidentReport:
         if missing is not None:
             return _not_configured(missing)
         folder_id = placement.vendor_id if placement is not None else settings.folder_id
-        created = _copy_template(title, folder_id, settings.report_template_id)
+        created = await asyncio.to_thread(_copy_template, title, folder_id, settings.report_template_id)
         if not created.is_success or not created.data or not created.data["id"]:
             _log_failure("incident_drive_create_document_failed", created)
             return OperationResult.error(
@@ -699,11 +706,11 @@ class GoogleDocsIncidentReport:
             )
         )
 
-    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+    async def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
         """Replace each key with its value in the report, case-sensitive."""
         if report.system is not WorkplaceSystem.GOOGLE:
             return _unsupported(report)
-        replaced = _replace_all_text(report.vendor_id, values, match_case=True)
+        replaced = await asyncio.to_thread(_replace_all_text, report.vendor_id, values, match_case=True)
         if not replaced.is_success:
             return OperationResult.error(
                 status=replaced.status,
@@ -713,11 +720,11 @@ class GoogleDocsIncidentReport:
             )
         return OperationResult.success()
 
-    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+    async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
         """Return the report's sections in document order."""
         if report.system is not WorkplaceSystem.GOOGLE:
             return _unsupported(report)
-        read = read_document_sections(report.vendor_id)
+        read = await asyncio.to_thread(read_document_sections, report.vendor_id)
         if not read.is_success:
             return OperationResult.error(
                 status=read.status,
@@ -727,7 +734,7 @@ class GoogleDocsIncidentReport:
             )
         return OperationResult.success(data=tuple(read.data or ()))
 
-    def write_draft_copy(
+    async def write_draft_copy(
         self,
         report: ReportReference,
         drafts: Sequence[SectionDraft],
@@ -737,7 +744,7 @@ class GoogleDocsIncidentReport:
         """Write a new filled-in copy of the report beside it; failures are logged by the writer."""
         if report.system is not WorkplaceSystem.GOOGLE:
             return _unsupported(report)
-        written = write_draft_document(report.vendor_id, drafts, fields, links)
+        written = await asyncio.to_thread(write_draft_document, report.vendor_id, drafts, fields, links)
         if written is None:
             return OperationResult.transient_error(message="The draft copy could not be written")
         return OperationResult.success(data=written)

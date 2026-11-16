@@ -382,7 +382,7 @@ class InMemoryIncidentReport:
         """Return the placeholder values applied to ``report`` so far."""
         return dict(self._reports[report.vendor_id].placeholders)
 
-    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+    async def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
         """Return the seeded placements sorted by label; no incident folder refuses naming its key."""
         if not self._folder_id:
             return _report_not_configured("incident_core.folder_id")
@@ -398,7 +398,9 @@ class InMemoryIncidentReport:
         )
         return OperationResult.success(tuple(sorted(placements, key=lambda placement: placement.label)))
 
-    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+    async def create_from_template(
+        self, title: str, placement: ReportPlacement | None = None
+    ) -> OperationResult[ReportReference]:
         """Create a known report filed in ``placement`` or the configured folder; an empty document id refuses naming its key."""
         if placement is not None and placement.system is not WorkplaceSystem.GOOGLE:
             return OperationResult.permanent_error(
@@ -420,7 +422,7 @@ class InMemoryIncidentReport:
             )
         )
 
-    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+    async def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
         """Record the values on a known report."""
         if report.system is not WorkplaceSystem.GOOGLE:
             return _report_unsupported(report)
@@ -430,7 +432,7 @@ class InMemoryIncidentReport:
         stored.placeholders.update(values)
         return OperationResult.success()
 
-    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+    async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
         """Return a known report's sections in order."""
         if report.system is not WorkplaceSystem.GOOGLE:
             return _report_unsupported(report)
@@ -440,7 +442,7 @@ class InMemoryIncidentReport:
         self.read_from.append(report)
         return OperationResult.success(data=tuple(stored.sections))
 
-    def write_draft_copy(
+    async def write_draft_copy(
         self,
         report: ReportReference,
         drafts: Sequence[SectionDraft],

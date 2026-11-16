@@ -148,9 +148,10 @@ class IncidentTranscriptReader(Protocol):
     interface. A reference of a system the implementation does not serve is a
     PERMANENT_ERROR with ``UNSUPPORTED_OPERATION``; platform failures are
     classified results, and an error the platform's table does not name raises.
+    The methods are awaited; an adapter over a blocking client offloads inside.
     """
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         """Return when the conversation started, timezone-aware UTC.
 
         The data is ``None`` when the conversation carries no creation time; on a
@@ -158,7 +159,7 @@ class IncidentTranscriptReader(Protocol):
         """
         ...
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,
@@ -282,10 +283,11 @@ class IncidentReport(Protocol):
     no method takes a delegation subject or credentials. A reference of a system
     the implementation does not serve is a PERMANENT_ERROR with
     ``UNSUPPORTED_OPERATION``. Platform failures are classified results, never
-    exceptions.
+    exceptions. Every method but the pure ``link`` is awaited; an adapter over a
+    blocking SDK offloads inside its own methods, never its callers.
     """
 
-    def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
+    async def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
         """Return the places a new report can be filed in, sorted by label.
 
         For Google, the subfolders of [incident_core] ``folder_id`` other than the
@@ -294,7 +296,9 @@ class IncidentReport(Protocol):
         """
         ...
 
-    def create_from_template(self, title: str, placement: ReportPlacement | None = None) -> OperationResult[ReportReference]:
+    async def create_from_template(
+        self, title: str, placement: ReportPlacement | None = None
+    ) -> OperationResult[ReportReference]:
         """Create a new report titled ``title`` from the configured template, filed in ``placement``.
 
         No placement files it in the configured folder. Returns the new report's
@@ -305,18 +309,18 @@ class IncidentReport(Protocol):
         """
         ...
 
-    def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
+    async def replace_placeholders(self, report: ReportReference, values: Mapping[str, str]) -> OperationResult[None]:
         """Replace every occurrence of each key in the report with its value (case-sensitive).
 
         Success whether or not a key occurred; a report that cannot be found is NOT_FOUND.
         """
         ...
 
-    def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
+    async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
         """Return the report's heading-delimited sections in document order; the report is only read."""
         ...
 
-    def write_draft_copy(
+    async def write_draft_copy(
         self,
         report: ReportReference,
         drafts: Sequence[SectionDraft],

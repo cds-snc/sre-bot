@@ -98,12 +98,12 @@ class _StubReader:
         self._start_fails = start_fails
         self.reads: list[dict[str, Any]] = []
 
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         if self._start_fails:
             return OperationResult.transient_error(message="ratelimited", error_code="ratelimited")
         return OperationResult.success(self._started_at)
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,

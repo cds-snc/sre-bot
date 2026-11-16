@@ -5,10 +5,10 @@ import inspect
 from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from slack_sdk import WebClient
+from slack_sdk.web.async_client import AsyncWebClient
 
 import features.incident.core as core
 from contracts.operations.result import OperationResult
@@ -16,8 +16,13 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from features.incident.common import vocabulary
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core import api
+from features.incident.core.adapters import google_docs
 from features.incident.core.adapters import slack as slack_adapter
-from features.incident.core.adapters.in_memory import InMemoryIncidentStore, InMemoryStatusUpdateStore
+from features.incident.core.adapters.in_memory import (
+    InMemoryIncidentReport,
+    InMemoryIncidentStore,
+    InMemoryStatusUpdateStore,
+)
 from features.incident.core.domain import ResourceReference
 from features.incident.core.store import RecordIncidentStore, RecordStatusUpdateStore
 from tests.factories.incident import incident_on, slack_conversation
@@ -127,6 +132,28 @@ def test_interface_signatures_carry_only_plain_and_domain_types() -> None:
     assert read.return_annotation == OperationResult[Sequence[api.TranscriptMessage]]
 
 
+_REPORT_METHODS = ("list_placements", "create_from_template", "replace_placeholders", "read_sections", "write_draft_copy")
+_READER_METHODS = ("conversation_started_at", "read_transcript")
+
+
+@pytest.mark.parametrize(
+    ("owner", "names"),
+    [
+        (api.IncidentReport, _REPORT_METHODS),
+        (google_docs.GoogleDocsIncidentReport, _REPORT_METHODS),
+        (InMemoryIncidentReport, _REPORT_METHODS),
+        (api.IncidentTranscriptReader, _READER_METHODS),
+        (slack_adapter.SlackIncidentTranscriptReader, _READER_METHODS),
+    ],
+)
+def test_report_and_transcript_reader_methods_are_awaited(owner: type, names: tuple[str, ...]) -> None:
+    """Async callers await the report and the reader; only the report's pure link stays a plain call."""
+    for name in names:
+        assert inspect.iscoroutinefunction(getattr(owner, name)), name
+    if hasattr(owner, "link"):
+        assert not inspect.iscoroutinefunction(owner.link)
+
+
 def test_conversation_interface_is_async_on_the_reference_with_operation_results() -> None:
     """Every IncidentConversation method is a coroutine; all but create and find_own take the conversation reference."""
     methods = {
@@ -167,20 +194,20 @@ def test_conversation_interface_is_async_on_the_reference_with_operation_results
     )
 
 
-def test_provider_returns_one_cached_reader_built_on_the_slack_web_client(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The provider hands out a single reader that satisfies the interface and calls the shared client factory's client."""
-    client = MagicMock(spec=WebClient)
+async def test_provider_returns_one_cached_reader_built_on_the_async_slack_read_client(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The provider hands out a single reader that satisfies the interface and calls the shared async read client."""
+    client = AsyncMock(spec=AsyncWebClient)
     client.conversations_info.return_value = {"ok": True, "channel": {"created": 1}}
     factory = MagicMock(return_value=client)
-    monkeypatch.setattr(slack_adapter, "get_slack_web_client", factory)
+    monkeypatch.setattr(slack_adapter, "get_async_slack_web_client", factory)
 
     reader = api.get_incident_transcript_reader()
 
     assert isinstance(reader, api.IncidentTranscriptReader)
     assert api.get_incident_transcript_reader() is reader
     factory.assert_called_once_with()
-    reader.conversation_started_at(slack_conversation("C123"))
-    client.conversations_info.assert_called_once_with(channel="C123")
+    await reader.conversation_started_at(slack_conversation("C123"))
+    client.conversations_info.assert_awaited_once_with(channel="C123")
 
 
 def test_conversation_provider_reads_on_the_shared_client_and_writes_on_the_write_handle(

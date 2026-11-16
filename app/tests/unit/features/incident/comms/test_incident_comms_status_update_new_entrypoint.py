@@ -86,10 +86,10 @@ _DRAFT = StatusUpdate(
 
 
 class _StubReader:
-    def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
+    async def conversation_started_at(self, conversation: ConversationReference) -> OperationResult[datetime | None]:
         return OperationResult.success(_NOW - timedelta(hours=2))
 
-    def read_transcript(
+    async def read_transcript(
         self,
         conversation: ConversationReference,
         *,
