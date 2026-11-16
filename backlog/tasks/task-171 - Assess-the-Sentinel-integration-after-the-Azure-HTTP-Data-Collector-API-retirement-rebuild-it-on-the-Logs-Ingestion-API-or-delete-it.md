@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-27T11:44:00Z'
-updated_date: '2026-11-06T19:02:00Z'
+updated_date: '2026-11-16T19:34:00Z'
 labels:
   - integrations
   - security
@@ -160,3 +160,15 @@ Planning review clarification (supersedes conflicting proposal details above; st
 
 2026-11-06 human planning checkpoint: keep the four-slice decomposition proposal pending; do not create subtasks. Authentication direction remains blocked until the platform owner confirms the deployed reference/version and federation contract (Cognito versus current IAM outbound federation). Task remains To Do at High priority. No production code, Terraform, ADR, deployment or feature work-queue changes authorized or made.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-16T19:34:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.5 OQ8): the rebuilt archive (TASK-145.8.5.3) sends incident_channel_archived once, after a successful archive, with {incident_id, conversation_id, user_id, at} instead of the raw Slack body (which carried the verification token and response_url); observability.md gains the rule that rebuilt surfaces send named events with minimal fields. List this event in the rebuilt integration's stream.
+
+---
+<!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T15:51:00Z'
+updated_date: '2026-11-16T19:34:00Z'
 labels:
   - incident
   - features
@@ -14,6 +14,7 @@ dependencies:
   - TASK-145.8.1
   - TASK-145.8.5
   - TASK-145.7.10
+  - TASK-145.8.5.2
 references:
   - decisions/incident-management.md
 parent_task_id: TASK-145.9
@@ -32,6 +33,7 @@ Stack L L10b. Reaction handlers registered by incident.response write timeline r
 <!-- AC:BEGIN -->
 - [ ] #1 The capture and nudge pins pass with assertions unchanged; captured entries keep the same key on re-capture (checks parent ACs #1, #2, #5, #7, #8)
 - [ ] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
+- [ ] #3 The stale notice's ignore button moves to incident.response (moved from TASK-145.8, TASK-145.8.5 OQ3): registered with the archive_channel alias scoped to the ignore value (TASK-145.8.5.2); new notices are Block Kit with one action id per button owner (incident.response archive and ignore, incident.postmortem schedule)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,6 +52,14 @@ created: 2026-11-16T15:51:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+
+created: 2026-11-16T19:34:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.5 OQ3): the archive_channel callback is split by button value through value-scoped aliases (TASK-145.8.5.2): archive is TASK-145.8.5.3's, ignore is this task's (the nudge's delay, which rewrites the notice), schedule_retro is TASK-145.10's. Until TASK-145.10 lands, schedule_retro falls through to the legacy listener.
 
 ---
 <!-- COMMENTS:END -->

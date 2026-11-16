@@ -198,7 +198,7 @@ def test_status_without_update_answers_its_help(text: str) -> None:
     )
 
 
-def test_the_hookimpl_registers_status_and_status_update_under_sre_incident() -> None:
+def test_the_hookimpl_registers_status_status_update_and_roles_under_sre_incident() -> None:
     registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     plugin.register_slack_commands(registrar=registrar)
@@ -206,6 +206,8 @@ def test_the_hookimpl_registers_status_and_status_update_under_sre_incident() ->
     assert [(command["parent"], command["command"]) for command in registrar.commands] == [
         ("sre.incident", "status"),
         ("sre.incident.status", "update"),
+        ("sre.incident", "roles"),
+        ("sre.incident.roles", "manage"),
     ]
 
 
@@ -225,4 +227,6 @@ def test_every_registered_command_carries_its_catalogue_keys() -> None:
     assert [command["description_key"] for command in registrar.commands] == [
         "incident_response.status.description",
         "incident_response.status.update.description",
+        "incident_response.roles.description",
+        "incident_response.roles.manage.description",
     ]

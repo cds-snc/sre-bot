@@ -1,4 +1,4 @@
-"""Slack entry point for the incident response subdomain: ``/sre incident status`` and ``status update``.
+"""Slack entry point for the incident response subdomain: ``/sre incident status`` and ``status update``, and the roles commands.
 
 Registers ``status`` as a child of ``sre.incident`` and ``update`` under it.
 ``status update <status>`` changes the status of the channel's incident through
@@ -11,6 +11,8 @@ a bare valid status (``status Closed``, the form retired after 2025-11-01)
 answers a pointer to ``status update`` and changes nothing. TASK-145.13 deletes
 the pointer with the legacy contract.
 
+``register`` also registers the roles commands and modal (``slack_roles.py``).
+
 A handler opens one service scope, builds the ``IncidentStore`` there from the
 resolved ``RecordStore`` and the configured systems, and runs the service in one
 event loop (``asyncio.run``, the sync Bolt edge). The report, list and
@@ -21,24 +23,21 @@ startup event names ``[slack.tenant]``. Every string goes through the
 """
 
 import asyncio
-from collections.abc import Generator
-from contextlib import contextmanager
 from datetime import UTC, datetime
 
 import structlog
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from contracts.records import RecordStore
 from contracts.services import ServiceScopeOpener
 from contracts.slack.models import CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
-from features.incident.common.settings import get_incident_core_settings
 from features.incident.common.vocabulary import IncidentStatus
-from features.incident.core.api import ConversationReference, IncidentStore, build_incident_store
 from features.incident.core.api import translate as t
 from features.incident.response import providers
+from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.slack_roles import register_roles
 from features.incident.response.service.status import StageOutcome, StageResult, StatusChange, change_status
 
 logger = structlog.get_logger()
@@ -94,6 +93,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
         examples=["Ready to be Reviewed"],
         example_keys=[f"{STATUS_DOMAIN}.update.examples.default"],
     )
+    register_roles(registrar, scopes)
 
 
 def handle_status_command(payload: CommandPayload) -> CommandResponse:
@@ -136,7 +136,7 @@ def handle_status_update_command(payload: CommandPayload, scopes: ServiceScopeOp
     status = IncidentStatus(text)
     notice = _t("notice", locale, user=f"<@{payload.user_id}>", status=status.value)
 
-    with _incident_scope(scopes, payload.channel_id) as (incidents, conversation):
+    with incident_scope(scopes, payload.channel_id) as (incidents, conversation):
         result = asyncio.run(
             change_status(
                 incidents,
@@ -159,19 +159,6 @@ def handle_status_update_command(payload: CommandPayload, scopes: ServiceScopeOp
         )
         return _reply(_refusal(result, locale))
     return _reply(_outcome(result.data, locale))
-
-
-@contextmanager
-def _incident_scope(scopes: ServiceScopeOpener, channel_id: str) -> Generator[tuple[IncidentStore, ConversationReference]]:
-    """Open one service scope; yield the incident store built in it and the channel's conversation reference.
-
-    The Slack tenant is present, since ``register`` registers nothing without it.
-    """
-    with scopes.create_scope() as services:
-        systems = services.get(ConfiguredSystems)
-        incidents = build_incident_store(services.get(RecordStore), systems, get_incident_core_settings())
-        tenant = systems.tenants()[WorkplaceSystem.SLACK]
-        yield incidents, ConversationReference(system=WorkplaceSystem.SLACK, tenant=tenant, vendor_id=channel_id)
 
 
 def _refusal(result: OperationResult[StatusChange], locale: str) -> str:

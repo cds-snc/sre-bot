@@ -60,6 +60,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "IncidentStore",
         "IncidentTranscriptReader",
         "Keep",
+        "LegacyRolesReader",
         "LegacyUpgrade",
         "MessageReference",
         "PostmortemMeetingReference",
@@ -90,8 +91,10 @@ def test_api_exports_exactly_the_public_names() -> None:
         "get_incident_list_projection",
         "get_incident_report",
         "get_incident_transcript_reader",
+        "get_legacy_roles_reader",
         "get_video_call",
         "incident_conversation_names",
+        "read_incident_roles",
         "resolve_new_incident_system",
         "translate",
     ]

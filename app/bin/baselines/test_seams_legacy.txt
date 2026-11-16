@@ -17,4 +17,4 @@ inline:tests/integration/legacy_surface/test_slack_command_registration_surface.
 legacy_acknowledged_webhooks_seam::modules.slack.webhooks.increment_acknowledged_count  # TASK-145.7
 legacy_incident_folders_seam::features.incident.core.adapters.google_docs.list_child_folders  # TASK-145.13
 legacy_scribe_transcript_reader_seam::features.incident.scribe.service.get_incident_transcript_reader  # TASK-145.11
-legacy_sre_web_client_seam::modules.sre.platforms.slack._web_client  # TASK-145.8
+legacy_sre_web_client_seam::modules.sre.platforms.slack._web_client  # TASK-145.13

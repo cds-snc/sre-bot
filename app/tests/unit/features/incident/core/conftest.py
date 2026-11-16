@@ -29,7 +29,8 @@ class StubSlack:
     ``users.conversations`` lists the named channels the bot is a member of and that are
     not archived, ``page_size`` per page. ``groups`` maps a user group id to its members;
     any other id is ``no_such_subteam``. A second channel canvas is
-    ``channel_canvas_already_exists``.
+    ``channel_canvas_already_exists``. A channel's purpose is absent from ``conversations.info``
+    until ``purposes`` holds one (a set purpose is stored there).
     """
 
     def __init__(
@@ -49,12 +50,13 @@ class StubSlack:
         self.groups = dict(groups or {})
         self.page_size = page_size
         self.canvases: dict[str, str] = {}
+        self.purposes: dict[str, str] = {}
         self._created = 0
         self.reads = AsyncMock(spec=AsyncWebClient)
         self.writes = AsyncMock(spec=AsyncWebClient)
         self.reads.conversations_info.side_effect = self._info
         self.writes.chat_postMessage.side_effect = self._post
-        self.writes.conversations_setPurpose.side_effect = self._channel_write("channel")
+        self.writes.conversations_setPurpose.side_effect = self._set_purpose
         self.writes.bookmarks_add.side_effect = self._channel_write("channel_id")
         self.writes.conversations_invite.side_effect = self._invite
         self.writes.conversations_archive.side_effect = self._archive
@@ -83,7 +85,15 @@ class StubSlack:
 
     async def _info(self, *, channel: str, **_: Any) -> dict[str, Any]:
         state = self._check(channel)
-        return {"ok": True, "channel": {"id": channel, **state}}
+        info: dict[str, Any] = {"id": channel, **state}
+        if channel in self.purposes:
+            info["purpose"] = {"value": self.purposes[channel]}
+        return {"ok": True, "channel": info}
+
+    async def _set_purpose(self, *, channel: str, purpose: str, **_: Any) -> dict[str, Any]:
+        self._writable(channel)
+        self.purposes[channel] = purpose
+        return {"ok": True}
 
     async def _post(self, *, channel: str, text: str, **_: Any) -> dict[str, Any]:
         self._writable(channel)

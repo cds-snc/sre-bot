@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.7
 title: 'Incident stores are async: IncidentStore and StatusUpdateStore'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-10T21:00:00Z'
-updated_date: '2026-11-10T22:32:00Z'
+updated_date: '2026-11-16T19:57:00Z'
 labels:
   - incident
   - features
