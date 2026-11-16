@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T16:52:00Z'
 labels:
   - incident
   - features
@@ -101,6 +101,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-09 (TASK-25.10 plan, open for this task's re-plan): incident.scribe declares Requirement('openai.tenant') (TASK-172; TASK-25.10.3 adds 'text_generation.model'), so scribe aborts boot without a model gateway. When this task moves scribe's summarize path into incident.response, the requirement must not move with it unchanged. Requiring text generation in response would abort the whole response plugin, declare included, in any environment without a gateway, and ci.toml would switch it off, dropping its CI boot coverage (plugins.md). Recommendation: the moved use becomes optional, like comms' drafting. It asks the capability's is_available() (TASK-25.10.2) and answers with an unavailable message otherwise, and the plugin declares no text-generation requirement. This narrows TASK-172's 'scribe requires it' to the dissolved package. It needs a human ruling at this re-plan, recorded in plugin-architecture.md and plugins.md.
 
 2026-11-09 (human): ruled. The moved text-generation use is optional: it asks is_available() (TASK-25.10.2) and answers with an unavailable message otherwise. The plugin it moves into declares no text-generation requirement. TASK-172's 'scribe requires it' holds only while scribe exists. Record it in plugin-architecture.md and plugins.md with this task's PR.
+
+2026-11-10 (TASK-145.8.1 plan, OQ13 applied): timeline_table, entry_key, TimelineStore.append and TimelineEntry kinds (message, severity_changed) land in TASK-145.8.1; captured_entry_id (uuid5 over system, tenant, conversation and message id, under TASK-145.8.1's TIMELINE_NAMESPACE) stays with its first user TASK-145.9.2. AC #5 stands as worded.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

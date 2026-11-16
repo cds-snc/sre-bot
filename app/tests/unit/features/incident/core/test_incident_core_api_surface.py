@@ -2,7 +2,7 @@
 
 import dataclasses
 import inspect
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -14,6 +14,7 @@ import features.incident.core as core
 from contracts.operations.result import OperationResult
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from features.incident.common import vocabulary
+from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core import api
 from features.incident.core.adapters import slack as slack_adapter
 from features.incident.core.adapters.in_memory import InMemoryIncidentStore
@@ -46,10 +47,12 @@ def test_api_exports_exactly_the_public_names() -> None:
         "ExternalCaseReference",
         "Incident",
         "IncidentBinding",
+        "IncidentChanges",
         "IncidentConversation",
         "IncidentReport",
         "IncidentStore",
         "IncidentTranscriptReader",
+        "Keep",
         "LegacyUpgrade",
         "MessageReference",
         "PostmortemMeetingReference",
@@ -57,6 +60,7 @@ def test_api_exports_exactly_the_public_names() -> None:
         "ReportPlacement",
         "ReportReference",
         "SectionDraft",
+        "SeverityChange",
         "StatusUpdate",
         "StatusUpdateOrigin",
         "StatusUpdateStage",
@@ -64,6 +68,8 @@ def test_api_exports_exactly_the_public_names() -> None:
         "StatusUpdateStore",
         "StatusUpdateText",
         "TimelineEntry",
+        "TimelineEntryKind",
+        "TimelineStore",
         "TranscriptMessage",
         "UpgradeReport",
         "VideoCall",
@@ -228,7 +234,7 @@ def test_status_update_store_signatures_carry_only_domain_types_and_operation_re
 
 
 def test_incident_store_signatures_carry_only_domain_types_and_operation_results() -> None:
-    """No table, item or SDK shape crosses the store interface; its only writes are create, attach_conversation and set_reference."""
+    """No table, item or SDK shape crosses the store interface; its writes are create, attach_conversation, set_reference and the field writes."""
     store = api.IncidentStore
 
     def params(method: object) -> dict[str, object]:
@@ -252,6 +258,11 @@ def test_incident_store_signatures_carry_only_domain_types_and_operation_results
     assert inspect.signature(store.create).return_annotation == OperationResult[api.Incident]
     assert inspect.signature(store.attach_conversation).return_annotation == OperationResult[api.Incident]
     assert inspect.signature(store.set_reference).return_annotation == OperationResult[api.Incident]
+    assert params(store.update_fields) == {"incident_id": str, "changes": api.IncidentChanges, "by": str, "at": datetime}
+    assert params(store.set_roles) == {"incident_id": str, "roles": Mapping[IncidentRole, str | None]}
+    assert params(store.set_status) == {"incident_id": str, "status": IncidentStatus, "at": datetime}
+    for write in (store.update_fields, store.set_roles, store.set_status):
+        assert inspect.signature(write).return_annotation == OperationResult[api.Incident]
     assert sorted(name for name in vars(store) if not name.startswith("_")) == [
         "attach_conversation",
         "create",
@@ -260,6 +271,9 @@ def test_incident_store_signatures_carry_only_domain_types_and_operation_results
         "list_open",
         "read_security_flag",
         "set_reference",
+        "set_roles",
+        "set_status",
+        "update_fields",
     ]
 
 

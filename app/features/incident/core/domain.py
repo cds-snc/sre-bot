@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field, fields
 from datetime import date, datetime
-from enum import StrEnum
+from enum import Enum, StrEnum
+from typing import Any
 
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity, StatusUpdateStage
@@ -371,6 +372,39 @@ class IncidentBinding:
         _require_aware(self, "bound_at", "archived_at")
 
 
+class TimelineEntryKind(StrEnum):
+    """What a timeline entry records; the stored form is the value.
+
+    MESSAGE: text a person wrote or captured. SEVERITY_CHANGED: a system entry
+    holding a ``SeverityChange``, rendered per locale when read. A reader meeting
+    a kind it does not know renders a labelled fallback; no command acts on entries.
+    """
+
+    MESSAGE = "message"
+    SEVERITY_CHANGED = "severity_changed"
+
+
+@dataclass(frozen=True)
+class SeverityChange:
+    """A change of an incident's severity; ``None`` is unrated.
+
+    Attributes:
+        previous: The severity before the change.
+        current: The severity after it; never equal to ``previous``.
+    """
+
+    previous: Severity | None
+    current: Severity | None
+
+    def __post_init__(self) -> None:
+        for name in ("previous", "current"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, Severity):
+                raise ValueError(f"{name} must be a Severity member or None, got {value!r}")
+        if self.previous == self.current:
+            raise ValueError("a severity change must differ from the previous severity")
+
+
 @dataclass(frozen=True)
 class TimelineEntry:
     """One entry of an incident's timeline, stored as its own record.
@@ -380,8 +414,10 @@ class TimelineEntry:
         entry_id: The entry's id, unique within the incident.
         posted_at: When the entry was posted, timezone-aware.
         author: Platform user id or display name of who wrote it.
-        text: The entry text.
+        text: The entry text; required for a message, empty for a system kind.
         source_message: The captured message, ``None`` for a manual entry.
+        kind: What the entry records.
+        severity_change: The change a ``SEVERITY_CHANGED`` entry records; ``None`` for any other kind.
     """
 
     incident_id: str
@@ -390,10 +426,61 @@ class TimelineEntry:
     author: str
     text: str
     source_message: MessageReference | None = None
+    kind: TimelineEntryKind = TimelineEntryKind.MESSAGE
+    severity_change: SeverityChange | None = None
 
     def __post_init__(self) -> None:
         _require_text(self, "incident_id", "entry_id")
         _require_aware(self, "posted_at")
+        if not isinstance(self.kind, TimelineEntryKind):
+            raise ValueError(f"kind must be a TimelineEntryKind member, got {self.kind!r}")
+        if self.kind is TimelineEntryKind.MESSAGE:
+            _require_text(self, "text")
+            if self.severity_change is not None:
+                raise ValueError("severity_change belongs to a severity_changed entry only")
+            return
+        if self.text:
+            raise ValueError("text must be empty for a system entry: it is rendered at read time")
+        if (self.kind is TimelineEntryKind.SEVERITY_CHANGED) != (self.severity_change is not None):
+            raise ValueError("severity_change is required on a severity_changed entry")
+
+
+class Keep(Enum):
+    """The typed "leave as stored" value of an ``IncidentChanges`` field."""
+
+    KEEP = "keep"
+
+
+@dataclass(frozen=True)
+class IncidentChanges:
+    """The record fields a field update writes; every field left at ``Keep.KEEP`` stays as stored.
+
+    ``None`` clears an optional field. The title and the security flag cannot
+    be cleared. Times are timezone-aware.
+    """
+
+    title: str | Keep = Keep.KEEP
+    severity: Severity | None | Keep = Keep.KEEP
+    detected_at: datetime | None | Keep = Keep.KEEP
+    impact_started_at: datetime | None | Keep = Keep.KEEP
+    impact_ended_at: datetime | None | Keep = Keep.KEEP
+    security_incident: bool | Keep = Keep.KEEP
+
+    def __post_init__(self) -> None:
+        named = self.named()
+        if not named:
+            raise ValueError("a field update names at least one field")
+        if "title" in named:
+            _require_text(self, "title")
+        if "severity" in named and named["severity"] is not None and not isinstance(named["severity"], Severity):
+            raise ValueError(f"severity must be a Severity member or None, got {named['severity']!r}")
+        if "security_incident" in named and not isinstance(named["security_incident"], bool):
+            raise ValueError(f"security_incident must be a bool, got {named['security_incident']!r}")
+        _require_aware(self, *(name for name in named if name.endswith("_at")))
+
+    def named(self) -> dict[str, Any]:
+        """Return the fields this update writes, by record field name."""
+        return {field.name: value for field in fields(self) if (value := getattr(self, field.name)) is not Keep.KEEP}
 
 
 @dataclass(frozen=True)

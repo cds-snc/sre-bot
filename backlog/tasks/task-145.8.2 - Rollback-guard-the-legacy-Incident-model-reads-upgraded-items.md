@@ -119,6 +119,8 @@ Placement (human, 2026-11-10): the guard module stays at app/features/incident/c
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
+2026-11-10: this guard must be deployed before TASK-145.7.8 sets upgrade_mode apply (see TASK-145.7.8 notes).
+
 Implemented. Adapter finding: DynamoDBAdapter.update_item does not raise on a lost condition; _call catches ClientError and classify_aws_error (integrations/aws/client.py:206) returns OperationResult.error(PERMANENT_ERROR, error_code='ConditionalCheckFailedException'). The writer classifies by result.error_code and retries once (re-reading the marker); a second loss is logged as incident_update_failed. A failed marker read logs a warning and falls back to the write pinned to attribute_not_exists(record_version), so the condition still protects an item that was upgraded meanwhile. _drop_retired_incident_updates deleted: both readers now validate with extra=ignore, create_incident builds only from payload dicts; strict Incident still rejects incident_updates (tested). Guard: features/incident/core/adapters/legacy_rollback.py (legacy_view, translated_update, TranslatedUpdate). Existing fixture edit: tests/integration/legacy_surface/conftest.py FakeDynamoDbClient gained get_item (the writer now reads the marker first). Gates: ruff, lint-imports (13 kept), check-package-shape, check-test-seams, check-settings-key-ownership OK; mypy 41 errors in 14 files (baseline, none in touched files); pytest 6999 passed. AC5 (PR body) left unchecked until the PR exists.
 
 PR body draft (AC #5) is the text the PR is opened with; AC #5 is checked once the PR exists.

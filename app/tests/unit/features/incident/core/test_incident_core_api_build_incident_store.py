@@ -17,12 +17,13 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
+from features.incident.common.vocabulary import Severity
 from features.incident.core.adapters.binding_items import binding_item
 from features.incident.core.api import IncidentStore, build_incident_store
-from features.incident.core.domain import ConversationReference
-from features.incident.core.store import bindings_table, incidents_table
+from features.incident.core.domain import ConversationReference, IncidentChanges
+from features.incident.core.store import bindings_table, incidents_table, timeline_table
 from infrastructure.records.in_memory import InMemoryRecordStore
-from tests.factories.incident import binding_on, slack_conversation
+from tests.factories.incident import DECLARED_AT, binding_on, declared_incident, slack_conversation
 
 pytestmark = pytest.mark.unit
 
@@ -169,3 +170,17 @@ def test_tenants_are_copied_at_build() -> None:
     result = store.get("inc-copied")
     assert result.data is not None
     assert result.data.conversation == CONVERSATION
+
+
+def test_build_appends_timeline_entries_to_the_table_named_in_the_settings() -> None:
+    """A severity change through the built store lands its entry in the configured timeline table."""
+    records = InMemoryRecordStore()
+    settings = IncidentCoreSettings(incidents_table=TABLE_NAME, timeline_table="timeline-under-test")
+    store = build_incident_store(records, _slack_and_google(), settings)
+    assert store.create(declared_incident("inc-1")).is_success
+
+    assert store.update_fields("inc-1", IncidentChanges(severity=Severity.SEV1), by="U0EDITOR", at=DECLARED_AT).is_success
+
+    entries = records.read_all(timeline_table("timeline-under-test"), max_items=10).data
+    assert entries is not None
+    assert [entry["incident_id"] for entry in entries] == ["inc-1"]

@@ -3,7 +3,9 @@
 For tests and local runs. ``InMemoryStatusUpdateStore``: appends only where
 nothing is stored, state changes only from the expected state, a repeat of a
 write that landed is a conflict, newest first. ``InMemoryIncidentStore``: the incident reads
-with the same classifications as ``RecordIncidentStore``. ``InMemoryIncidentReport``:
+with the same classifications as ``RecordIncidentStore``, and the field writes with
+its validation, replay and open-list rules. ``InMemoryTimelineStore``: one entry
+per key, a repeat a replay that succeeds. ``InMemoryIncidentReport``:
 the ``GoogleDocsIncidentReport`` rules (Google references only, unknown reports not
 found, empty document ids refused naming the key, no draft copy without content).
 ``InMemoryIncidentConversation``: the ``SlackIncidentConversation`` rules (Slack
@@ -13,15 +15,18 @@ invites succeeding). ``InMemoryVideoCall``: the ``GoogleMeetVideoCall`` rules
 (Google references under the tenant, a link only for Google references).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Any
 
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
+from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core.adapters.slack import slack_channel_name
+from features.incident.core.adapters.timeline_items import entry_key
 from features.incident.core.domain import (
     BindingKind,
     ConversationName,
@@ -31,6 +36,7 @@ from features.incident.core.domain import (
     DraftWriteResult,
     Incident,
     IncidentBinding,
+    IncidentChanges,
     MessageReference,
     ReferenceKind,
     ReportPlacement,
@@ -39,20 +45,44 @@ from features.incident.core.domain import (
     SectionDraft,
     StatusUpdate,
     StatusUpdateState,
+    TimelineEntry,
     VideoCallReference,
 )
 from features.incident.core.store import (
     IncidentStore,
     StatusUpdateStore,
+    TimelineStore,
     ambiguous_conversation,
+    apply_changes,
+    apply_roles,
     no_such_incident,
     not_an_incident,
     record_conflict,
     select_active_bindings,
+    severity_entry,
     validate_attachment,
+    validate_field_update,
     validate_new_incident,
     validate_reference,
+    validate_roles,
+    validate_status_change,
 )
+
+
+class InMemoryTimelineStore(TimelineStore):
+    """Hold timeline entries in a dict keyed by incident id and entry key."""
+
+    def __init__(self) -> None:
+        self._entries: dict[tuple[str, str], TimelineEntry] = {}
+
+    def append(self, entry: TimelineEntry) -> OperationResult[TimelineEntry]:
+        """Store ``entry`` unless its key is taken; a taken key is a replay that succeeds."""
+        self._entries.setdefault((entry.incident_id, entry_key(entry.posted_at, entry.entry_id)), entry)
+        return OperationResult.success(data=entry)
+
+    def entries(self, incident_id: str) -> tuple[TimelineEntry, ...]:
+        """Return the incident's entries in key order (time, then id)."""
+        return tuple(entry for (owner, _), entry in sorted(self._entries.items()) if owner == incident_id)
 
 
 class InMemoryStatusUpdateStore(StatusUpdateStore):
@@ -109,11 +139,15 @@ class InMemoryIncidentStore(IncidentStore):
 
     Open incidents are listed by ``declared_at``, a stand-in for the
     ``opened_at`` time the real store orders by and this fake does not hold.
-    ``create``, ``attach_conversation`` and ``set_reference`` share the real store's
-    validation; the fake holds no record version, so only a different conversation conflicts.
+    ``create``, ``attach_conversation``, ``set_reference`` and the field writes share
+    the real store's validation; the fake holds no record version and has no
+    concurrent writer, so only a different conversation conflicts and no guard is
+    ever lost. Severity entries go to ``timeline`` (a new ``InMemoryTimelineStore``
+    when none is given).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, timeline: TimelineStore | None = None) -> None:
+        self.timeline = InMemoryTimelineStore() if timeline is None else timeline
         self._incidents: dict[str, Incident] = {}
         self._open: set[str] = set()
         self._bindings: dict[tuple[str, str, str, str, str], IncidentBinding] = {}
@@ -236,6 +270,52 @@ class InMemoryIncidentStore(IncidentStore):
         updated = replace(stored, **changes)
         self._incidents[incident_id] = updated
         return OperationResult.success(data=updated)
+
+    def update_fields(self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime) -> OperationResult[Incident]:
+        """Write the named fields; a severity change appends its entry to ``timeline``.
+
+        Raises:
+            ValueError: see ``IncidentStore.update_fields``.
+        """
+        validate_field_update(by, at)
+        stored = self._incidents.get(incident_id)
+        if stored is None:
+            return no_such_incident()
+        updated = self._write(stored, apply_changes(stored, changes))
+        entry = severity_entry(stored, updated, by=by, at=at)
+        if entry is not None:
+            self.timeline.append(entry)
+        return OperationResult.success(data=updated)
+
+    def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+        """Give each named role its holder.
+
+        Raises:
+            ValueError: see ``IncidentStore.set_roles``.
+        """
+        validate_roles(roles)
+        return self._apply(incident_id, lambda stored: apply_roles(stored, roles))
+
+    def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+        """Set the status; closing leaves the open list and reopening rejoins it.
+
+        Raises:
+            ValueError: see ``IncidentStore.set_status``.
+        """
+        validate_status_change(status, at)
+        return self._apply(incident_id, lambda stored: replace(stored, status=status))
+
+    def _apply(self, incident_id: str, desire: Callable[[Incident], Incident]) -> OperationResult[Incident]:
+        stored = self._incidents.get(incident_id)
+        if stored is None:
+            return no_such_incident()
+        return OperationResult.success(data=self._write(stored, desire(stored)))
+
+    def _write(self, stored: Incident, updated: Incident) -> Incident:
+        """Store ``updated`` unless it equals ``stored`` (a replay writes nothing)."""
+        if updated != stored:
+            self.seed(updated)
+        return updated
 
 
 @dataclass

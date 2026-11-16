@@ -44,6 +44,8 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-03: asked at session start; #1, #2 and #4 still open (human).
 
+2026-11-10 (Stack L, L3 planning session): asked at session start; #1 and #4 still open (human). #2 waits on TASK-182 (live key).
+
 2026-11-10: asked at TASK-145.7.5 (Stack L L4a) start; #1 and #4 still open, #2 still waits on TASK-182 (human).
 
 2026-11-10: asked at TASK-145.7.6 (Stack L L4b) planning; unchanged, #1 and #4 open, #2 waits on TASK-182; the human reassesses at the next session.

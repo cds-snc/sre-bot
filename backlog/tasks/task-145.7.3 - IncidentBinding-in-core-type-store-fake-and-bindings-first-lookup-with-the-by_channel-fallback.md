@@ -3,10 +3,10 @@ id: TASK-145.7.3
 title: >-
   IncidentBinding in core: type, store, fake and bindings-first lookup with the
   by_channel fallback
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-09T21:54:00Z'
+updated_date: '2026-11-10T16:54:00Z'
 labels:
   - incident
   - features

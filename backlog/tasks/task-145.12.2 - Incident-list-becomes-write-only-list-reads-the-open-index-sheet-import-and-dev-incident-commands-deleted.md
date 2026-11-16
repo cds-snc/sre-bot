@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-10T16:37:00Z'
 labels:
   - incident
   - features
@@ -32,3 +33,9 @@ Stack L L11 (outline in TASK-145.12's plan). /sre incident list active and stale
 - [ ] #2 The job rerun reports are recorded in the notes (parent AC #2)
 - [ ] #3 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10: after this task deploys, the legacy upgrade job reruns (dry_run, then apply; README Rerun rule) before TASK-145.13 deletes it; items written by a legacy writer after the TASK-145.7.8 run have no marker and no binding until then.
+<!-- SECTION:NOTES:END -->

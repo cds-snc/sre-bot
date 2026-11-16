@@ -35,6 +35,12 @@ Stack L L6a (slices in TASK-145.8's plan). incident.response registers show and 
 - [ ] #3 The PR body states the revert target: one git revert restores the legacy surface, and the L5r rollback guard (TASK-145.8.2) keeps it reading and writing upgraded items correctly (decisions/incident-management.md Migration rule 1)
 <!-- AC:END -->
 
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-10 (human ruling at TASK-145.8.1 planning): the Retro Link (retrospective_url) is dropped from show and the update modal: named behaviour change in the PR body; the field-update pin (tests/integration/legacy_surface/test_incident_field_update_surface.py:95-96, :127, :134) is updated to match. The record holds typed references only (decisions/incident-management.md:32); legacy values stay on items (Migration rule 5); TASK-145.10's postmortem_meeting reference replaces it. Severity changes go through IncidentStore.update_fields(changes, by, at), which writes the severity_changed timeline entry; status through set_status(status, at).
+<!-- SECTION:NOTES:END -->
+
 ## Comments
 
 <!-- COMMENTS:BEGIN -->

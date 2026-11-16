@@ -6,15 +6,25 @@ parsed as stored; an item without it is upgraded on read by the legacy item
 bridge (``adapters/legacy_items.py``) with the configured tenants, and is
 ``INCIDENT_RECORD_UNREADABLE`` when the bridge cannot read it.
 
+Field writes (``update_fields``, ``set_roles``, ``set_status``) are guarded on
+``record_version`` and on the read value of every attribute they change. An
+item below the current version is upgraded on write: ``plan_item_upgrade``, the
+legacy upgrade job's plan, gives its binding (put first) and its changes, which
+go out in the one update that carries the field change.
+
+``RecordTimelineStore`` keeps each timeline entry as its own item in the
+timeline table, in the layout of ``adapters/timeline_items.py``.
 ``RecordStatusUpdateStore`` keeps each public status update as its own item in
 the status-updates table, in the layout of ``adapters/status_updates.py``.
 
-Entry points build both per service scope with ``build_incident_store`` and
+Entry points build the incident and status-update stores per service scope with ``build_incident_store`` and
 ``build_status_update_store`` in ``core/api.py``, from the resolved
 ``RecordStore`` and the incident core settings.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, fields, replace
+from datetime import datetime
 from typing import Any, Protocol, runtime_checkable
 
 import structlog
@@ -36,7 +46,7 @@ from contracts.records import (
     SortOrder,
 )
 from contracts.workplace import WorkplaceSystem
-from features.incident.common.vocabulary import IncidentStatus
+from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core.adapters.binding_items import (
     CONVERSATION_ATTRIBUTE,
     UnknownBindingKindError,
@@ -53,11 +63,19 @@ from features.incident.core.adapters.binding_items import (
 from features.incident.core.adapters.incident_items import (
     OPEN_BUCKET,
     RECORD_VERSION,
+    format_stored_time,
     incident_item,
     incident_record_unreadable,
     parse_incident_item,
     read_reference,
     reference_item,
+)
+from features.incident.core.adapters.item_upgrade import (
+    ItemUpgrade,
+    UnboundOpenItem,
+    UnguardableValueError,
+    guard_value,
+    plan_item_upgrade,
 )
 from features.incident.core.adapters.legacy_items import UnreadableLegacyItem, upgrade_legacy_item
 from features.incident.core.adapters.status_updates import (
@@ -71,18 +89,29 @@ from features.incident.core.adapters.status_updates import (
     status_update_item,
     status_update_key,
 )
+from features.incident.core.adapters.timeline_items import (
+    PARTITION_ATTRIBUTE as TIMELINE_PARTITION_ATTRIBUTE,
+)
+from features.incident.core.adapters.timeline_items import (
+    SORT_ATTRIBUTE as TIMELINE_SORT_ATTRIBUTE,
+)
+from features.incident.core.adapters.timeline_items import severity_entry_id, timeline_entry_item
 from features.incident.core.domain import (
     BindingKind,
     ConversationReference,
     ExternalCaseReference,
     Incident,
     IncidentBinding,
+    IncidentChanges,
     PostmortemMeetingReference,
     ReferenceKind,
     ReportReference,
     ResourceReference,
+    SeverityChange,
     StatusUpdate,
     StatusUpdateState,
+    TimelineEntry,
+    TimelineEntryKind,
     VideoCallReference,
 )
 
@@ -91,7 +120,8 @@ logger = structlog.get_logger()
 # Far above any real count of incidents sharing one channel id; reaching it fails closed.
 _CONVERSATION_QUERY_BOUND = 10
 _STORE_FAILED_MESSAGE = "The incident store is unavailable."
-_RECORD_CONFLICT_MESSAGE = "The incident record is not in the shape this writer owns."
+_RECORD_CONFLICT_MESSAGE = "The incident record was changed by another writer or is not in the shape this writer owns."
+_TIMELINE_STORE_FAILED_MESSAGE = "The incident timeline store is unavailable."
 _STATUS_UPDATE_STORE_FAILED_MESSAGE = "The status update store is unavailable."
 _STATUS_UPDATE_CONFLICT_MESSAGE = "The status update was changed or taken by another writer."
 _STATUS_UPDATE_UNREADABLE_MESSAGE = "A stored status update could not be read."
@@ -120,6 +150,46 @@ def bindings_table(name: str) -> RecordTable:
     )
 
 
+def timeline_table(name: str) -> RecordTable:
+    """Return the timeline table declaration; the keys match terraform/dynamodb.tf."""
+    return RecordTable(name=name, key=KeySchema(partition=TIMELINE_PARTITION_ATTRIBUTE, sort=TIMELINE_SORT_ATTRIBUTE))
+
+
+@runtime_checkable
+class TimelineStore(Protocol):
+    """Interface keeping an incident's timeline entries, each its own record under the incident.
+
+    A store failure is a classified error result, never an exception.
+    """
+
+    def append(self, entry: TimelineEntry) -> OperationResult[TimelineEntry]:
+        """Store ``entry`` at its key; an entry already stored at that key is a replay that writes nothing and succeeds."""
+        ...
+
+
+class RecordTimelineStore(TimelineStore):
+    """Keep timeline entries in the timeline table through the records contract."""
+
+    def __init__(self, records: RecordStore, table: RecordTable) -> None:
+        self._records = records
+        self._table = table
+
+    def append(self, entry: TimelineEntry) -> OperationResult[TimelineEntry]:
+        """Create the entry's item only where none exists."""
+        result = self._records.put_if_not_exists(self._table, timeline_entry_item(entry))
+        if not result.is_success:
+            return _store_failure(
+                result,
+                operation="append",
+                table=self._table,
+                message=_TIMELINE_STORE_FAILED_MESSAGE,
+                incident_id=entry.incident_id,
+            )
+        if result.data is not True:
+            logger.info("incident_timeline_entry_replayed", incident_id=entry.incident_id, entry_id=entry.entry_id)
+        return OperationResult.success(data=entry)
+
+
 def status_updates_table(name: str) -> RecordTable:
     """Return the status-updates table declaration; the keys match terraform/dynamodb.tf."""
     return RecordTable(name=name, key=KeySchema(partition=PARTITION_ATTRIBUTE, sort=SORT_ATTRIBUTE))
@@ -135,8 +205,17 @@ class IncidentStore(Protocol):
     a store failure carries the store's status, error code and retry hint with a
     generic message. Only a caller error raises (``ValueError``, nothing written).
 
-    Writes arrive with their slices: create, attach_conversation and set_reference with TASK-145.7,
-    the field updates with TASK-145.8 and the timeline append with TASK-145.9.
+    Writes arrive with their slices: create, attach_conversation and set_reference with TASK-145.7;
+    update_fields, set_roles and set_status with TASK-145.8; captured timeline entries with TASK-145.9.
+
+    The field writes compute the new record from the stored one, so a change
+    already stored is a replay that writes nothing. Each is one update guarded
+    on the record version and on the read value of every attribute it changes;
+    when another writer got there first the record is read once more and the
+    change recomputed, and a second loss is PERMANENT_ERROR with
+    ``INCIDENT_RECORD_CONFLICT``. A record below the current version is upgraded
+    on write, in the same update, after its binding is put; one that cannot be
+    upgraded is ``INCIDENT_RECORD_UNREADABLE``, and one above it is a conflict.
     """
 
     def get(self, incident_id: str) -> OperationResult[Incident]:
@@ -200,14 +279,63 @@ class IncidentStore(Protocol):
         """
         ...
 
+    def update_fields(self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime) -> OperationResult[Incident]:
+        """Write the fields ``changes`` names and return the updated incident.
+
+        A severity change then appends one ``severity_changed`` timeline entry by
+        ``by`` at ``at``, with an id derived from the change and ``at``. A failed
+        entry is retried once, then logged; it never rolls the field back.
+
+        Raises:
+            ValueError: ``by`` is blank or ``at`` is naive.
+        """
+        ...
+
+    def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+        """Give each named role its holder (``None`` unassigns it) and return the updated incident; other roles stay.
+
+        Raises:
+            ValueError: no role is named, a key is not an ``IncidentRole`` or a holder is blank.
+        """
+        ...
+
+    def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+        """Set the status and return the updated incident.
+
+        Closing removes the incident from the open list; reopening puts it back
+        with ``at`` as its opened time; a move between open statuses changes the
+        status only.
+
+        Raises:
+            ValueError: ``status`` is not an ``IncidentStatus`` or ``at`` is naive.
+        """
+        ...
+
+
+@dataclass(frozen=True)
+class _Written:
+    """The incident before and after a field write; equal when the write was a replay."""
+
+    before: Incident
+    after: Incident
+
+
+@dataclass(frozen=True)
+class _PlannedWrite:
+    current: Incident
+    changes: tuple[RecordChange, ...]
+    expected: dict[str, Any]
+    binding: IncidentBinding | None
+
 
 class RecordIncidentStore(IncidentStore):
     """Read incidents from the incidents table through the records contract.
 
     ``tenants`` is the configured tenant per workplace system, which the legacy
     item bridge gives the references of items without ``record_version``.
-    ``bindings`` is the bindings table ``find_by_conversation`` reads first; it
-    has no default, so no construction can skip it.
+    ``bindings`` is the bindings table ``find_by_conversation`` reads first and
+    upgrade on write puts into; ``timeline`` takes the severity entries. Neither
+    has a default, so no construction can skip them.
     """
 
     def __init__(
@@ -217,11 +345,13 @@ class RecordIncidentStore(IncidentStore):
         tenants: Mapping[WorkplaceSystem, str],
         *,
         bindings: RecordTable,
+        timeline: TimelineStore,
     ) -> None:
         self._records = records
         self._table = table
         self._tenants = tenants
         self._bindings = bindings
+        self._timeline = timeline
 
     def get(self, incident_id: str) -> OperationResult[Incident]:
         """Return the incident with this id."""
@@ -435,6 +565,135 @@ class RecordIncidentStore(IncidentStore):
             return self._conflict(incident_id, operation="set_reference", kind=kind.value)
         return self._parse(result.data, operation="set_reference")
 
+    def update_fields(self, incident_id: str, changes: IncidentChanges, *, by: str, at: datetime) -> OperationResult[Incident]:
+        """Write the named fields through the guarded write, then append the severity entry when severity changed.
+
+        Raises:
+            ValueError: see ``IncidentStore.update_fields``.
+        """
+        validate_field_update(by, at)
+        written = self._guarded_write(
+            incident_id, operation="update_fields", desire=lambda current: apply_changes(current, changes)
+        )
+        if written.data is None:
+            return _refusal(written)
+        entry = severity_entry(written.data.before, written.data.after, by=by, at=at)
+        if entry is not None:
+            self._append_entry(entry)
+        return OperationResult.success(data=written.data.after)
+
+    def set_roles(self, incident_id: str, roles: Mapping[IncidentRole, str | None]) -> OperationResult[Incident]:
+        """Write the named roles through the guarded write.
+
+        Raises:
+            ValueError: see ``IncidentStore.set_roles``.
+        """
+        validate_roles(roles)
+        written = self._guarded_write(incident_id, operation="set_roles", desire=lambda current: apply_roles(current, roles))
+        return _refusal(written) if written.data is None else OperationResult.success(data=written.data.after)
+
+    def set_status(self, incident_id: str, status: IncidentStatus, *, at: datetime) -> OperationResult[Incident]:
+        """Write the status and the open-index attributes through the guarded write.
+
+        Raises:
+            ValueError: see ``IncidentStore.set_status``.
+        """
+        validate_status_change(status, at)
+        written = self._guarded_write(
+            incident_id, operation="set_status", desire=lambda current: replace(current, status=status), at=at
+        )
+        return _refusal(written) if written.data is None else OperationResult.success(data=written.data.after)
+
+    def _guarded_write(
+        self, incident_id: str, *, operation: str, desire: Callable[[Incident], Incident], at: datetime | None = None
+    ) -> OperationResult[_Written]:
+        """Read the item, compute the change from it, then put any upgrade binding and send one guarded update.
+
+        A lost guard reads and recomputes once; a second loss is a conflict.
+        ``at`` is the reopen time when the change reopens the incident.
+        """
+        if not incident_id.strip():
+            return no_such_incident()
+        for _ in range(2):
+            read = self._records.get(self._table, {"id": incident_id})
+            if read.status is OperationStatus.NOT_FOUND and read.error_code is None:
+                return no_such_incident()
+            if not read.is_success:
+                return self._failed(read, operation=operation)
+            planned = self._plan_write(read.data or {}, desire, at=at, operation=operation)
+            if isinstance(planned, OperationResult):
+                return planned
+            if not planned.changes:
+                logger.info("incident_write_replayed", operation=operation, incident_id=incident_id)
+                return OperationResult.success(data=_Written(planned.current, planned.current))
+            if planned.binding is not None:
+                bound = self._records.put_if_not_exists(self._bindings, binding_item(planned.binding))
+                if not bound.is_success:
+                    return self._failed(bound, operation=operation, table=self._bindings)
+            result = self._records.update(self._table, {"id": incident_id}, planned.changes, expected=planned.expected)
+            if result.status is OperationStatus.NOT_FOUND and result.error_code is None:
+                return no_such_incident()
+            if not result.is_success:
+                return self._failed(result, operation=operation)
+            if result.data is not None:
+                parsed = self._parse(result.data, operation=operation)
+                if parsed.data is None:
+                    return _refusal(parsed)
+                return OperationResult.success(data=_Written(planned.current, parsed.data))
+            logger.info("incident_record_guard_lost", operation=operation, incident_id=incident_id)
+        logger.warning("incident_record_changed", operation=operation, incident_id=incident_id)
+        return record_conflict()
+
+    def _plan_write(
+        self, item: Mapping[str, Any], desire: Callable[[Incident], Incident], *, at: datetime | None, operation: str
+    ) -> _PlannedWrite | OperationResult[_Written]:
+        """Return the guarded update that applies ``desire`` to ``item``, upgrading it when below the current version."""
+        incident_id = str(item.get("id"))
+        upgrade: ItemUpgrade | None = None
+        if item.get("record_version") != RECORD_VERSION:
+            plan = plan_item_upgrade(item, self._tenants)
+            if plan is None:
+                return self._conflict(incident_id, operation=operation)
+            if isinstance(plan, UnreadableLegacyItem):
+                _log_unreadable(operation, plan.incident_id, plan.field, plan.value)
+                return incident_record_unreadable()
+            if isinstance(plan, UnboundOpenItem):
+                _log_unreadable(operation, plan.incident_id, "conversation", None)
+                return incident_record_unreadable()
+            upgrade = plan
+        current = self._parse(item, operation=operation)
+        if current.data is None:
+            return _refusal(current)
+        changes = record_changes(current.data, desire(current.data), at=at)
+        if not changes:
+            return _PlannedWrite(current.data, (), {}, None)
+        expected: dict[str, Any] = {"record_version": RECORD_VERSION} if upgrade is None else dict(upgrade.expected)
+        try:
+            for change in changes:
+                expected[change.attribute] = guard_value(change.attribute, item.get(change.attribute))
+        except UnguardableValueError as exc:
+            _log_unreadable(operation, incident_id, exc.field, None)
+            return incident_record_unreadable()
+        if upgrade is None:
+            return _PlannedWrite(current.data, tuple(changes), expected, None)
+        # One action per attribute: the field change replaces the upgrade's Set of the same attribute.
+        merged = {change.attribute: change for change in upgrade.changes} | {change.attribute: change for change in changes}
+        return _PlannedWrite(current.data, tuple(merged.values()), expected, upgrade.binding)
+
+    def _append_entry(self, entry: TimelineEntry) -> None:
+        """Append ``entry``, retrying a transient failure once; a failure is logged, never raised."""
+        result = self._timeline.append(entry)
+        if result.status is OperationStatus.TRANSIENT_ERROR:
+            result = self._timeline.append(entry)
+        if not result.is_success:
+            logger.warning(
+                "incident_timeline_entry_failed",
+                incident_id=entry.incident_id,
+                entry_id=entry.entry_id,
+                status=result.status.value,
+                error_code=result.error_code,
+            )
+
     def _end_state_record(self, incident_id: str, *, operation: str) -> OperationResult[Incident]:
         """Return the incident only when its stored item is an end-state record of the current version.
 
@@ -469,33 +728,130 @@ class RecordIncidentStore(IncidentStore):
             return item
         upgraded = upgrade_legacy_item(item, self._tenants)
         if isinstance(upgraded, UnreadableLegacyItem):
-            # The value is logged for status only: other legacy values may be vendor links.
-            log_fields: dict[str, object] = {
-                "operation": operation,
-                "incident_id": upgraded.incident_id,
-                "field": upgraded.field,
-            }
-            if upgraded.field == "status":
-                log_fields["value"] = upgraded.value
-            logger.warning("incident_record_unreadable", **log_fields)
+            _log_unreadable(operation, upgraded.incident_id, upgraded.field, upgraded.value)
             return None
         return upgraded.item
 
     def _failed[T](self, result: OperationResult[Any], *, operation: str, table: RecordTable | None = None) -> OperationResult[T]:
-        status = result.status
-        if status is OperationStatus.NOT_FOUND:
-            # A missing table or index is a broken store; NOT_FOUND is reserved for "not an incident".
-            status = OperationStatus.PERMANENT_ERROR
-        logger.warning(
-            "incident_store_failed",
-            operation=operation,
-            table=(self._table if table is None else table).name,
-            status=status.value,
-            error_code=result.error_code,
+        return _store_failure(
+            result, operation=operation, table=self._table if table is None else table, message=_STORE_FAILED_MESSAGE
         )
-        return OperationResult.error(
-            status, message=_STORE_FAILED_MESSAGE, error_code=result.error_code, retry_after=result.retry_after
-        )
+
+
+def _log_unreadable(operation: str, incident_id: object, field: str, value: object) -> None:
+    """Log an item the store cannot read; the value only for status, since other legacy values may be vendor links."""
+    log_fields: dict[str, object] = {"operation": operation, "incident_id": incident_id, "field": field}
+    if field == "status":
+        log_fields["value"] = value
+    logger.warning("incident_record_unreadable", **log_fields)
+
+
+def _store_failure[T](
+    result: OperationResult[Any], *, operation: str, table: RecordTable, message: str, **context: object
+) -> OperationResult[T]:
+    """Classify a backend failure: its status, code and retry hint, with a generic message."""
+    status = result.status
+    if status is OperationStatus.NOT_FOUND:
+        # A missing table or index is a broken store; NOT_FOUND is reserved for "not an incident".
+        status = OperationStatus.PERMANENT_ERROR
+    logger.warning(
+        "incident_store_failed",
+        operation=operation,
+        table=table.name,
+        status=status.value,
+        error_code=result.error_code,
+        **context,
+    )
+    return OperationResult.error(status, message=message, error_code=result.error_code, retry_after=result.retry_after)
+
+
+def apply_changes(current: Incident, changes: IncidentChanges) -> Incident:
+    """Return ``current`` with the fields ``changes`` names; shared by the real store and the fake."""
+    return replace(current, **changes.named())
+
+
+def apply_roles(current: Incident, roles: Mapping[IncidentRole, str | None]) -> Incident:
+    """Return ``current`` with each named role given its holder; shared by the real store and the fake."""
+    holders: dict[str, Any] = {role.value: holder for role, holder in roles.items()}
+    return replace(current, **holders)
+
+
+def record_changes(current: Incident, desired: Incident, *, at: datetime | None) -> list[RecordChange]:
+    """Return the attribute changes that turn the stored ``current`` into ``desired``; none when they are equal.
+
+    A field set to ``None`` is removed. Closing removes ``open_bucket`` and
+    ``opened_at``; reopening sets them, ``opened_at`` being ``at``.
+    """
+    stored = incident_item(desired)
+    changes: list[RecordChange] = []
+    for field in fields(Incident):
+        if getattr(current, field.name) != getattr(desired, field.name):
+            changes.append(SetAttribute(field.name, stored[field.name]) if field.name in stored else RemoveAttribute(field.name))
+    if current.status.is_open and not desired.status.is_open:
+        changes += [RemoveAttribute("open_bucket"), RemoveAttribute("opened_at")]
+    elif desired.status.is_open and not current.status.is_open:
+        if at is None:
+            raise ValueError("reopening an incident needs the time it reopened")
+        changes += [SetAttribute("open_bucket", OPEN_BUCKET), SetAttribute("opened_at", format_stored_time(at))]
+    return changes
+
+
+def severity_entry(before: Incident, after: Incident, *, by: str, at: datetime) -> TimelineEntry | None:
+    """Return the severity_changed entry for a write from ``before`` to ``after``; ``None`` when severity did not change."""
+    if before.severity == after.severity:
+        return None
+    change = SeverityChange(previous=before.severity, current=after.severity)
+    return TimelineEntry(
+        incident_id=after.id,
+        entry_id=severity_entry_id(after.id, change, at),
+        posted_at=at,
+        author=by,
+        text="",
+        kind=TimelineEntryKind.SEVERITY_CHANGED,
+        severity_change=change,
+    )
+
+
+def validate_field_update(by: str, at: datetime) -> None:
+    """Refuse a field update without its author or with a naive time; shared by the real store and the fake.
+
+    Raises:
+        ValueError: ``by`` is blank or ``at`` is naive.
+    """
+    if not by.strip():
+        raise ValueError("by must name who made the change")
+    _require_aware_time(at)
+
+
+def validate_roles(roles: Mapping[IncidentRole, str | None]) -> None:
+    """Refuse roles the record cannot hold; shared by the real store and the fake.
+
+    Raises:
+        ValueError: no role is named, a key is not an ``IncidentRole`` or a holder is blank.
+    """
+    if not roles:
+        raise ValueError("a role update names at least one role")
+    for role, holder in roles.items():
+        if not isinstance(role, IncidentRole):
+            raise ValueError(f"each role must be an IncidentRole member, got {role!r}")
+        if holder is not None and not holder.strip():
+            raise ValueError(f"{role.value} must name a holder or be None")
+
+
+def validate_status_change(status: IncidentStatus, at: datetime) -> None:
+    """Refuse a status the record cannot hold or a naive time; shared by the real store and the fake.
+
+    Raises:
+        ValueError: ``status`` is not an ``IncidentStatus`` member or ``at`` is naive.
+    """
+    if not isinstance(status, IncidentStatus):
+        raise ValueError(f"status must be an IncidentStatus member, got {status!r}")
+    _require_aware_time(at)
+
+
+def _require_aware_time(at: datetime) -> None:
+    if at.utcoffset() is None:
+        raise ValueError("at must be timezone-aware")
 
 
 def select_active_bindings(conversation: ConversationReference, bindings: Sequence[IncidentBinding]) -> list[IncidentBinding]:
