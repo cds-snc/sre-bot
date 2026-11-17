@@ -96,3 +96,55 @@ def test_each_legacy_id_is_logged_once_with_its_plugin(registrar: PluginSlackReg
         (PLUGIN, "a_legacy", f"{PLUGIN}.alert"),
         (PLUGIN, "b_legacy", f"{PLUGIN}.alert"),
     ]
+
+
+def test_scoped_legacy_ids_are_exempt_from_the_prefix_and_listed_with_their_values(
+    provider: SlackPlatformProvider, registrar: PluginSlackRegistrar
+) -> None:
+    registrar.register_attachment_action(
+        f"{PLUGIN}.archive", listener, legacy_callback_values={"archive_channel": ("archive", "ignore")}
+    )
+
+    assert provider.legacy_callback_values() == {
+        ("archive_channel", "archive"): f"{PLUGIN}.archive",
+        ("archive_channel", "ignore"): f"{PLUGIN}.archive",
+    }
+    assert provider.legacy_ids() == {}
+
+
+@pytest.mark.parametrize(
+    "values",
+    [
+        {" ": ("archive",)},
+        {"archive_channel": (" ",)},
+        {"archive_channel": ()},
+        {"archive_channel": "archive"},
+        {"archive_channel": ("archive", "archive")},
+    ],
+)
+def test_a_malformed_value_scope_is_refused(registrar: PluginSlackRegistrar, values: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        registrar.register_attachment_action(f"{PLUGIN}.archive", listener, legacy_callback_values=values)
+
+
+def test_a_callback_id_both_unscoped_and_scoped_is_refused(registrar: PluginSlackRegistrar) -> None:
+    with pytest.raises(ValueError, match="archive_channel"):
+        registrar.register_attachment_action(
+            f"{PLUGIN}.archive",
+            listener,
+            legacy_callback_ids=("archive_channel",),
+            legacy_callback_values={"archive_channel": ("archive",)},
+        )
+
+
+def test_each_scoped_value_is_logged_once_with_its_plugin(registrar: PluginSlackRegistrar) -> None:
+    with capture_logs() as events:
+        registrar.register_attachment_action(
+            f"{PLUGIN}.archive", listener, legacy_callback_values={"archive_channel": ("archive", "ignore")}
+        )
+
+    logged = [event for event in events if event["event"] == "slack_legacy_id_registered"]
+    assert [(event["plugin"], event["legacy_id"], event["value"], event["id"]) for event in logged] == [
+        (PLUGIN, "archive_channel", "archive", f"{PLUGIN}.archive"),
+        (PLUGIN, "archive_channel", "ignore", f"{PLUGIN}.archive"),
+    ]

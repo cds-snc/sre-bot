@@ -5,14 +5,15 @@ The host hands each plugin's ``register_slack_commands`` hookimpl its own
 registers carries that plugin's entry-point name and two plugins cannot
 claim the same id. A legacy id (an alias already posted in Slack messages) is
 exempt from the prefix, must be non-blank and unique, and is logged once at
-registration so the legacy contract task can find it. Commands and the reply
+registration so the legacy contract task can find it; a value-scoped legacy
+callback id is logged once per value. Commands and the reply
 interface pass through unchanged.
 
 See: decisions/transport-slack.md (Block actions and view submissions),
 decisions/platform-entrypoints.md rule 2
 """
 
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from typing import Any
 
 import structlog
@@ -85,13 +86,27 @@ class PluginSlackRegistrar:
         self._log_legacy_ids(action_id, legacy_action_ids)
 
     def register_attachment_action(
-        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+        self,
+        callback_id: str,
+        listener: Callable[..., object],
+        *,
+        legacy_callback_ids: Sequence[str] = (),
+        legacy_callback_values: Mapping[str, Collection[str]] | None = None,
     ) -> None:
         """Register an attachment action whose id starts with the plugin's entry-point name, with its legacy aliases."""
+        scoped = legacy_callback_values or {}
         self._require_own_prefix(callback_id)
         self._require_valid_legacy_ids(legacy_callback_ids)
-        self._registrar.register_attachment_action(callback_id, listener, legacy_callback_ids=legacy_callback_ids)
+        self._require_valid_scopes(legacy_callback_ids, scoped)
+        self._registrar.register_attachment_action(
+            callback_id, listener, legacy_callback_ids=legacy_callback_ids, legacy_callback_values=legacy_callback_values
+        )
         self._log_legacy_ids(callback_id, legacy_callback_ids)
+        for legacy_id, values in scoped.items():
+            for value in values:
+                logger.debug(
+                    "slack_legacy_id_registered", plugin=self.plugin_name, legacy_id=legacy_id, value=value, id=callback_id
+                )
 
     def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
         """Register a view submission whose id starts with the plugin's entry-point name."""
@@ -104,6 +119,19 @@ class PluginSlackRegistrar:
         repeated = sorted({legacy_id for legacy_id in legacy_ids if legacy_ids.count(legacy_id) > 1})
         if repeated:
             raise ValueError(f"Slack legacy ids {repeated} of plugin {self.plugin_name!r} are repeated.")
+
+    def _require_valid_scopes(self, legacy_ids: Sequence[str], scoped: Mapping[str, Collection[str]]) -> None:
+        self._require_valid_legacy_ids(list(scoped))
+        for legacy_id, values in scoped.items():
+            if legacy_id in legacy_ids:
+                raise ValueError(
+                    f"Slack legacy id {legacy_id!r} of plugin {self.plugin_name!r} is both unscoped and value-scoped."
+                )
+            if isinstance(values, str) or not values:
+                raise ValueError(
+                    f"Slack legacy id {legacy_id!r} of plugin {self.plugin_name!r} needs a non-empty collection of values."
+                )
+            self._require_valid_legacy_ids(list(values))
 
     def _log_legacy_ids(self, listener_id: str, legacy_ids: Sequence[str]) -> None:
         for legacy_id in legacy_ids:

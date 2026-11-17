@@ -226,6 +226,10 @@ class SlackPlatformProvider:
         self._attachment_actions: dict[str, Callable[..., object]] = {}
         self._view_submissions: dict[str, Callable[..., object]] = {}
         self._legacy_ids: dict[str, str] = {}
+        # A value-scoped alias shares one posted callback id between listeners, one owner per button value;
+        # attached after the exact ids with a value matcher, so an unclaimed value reaches a later (legacy) listener.
+        self._scoped_attachment_actions: list[tuple[str, frozenset[str], Callable[..., object]]] = []
+        self._legacy_callback_values: dict[tuple[str, str], str] = {}
         self._listeners_attached = False
         self._translator: Translator | None = None
         self._scope_opener: ServiceScopeOpener | None = None
@@ -631,19 +635,52 @@ class SlackPlatformProvider:
         self._register_action("block action", self._block_actions, action_id, listener, legacy_action_ids)
 
     def register_attachment_action(
-        self, callback_id: str, listener: Callable[..., object], *, legacy_callback_ids: Sequence[str] = ()
+        self,
+        callback_id: str,
+        listener: Callable[..., object],
+        *,
+        legacy_callback_ids: Sequence[str] = (),
+        legacy_callback_values: Mapping[str, Collection[str]] | None = None,
     ) -> None:
-        """Register a native Bolt listener for one legacy attachment's ``interactive_message``, by exact ``callback_id`` and each legacy alias.
+        """Register a native Bolt listener for one legacy attachment's ``interactive_message``, by exact ``callback_id``, each legacy alias and each value-scoped alias.
 
         Raises:
-            ValueError: An id is blank or already registered as a block or attachment action.
+            ValueError: An id or value is blank, a value set is empty or a bare string, an id is already
+                registered as a block or attachment action, or a value is already claimed for its callback id.
             RuntimeError: Listeners were already attached to the Bolt app.
         """
+        scoped = {
+            legacy_id: self._scope_values(legacy_id, values) for legacy_id, values in (legacy_callback_values or {}).items()
+        }
+        exact = {callback_id, *legacy_callback_ids}
+        for legacy_id, values in scoped.items():
+            self._require_free(
+                "attachment action", self._block_actions.keys() | self._attachment_actions.keys() | exact, legacy_id
+            )
+            claimed = sorted(value for value in values if (legacy_id, value) in self._legacy_callback_values)
+            if claimed:
+                raise ValueError(f"Slack attachment action {legacy_id!r} values {claimed} are already claimed")
         self._register_action("attachment action", self._attachment_actions, callback_id, listener, legacy_callback_ids)
+        for legacy_id, values in scoped.items():
+            self._scoped_attachment_actions.append((legacy_id, values, listener))
+            self._legacy_callback_values.update(dict.fromkeys(((legacy_id, value) for value in values), callback_id))
+            self._logger.debug(
+                "slack_listener_registered", kind="scoped attachment action", listener_id=legacy_id, values=sorted(values)
+            )
+
+    @staticmethod
+    def _scope_values(legacy_id: str, values: Collection[str]) -> frozenset[str]:
+        if isinstance(values, str) or not values or any(not value.strip() for value in values):
+            raise ValueError(f"Slack attachment action {legacy_id!r} needs a non-empty collection of non-blank values")
+        return frozenset(values)
 
     def legacy_ids(self) -> Mapping[str, str]:
         """Return each registered legacy id with the new id it aliases, for the legacy contract task to remove."""
         return MappingProxyType(dict(self._legacy_ids))
+
+    def legacy_callback_values(self) -> Mapping[tuple[str, str], str]:
+        """Return each value-scoped legacy (callback id, value) with the new id it aliases, for the legacy contract task to remove."""
+        return MappingProxyType(dict(self._legacy_callback_values))
 
     def register_view_submission(self, callback_id: str, listener: Callable[..., object]) -> None:
         """Register a native Bolt listener for one view submission, by exact ``callback_id``.
@@ -664,7 +701,11 @@ class SlackPlatformProvider:
     ) -> None:
         """Store an action listener under its id and every legacy alias, or none of them when one is taken."""
         ids = (action_id, *legacy_ids)
-        taken = self._block_actions.keys() | self._attachment_actions.keys()
+        taken = (
+            self._block_actions.keys()
+            | self._attachment_actions.keys()
+            | {scoped[0] for scoped in self._scoped_attachment_actions}
+        )
         for listener_id in ids:
             self._require_free(kind, taken, listener_id)
             taken.add(listener_id)
@@ -700,6 +741,8 @@ class SlackPlatformProvider:
             self._app.block_action(action_id)(listener)
         for callback_id, listener in self._attachment_actions.items():
             self._app.attachment_action(callback_id)(listener)
+        for callback_id, values, listener in self._scoped_attachment_actions:
+            self._app.attachment_action(callback_id, matchers=[_value_in(values)])(listener)
         for callback_id, listener in self._view_submissions.items():
             self._app.view_submission(callback_id)(listener)
         self._listeners_attached = True
@@ -707,6 +750,7 @@ class SlackPlatformProvider:
             "slack_interaction_listeners_attached",
             block_actions=sorted(self._block_actions),
             attachment_actions=sorted(self._attachment_actions),
+            scoped_attachment_actions=sorted(f"{callback_id}:{value}" for callback_id, value in self._legacy_callback_values),
             view_submissions=sorted(self._view_submissions),
         )
 
@@ -1183,6 +1227,16 @@ class SlackPlatformProvider:
     def __repr__(self) -> str:
         """String representation of the provider."""
         return f"{self.__class__.__name__}(name={self._name!r}, version={self._version!r}, enabled={self._enabled})"
+
+
+def _value_in(values: frozenset[str]) -> Callable[..., bool]:
+    """Bolt listener matcher: the clicked legacy button's value is one of ``values``; no value never matches."""
+
+    def matches(body: dict[str, Any]) -> bool:
+        actions = body.get("actions") or [{}]
+        return isinstance(actions[0], dict) and actions[0].get("value") in values
+
+    return matches
 
 
 @cache
