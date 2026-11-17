@@ -514,7 +514,9 @@ class InMemoryIncidentConversation:
     """Hold Slack conversations in a dict keyed by channel id; every write is recorded for assertions.
 
     Built with the Slack tenant it stands in for and the ids of open, archived and
-    non-member conversations; any other id is not found. Posts get ``ts`` values
+    non-member conversations, and private ones the bot left (``private_non_member_ids``,
+    whose join is refused); any other id is not found. ``joined`` lists the
+    conversations a join made the bot a member of. Posts get ``ts`` values
     ``1700000000.00000<n>`` in order. ``checked`` lists the conversations whose
     writability was asked.
 
@@ -533,6 +535,7 @@ class InMemoryIncidentConversation:
         open_ids: Sequence[str] = (),
         archived_ids: Sequence[str] = (),
         non_member_ids: Sequence[str] = (),
+        private_non_member_ids: Sequence[str] = (),
         names: Mapping[str, str] | None = None,
         foreign_names: Sequence[str] = (),
         groups: Mapping[str, Sequence[str]] | None = None,
@@ -545,12 +548,15 @@ class InMemoryIncidentConversation:
             self._conversations[vendor_id] = _StoredConversation(archived=True, member=True)
         for vendor_id in non_member_ids:
             self._conversations[vendor_id] = _StoredConversation(archived=False, member=False)
+        for vendor_id in private_non_member_ids:
+            self._conversations[vendor_id] = _StoredConversation(archived=False, member=False, private=True)
         self._posted = 0
         self._created = 0
         self._names = dict(names or {})
         self._foreign_names = frozenset(foreign_names)
         self._groups = {group_id: tuple(members) for group_id, members in (groups or {}).items()}
         self.checked: list[ConversationReference] = []
+        self.joined: list[ConversationReference] = []
 
     def topic_of(self, conversation: ConversationReference) -> str | None:
         """Return the topic last set on ``conversation``."""
@@ -693,6 +699,24 @@ class InMemoryIncidentConversation:
             return _not_writable("not_in_channel")
         stored.archived = True
         return OperationResult.success()
+
+    async def join(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Make the bot a member; an archived conversation, or a private one it is not in, is not writable."""
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        if stored.archived:
+            return _not_writable("is_archived")
+        if not stored.member and stored.private:
+            return _not_writable("method_not_supported_for_channel_type")
+        if not stored.member:
+            self.joined.append(conversation)
+        stored.member = True
+        return OperationResult.success()
+
+    def is_archived(self, conversation: ConversationReference) -> bool:
+        """Say whether ``conversation`` is archived."""
+        return self._conversations[conversation.vendor_id].archived
 
     async def purpose(self, conversation: ConversationReference) -> OperationResult[str]:
         """Return the purpose last set (or seeded) on the conversation; an empty string when none."""

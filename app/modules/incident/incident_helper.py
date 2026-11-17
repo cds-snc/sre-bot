@@ -8,22 +8,16 @@ from structlog import get_logger
 
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.adapters import google_docs as incident_drive
-from integrations.sentinel import log_to_sentinel
 from integrations.slack import (
     channels as slack_channels,
 )
 from integrations.slack import (
     commands as slack_commands,
 )
-from integrations.slack import (
-    users as slack_users,
-)
 from modules.incident import (
-    db_operations,
     incident_alert,
     incident_conversation,
     incident_folder,
-    incident_status,
     information_display,
     information_update,
     schedule_retro,
@@ -154,7 +148,6 @@ def register(bot: App):
 def get_incident_actions() -> dict[str, Callable]:
     """Returns a dictionary mapping incident subcommands to their handler functions."""
     return {
-        "close": handle_close,
         "show": handle_show,
         "help": handle_help,
         "aide": handle_help,
@@ -222,10 +215,6 @@ def handle_help(_client, _body, respond, _ack, args, _flags) -> None:
         respond(help_text_fr)
     else:
         respond(help_text)
-
-
-def handle_close(client, body, respond, ack, _args, _flags):
-    close_incident(client, body, ack, respond)
 
 
 def handle_show(client, body, respond, _ack, _args, _flags):
@@ -347,91 +336,6 @@ def handle_legacy_stale(client, body, respond, ack, _args, _flags):
         "The `/sre incident stale` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident list --stale` instead."
     )
     stale_incidents(client, body, ack)
-
-
-def close_incident(client: WebClient, body, ack, respond):
-    ack()
-    # get the current chanel id and name
-    channel_id = body["channel_id"]
-    channel_name = body["channel_name"]
-    user_id = slack_users.get_user_id_from_request(body)
-    incident_id = None
-    try:
-        incident = db_operations.get_incident_by_channel_id(channel_id)
-    except db_operations.IncidentStoreUnavailableError:
-        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
-        return
-    if incident:
-        incident_id = incident.get("id", {}).get("S", None)
-    # ensure the bot is actually in the channel before performing actions
-    try:
-        response = client.conversations_info(channel=channel_id)
-        channel_info = response.get("channel", None)
-        if channel_info is None or not channel_info.get("is_member", False):
-            client.conversations_join(channel=channel_id)
-    except Exception as e:
-        logger.exception("client_conversations_error", channel_id=channel_id, error=str(e))
-        return
-
-    if not channel_name.startswith("incident-"):
-        try:
-            client.chat_postEphemeral(
-                text=f"Channel {channel_name} is not an incident channel. Please use this command in an incident channel.",
-                channel=channel_id,
-                user=user_id,
-            )
-        except Exception as e:
-            logger.exception(
-                "client_post_ephemeral_error",
-                channel_id=channel_id,
-                user_id=user_id,
-                error=str(e),
-            )
-        return
-
-    incident_status.update_status(
-        client,
-        respond,
-        "Closed",
-        channel_id,
-        channel_name,
-        user_id,
-        incident_id,
-    )
-
-    # Need to post the message before the channel is archived so that the message can be delivered.
-    try:
-        client.chat_postMessage(
-            channel=channel_id,
-            text=f"<@{user_id}> has archived this channel 👋",
-        )
-    except Exception as e:
-        logger.exception(
-            "client_post_message_error",
-            channel_id=channel_id,
-            user_id=user_id,
-            error=str(e),
-        )
-
-    # archive the channel
-    try:
-        client.conversations_archive(channel=channel_id)
-        logger.info(
-            "incident_channel_archived",
-            channel_id=channel_id,
-            channel_name=channel_name,
-            user_id=user_id,
-        )
-        log_to_sentinel("incident_channel_archived", body)
-    except Exception as e:
-        logger.exception(
-            "client_conversations_archive_error",
-            channel_id=channel_id,
-            user_id=user_id,
-            error=str(e),
-        )
-        error_message = f"Could not archive the channel {channel_name} due to error: {e}"
-        respond(error_message)
 
 
 def stale_incidents(client: WebClient, body, ack: Ack):

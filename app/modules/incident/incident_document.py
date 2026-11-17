@@ -76,7 +76,7 @@ def update_incident_document_status(document_id, new_status="Closed"):
     if new_status not in set(IncidentStatus):
         raise ValueError(f"Invalid status: {new_status}")
 
-    # The mapping lives in core (decisions/migration.md rule 5); TASK-145.8.5 deletes this function.
+    # The mapping lives in core (decisions/migration.md rule 5); TASK-145.8.3 deletes this function with its last caller (information_update.py).
     return replace_placeholders(document_id, status_line_replacements(IncidentStatus(new_status)), match_case=False)
 
 

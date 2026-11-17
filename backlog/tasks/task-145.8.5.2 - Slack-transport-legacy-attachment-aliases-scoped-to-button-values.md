@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.5.2
 title: 'Slack transport: legacy attachment aliases scoped to button values'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T19:34:00Z'
-updated_date: '2026-11-16T23:09:00Z'
+updated_date: '2026-11-17T19:05:00Z'
 labels:
   - slack
   - transport

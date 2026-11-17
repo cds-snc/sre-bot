@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T23:57:00Z'
+updated_date: '2026-11-17T19:03:00Z'
 labels:
   - incident
   - features
@@ -64,6 +64,14 @@ created: 2026-11-16T19:34:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.5 OQ3): the archive_channel callback is split by button value through value-scoped aliases (TASK-145.8.5.2): archive is TASK-145.8.5.3's, ignore is this task's (the nudge's delay, which rewrites the notice), schedule_retro is TASK-145.10's. Until TASK-145.10 lands, schedule_retro falls through to the legacy listener.
+
+---
+
+created: 2026-11-17T19:03:00Z
+
+---
+
+2026-11-17 (human, TASK-145.8.5.3 OQ2 and OQ6): (1) the rebuilt stale notice and the ignore reply follow the new i18n.md line: a request whose payload names no locale (block actions carry none) is answered in English and French, each from its catalogue. (2) /sre dev stale (modules/dev/platforms/slack.py handle_stale_dev_command) posts its own copy of the legacy notice with archive_channel and has no other owner: this task repoints it to the rebuilt notice's renderer or deletes it, before TASK-145.13 (AC #10) removes the value-scoped aliases.
 
 ---
 <!-- COMMENTS:END -->

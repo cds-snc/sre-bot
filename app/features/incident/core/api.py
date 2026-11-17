@@ -284,6 +284,15 @@ class IncidentConversation(Protocol):
         """Archive the conversation; one already archived is a success."""
         ...
 
+    async def join(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Make the bot a member of the conversation; already a member is a success.
+
+        A step of a write that needs membership (archive), never part of the
+        writability check. An archived conversation, or one the bot cannot join
+        (a private channel it left), is refused as ``CONVERSATION_NOT_WRITABLE``.
+        """
+        ...
+
     async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
         """Say whether the bot can write to the conversation (not archived, a member), without changing it."""
         ...

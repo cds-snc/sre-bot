@@ -94,6 +94,7 @@ REGISTERED_COMMAND_TREE: dict[str, bool] = {
     "sre.dev.stale": False,
     "sre.geolocate": False,
     "sre.incident": False,
+    "sre.incident.close": False,
     "sre.incident.draft": False,
     "sre.incident.roles": False,
     "sre.incident.roles.manage": False,

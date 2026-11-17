@@ -1213,9 +1213,8 @@ def test_handle_reaction_removed_forwarded_message():
 
 
 @patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.incident_helper")
 @patch("modules.incident.incident_conversation.log_to_sentinel")
-def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helper, mock_logger):
+def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_logger):
     client = MagicMock()
     body = {
         "actions": [{"value": "ignore"}],
@@ -1234,35 +1233,6 @@ def test_archive_channel_action_ignore(mock_log_to_sentinel, mock_incident_helpe
         attachments=[],
     )
     mock_log_to_sentinel.assert_called_once_with("incident_channel_archive_delayed", body)
-
-
-@patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.incident_helper")
-@patch("modules.incident.incident_conversation.log_to_sentinel")
-def test_archive_channel_action_archive(
-    mock_log_to_sentinel,
-    mock_incident_helper,
-    mock_logger,
-):
-    client = MagicMock()
-
-    body = {
-        "actions": [{"value": "archive"}],
-        "channel": {"id": "channel_id", "name": "incident-2024-01-12-test"},
-        "message_ts": "message_ts",
-        "user": {"id": "user_id"},
-    }
-    channel_info = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "user_id",
-    }
-    ack = MagicMock()
-    respond = MagicMock()
-    incident_conversation.archive_channel_action(client, body, ack, respond)
-    assert ack.call_count == 1
-    mock_log_to_sentinel.assert_called_once_with("incident_channel_archived", body)
-    mock_incident_helper.close_incident.assert_called_once_with(client, channel_info, ack, respond)
 
 
 @patch("modules.incident.incident_conversation.logger")

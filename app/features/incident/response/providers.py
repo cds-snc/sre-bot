@@ -15,6 +15,8 @@ from features.incident.core.api import (
     get_incident_report,
     get_legacy_roles_reader,
 )
+from features.incident.response.adapters.sentinel import SentinelArchiveEventSink
+from features.incident.response.interfaces import ArchiveEventSink
 
 
 def incident_report() -> IncidentReport:
@@ -35,3 +37,8 @@ def incident_conversation() -> IncidentConversation:
 def legacy_roles_reader() -> LegacyRolesReader:
     """Return the process-wide ``LegacyRolesReader`` (TODO(TASK-145.13): deleted with the legacy roles bridge)."""
     return get_legacy_roles_reader()
+
+
+def archive_event_sink() -> ArchiveEventSink:
+    """Return the sink the archived event is sent to (TODO(TASK-122): the audit capability's sink)."""
+    return SentinelArchiveEventSink()
