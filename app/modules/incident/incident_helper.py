@@ -32,13 +32,6 @@ from modules.incident import (
 )
 
 INCIDENT_CHANNELS_PATTERN = r"^incident-\d{4}-"
-VALID_STATUS = [
-    "In Progress",
-    "Open",
-    "Ready to be Reviewed",
-    "Reviewed",
-    "Closed",
-]
 
 UPDATES_RETIRED_POINTER = (
     "`/sre incident updates` has been retired. "
@@ -60,7 +53,7 @@ Usage:
 • channels     - Manage incident channels
 • products     - Manage incident products (aka folders)
 • roles        - Manage incident roles
-• status       - Update or show incident status
+• status       - Update the incident status
 
 *Incident-level actions (no resource):*
 • create       - Create a new incident
@@ -105,7 +98,7 @@ Utilisation:
 • channels     - Gérer les canaux d'incidents
 • products     - Gérer les produits d'incidents (dossiers)
 • roles        - Gérer les rôles d'incidents
-• status       - Mettre à jour ou afficher l'état d'un incident
+• status       - Mettre à jour l'état d'un incident
 
 *Actions pour l'incident (sans ressource):*
 • create       - Créer un nouvel incident
@@ -189,7 +182,6 @@ def get_resource_handlers():
         "product": handle_products,
         "roles": handle_roles,
         "updates": handle_updates,
-        "status": handle_status,
     }
 
 
@@ -212,12 +204,6 @@ def handle_incident_command(
         first_arg = None
     resource_handlers = get_resource_handlers()
     incident_actions = get_incident_actions()
-    # Handle deprecated `/sre incident status <status>` command
-    if first_arg == "status" and args_list and " ".join(args_list) in VALID_STATUS:
-        respond(
-            "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
-        )
-        args_list = ["update"] + args_list
 
     if first_arg in resource_handlers:
         # this is to handle if the argument is a resource
@@ -361,28 +347,6 @@ Use `/sre incident help` to see a list of commands."""
             incident_folder.list_folders_view(client, body, ack)
         case _:
             respond(product_help_text)
-
-
-def handle_status(client, body, respond, ack, action, args, _flags):
-    """Handle the status command."""
-    status_help_text = """`/sre incident status [options] [arguments]`
-
-*Options:*
-• `show` — show the current incident status
-• `update <status>` — update the incident status to one of the valid statuses
-
-*Valid Statuses:*
-""" + ", ".join(VALID_STATUS)
-    match action:
-        case "update":
-            if args:
-                handle_update_status_command(client, body, respond, ack, args)
-            else:
-                respond("Please provide a status to update.")
-        case "show":
-            respond("Upcoming feature: show current incident status.")
-        case _:
-            respond(status_help_text)
 
 
 def handle_roles(client, body, respond, ack, action, _args, _flags):
@@ -572,42 +536,6 @@ def channel_item(channel):
         },
         {"type": "divider"},
     ]
-
-
-def handle_update_status_command(client: WebClient, body, respond: Respond, ack: Ack, args):
-    ack()
-    status = str.join(" ", args)
-    user_id = slack_users.get_user_id_from_request(body)
-    valid_statuses = [
-        "In Progress",
-        "Open",
-        "Ready to be Reviewed",
-        "Reviewed",
-        "Closed",
-    ]
-    if status not in valid_statuses:
-        respond("A valid status must be used with this command:\n" + ", ".join(valid_statuses))
-        return
-    try:
-        incident = db_operations.get_incident_by_channel_id(body["channel_id"])
-    except db_operations.IncidentStoreUnavailableError:
-        respond(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
-        return
-
-    if not incident:
-        respond("No incident found for this channel. Will not update status in DB record.")
-        return
-    else:
-        respond(f"Updating incident status to {status}...")
-
-        incident_status.update_status(
-            client,
-            respond,
-            status,
-            body["channel_id"],
-            body["channel_name"],
-            user_id,
-        )
 
 
 def parse_incident_datetime_string(datetime_string: str) -> str:

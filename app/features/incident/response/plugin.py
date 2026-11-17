@@ -1,4 +1,4 @@
-"""The incident.response plugin: its requirements, the new-incident policy check and the incident legacy upgrade job.
+"""The incident.response plugin: its requirements, the new-incident policy check, the status commands and the incident legacy upgrade job.
 
 The entry point names this module, not the package, because the host
 configuration phase and the legacy modules read ``response/settings.py`` before
@@ -9,15 +9,19 @@ production run reports nothing pending.
 """
 
 from datetime import timedelta
+from pathlib import Path
 
 import structlog
 
+from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
 from contracts.plugins.namespace import hookimpl
 from contracts.plugins.requirements import Requirement
 from contracts.scheduler.registry import BackgroundJobRegistry
+from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.workplace import ConfiguredSystems
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.api import resolve_new_incident_system
+from features.incident.response.entrypoints import slack
 from features.incident.response.legacy_upgrade_job import run_legacy_upgrade
 from features.incident.response.settings import UpgradeMode, get_incident_response_settings
 
@@ -49,6 +53,36 @@ def startup_warmup(logger: structlog.stdlib.BoundLogger, systems: ConfiguredSyst
     """
     system = resolve_new_incident_system(get_incident_core_settings().new_incident_system, systems)
     logger.debug("incident_new_incident_system_resolved", system=system.value)
+
+
+@hookimpl
+def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
+    """Register ``/sre incident status`` and ``/sre incident status update``.
+
+    Args:
+        registrar: Slack command registrar.
+    """
+    slack.register(registrar)
+
+
+@hookimpl
+def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
+    """Register the incident response translation resource location.
+
+    The ``locales`` directory holds the ``incident_response`` catalogue.
+
+    Args:
+        registry: Registrar for translation resource specifications.
+    """
+    registry.register(
+        I18nResourceSpec(
+            owner="features.incident.response",
+            path=str(Path(__file__).parent / "locales"),
+            required=False,
+            format="yaml",
+            domain="incident_response",
+        )
+    )
 
 
 @hookimpl

@@ -4,7 +4,7 @@ title: Cut over incident show and the update modal
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T21:00:00Z'
+updated_date: '2026-11-16T15:51:00Z'
 labels:
   - incident
   - features
@@ -13,6 +13,7 @@ dependencies:
   - TASK-145.8.1
   - TASK-145.8.2
   - TASK-145.8.7
+  - TASK-145.8.4
 references:
   - decisions/incident-management.md
   - decisions/migration.md
@@ -49,6 +50,22 @@ created: 2026-11-10T21:00:00Z
 ---
 
 2026-11-10 (human-approved, TASK-145.7.6 OQ3 R3): depends on TASK-145.8.7 (L3b, async incident core ports), stacked between L3 and this layer; plan this cutover against the async ports.
+
+---
+
+created: 2026-11-16T15:46:00Z
+
+---
+
+2026-11-16 (TASK-145.8.4 OQ6, human): depends on TASK-145.8.4; the update modal's status field calls response's change_status (record first, then report text, projection, channel) and keeps its own pinned channel notice; L6a stacks above L6b.
+
+---
+
+created: 2026-11-16T15:51:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
 
 ---
 <!-- COMMENTS:END -->

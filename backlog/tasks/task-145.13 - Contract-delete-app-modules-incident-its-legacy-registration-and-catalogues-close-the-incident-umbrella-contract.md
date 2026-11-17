@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-09T19:04:00Z'
+updated_date: '2026-11-16T16:05:00Z'
 labels:
   - incident
   - features
@@ -126,6 +126,22 @@ created: 2026-11-09T18:37:00Z
 ---
 
 Stack L OQ assessment 2026-11-09 (OQ12, OQ17), proposed: the waits on TASK-165.1 and TASK-146.3 drop if 146.3 lands inside 145.7's L9a (declare invites through capabilities.oncall.api; the only remnant is a read-only schedule-source adapter owned by 165.1, outside modules/incident). The dev incident commands are deleted by TASK-145.12 (L11), so 'repointed or deleted' and 'decide delete or rewrite at pickup' no longer apply. Dependencies unchanged until the human rules.
+
+---
+
+created: 2026-11-16T15:51:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+
+created: 2026-11-16T16:05:00Z
+
+---
+
+2026-11-16 (TASK-145.8.4 OQ4): delete the bare-status pointer in incident.response's status node (a bare valid status answers 'use /sre incident status update <status>').
 
 ---
 <!-- COMMENTS:END -->

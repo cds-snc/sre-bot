@@ -11,7 +11,7 @@ from typing import Any
 
 from contracts.operations import OperationResult
 from contracts.operations.status import OperationStatus
-from contracts.records import ExpectedValue, RecordChange, RecordStore, RecordTable
+from contracts.records import ExpectedValue, RecordChange, RecordQuery, RecordStore, RecordTable
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.common.vocabulary import IncidentStatus
@@ -258,6 +258,43 @@ class FlakyRecordStore(InMemoryRecordStore):
             self.fail_updates[table.name] -= 1
             return _unavailable()
         return super().update(table, key, changes, expected=expected)
+
+
+class SwitchableRecordStore(InMemoryRecordStore):
+    """In-memory record store that fails every read and write with a transient error once ``go_down`` is called."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.down = False
+
+    def go_down(self) -> None:
+        """Make every later call fail the way a throttled or unreachable table does."""
+        self.down = True
+
+    def put(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        return _unavailable() if self.down else super().put(table, item)
+
+    def put_if_not_exists(self, table: RecordTable, item: dict[str, Any]) -> OperationResult:
+        return _unavailable() if self.down else super().put_if_not_exists(table, item)
+
+    def get(self, table: RecordTable, key: dict[str, Any]) -> OperationResult:
+        return _unavailable() if self.down else super().get(table, key)
+
+    def query(self, table: RecordTable, spec: RecordQuery) -> OperationResult:
+        return _unavailable() if self.down else super().query(table, spec)
+
+    def read_all(self, table: RecordTable, *, max_items: int) -> OperationResult:
+        return _unavailable() if self.down else super().read_all(table, max_items=max_items)
+
+    def update(
+        self,
+        table: RecordTable,
+        key: dict[str, Any],
+        changes: Sequence[RecordChange],
+        *,
+        expected: Mapping[str, ExpectedValue] | None = None,
+    ) -> OperationResult:
+        return _unavailable() if self.down else super().update(table, key, changes, expected=expected)
 
 
 def _unavailable() -> OperationResult:

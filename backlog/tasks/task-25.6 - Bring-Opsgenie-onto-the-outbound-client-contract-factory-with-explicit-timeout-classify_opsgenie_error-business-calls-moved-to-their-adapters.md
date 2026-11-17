@@ -3,10 +3,10 @@ id: TASK-25.6
 title: >-
   Bring Opsgenie onto the outbound-client contract: factory with explicit
   timeout, classify_opsgenie_error, business calls moved to their adapters
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-16T14:30:00Z'
+updated_date: '2026-11-16T16:04:00Z'
 labels:
   - clients
   - phase-3

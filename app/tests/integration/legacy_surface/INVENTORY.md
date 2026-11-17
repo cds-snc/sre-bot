@@ -14,8 +14,8 @@ messages stay working; modal-internal ids may take the plugin prefix at rebuild
 Each surface is assigned to a target by what it does, not by the module that
 holds it today. `modules/sre` and `modules/aws` are grab-bags, so their
 surfaces go to different targets. Incident surfaces go to `app/features/incident/`
-through TASK-145, which rebuilds the legacy incident module surface by surface;
-rows that still name TASK-38 are repointed as their pins land.
+through TASK-145, which rebuilds the legacy incident module surface by surface
+(TASK-145 replaced TASK-38).
 
 Conventions:
 
@@ -117,15 +117,16 @@ generates the help text.
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| `/sre` root; `/sre version`, `/sre incident` (legacy mode), `/sre webhooks` (legacy mode) | `modules/sre/__init__.py:7` → `modules/sre/platforms/slack.py:183` | hard-coded `_register_legacy_slack_commands` | split: `version` → `app/server/` (system info, like `GET /version`); `incident` → `app/features/incident/`; `webhooks` → `app/capabilities/webhooks/` (admin surface) | `version` TASK-40; `incident` TASK-38; `webhooks` TASK-37.4 | `test_slack_command_registration_surface.py` `-k "sre_ or registered_once or prefix or tree"` |
+| `/sre` root; `/sre version`, `/sre incident` (legacy mode), `/sre webhooks` (legacy mode) | `modules/sre/__init__.py:7` → `modules/sre/platforms/slack.py:183` | hard-coded `_register_legacy_slack_commands` | split: `version` → `app/server/` (system info, like `GET /version`); `incident` → `app/features/incident/`; `webhooks` → `app/capabilities/webhooks/` (admin surface) | `version` TASK-40; `incident` TASK-145; `webhooks` TASK-37.4 | `test_slack_command_registration_surface.py` `-k "sre_ or registered_once or prefix or tree"` |
 | `/sre dev` with `google`, `slack`, `stale`, `incident`, `load-incidents`, `add-incident` (dev environment only) | `modules/dev/__init__.py:11` → `modules/dev/platforms/slack.py:291` | hard-coded `_register_legacy_slack_commands` | delete: dev-environment test commands with no production users (TASK-40 records the drop) | TASK-40 | `test_slack_command_registration_surface.py` `-k dev_` |
 | `/rant` (root command, no parent) | `packages/rant/__init__.py:9` → `packages/rant/platforms/slack.py:19` | hookimpl | `app/features/rant/` | TASK-124.3 | `test_slack_command_registration_surface.py` `-k rant` |
 | `/sre rotations`; `/sre rotations view <usergroup_handle>` | `packages/user_rotations/__init__.py:7` → `packages/user_rotations/platforms/slack.py:18` | hookimpl | `app/capabilities/rotations/` | TASK-123 | `test_slack_command_registration_surface.py` `-k rotations` |
 | `/sre access` (parent, shared by the access subpackages); `/sre access sync`; `sync user <user_email> <platform> [--dry-run]`; `sync platform <platform> [--dry-run]`; `sync status <job_id>` | `packages/access/sync/__init__.py:26` → `packages/access/sync/interactions/slack.py:38` | hookimpl | `app/features/access/` (sync) | TASK-124.1 | `test_slack_command_registration_surface.py` `-k access_sync` |
 | `/sre incident draft [--limit]` | `features/incident/scribe/__init__.py:19` → `features/incident/scribe/entrypoints/slack.py:79` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_draft` |
 | `/sre incident summarize [--since] [--limit]` | `features/incident/scribe/__init__.py:19` → `features/incident/scribe/entrypoints/slack.py:98` | hookimpl | `app/features/incident/` (scribe) | TASK-124.5 | `test_slack_command_registration_surface.py` `-k incident_summarize` |
+| `/sre incident status update <status>`; `/sre incident status` and `status show` (help); a bare `status <status>` (pointer to `status update`, the form retired after 2025-11-01, TASK-145.8.4 named change (c)) | `features/incident/response/plugin.py` → `features/incident/response/entrypoints/slack.py` | hookimpl | `app/features/incident/` (response) | TASK-145.8.4 (pointer deleted by TASK-145.13) | `test_incident_status_command_surface.py`; `test_slack_command_registration_surface.py` `-k registered_command_tree_is_unchanged` |
 | `/sre incident status-update` | `features/incident/comms/__init__.py:19` → `features/incident/comms/entrypoints/slack.py:124` | hookimpl | `app/features/incident/` (comms) | TASK-145.4 | `test_slack_command_registration_surface.py` `-k registered_command_tree_is_unchanged` |
-| `/sre incident updates` (any action): bilingual pointer to `/sre incident status-update`, no modal and no store access | `modules/incident/incident_helper.py:406` (resource key at `:193`), reached through the legacy `/sre incident` dispatcher | hard-coded `_register_legacy_slack_commands` | delete with the legacy `/sre incident` dispatcher (TASK-38.4 removes it; the pointer goes with it) | TASK-38 | `test_incident_updates_command_surface.py` `-k incident_updates` |
+| `/sre incident updates` (any action): bilingual pointer to `/sre incident status-update`, no modal and no store access | `modules/incident/incident_helper.py:406` (resource key at `:193`), reached through the legacy `/sre incident` dispatcher | hard-coded `_register_legacy_slack_commands` | delete with the legacy `/sre incident` dispatcher (TASK-145.13 removes it; the pointer goes with it) | TASK-145.13 | `test_incident_updates_command_surface.py` `-k incident_updates` |
 | `/sre geolocate <ip_address>` | `packages/geolocate/__init__.py:14` → `packages/geolocate/platforms/slack.py:20` | hookimpl | `app/features/geolocate/` | TASK-124.6 | `test_slack_command_registration_surface.py` `-k geolocate` |
 
 ## Other `app/api/` routes

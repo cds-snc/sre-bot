@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:37:00Z'
+updated_date: '2026-11-16T15:51:00Z'
 labels:
   - incident
   - features
@@ -39,3 +39,15 @@ Stack L L11 (outline in TASK-145.12's plan). /sre incident list active and stale
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-10: after this task deploys, the legacy upgrade job reruns (dry_run, then apply; README Rerun rule) before TASK-145.13 deletes it; items written by a legacy writer after the TASK-145.7.8 run have no marker and no binding until then.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-16T15:51:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+<!-- COMMENTS:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-145.12.1
 title: Incident list projection adapter in core over integrations/google_workspace
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T13:26:00Z'
+updated_date: '2026-11-16T15:53:00Z'
 labels:
   - incident
   - features

@@ -7,8 +7,6 @@ from contracts.operations import OperationStatus
 from modules import incident_helper
 from modules.incident import db_operations
 
-VALID_STATUS = incident_helper.VALID_STATUS
-
 # Legacy command tests to be removed once transition period is over
 
 
@@ -72,26 +70,6 @@ def test_legacy_handle_incident_command_with_list_folders(mock_list_folders):
 
     incident_helper.handle_incident_command(["list-folders"], client, body, respond, ack)
     mock_list_folders.assert_called_once_with(client, body, ack)
-
-
-# @patch("modules.incident.incident_helper.handle_status")
-@patch("modules.incident.incident_helper.handle_update_status_command")
-def test_legacy_handle_incident_command_with_update_status_command(
-    mock_handle_update_status_command,
-    # mock_handle_status,
-):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    args = ["status", "Ready", "to", "be", "Reviewed"]
-    incident_helper.handle_incident_command(args, client, body, respond, ack)
-    args.pop(0)  # remove status value as it doesn't get parsed after
-    respond.assert_called_once_with(
-        "The `/sre incident status <status>` command is deprecated and will be discontinued after 2025-11-01. Please use `/sre incident status update <status>` instead."
-    )
-    mock_handle_update_status_command.assert_called_once_with(client, body, respond, ack, args)
 
 
 @patch("modules.incident.incident_helper.stale_incidents")
@@ -414,58 +392,6 @@ def test_handle_products_with_create_error(mock_create_folder):
     mock_create_folder.assert_called_once_with("foo bar", ANY)
 
     respond.assert_called_once_with("Failed to create product `foo bar`.")
-
-
-def test_handle_status_with_no_action():
-    respond = MagicMock()
-    ack = MagicMock()
-    status_help_text = """`/sre incident status [options] [arguments]`
-
-*Options:*
-• `show` — show the current incident status
-• `update <status>` — update the incident status to one of the valid statuses
-
-*Valid Statuses:*
-""" + ", ".join(VALID_STATUS)
-    incident_helper.handle_status(MagicMock(), MagicMock(), respond, ack, None, [], {})
-    respond.assert_called_once_with(status_help_text)
-
-
-@patch("modules.incident.incident_helper.handle_update_status_command")
-def test_handle_status_with_update(mock_update_status_command):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_status(client, body, respond, ack, "update", ["Ready", "to", "be", "Reviewed"], {})
-    mock_update_status_command.assert_called_once_with(client, body, respond, ack, ["Ready", "to", "be", "Reviewed"])
-
-
-@patch("modules.incident.incident_helper.handle_update_status_command")
-def test_handle_status_with_update_no_args(mock_update_status_command):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_status(client, body, respond, ack, "update", [], {})
-    mock_update_status_command.assert_not_called()
-    respond.assert_called_once_with("Please provide a status to update.")
-
-
-def test_handle_status_with_show():
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = {
-        "channel_id": "channel_id",
-        "channel_name": "incident-2024-01-12-test",
-        "user_id": "user_id",
-    }
-
-    incident_helper.handle_status(client, body, respond, ack, "show", [], {})
-    respond.assert_called_once_with("Upcoming feature: show current incident status.")
 
 
 @patch("modules.incident.incident_helper.incident_roles")
@@ -895,103 +821,6 @@ def test_close_incident_handles_post_message_failure(
     )
 
 
-@patch("modules.incident.incident_helper.logger")
-@patch("modules.incident.incident_helper.slack_users")
-@patch("modules.incident.incident_helper.db_operations")
-@patch("modules.incident.incident_helper.incident_status")
-def test_handle_update_status_command(mock_incident_status, mock_db_operations, mock_slack_users, mock_logger):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_respond = MagicMock()
-
-    args = ["Closed"]
-    mock_slack_users.get_user_id_from_request.return_value = "U12345"
-    mock_db_operations.get_incident_by_channel_id.return_value = [{"id": {"S": "incident-2024-01-12-test"}}]
-    incident_helper.handle_update_status_command(
-        mock_client,
-        {
-            "channel_id": "C12345",
-            "channel_name": "incident-2024-01-12-test",
-            "user_id": "U12345",
-            "text": "Closed",
-        },
-        mock_respond,
-        mock_ack,
-        args,
-    )
-
-    mock_ack.assert_called_once()
-    mock_incident_status.update_status.assert_called_once_with(
-        mock_client,
-        mock_respond,
-        "Closed",
-        "C12345",
-        "incident-2024-01-12-test",
-        "U12345",
-    )
-
-
-@patch("modules.incident.incident_helper.logger")
-@patch("modules.incident.incident_helper.slack_users")
-@patch("modules.incident.incident_helper.incident_status")
-@patch("modules.incident.incident_helper.db_operations")
-def test_handle_update_status_command_invalid_status(mock_db_operations, mock_incident_status, mock_slack_users, mock_logger):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_respond = MagicMock()
-
-    args = ["InvalidStatus"]
-    mock_db_operations.get_incident_by_channel_id.return_value = {"id": {"S": "incident-2024-01-12-test"}}
-    # Call the function
-    incident_helper.handle_update_status_command(
-        mock_client,
-        {
-            "channel_id": "C12345",
-            "channel_name": "incident-2024-01-12-test",
-            "user_id": "U12345",
-            "text": "InvalidStatus",
-        },
-        mock_respond,
-        mock_ack,
-        args,
-    )
-
-    mock_ack.assert_called_once()
-    mock_respond.assert_called_once_with(
-        "A valid status must be used with this command:\nIn Progress, Open, Ready to be Reviewed, Reviewed, Closed"
-    )
-    mock_incident_status.update_status.assert_not_called()
-
-
-@patch("modules.incident.incident_helper.slack_users")
-@patch("modules.incident.incident_helper.incident_status")
-@patch("modules.incident.incident_helper.db_operations")
-def test_handle_update_status_command_no_incidents_found(mock_db_operations, mock_incident_status, mock_slack_users):
-    mock_client = MagicMock()
-    mock_ack = MagicMock()
-    mock_respond = MagicMock()
-
-    args = ["Closed"]
-    mock_db_operations.get_incident_by_channel_id.return_value = []
-    # Call the function
-    incident_helper.handle_update_status_command(
-        mock_client,
-        {
-            "channel_id": "C12345",
-            "channel_name": "incident-2024-01-12-test",
-            "user_id": "U12345",
-            "text": "Closed",
-        },
-        mock_respond,
-        mock_ack,
-        args,
-    )
-
-    mock_ack.assert_called_once()
-    mock_respond.assert_called_once_with("No incident found for this channel. Will not update status in DB record.")
-    mock_incident_status.update_status.assert_not_called()
-
-
 def test_parse_incident_datetime_string():
     assert incident_helper.parse_incident_datetime_string("2025-01-23 17:02:16.915368") == "2025-01-23 17:02"
     assert incident_helper.parse_incident_datetime_string("2025-01-23 17:02") == "Unknown"
@@ -1068,24 +897,5 @@ def test_close_incident_responds_when_store_unavailable(mock_db_ops):
     ack = MagicMock()
 
     incident_helper.close_incident(client, body, ack, respond)
-
-    respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)
-
-
-@patch("modules.incident.incident_helper.db_operations")
-def test_handle_update_status_command_responds_when_store_unavailable(mock_db_ops):
-    """When the incidents store is unavailable, the handler responds with the unavailable message."""
-    mock_db_ops.IncidentStoreUnavailableError = db_operations.IncidentStoreUnavailableError
-    mock_db_ops.INCIDENT_STORE_UNAVAILABLE_MESSAGE = db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE
-    mock_db_ops.get_incident_by_channel_id.side_effect = db_operations.IncidentStoreUnavailableError(
-        OperationStatus.PERMANENT_ERROR
-    )
-
-    client = MagicMock()
-    body = {"channel_id": "C1234567890"}
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_update_status_command(client, body, respond, ack, ["Closed"])
 
     respond.assert_called_once_with(db_operations.INCIDENT_STORE_UNAVAILABLE_MESSAGE)

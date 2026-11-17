@@ -329,6 +329,7 @@ class _StoredReport:
     folder_id: str
     sections: list[DocumentSection] = field(default_factory=list)
     placeholders: dict[str, str] = field(default_factory=dict)
+    status: IncidentStatus | None = None
 
 
 @dataclass(frozen=True)
@@ -377,6 +378,10 @@ class InMemoryIncidentReport:
     def filed_in(self, report: ReportReference) -> str:
         """Return the folder a created report was filed in."""
         return self._reports[report.vendor_id].folder_id
+
+    def status_text_of(self, report: ReportReference) -> IncidentStatus | None:
+        """Return the status last set on ``report``'s status line, ``None`` before any."""
+        return self._reports[report.vendor_id].status
 
     def placeholders_of(self, report: ReportReference) -> Mapping[str, str]:
         """Return the placeholder values applied to ``report`` so far."""
@@ -430,6 +435,16 @@ class InMemoryIncidentReport:
         if stored is None:
             return _no_such_report()
         stored.placeholders.update(values)
+        return OperationResult.success()
+
+    async def set_status_text(self, report: ReportReference, status: IncidentStatus) -> OperationResult[None]:
+        """Record the status on a known report's status line."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _no_such_report()
+        stored.status = status
         return OperationResult.success()
 
     async def read_sections(self, report: ReportReference) -> OperationResult[Sequence[DocumentSection]]:
