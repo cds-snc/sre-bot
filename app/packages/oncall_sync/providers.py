@@ -8,15 +8,17 @@ hookimpls in ``__init__.py`` stay untouched.
 
 from functools import lru_cache
 
+from capabilities.oncall.api import get_oncall_lookup
 from packages.oncall_sync.adapters.opsgenie import OpsGenieScheduleProvider
+from packages.oncall_sync.adapters.rotations import CapabilityUserRotations
 from packages.oncall_sync.adapters.slack import build_user_group_sync_target
 from packages.oncall_sync.ports import (
     OnCallScheduleProvider,
     UserGroupSyncTarget,
+    UserRotationsProvider,
 )
 from packages.oncall_sync.service import OnCallSyncService
 from packages.oncall_sync.settings import get_oncall_schedules, get_oncall_sync_settings
-from packages.user_rotations.providers import get_user_rotations_service
 
 
 @lru_cache(maxsize=1)
@@ -30,10 +32,15 @@ def get_user_group_sync_target() -> UserGroupSyncTarget:
 
 
 @lru_cache(maxsize=1)
+def get_user_rotations_provider() -> UserRotationsProvider:
+    return CapabilityUserRotations(get_oncall_lookup())
+
+
+@lru_cache(maxsize=1)
 def get_oncall_sync_service() -> OnCallSyncService:
     return OnCallSyncService(
         on_call=get_oncall_schedule_provider(),
         target=get_user_group_sync_target(),
         schedules=get_oncall_schedules(),
-        user_rotations=get_user_rotations_service(),
+        user_rotations=get_user_rotations_provider(),
     )

@@ -39,11 +39,11 @@ scope: Who is on call, where schedules come from, and how the incident feature a
 Tickets: TASK-146 (the capability, `oncall_sync` over it, incident declare through it), after TASK-25.6 (Opsgenie client) and TASK-114 (the capabilities directory and shape check). TASK-123 and TASK-124.2 are superseded by it.
 
 Tolerated until then:
-- `packages/oncall_sync` importing `packages.user_rotations` and holding its own Opsgenie adapter and `ports.py`;
-- `packages/user_rotations` as a feature with `platforms/`;
+- `packages/oncall_sync` holding its own Opsgenie adapter and `ports.py` (TASK-146.2);
 - the product catalog holding an Opsgenie-specific schedule value and the legacy declare flow calling Opsgenie directly.
 
 **Changes:**
 - 2026-10-09: Accepted (TASK-146). On-call is a capability with two schedule sources; rotations are a source, not a capability; Opsgenie's end is a one-adapter change.
 - 2026-10-27: Opsgenie's end of support recorded (2027-04-05). Opsgenie is only an adapter behind on-call and user rotations; TASK-146 is re-cut before planning to re-architect both features, choosing the replacement source before that date (human, TASK-111.12 planning).
 - 2026-11-16: Built (TASK-146.1.1). Lookups return `OperationResult` (an unknown system is `ADAPTER_NOT_FOUND`, no custom exception); `Account` is shaped as TASK-83.4 specifies; the host's settings reads of `integrations.opsgenie` in `server/` are allowed beside the one adapter.
+- 2026-11-17: `packages/user_rotations` deleted (TASK-146.1.2): its rotation files moved byte-identical to `capabilities/oncall/adapters/rotation_files/`, `/sre rotations` is served by `capabilities/oncall/entrypoints/slack.py` under the `oncall` enablement key, and `oncall_sync` reads self-managed rotations only through `capabilities.oncall.api`, skipping a rotation whose lookup fails instead of emptying its usergroup.

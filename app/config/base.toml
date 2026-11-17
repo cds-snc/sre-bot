@@ -266,7 +266,6 @@ sheet_id = ""
 "incident.response" = true
 "incident.scribe" = true
 oncall_sync = true
-user_rotations = true
 oncall = true
 
 [plugins.cloud_operations]

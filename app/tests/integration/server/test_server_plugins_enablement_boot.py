@@ -67,7 +67,6 @@ def test_base_keeps_the_access_plugins_off_and_every_other_plugin_on() -> None:
         "incident.response",
         "incident.scribe",
         "oncall_sync",
-        "user_rotations",
         "rant",
     }
 

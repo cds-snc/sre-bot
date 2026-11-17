@@ -39,7 +39,6 @@ DISABLED_PLUGINS = {
     "incident.scribe",
     "oncall_sync",
     "rant",
-    "user_rotations",
 }
 ENABLED_PLUGINS = {
     "geolocate",

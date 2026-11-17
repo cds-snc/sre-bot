@@ -9,14 +9,13 @@ from collections.abc import Sequence
 
 import pytest
 
-from packages.oncall_sync.ports import OnCallSyncError
+from packages.oncall_sync.ports import CurrentUserRotation, OnCallSyncError
 from packages.oncall_sync.service import OnCallSyncService
 from packages.oncall_sync.settings import (
     OnCallRotation,
     OnCallRotationConfig,
     OnCallScheduleConfig,
 )
-from packages.user_rotations.service import CurrentUserRotation
 
 
 def _rotation_config(handle: str = "oncall-x", name: str = "rot") -> OnCallRotationConfig:
@@ -79,7 +78,7 @@ class _FakeUserRotations:
     def __init__(self, current_rotations: list[CurrentUserRotation]) -> None:
         self._current_rotations = current_rotations
 
-    def get_current_rotations(self) -> list[CurrentUserRotation]:
+    async def get_current_rotations(self) -> list[CurrentUserRotation]:
         return self._current_rotations
 
 

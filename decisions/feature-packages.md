@@ -10,7 +10,7 @@ scope: The one package shape for features, capabilities and their subdomains, pl
 ## Context
 
 Features live in `app/packages/` today; `features/` and `capabilities/` do not exist yet ([plugin-architecture.md](plugin-architecture.md)). An earlier layout record was a closed filename list that banned names the code needed (no slot for persistence, no `locales/`), so this record was reconciled with the shipped shape. Nothing enforces it, and the shipped packages have drifted:
-- Three packages (`geolocate`, `rant`, `user_rotations`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
+- Two packages (`geolocate`, `rant`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
 - Handler files in six packages import `integrations.slack` directly, `oncall_sync/providers.py` imports `integrations.slack.settings`, and the `incident/scribe` service imports `integrations.openai`.
 - `access/sync` handlers are synchronous `def` functions.
 - `access/request` and `access/sync` publish and handle domain events through the blinker-backed `infrastructure.events` dispatcher.

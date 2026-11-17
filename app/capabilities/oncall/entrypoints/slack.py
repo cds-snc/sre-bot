@@ -1,26 +1,32 @@
-"""Slack command interface for viewing user rotations."""
+"""Slack entry points of the on-call capability: ``/sre rotations`` over the self-managed rotations.
 
+The one case where a capability has entry points (decisions/oncall.md). Each handler makes one
+lookup call; the sync Bolt edge bridges it with one ``asyncio.run``.
+"""
+
+import asyncio
 from datetime import datetime
 from typing import Any
 
 import structlog
 
+from capabilities.oncall.api import ROTATIONS, OnCallLookup, OnCallPerson, ScheduleReference, Shift, get_oncall_lookup
+from contracts.operations.status import OperationStatus
 from contracts.slack.models import Argument, ArgumentType, CommandPayload, CommandResponse
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
-from packages.user_rotations.providers import get_user_rotations_service
-from packages.user_rotations.service import UserRotationShift, UserRotationsService
 
 logger = structlog.get_logger()
 
-README_URL = "https://github.com/cds-snc/sre-bot/blob/main/app/packages/user_rotations/README.md"
+README_URL = "https://github.com/cds-snc/sre-bot/blob/main/app/capabilities/oncall/README.md"
+SLACK_PLATFORM = "slack"
 
 
 def register_commands(registrar: SlackCommandRegistrar) -> None:
     """Register ``/sre rotations`` commands."""
 
     def dispatch(payload: CommandPayload, parsed_args: dict[str, Any]) -> CommandResponse:
-        return handle_view_command(payload, parsed_args, registrar.reply, get_user_rotations_service())
+        return handle_view_command(payload, parsed_args, registrar.reply, get_oncall_lookup())
 
     registrar.register_command(
         command="rotations",
@@ -63,19 +69,24 @@ def handle_view_command(
     payload: CommandPayload,
     parsed_args: dict[str, Any],
     reply: SlackReplySender,
-    service: UserRotationsService,
+    lookup: OnCallLookup,
 ) -> CommandResponse:
-    """Open a modal showing the selected rotation's next 12 weeks of shifts."""
+    """Open a modal showing the selected rotation's active shift and those of the next 12 weeks."""
     handle = str(parsed_args["usergroup_handle"])
-    shifts = service.get_rotation_shifts(handle)
-    if shifts is None:
+    result = asyncio.run(lookup.get_schedule(ScheduleReference(ROTATIONS, handle)))
+    if result.status is OperationStatus.NOT_FOUND:
         return CommandResponse(message=f"No user rotation configured for `{handle}`.", ephemeral=True)
+    if not result.is_success or result.data is None:
+        logger.warning(
+            "user_rotations_view_lookup_failed", usergroup_handle=handle, error=result.message, error_code=result.error_code
+        )
+        return CommandResponse(message="Unable to open the user rotation view.", ephemeral=True)
 
     trigger_id = str(payload.platform_metadata.get("trigger_id", ""))
     if not trigger_id:
         return CommandResponse(message="Unable to open the user rotation view.", ephemeral=True)
 
-    opened = reply.open_view(trigger_id=trigger_id, view=_modal(shifts))
+    opened = reply.open_view(trigger_id=trigger_id, view=_modal(result.data.shifts))
     if not opened.is_success:
         logger.warning(
             "user_rotations_view_open_failed",
@@ -87,7 +98,7 @@ def handle_view_command(
     return CommandResponse(message="", ephemeral=True)
 
 
-def _modal(shifts: list[UserRotationShift]) -> dict[str, Any]:
+def _modal(shifts: tuple[Shift, ...]) -> dict[str, Any]:
     return {
         "type": "modal",
         "title": {"type": "plain_text", "text": "User rotation"},
@@ -96,8 +107,14 @@ def _modal(shifts: list[UserRotationShift]) -> dict[str, Any]:
     }
 
 
-def _format_shift(shift: UserRotationShift) -> str:
-    return f"<@{shift.slack_user_id}> | {_format_datetime(shift.start)} - {_format_datetime(shift.end)}"
+def _format_shift(shift: Shift) -> str:
+    return f"{_mention(shift.person)} | {_format_datetime(shift.start)} - {_format_datetime(shift.end)}"
+
+
+def _mention(person: OnCallPerson) -> str:
+    if person.account is not None and person.account.platform == SLACK_PLATFORM:
+        return f"<@{person.account.account_id}>"
+    return person.email or "unknown"
 
 
 def _format_datetime(value: datetime) -> str:

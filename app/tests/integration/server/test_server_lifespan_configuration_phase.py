@@ -161,7 +161,6 @@ async def test_the_lifespan_loads_plugins_with_the_disabled_names_from_the_files
             "incident.response",
             "incident.scribe",
             "oncall_sync",
-            "user_rotations",
             "rant",
         }
     )

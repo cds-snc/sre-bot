@@ -132,7 +132,7 @@ def test_duplicate_id_aborts_registration_through_the_real_provider(pm: pluggy.P
 
 def test_commands_and_reply_pass_through_unchanged(pm: pluggy.PluginManager) -> None:
     plugin = CommandPlugin()
-    pm.register(plugin, name="user_rotations")
+    pm.register(plugin, name="oncall")
     registrar = FakeSlackRegistrar()
 
     run_registration(registrar)

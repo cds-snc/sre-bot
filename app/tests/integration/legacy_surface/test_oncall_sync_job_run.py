@@ -12,10 +12,9 @@ from collections.abc import Sequence
 import pytest
 
 from packages.oncall_sync import _run_oncall_sync as run_oncall_sync_job
-from packages.oncall_sync.ports import OnCallSyncError
+from packages.oncall_sync.ports import CurrentUserRotation, OnCallSyncError
 from packages.oncall_sync.service import OnCallSyncService
 from packages.oncall_sync.settings import OnCallRotation, OnCallRotationConfig, OnCallScheduleConfig
-from packages.user_rotations.service import CurrentUserRotation
 
 pytestmark = pytest.mark.integration
 
@@ -56,7 +55,7 @@ class FakeUserRotations:
     def __init__(self, *rotations: CurrentUserRotation) -> None:
         self.rotations = rotations
 
-    def get_current_rotations(self) -> Sequence[CurrentUserRotation]:
+    async def get_current_rotations(self) -> Sequence[CurrentUserRotation]:
         return self.rotations
 
 

@@ -15,6 +15,9 @@ from typing import Any
 
 import pytest
 
+from capabilities.oncall import providers as oncall_providers
+from capabilities.oncall.adapters.in_memory import InMemoryOnCallLookup
+from capabilities.oncall.api import ROTATIONS, Account, OnCallPerson, Rotation, Schedule, ScheduleReference, Shift
 from contracts.operations import OperationResult, OperationStatus
 from features.incident.scribe import service as incident_scribe_service
 from features.incident.scribe.domain import DraftedDocument
@@ -23,8 +26,6 @@ from packages.access.sync.interactions import slack as access_sync_slack
 from packages.access.sync.interactions.ingress import EnqueuedJob
 from packages.geolocate.platforms import slack as geolocate_slack
 from packages.rant.service import format_rant
-from packages.user_rotations.platforms import slack as user_rotations_slack
-from packages.user_rotations.service import UserRotationShift
 from tests.factories.incident import seed_legacy_incident
 from tests.factories.slack_bolt import FakeSlackClient
 
@@ -259,28 +260,37 @@ def test_rant_without_text_replies_with_usage_and_posts_nothing(slack_command_ha
     assert slack_command_harness.client.calls_to("chat_postMessage") == []
 
 
-# --- packages/user_rotations ------------------------------------------------
+# --- capabilities/oncall (was packages/user_rotations) ----------------------
 
 
-class FakeUserRotationsService:
-    def __init__(self, shifts: list[UserRotationShift] | None) -> None:
-        self.shifts = shifts
+class FakeUserRotationsService(InMemoryOnCallLookup):
+    """In-memory on-call lookup seeded with one rotation's shifts; records each schedule handle read."""
+
+    def __init__(self, shifts: list[Shift] | None) -> None:
+        schedules: dict[ScheduleReference, Schedule] = {}
+        if shifts is not None:
+            reference = ScheduleReference(ROTATIONS, "sre-oncall")
+            rotation = Rotation("SRE on-call", tuple(shift.person for shift in shifts), 1, shifts[0].start)
+            schedules[reference] = Schedule(reference, "SRE on-call", (rotation,), tuple(shifts))
+        super().__init__(schedules=schedules)
         self.handles: list[str] = []
 
-    def get_rotation_shifts(self, handle: str) -> list[UserRotationShift] | None:
-        self.handles.append(handle)
-        return self.shifts
+    async def get_schedule(self, reference: ScheduleReference, *, horizon_weeks: int = 12) -> OperationResult[Schedule]:
+        self.handles.append(reference.id)
+        return await super().get_schedule(reference, horizon_weeks=horizon_weeks)
 
 
 def test_rotations_view_opens_a_modal_with_the_rotation_shifts(
     slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """/sre rotations view <handle> reads the rotation once and opens one modal."""
-    shift = UserRotationShift(
-        slack_user_id="U0ONCALL", start=datetime(2026, 9, 28, tzinfo=UTC), end=datetime(2026, 10, 5, tzinfo=UTC)
+    shift = Shift(
+        person=OnCallPerson(email=None, account=Account("slack", None, "U0ONCALL")),
+        start=datetime(2026, 9, 28, tzinfo=UTC),
+        end=datetime(2026, 10, 5, tzinfo=UTC),
     )
     service = FakeUserRotationsService([shift])
-    monkeypatch.setattr(user_rotations_slack, "get_user_rotations_service", lambda: service)
+    monkeypatch.setattr(oncall_providers, "get_oncall_service", lambda: service)
 
     response = slack_command_harness.dispatch("sre", "rotations view sre-oncall")
 
@@ -297,7 +307,7 @@ def test_rotations_view_for_unknown_handle_reports_no_rotation(
     slack_command_harness: SlackCommandHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """An unconfigured rotation handle is reported and no modal opens."""
-    monkeypatch.setattr(user_rotations_slack, "get_user_rotations_service", lambda: FakeUserRotationsService(None))
+    monkeypatch.setattr(oncall_providers, "get_oncall_service", lambda: FakeUserRotationsService(None))
 
     slack_command_harness.dispatch("sre", "rotations view nobody")
 

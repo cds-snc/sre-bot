@@ -10,10 +10,19 @@ protocols and wiring it in the provider — no changes to ``service.py``.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from typing import Protocol
 
 from packages.oncall_sync.settings import OnCallRotation
-from packages.user_rotations.service import CurrentUserRotation
+
+
+@dataclass(frozen=True)
+class CurrentUserRotation:
+    """The current Slack user of one self-managed rotation, and the usergroup it is written to."""
+
+    slack_usergroup_handle: str
+    slack_usergroup_name: str
+    slack_user_id: str
 
 
 class OnCallScheduleProvider(Protocol):
@@ -65,8 +74,11 @@ class UserGroupSyncTarget(Protocol):
 class UserRotationsProvider(Protocol):
     """Source of current assignments from self-managed user rotations."""
 
-    def get_current_rotations(self) -> Sequence[CurrentUserRotation]:
-        """Return each self-managed rotation with its current Slack user ID."""
+    async def get_current_rotations(self) -> Sequence[CurrentUserRotation]:
+        """Return each self-managed rotation with its current Slack user ID.
+
+        A rotation the source cannot answer for is left out, so its usergroup is never written empty.
+        """
         ...
 
 
