@@ -28,7 +28,7 @@ capabilities/ or modules/ target anywhere else (decisions/testing.md).
 import base64
 import json
 import re
-from collections.abc import Callable, Coroutine, Iterator
+from collections.abc import Callable, Coroutine, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
@@ -974,11 +974,12 @@ _ANSWER_STATE = {
     "static_select": lambda answer: {"selected_option": {"value": answer}},
     "datepicker": lambda answer: {"selected_date": answer},
     "timepicker": lambda answer: {"selected_time": answer},
+    "datetimepicker": lambda answer: {"selected_date_time": answer},
     "number_input": lambda answer: {"value": answer},
 }
 
 
-def submission_payload(view: dict[str, Any], answers: dict[str, str | None]) -> dict[str, Any]:
+def submission_payload(view: dict[str, Any], answers: Mapping[str, str | int | None]) -> dict[str, Any]:
     """The view_submission payload Slack sends when ``view`` is submitted with ``answers`` by input block id.
 
     The callback id, private metadata, block ids and action ids all come from
@@ -990,7 +991,8 @@ def submission_payload(view: dict[str, Any], answers: dict[str, str | None]) -> 
             continue
         element = block["element"]
         initial = element.get("initial_user") or element.get("initial_value") or element.get("initial_date")
-        initial = initial or element.get("initial_time") or (element.get("initial_option") or {}).get("value")
+        initial = initial or element.get("initial_time") or element.get("initial_date_time")
+        initial = initial or (element.get("initial_option") or {}).get("value")
         answer = answers.get(block["block_id"], initial)
         values[block["block_id"]] = {element["action_id"]: {"type": element["type"], **_ANSWER_STATE[element["type"]](answer)}}
     return {

@@ -3,8 +3,8 @@ id: TASK-151
 title: Handle gone Slack views and messages gracefully when the bot updates them
 status: To Do
 assignee: []
-created_date: '2026-10-14 19:31'
-updated_date: '2026-10-15 17:53'
+created_date: 2026-10-14 19:31
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - slack
   - reliability
@@ -14,7 +14,7 @@ references:
   - decisions/outbound-clients.md
   - app/contracts/slack/reply.py
   - app/integrations/slack/settings.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1718'
+  - https://github.com/cds-snc/sre-bot/issues/1718
 priority: medium
 ordinal: 385000
 ---
@@ -59,3 +59,15 @@ TASK-25.4 (classify_slack_error, done), TASK-26.1.3 (reply Protocol, done), TASK
 - [ ] #4 The Slack listener error boundary logs an unhandled gone-surface SlackApiError as a warning without a traceback
 - [ ] #5 The decision on legacy app/modules call sites (wrap now vs leave to TASK-145.8 and other rebuilds) is recorded on the task, and TASK-145.8 is updated to adopt the behaviour
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (TASK-145.8.3 OQ9): AC #3's legacy flow (information_update.py's views_update after the user closed the modal) is deleted by TASK-145.8.3. The rebuilt submission reads reply.update_view's classified result: not_found logged at info, other codes at warning, never reported as a failed update; a failed views.push gets a private line. This task's classification later gives those logs a stable code without changing the listener.
+
+---
+<!-- COMMENTS:END -->

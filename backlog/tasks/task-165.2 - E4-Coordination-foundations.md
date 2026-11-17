@@ -45,3 +45,15 @@ The coordination ADR records the work model proposed in large-scale-incident-ana
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-18 (human, TASK-145.7.9 OQ3): the HTTP declare route moved here from TASK-145.7.9, since this task owns the incident HTTP API base, caller identity and the edge test; needs TASK-131 (declared permissions). The declare service it calls is platform-neutral (TASK-145.7.9).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (human, TASK-145.8.3 OQ2): L6a ships the security flag as editable by anyone who passes the incident's command check (incident-management.md:40 reworded; "the coordinator" was undefined). Decide here, with the visibility policy, whether editing the flag (especially true -> false) is restricted and to whom, and define the coordinator role if one is needed.
+
+---
+<!-- COMMENTS:END -->

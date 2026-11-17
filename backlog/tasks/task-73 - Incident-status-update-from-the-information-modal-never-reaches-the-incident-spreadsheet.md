@@ -5,8 +5,8 @@ title: >-
   spreadsheet
 status: To Do
 assignee: []
-created_date: '2026-09-01 19:28'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-01 19:28
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - bug
   - incident
@@ -17,7 +17,7 @@ references:
   - app/modules/incident/incident_folder.py
   - app/modules/incident/information_update.py
   - app/modules/incident/incident_status.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1616'
+  - https://github.com/cds-snc/sre-bot/issues/1616
 priority: medium
 ordinal: 129000
 ---
@@ -87,12 +87,26 @@ This is deliberately not being fixed inside the TASK-25.1.3 PR, to keep that mig
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-01 19:28
+
 ---
+
 Discovered while validating TASK-25.1.3 (Sheets migration off execute_google_api_call). Explicitly NOT a regression from that PR: get_values old-vs-new returned identical live payloads (467 rows, old == new) and batch_update_values old-vs-new build an identical request URI and JSON body; googleapiclient strips None kwargs exactly as the old filtered_params logic did. Left out of that PR to keep the migration behaviour-neutral.
+
 ---
 
 created: 2026-10-02 16:46
+
 ---
+
 2026-10-02 (TASK-97 decided, decisions/incident-management.md): the sheet stops being a record. TASK-38.4 rewrites the status fan-out from the record, so the modal path and the command path write the same projection row, and TASK-38.7 makes the sheet a write-only projection rebuilt from storage. If this bug is fixed earlier as a bug fix in the frozen module, keep it to the normalization in the proposed fix.
+
+---
+
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17: superseded by TASK-145.8.3 (Stack L L6a): the rebuilt update modal's status field calls change_status (record, report text, list projection, channel), the status pin proves the list cell moves, and the legacy update_spreadsheet_incident_status is deleted. The human archives this task once L6a merges.
+
 ---
 <!-- COMMENTS:END -->

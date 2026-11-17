@@ -152,17 +152,6 @@ def test_handle_help_with_french():
     respond.assert_called_once_with(incident_helper.help_text_fr)
 
 
-@patch("modules.incident.incident_helper.information_display.open_incident_info_view")
-def test_handle_show(mock_open_incident_info_view):
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = MagicMock()
-
-    incident_helper.handle_show(client, body, respond, ack, [], {})
-    mock_open_incident_info_view.assert_called_once_with(client, body, respond)
-
-
 def test_handle_list_without_resource():
     respond = MagicMock()
     ack = MagicMock()

@@ -44,6 +44,11 @@ def incident_conversation() -> IncidentConversation:
     return get_incident_conversation()
 
 
+def video_call() -> VideoCall:
+    """Return the process-wide ``VideoCall``, whose ``link`` renders the incident's call in show."""
+    return get_video_call()
+
+
 def legacy_roles_reader() -> LegacyRolesReader:
     """Return the process-wide ``LegacyRolesReader`` (TODO(TASK-145.13): deleted with the legacy roles bridge)."""
     return get_legacy_roles_reader()
@@ -52,11 +57,6 @@ def legacy_roles_reader() -> LegacyRolesReader:
 def archive_event_sink() -> ArchiveEventSink:
     """Return the sink the archived event is sent to (TODO(TASK-122): the audit capability's sink)."""
     return SentinelArchiveEventSink()
-
-
-def video_call() -> VideoCall:
-    """Return the process-wide ``VideoCall``."""
-    return get_video_call()
 
 
 def placement_schedule_lookup() -> PlacementScheduleLookup:
