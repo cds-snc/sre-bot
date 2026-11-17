@@ -71,12 +71,15 @@ converges on the next run. It is registered by `response/plugin.py` and ships wi
 `[incident_response] upgrade_mode = "off"`, so nothing runs until an environment switches it on in
 its own configuration file.
 
-- **When.** The first run in an environment follows TASK-145.8's deploy there: the upgrade writes
-  status, severity and `security_incident` in their end-state form (the roles are not among the
-  attributes it carries over: no legacy writer set them, they lived in the report's Drive properties,
-  which TASK-145.7.12 maps into the record and `read_incident_roles` bridges until then), and
-  TASK-145.8 removes the last legacy reader of those attributes. Running it, with a report of
-  nothing pending, is a precondition of TASK-145.9 merging.
+- **When.** A dry run writes nothing, so it may run in an environment as soon as the binding step
+  (TASK-145.7.4) is deployed there; production runs one from TASK-145.7.8. The first apply follows
+  the last TASK-145.8 reader cutovers (TASK-145.8.3 and TASK-145.8.5.3) deployed and soaked there,
+  and a dry run with no blocker: the upgrade writes status, severity and `security_incident` in their
+  end-state form, and TASK-145.8 removes the last legacy reader of those attributes. The roles are not
+  among the attributes it carries over: no legacy writer set them, they lived in the report's Drive
+  properties, which `read_incident_roles` bridges and TASK-145.7.12 maps into the record in a later
+  rerun, items already at 2 included. Running it, with a report of nothing pending, is a
+  precondition of TASK-145.9 merging.
 - **Legacy writers.** Each of these still creates legacy-shaped items, so the job must run again
   after the last one is gone (Migration rule 6):
   - the legacy declare, `app/modules/incident/core.py:36` (`initiate_resources_creation`), removed
@@ -110,7 +113,13 @@ its own configuration file.
   ids). A dry run counts the plan and writes nothing, so its `bindings_put` is 0. The first
   production dry run confirms the `auth.test` org-token shape (D10 of TASK-145.5.7):
   `tenant_check` is verified; a mismatch is fixed in configuration (`[slack.tenant]
-  enterprise_id`), not in code.
+  enterprise_id`), not in code. `already_upgraded` is not 0 in production: the rebuilt writers
+  upgrade each legacy item they write (upgrade on write). Read the event, read-only:
+  `aws logs filter-log-events --region ca-central-1 --log-group-name /ecs/sre-bot-app --filter-pattern '"incident_legacy_upgrade_report"' --start-time $(( ($(date +%s) - 7200) * 1000 )) --query 'events[].message' --output text`.
+  The mode stays `dry_run` until the apply PR replaces it. Each run also logs one
+  `incident_legacy_field_dropped` warning per dropped field (the shared bridge's read-path
+  warning), so a run with ten or more drops sets off the warning alarm every interval; if it does,
+  a PR sets the mode to `off` until TASK-145.7.12 keeps a batch run's drops in its report only.
 - **A blocked dry run.** Any unmatched status, unreadable item or `unbound` item fails the run,
   logged at error, so the error alarm fires on every run. `unbound` lists, by id only, the open
   items without a conversation: set their `channel_id` or mark them Closed by hand in the table.
