@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T19:34:00Z'
+updated_date: '2026-11-17T15:47:00Z'
 labels:
   - incident
   - features
@@ -102,6 +102,8 @@ Deleting the legacy module is final for the surfaces already cut over; a revert 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Contract task: removes the legacy id aliases, the remaining legacy_only_* tests and the seam-baseline entries for the module it deletes.
 
 2026-11-09 (human, Stack L OQ12): no longer waits on TASK-165.1 or TASK-146.3: declare invites on-call through the capability inside TASK-145.7 (146.3 delivered there); the only remnant is the read-only schedule-source adapter owned by 165.1, outside modules/incident. The dev incident commands are deleted by TASK-145.12 (OQ17).
+
+2026-11-17 (TASK-145.8.6): add to the deletion list: the retired-surface pin test_incident_create_retired_surface.py, its INVENTORY.md row, and the legacy create-folder deprecation text (incident_helper; tells users to run a create folder form that never existed).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

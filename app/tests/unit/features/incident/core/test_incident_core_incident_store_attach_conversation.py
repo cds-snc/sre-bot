@@ -100,7 +100,7 @@ async def test_attaching_the_same_conversation_again_is_a_no_op(store: IncidentS
 
 
 async def test_another_conversation_on_the_record_is_a_conflict_and_nothing_moves(store: IncidentStore) -> None:
-    """Moving the primary conversation is recreate's job; the new channel is not bound."""
+    """Moving the primary conversation is the rebind's (TASK-165.11); the new channel is not bound."""
     assert (await store.attach_conversation(INCIDENT_ID, binding_on(CHANNEL, INCIDENT_ID))).is_success
 
     result = await store.attach_conversation(INCIDENT_ID, binding_on(OTHER_CHANNEL, INCIDENT_ID))

@@ -166,42 +166,6 @@ def test_handle_close(mock_close_incident):
     mock_close_incident.assert_called_once_with(client, body, ack, respond)
 
 
-def test_handle_create_with_new():
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = MagicMock()
-
-    incident_helper.handle_create(client, body, respond, ack, ["new"], {})
-    respond.assert_called_once_with("Upcoming feature: create a new incident.")
-
-
-@patch("modules.incident.incident_helper.recreate_missing_incident_resources")
-def test_handle_create_with_resources(mock_recreate_resources):
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = MagicMock()
-
-    incident_helper.handle_create(client, body, respond, ack, ["resources"], {})
-    mock_recreate_resources.assert_called_once_with(client, body, respond, ack)
-
-
-@patch("modules.incident.incident_helper.recreate_missing_incident_resources")
-def test_handle_create_without_resource(mock_recreate_resources):
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = MagicMock()
-    create_help_text = """`/sre incident create [resource] [options]`
-
-*Resources:*
-• `new [<incident_name>]` — create a new incident (upcoming feature)
-• `resources` — create resources for an existing incident (document, meet links, etc.)"""
-    incident_helper.handle_create(client, body, respond, ack, [], {})
-    respond.assert_called_once_with(create_help_text)
-
-
 def test_handle_help():
     respond = MagicMock()
     ack = MagicMock()

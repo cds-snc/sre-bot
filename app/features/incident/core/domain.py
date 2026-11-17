@@ -314,8 +314,8 @@ class Incident:
 class ReferenceKind(StrEnum):
     """A resource reference ``set_reference`` replaces after declare; the value is the record field and stored attribute.
 
-    The conversation and the source alert are set only when the incident is
-    created: a recreated channel never moves the record's conversation.
+    The conversation and the source alert are set only by create and
+    ``attach_conversation``; moving the primary conversation is the rebind's (TASK-165.11).
     """
 
     REPORT = "report"
@@ -547,7 +547,7 @@ class DraftWriteResult:
 
 
 CONVERSATION_NAME_ATTEMPTS = 5
-"""How many names declare and recreate try for one incident's conversation: the first, then attempts 2 to 5."""
+"""How many names declare tries for one incident's conversation: the first, then attempts 2 to 5."""
 
 
 @dataclass(frozen=True)

@@ -5,8 +5,8 @@ The only module in features/incident/ that reaches Google Meet.
 is async and runs the blocking Meet request through ``asyncio.to_thread``
 inside the adapter (decisions/outbound-clients.md), bounded by the gateway's
 per-attempt timeout with SDK retries off, and returns classified results.
-``create_space`` is the legacy entry point the legacy declare and recreate call
-until their cutovers delete it. No call takes a delegation subject.
+``create_space`` is the legacy entry point the legacy declare calls until its
+cutover deletes it. No call takes a delegation subject.
 """
 
 import asyncio

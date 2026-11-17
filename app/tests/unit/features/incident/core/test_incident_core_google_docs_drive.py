@@ -61,17 +61,6 @@ def test_list_child_folders_reads_every_page_and_filters_templates():
     )
 
 
-def test_list_folder_files_lists_non_folders_across_pages():
-    service = _drive_with_pages([{"id": "doc-1", "name": "One"}], [{"id": "doc-2"}])
-    with patch.object(google_drive, "_drive_service", return_value=service):
-        result = google_drive.list_folder_files("parent-folder")
-
-    assert result == [{"id": "doc-1", "name": "One"}, {"id": "doc-2", "name": None}]
-    service.files.return_value.list.assert_called_once_with(
-        **_list_kwargs(f"parents in 'parent-folder' and mimeType != '{FOLDER_MIME}' and trashed=false")
-    )
-
-
 def test_create_folder_creates_a_folder_in_the_parent_on_shared_drives():
     service = MagicMock()
     service.files.return_value.create.return_value.execute.return_value = {"id": "folder-new", "name": "Incident"}
@@ -96,28 +85,6 @@ def test_create_document_from_template_copies_the_template_into_the_parent():
     )
 
 
-def test_find_document_by_channel_name_enriches_match_with_app_properties():
-    service = _drive_with_pages([{"id": "doc-1", "name": "incident-2024-001"}])
-    files_resource = service.files.return_value
-    files_resource.get.return_value.execute.return_value = {
-        "id": "doc-1",
-        "name": "incident-2024-001",
-        "appProperties": {"ic_id": "ic-1", "ol_id": "ol-1"},
-    }
-    with patch.object(google_drive, "_drive_service", return_value=service):
-        result = google_drive.find_document_by_channel_name("2024-001")
-
-    assert result == {"id": "doc-1", "appProperties": {"ic_id": "ic-1", "ol_id": "ol-1"}}
-    files_resource.list.assert_called_once_with(**_list_kwargs("trashed=false and name='2024-001'"))
-    files_resource.get.assert_called_once_with(fileId="doc-1", fields="id, name, appProperties", supportsAllDrives=True)
-
-
-def test_find_document_by_channel_name_without_a_match_is_none():
-    service = _drive_with_pages([])
-    with patch.object(google_drive, "_drive_service", return_value=service):
-        assert google_drive.find_document_by_channel_name("2024-001") is None
-
-
 @pytest.mark.parametrize(
     ("status", "classified"),
     [(404, "NOT_FOUND"), (403, "UNAUTHORIZED"), (401, "UNAUTHORIZED"), (429, "TRANSIENT_ERROR"), (503, "TRANSIENT_ERROR")],
@@ -125,11 +92,9 @@ def test_find_document_by_channel_name_without_a_match_is_none():
 @pytest.mark.parametrize(
     ("call", "event", "empty"),
     [
-        (lambda: google_drive.list_folder_files("p"), "incident_drive_list_files_failed", []),
         (lambda: google_drive.list_child_folders("p"), "incident_drive_list_folders_failed", []),
         (lambda: google_drive.create_folder("n", "p"), "incident_drive_create_folder_failed", None),
         (lambda: google_drive.create_document_from_template("n", "p", "t"), "incident_drive_create_document_failed", None),
-        (lambda: google_drive.find_document_by_channel_name("n"), "incident_drive_find_document_failed", None),
     ],
 )
 def test_a_classified_drive_error_is_logged_and_returns_the_empty_value(status, classified, call, event, empty):
@@ -152,7 +117,7 @@ def test_an_unclassified_drive_error_raises():
     service = MagicMock()
     service.files.return_value.list.return_value.execute.side_effect = _http_error(400)
     with patch.object(google_drive, "_drive_service", return_value=service), pytest.raises(HttpError):
-        google_drive.list_folder_files("p")
+        google_drive.list_child_folders("p")
 
 
 def test_incident_drive_healthcheck_returns_false_when_metadata_lookup_raises():

@@ -83,16 +83,14 @@ async def test_every_report_operation_builds_its_services_with_scopes_only(facto
 
 
 def test_every_drive_function_builds_its_service_with_scopes_only(factories: list[_ScopesOnly]) -> None:
-    google_docs.list_folder_files("F0")
     google_docs.list_child_folders("F0")
     google_docs.create_folder("name", "F0")
     google_docs.create_document_from_template("name", "F0", "T0")
-    google_docs.find_document_by_channel_name("incident-1")
     google_docs.add_metadata("D0", "k", "v")
     google_docs.delete_metadata("D0", "k")
     google_docs.get_metadata("D0")
 
-    assert len(factories[2].calls) >= 8
+    assert len(factories[2].calls) >= 6
 
 
 async def test_video_call_builds_its_service_with_scopes_only(factories: list[_ScopesOnly]) -> None:

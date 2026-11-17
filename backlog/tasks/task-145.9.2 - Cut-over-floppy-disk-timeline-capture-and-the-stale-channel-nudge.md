@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T19:34:00Z'
+updated_date: '2026-11-16T23:57:00Z'
 labels:
   - incident
   - features
@@ -42,6 +42,10 @@ Stack L L10b. Reaction handlers registered by incident.response write timeline r
 2026-11-10: captured_entry_id is built here (uuid5 under TIMELINE_NAMESPACE in core/adapters/timeline_items.py from TASK-145.8.1); captured entries are TimelineEntry kind message with source_message, appended through TimelineStore.append.
 
 2026-11-10 (TASK-145.8.7 planning): TimelineStore stays sync after TASK-145.8.7 because only the store bodies call it; when this task (or 145.9.1) gives it an async consumer, it becomes async def with its Record adapter offloading (decisions/outbound-clients.md async-port rule).
+
+2026-11-16 (human, TASK-145.8.5.2 OQ7): claiming the ignore value makes the ignore branch of archive_channel_action unreachable; this task deletes that branch.
+
+2026-11-16 (human, #1858 Q1-Q5 approved; production fix shipped without a task): the legacy capture now (a) captures the exact reacted-to message through reactions.get, a thread reply included, never its parent; (b) keys report entries by the Slack message (channel + full ts from the permalink), so same-second messages are distinct and removal no longer rebuilds the entry from the current profile and text; (c) posts a bilingual ephemeral notice to the reacting user when a save or removal fails or cannot be confirmed (keys in app/locales/incident.*.yml). #1858 pins (a) and (c) in tests/integration/legacy_surface. Scope for this task: the rebuilt capture keeps (a)-(c) with those pins passing unchanged; the notice keys move into incident_response's catalogue; captured_entry_id (uuid5 over system, tenant, conversation, message id) matches the report entry identity of (b).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
