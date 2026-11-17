@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-15 19:39
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-17T22:35:00Z'
 labels:
   - infrastructure
   - observability
@@ -57,3 +57,15 @@ Scope (terraform only, after TASK-28.2 makes every line JSON):
 
 2026-11-03 (from TASK-28.4's approved plan): no terraform metric filter or saved query keys on a startup event, so 28.4's demotions change no metric. Hazard while the filters stay free-text: the error pattern in terraform/local.tf skips only level warning|info, so a DEBUG line containing error or exception would count when [logging] level is DEBUG; matching on $.level fields removes it.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-17T22:35:00Z
+
+---
+
+2026-11-17 (TASK-145.7.8 OQ4, human approved): expected-volume candidates for AC #2 from the incident legacy upgrade job while production runs it (dry_run from TASK-145.7.8 until its apply PR; off afterwards, rerun after TASK-145.12.2). (1) incident_legacy_field_dropped at warning: the shared legacy bridge logs one per dropped field on every read, and a batch run repeats them every 30 min; the run's report already lists them. TASK-145.7.12 removes the batch-run copies if a run drops 10 or more. (2) incident_legacy_upgrade_report at error on a blocked run: one per run by design (TASK-145.5.7.3 OQ15/OQ20); the procedure switches the mode off by PR while items are fixed. Decide whether either is filtered by $.event or kept counted.
+
+---
+<!-- COMMENTS:END -->
