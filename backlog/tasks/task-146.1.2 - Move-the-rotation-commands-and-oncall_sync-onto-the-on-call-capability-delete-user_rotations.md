@@ -3,10 +3,10 @@ id: TASK-146.1.2
 title: >-
   Move the rotation commands and oncall_sync onto the on-call capability; delete
   user_rotations
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T17:07:00Z'
-updated_date: '2026-11-17T14:18:00Z'
+updated_date: '2026-11-17T20:20:00Z'
 labels:
   - oncall
   - capabilities

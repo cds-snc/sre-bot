@@ -35,7 +35,6 @@ LEGACY_ACTIONS = (
     "confirm_click",
     "user_select_action",
     "archive_channel",
-    "update_incident_field",
 )
 
 LEGACY_VIEWS = (
@@ -48,7 +47,6 @@ LEGACY_VIEWS = (
     "view_folder_metadata_modal",
     "add_metadata_view",
     "view_save_event",
-    "update_field_modal",
 )
 
 # Each reaction event has a floppy-disk listener (with a matcher) and an ack-only fallback.

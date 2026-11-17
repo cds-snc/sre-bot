@@ -10,10 +10,12 @@ from features.incident.core.api import (
     IncidentListProjection,
     IncidentReport,
     LegacyRolesReader,
+    VideoCall,
     get_incident_conversation,
     get_incident_list_projection,
     get_incident_report,
     get_legacy_roles_reader,
+    get_video_call,
 )
 from features.incident.response.adapters.sentinel import SentinelArchiveEventSink
 from features.incident.response.interfaces import ArchiveEventSink
@@ -32,6 +34,11 @@ def incident_list_projection() -> IncidentListProjection:
 def incident_conversation() -> IncidentConversation:
     """Return the process-wide ``IncidentConversation``."""
     return get_incident_conversation()
+
+
+def video_call() -> VideoCall:
+    """Return the process-wide ``VideoCall``, whose ``link`` renders the incident's call in show."""
+    return get_video_call()
 
 
 def legacy_roles_reader() -> LegacyRolesReader:

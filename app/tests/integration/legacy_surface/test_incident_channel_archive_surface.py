@@ -63,8 +63,6 @@ from .conftest import (
     USER_ID,
     IncidentSurface,
     attach_rebuilt_listeners_first,
-    last_view,
-    view_text,
 )
 
 pytestmark = pytest.mark.integration
@@ -194,9 +192,8 @@ def sentinel_events(surface: ArchiveSurface) -> list[str]:
 
 
 def shown_status(surface: ArchiveSurface) -> str:
-    """The status the legacy ``/sre incident show`` renders from the legacy table (ignore and retro stay legacy)."""
-    surface.surface.sre("incident show")
-    return view_text(last_view(surface.slack.client)).split("*Status*:\n", 1)[1].split("\n", 1)[0]
+    """The status ``/sre incident show`` renders: the record's, since show reads the record (TASK-145.8.3)."""
+    return surface.stored_status().value
 
 
 # ignore

@@ -4,7 +4,7 @@ title: E4 Coordination foundations
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - incident
 milestone: m-7
@@ -40,3 +40,15 @@ The coordination ADR records the work model proposed in large-scale-incident-ana
 - [ ] #9 The incident API distinguishes explicitly extensible classification/display values from closed lifecycle and authorization values. Contract tests preserve existing records/responses, reject unsupported commands and transitions, and never grant access for unknown values. Unknown read classifications must remain visibly unknown, not become success states; surface tasks inherit that compatibility requirement.
 - [ ] #10 If app/bin/baselines/package_shape.txt still holds the people capability's readme-consumers entry, it is deleted and the capability README names this consumer
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (human, TASK-145.8.3 OQ2): L6a ships the security flag as editable by anyone who passes the incident's command check (incident-management.md:40 reworded; "the coordinator" was undefined). Decide here, with the visibility policy, whether editing the flag (especially true -> false) is restricted and to whom, and define the coordinator role if one is needed.
+
+---
+<!-- COMMENTS:END -->

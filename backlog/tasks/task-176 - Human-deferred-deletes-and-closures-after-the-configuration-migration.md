@@ -70,6 +70,10 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-17: asked at TASK-145.8.6 implementation start; unchanged (human).
 
+2026-11-17: asked at TASK-145.8.3 (Stack L row 18.L6a) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
+
+2026-11-17: asked at TASK-145.8.3 implementation start; unchanged (human).
+
 2026-11-17: asked at TASK-145.7.8 (row 18.L8, dry run) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
 
 2026-11-18: asked at TASK-145.7.12 (row 18.L7c) implementation start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).

@@ -18,8 +18,6 @@ from modules.incident import (
     incident_alert,
     incident_conversation,
     incident_folder,
-    information_display,
-    information_update,
     schedule_retro,
 )
 
@@ -141,14 +139,11 @@ def register(bot: App):
     bot.event("reaction_removed", matchers=[incident_conversation.is_floppy_disk])(incident_conversation.handle_reaction_removed)
     bot.event("reaction_added")(incident_conversation.just_ack_the_rest_of_reaction_events)
     bot.event("reaction_removed")(incident_conversation.just_ack_the_rest_of_reaction_events)
-    bot.action("update_incident_field")(information_update.open_update_field_view)
-    bot.view("update_field_modal")(information_update.handle_update_field_submission)
 
 
 def get_incident_actions() -> dict[str, Callable]:
     """Returns a dictionary mapping incident subcommands to their handler functions."""
     return {
-        "show": handle_show,
         "help": handle_help,
         "aide": handle_help,
         "list": handle_list,
@@ -215,11 +210,6 @@ def handle_help(_client, _body, respond, _ack, args, _flags) -> None:
         respond(help_text_fr)
     else:
         respond(help_text)
-
-
-def handle_show(client, body, respond, _ack, _args, _flags):
-    """Handle show command."""
-    information_display.open_incident_info_view(client, body, respond)
 
 
 def handle_list(client, body, respond, ack, args, _flags):

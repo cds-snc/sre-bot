@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T19:10:00Z'
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - incident
   - features
@@ -62,6 +62,14 @@ created: 2026-11-17T19:10:00Z
 ---
 
 2026-11-17 (found at the Stack L sync, TASK-145.8.5.3 session): #1853 (fba4ff8b, merged to main, not a Stack L change) added a policy-help answer to the legacy declare: production-only invite of the policy group ([incident] policy_group_id in features/incident/response/settings.py; modules/incident/core.py and incident.py; pinned in tests/modules/incident/test_incident_core.py and test_incident.py, 15 policy tests). The declare rebuild carries it (pins rewired, not dropped) or rules it a named change at planning.
+
+---
+
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (TASK-145.8.3 OQ7): the rebuilt field updates (L6a) and close (L7a.3) no longer append to the item's legacy logs list (incident-management.md:32, Migration rule 5). The legacy declare's append (db_operations.py:100 create_incident -> log_activity) ends with this cutover: name it in the PR body as a kind (b) change. Also from L6a: the update modal's severity options are one list; add SEV0 there with the declare picker.
 
 ---
 <!-- COMMENTS:END -->
