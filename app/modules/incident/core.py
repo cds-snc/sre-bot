@@ -571,6 +571,21 @@ def initiate_resources_creation(
                 if security_user != incident_payload.user_id:
                     users_to_invite.append(security_user)
 
+    # Get users from the @incident-policy group
+    policy_group_id = incident_settings.policy_group_id
+    if incident_payload.policy_help == "yes" and not policy_group_id:
+        logger.warning("policy_user_group_not_configured", channel_id=incident_payload.channel_id)
+    elif incident_payload.policy_help == "yes":
+        response = client.usergroups_users_list(usergroup=policy_group_id)
+
+        # Avoid inviting policy group users outside production to prevent spam.
+        if response.get("ok") and host_info().environment == "production":
+            for policy_user in response["users"]:
+                if policy_user != incident_payload.user_id and policy_user not in users_to_invite:
+                    users_to_invite.append(policy_user)
+        elif not response.get("ok"):
+            logger.warning("policy_group_fetch_failed", error=response.get("error"), usergroup=policy_group_id)
+
     # Get users from the @notify-management group
     if incident_payload.product == "Notify" and incident_settings.notify_management_group_id:
         # If this is a Notify product incident, get users from the Notify management user group

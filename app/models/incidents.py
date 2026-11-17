@@ -40,6 +40,7 @@ class IncidentPayload(BaseModel):
     folder: str
     product: str
     security_incident: str
+    policy_help: str = "no"
     user_id: str
     channel_id: str
     channel_name: str

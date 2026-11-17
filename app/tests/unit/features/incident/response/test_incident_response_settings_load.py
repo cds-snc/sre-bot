@@ -23,7 +23,7 @@ from server.configuration.loader import CONFIG_DIR, load_configuration_files
 pytestmark = pytest.mark.unit
 
 _FIELDS = ("handbook_id",)
-_SLACK_IDS = ("announcement_channel_id", "security_group_id", "notify_management_group_id")
+_SLACK_IDS = ("announcement_channel_id", "security_group_id", "policy_group_id", "notify_management_group_id")
 _UPGRADE_KEYS = {"upgrade_mode": "off", "upgrade_interval_minutes": 30, "upgrade_lease_ttl_seconds": 900}
 
 
@@ -108,9 +108,15 @@ def test_production_resolves_the_slack_ids_production_ran_on() -> None:
 
     settings = IncidentResponseSettings()
 
-    assert (settings.announcement_channel_id, settings.security_group_id, settings.notify_management_group_id) == (
+    assert (
+        settings.announcement_channel_id,
+        settings.security_group_id,
+        settings.policy_group_id,
+        settings.notify_management_group_id,
+    ) == (
         "CUYR73ESX",
         "S057X3XB5FX",
+        "S0CHP1YRQNQ",
         "S0BC6L00PUG",
     )
 
@@ -122,7 +128,7 @@ def test_local_and_ci_configure_no_slack_id(environment: str) -> None:
 
     settings = IncidentResponseSettings()
 
-    assert [getattr(settings, field) for field in _SLACK_IDS] == ["", "", ""]
+    assert [getattr(settings, field) for field in _SLACK_IDS] == ["", "", "", ""]
 
 
 def test_a_prefixed_environment_variable_beats_the_files(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -33,6 +33,12 @@ def register(bot: App):
     bot.action("incident_change_locale")(handle_change_locale_button)
 
 
+def _yes_no_radio_buttons(action_id: str) -> dict:
+    yes = {"text": {"type": "plain_text", "text": i18n.t("incident.modal.security_yes"), "emoji": True}, "value": "yes"}
+    no = {"text": {"type": "plain_text", "text": i18n.t("incident.modal.security_no"), "emoji": True}, "value": "no"}
+    return {"type": "radio_buttons", "action_id": action_id, "options": [yes, no], "initial_option": no}
+
+
 def _incident_modal_loading_view():
     loading_view = views.View(
         type="modal",
@@ -135,6 +141,8 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
     product = view["state"]["values"]["product"]["product"]["selected_option"]["text"]["text"]
     security_incident = view["state"]["values"]["security_incident"]["security_incident"]["selected_option"]["value"]
     severity = view["state"]["values"]["severity"]["severity"]["selected_option"]["value"]
+    policy_option = view["state"]["values"].get("policy_help", {}).get("policy_help", {}).get("selected_option")
+    policy_help = policy_option["value"] if policy_option else "no"
 
     if not re.match(r"^[\w\-\s]+$", name):
         errors["name"] = (
@@ -196,6 +204,7 @@ def submit(ack: Ack, view, say, body, client: WebClient):  # noqa: C901
         folder=folder,
         product=product,
         security_incident=security_incident,
+        policy_help=policy_help,
         user_id=user_id,
         channel_id=channel_id,
         channel_name=channel_name,
@@ -365,33 +374,7 @@ def generate_incident_modal_view(command, options=None, private_metadata=None, l
             {
                 "block_id": "security_incident",
                 "type": "input",
-                "element": {
-                    "type": "static_select",
-                    "placeholder": {
-                        "type": "plain_text",
-                        "text": i18n.t("incident.modal.security_incident_placeholder"),
-                        "emoji": True,
-                    },
-                    "options": [
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": i18n.t("incident.modal.security_yes"),
-                                "emoji": True,
-                            },
-                            "value": "yes",
-                        },
-                        {
-                            "text": {
-                                "type": "plain_text",
-                                "text": i18n.t("incident.modal.security_no"),
-                                "emoji": True,
-                            },
-                            "value": "no",
-                        },
-                    ],
-                    "action_id": "security_incident",
-                },
+                "element": _yes_no_radio_buttons("security_incident"),
                 "label": {
                     "type": "plain_text",
                     "text": i18n.t("incident.modal.security_incident"),
@@ -400,6 +383,20 @@ def generate_incident_modal_view(command, options=None, private_metadata=None, l
                 "hint": {
                     "type": "plain_text",
                     "text": i18n.t("incident.modal.security_incident_hint"),
+                },
+            },
+            {
+                "block_id": "policy_help",
+                "type": "input",
+                "element": _yes_no_radio_buttons("policy_help"),
+                "label": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.policy_help"),
+                    "emoji": True,
+                },
+                "hint": {
+                    "type": "plain_text",
+                    "text": i18n.t("incident.modal.policy_help_hint"),
                 },
             },
             {
