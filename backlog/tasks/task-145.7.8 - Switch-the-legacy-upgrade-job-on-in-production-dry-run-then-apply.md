@@ -4,7 +4,7 @@ title: 'Switch the legacy upgrade job on in production: dry run, then apply'
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T16:37:00Z'
+updated_date: '2026-11-16T19:34:00Z'
 labels:
   - incident
   - config
@@ -14,6 +14,7 @@ dependencies:
   - TASK-145.8.4
   - TASK-145.8.5
   - TASK-145.8.6
+  - TASK-145.7.12
 references:
   - decisions/incident-management.md
   - app/features/incident/README.md
@@ -44,3 +45,15 @@ Stack L L8. After the TASK-145.8 cutovers have deployed: one config PR sets [inc
 - No need to wait for the whole stack: the stored shape is versioned (record_version); a later shape change bumps the version with its own upgrade step while readers accept both; the job reruns after TASK-145.12.2 anyway (README Rerun rule), and the rebuilt writers upgrade each item they touch from L3/L6a on regardless of the job.
 - The L5 re-plan (TASK-145.7.7 R4-R6, 2026-11-10) does not change what the job writes: legacy items always have a channel, so they keep the conversation copy, one primary chat binding and record_version 2.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-16T19:34:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.5 OQ7): the apply waits on TASK-145.7.12 (the job maps the report's Drive roles into the record); the dry run reports roles mapped and dropped.
+
+---
+<!-- COMMENTS:END -->

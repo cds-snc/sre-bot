@@ -502,6 +502,17 @@ class SlackIncidentConversation:
             return _conversation_failure("archive", conversation, exc)
         return OperationResult.success()
 
+    async def purpose(self, conversation: ConversationReference) -> OperationResult[str]:
+        """Return the channel's purpose text; an empty string when it has none."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            response = await self._reads.conversations_info(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            return _conversation_failure("purpose", conversation, exc)
+        channel: Mapping[str, Any] = response.get("channel") or {}
+        return OperationResult.success(str((channel.get("purpose") or {}).get("value") or ""))
+
     async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
         """Say whether the bot can write to the channel: not archived and a member. Never joins."""
         if conversation.system is not WorkplaceSystem.SLACK:

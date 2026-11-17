@@ -21,6 +21,8 @@ and ``conversation_is_writable`` is the check every caller applies before a writ
 ``get_video_call`` provides the Google Meet one.
 ``IncidentListProjection`` writes the incident list sheet (append a row, update the status
 cell); ``get_incident_list_projection`` provides the Google Sheets one.
+``read_incident_roles`` reads an incident's roles from the record, else through ``LegacyRolesReader``
+(the legacy read bridge, deleted by TASK-145.13).
 ``resolve_new_incident_system`` resolves the new-incident policy against the
 configured systems; the declare path's plugin calls it at startup.
 """
@@ -30,16 +32,19 @@ from datetime import datetime
 from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
+import structlog
+
 from contracts.configuration import SettingError
 from contracts.operations.result import OperationResult
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
-from features.incident.common.vocabulary import IncidentStatus, StatusUpdateStage
+from features.incident.common.vocabulary import IncidentRole, IncidentStatus, StatusUpdateStage
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.google_meet import GoogleMeetVideoCall
 from features.incident.core.adapters.google_sheets import GoogleSheetsIncidentListProjection
 from features.incident.core.adapters.i18n import translate
+from features.incident.core.adapters.legacy_roles import GoogleDriveLegacyRolesReader
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
     CONVERSATION_NAME_ATTEMPTS,
@@ -85,6 +90,8 @@ from features.incident.core.store import (
     timeline_table,
 )
 
+logger = structlog.get_logger()
+
 __all__ = [
     "CONVERSATION_NAME_ATTEMPTS",
     "BindingKind",
@@ -103,6 +110,7 @@ __all__ = [
     "IncidentStore",
     "IncidentTranscriptReader",
     "Keep",
+    "LegacyRolesReader",
     "LegacyUpgrade",
     "MessageReference",
     "PostmortemMeetingReference",
@@ -133,8 +141,10 @@ __all__ = [
     "get_incident_list_projection",
     "get_incident_report",
     "get_incident_transcript_reader",
+    "get_legacy_roles_reader",
     "get_video_call",
     "incident_conversation_names",
+    "read_incident_roles",
     "resolve_new_incident_system",
     "translate",
 ]
@@ -252,6 +262,10 @@ class IncidentConversation(Protocol):
 
     async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
         """Set the conversation's purpose (its description) to ``text``."""
+        ...
+
+    async def purpose(self, conversation: ConversationReference) -> OperationResult[str]:
+        """Return the conversation's purpose text; an empty string when it has none."""
         ...
 
     async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
@@ -477,6 +491,56 @@ def get_incident_conversation() -> IncidentConversation:
 def get_incident_transcript_reader() -> IncidentTranscriptReader:
     """Return the process-wide Slack-backed ``IncidentTranscriptReader``."""
     return build_incident_transcript_reader()
+
+
+@runtime_checkable
+class LegacyRolesReader(Protocol):
+    """Interface reading the roles the legacy ``roles manage`` kept on an incident's report.
+
+    Legacy only: the report's Drive properties ``ic_id`` and ``ol_id`` hold the incident commander and the
+    operations lead of an incident whose record holds no role yet. It reads and never writes.
+
+    TODO(TASK-145.13): delete with ``read_incident_roles`` once the legacy upgrade job's backfill reports
+    nothing pending.
+    """
+
+    async def read(self, report: ReportReference) -> OperationResult[Mapping[IncidentRole, str]]:
+        """Return the roles the report carries (a role it does not carry is absent).
+
+        A report of a system the implementation does not serve is a PERMANENT_ERROR with
+        ``UNSUPPORTED_OPERATION``; a missing report is NOT_FOUND.
+        """
+        ...
+
+
+@lru_cache(maxsize=1)
+def get_legacy_roles_reader() -> LegacyRolesReader:
+    """Return the process-wide Google-Drive-backed ``LegacyRolesReader`` (TODO(TASK-145.13): delete)."""
+    return GoogleDriveLegacyRolesReader()
+
+
+async def read_incident_roles(incident: Incident, legacy: LegacyRolesReader) -> Mapping[IncidentRole, str | None]:
+    """Return the incident's five roles: the record's when any is set, else the legacy report's commander and lead.
+
+    An incident whose record holds no role and whose report is a Google document reads the report's Drive
+    properties through ``legacy``; the other three roles are then unset. A failed read is logged and yields the
+    record's (empty) roles, so a role that cannot be read shows as unassigned.
+
+    TODO(TASK-145.13): drop the legacy read with ``LegacyRolesReader``.
+    """
+    recorded: dict[IncidentRole, str | None] = {role: getattr(incident, role.value) for role in IncidentRole}
+    if any(recorded.values()) or incident.report is None or incident.report.system is not WorkplaceSystem.GOOGLE:
+        return recorded
+    read = await legacy.read(incident.report)
+    if not read.is_success or read.data is None:
+        logger.warning(
+            "incident_legacy_roles_read_failed",
+            incident_id=incident.id,
+            operation_status=read.status.value,
+            error_code=read.error_code,
+        )
+        return recorded
+    return {role: read.data.get(role) for role in IncidentRole}
 
 
 NEW_INCIDENT_SYSTEM_SETTING = "incident_core.new_incident_system"

@@ -694,6 +694,17 @@ class InMemoryIncidentConversation:
         stored.archived = True
         return OperationResult.success()
 
+    async def purpose(self, conversation: ConversationReference) -> OperationResult[str]:
+        """Return the purpose last set (or seeded) on the conversation; an empty string when none."""
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        return OperationResult.success(stored.purpose or "")
+
+    def seed_purpose(self, conversation: ConversationReference, text: str) -> None:
+        """Give ``conversation`` the purpose ``text`` without a write, as a channel created before the bot's writes has one."""
+        self._conversations[conversation.vendor_id].purpose = text
+
     async def is_writable(self, conversation: ConversationReference) -> OperationResult[bool]:
         """Answer whether the conversation is open and the bot a member."""
         stored = self._known(conversation)
@@ -803,3 +814,37 @@ class InMemoryIncidentListProjection:
         else:
             self.rows[index] = row
         return OperationResult.success(None)
+
+
+class InMemoryLegacyRolesReader:
+    """Hold legacy report roles by report vendor id; reads never write.
+
+    ``seed`` gives a report its commander and lead as the legacy ``roles manage`` left them in Drive. A report
+    with none seeded is NOT_FOUND, as a missing Drive file is; ``fail_with`` makes every read return that error
+    result instead. ``reads`` lists the reports read, in order.
+
+    TODO(TASK-145.13): delete with ``LegacyRolesReader``.
+    """
+
+    def __init__(self, *, fail_with: OperationResult[Any] | None = None) -> None:
+        self._roles: dict[str, dict[IncidentRole, str]] = {}
+        self._fail_with = fail_with
+        self.reads: list[ReportReference] = []
+
+    def seed(self, report: ReportReference, roles: Mapping[IncidentRole, str]) -> None:
+        """Give ``report`` these roles."""
+        self._roles[report.vendor_id] = dict(roles)
+
+    async def read(self, report: ReportReference) -> OperationResult[Mapping[IncidentRole, str]]:
+        """Return the seeded roles of a Google report; another system is unsupported, an unseeded report not found."""
+        self.reads.append(report)
+        if self._fail_with is not None:
+            return OperationResult.error(self._fail_with.status, self._fail_with.message or "", self._fail_with.error_code)
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return OperationResult.permanent_error(
+                f"Google Drive cannot reach a report on {report.system.value}", ErrorCode.UNSUPPORTED_OPERATION
+            )
+        roles = self._roles.get(report.vendor_id)
+        if roles is None:
+            return OperationResult.error(OperationStatus.NOT_FOUND, "No such report")
+        return OperationResult.success(dict(roles))

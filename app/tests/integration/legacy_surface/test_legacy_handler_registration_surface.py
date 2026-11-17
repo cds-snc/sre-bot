@@ -47,7 +47,6 @@ LEGACY_VIEWS = (
     "incident_view",
     "view_folder_metadata_modal",
     "add_metadata_view",
-    "view_save_incident_roles",
     "view_save_event",
     "update_field_modal",
 )

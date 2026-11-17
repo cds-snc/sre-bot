@@ -24,7 +24,6 @@ from modules.incident import (
     incident_alert,
     incident_conversation,
     incident_folder,
-    incident_roles,
     incident_status,
     information_display,
     information_update,
@@ -145,7 +144,6 @@ def register(bot: App):
     bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)
     bot.view("add_metadata_view")(incident_folder.save_metadata)
     bot.action("delete_folder_metadata")(incident_folder.delete_folder_metadata)
-    bot.view("view_save_incident_roles")(incident_roles.save_incident_roles)
     bot.view("view_save_event")(schedule_retro.handle_schedule_retro_submit)
     bot.action("confirm_click")(schedule_retro.confirm_click)
     bot.action("user_select_action")(schedule_retro.incident_selected_users_updated)
@@ -180,7 +178,6 @@ def get_resource_handlers():
     return {
         "channels": handle_channels,
         "product": handle_products,
-        "roles": handle_roles,
         "updates": handle_updates,
     }
 
@@ -347,22 +344,6 @@ Use `/sre incident help` to see a list of commands."""
             incident_folder.list_folders_view(client, body, ack)
         case _:
             respond(product_help_text)
-
-
-def handle_roles(client, body, respond, ack, action, _args, _flags):
-    """Handle the roles command."""
-    roles_help_text = """`/sre incident roles <action> [options] [arguments]`
-
-*Actions:*
-• `manage` — manage incident roles
-• `show` — show current incident roles"""
-    match action:
-        case "manage":
-            incident_roles.manage_roles(client, body, ack, respond)
-        case "show":
-            respond("Upcoming feature: show current incident roles.")
-        case _:
-            respond(roles_help_text)
 
 
 def handle_updates(client, body, respond, ack, action, _args, _flags):

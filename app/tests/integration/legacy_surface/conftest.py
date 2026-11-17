@@ -843,9 +843,9 @@ def legacy_sre_web_client_seam(legacy_handler_harness: LegacyHandlerHarness, mon
     ``modules/sre/platforms/slack.py`` builds its WebClient through a private
     factory rather than from Bolt's injected client, so no external edge is
     reachable for the ``/sre incident`` subcommands. The factory is pointed at
-    the harness's recording client. Owning rebuild task: TASK-145.8, whose
-    rebuilt ``sre.incident`` subcommands are registered through hookimpls and
-    receive the client from the transport; this fixture is deleted there.
+    the harness's recording client. Owning rebuild task: TASK-145.13, which
+    deletes the legacy ``/sre incident`` dispatcher and the other pins still
+    reaching it through this factory; this fixture is deleted there.
     """
     monkeypatch.setattr(sre_slack, "_web_client", lambda: legacy_handler_harness.client)
 

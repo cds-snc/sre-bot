@@ -4,7 +4,7 @@ title: Cut over incident show and the update modal
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T15:51:00Z'
+updated_date: '2026-11-16T19:34:00Z'
 labels:
   - incident
   - features
@@ -14,6 +14,8 @@ dependencies:
   - TASK-145.8.2
   - TASK-145.8.7
   - TASK-145.8.4
+  - TASK-145.8.5.1
+  - TASK-145.8.5.3
 references:
   - decisions/incident-management.md
   - decisions/migration.md
@@ -34,6 +36,8 @@ Stack L L6a (slices in TASK-145.8's plan). incident.response registers show and 
 - [ ] #1 The show and update pins pass with assertions unchanged, fixtures rewired; information_display.py and information_update.py are gone (checks parent ACs #1, #4, #6 and the show part of #5)
 - [ ] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 - [ ] #3 The PR body states the revert target: one git revert restores the legacy surface, and the L5r rollback guard (TASK-145.8.2) keeps it reading and writing upgraded items correctly (decisions/incident-management.md Migration rule 1)
+- [ ] #4 update_incident_document_status (modules/incident/incident_document.py) and its tests are deleted with its last caller information_update.py:313 (moved from TASK-145.8.5, OQ2 2026-11-16)
+- [ ] #5 The show modal reads the five roles through core's roles read (record, else the report's Drive properties via the TASK-145.8.5.1 bridge)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -66,6 +70,14 @@ created: 2026-11-16T15:51:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+
+created: 2026-11-16T19:34:00Z
+
+---
+
+2026-11-16 (human, TASK-145.8.5 OQ2/OQ7): L6a stacks above L7a.3 (TASK-145.8.5.3); it deletes update_incident_document_status with its last caller, and shows roles through the read bridge built in TASK-145.8.5.1 (existing roles live only in Drive until TASK-145.7.12's backfill).
 
 ---
 <!-- COMMENTS:END -->

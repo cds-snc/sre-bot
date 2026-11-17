@@ -394,43 +394,6 @@ def test_handle_products_with_create_error(mock_create_folder):
     respond.assert_called_once_with("Failed to create product `foo bar`.")
 
 
-@patch("modules.incident.incident_helper.incident_roles")
-def test_handle_roles_with_no_action(mock_incident_roles):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-    roles_help_text = """`/sre incident roles <action> [options] [arguments]`
-
-*Actions:*
-• `manage` — manage incident roles
-• `show` — show current incident roles"""
-    incident_helper.handle_roles(client, body, respond, ack, None, [], {})
-    mock_incident_roles.assert_not_called()
-    respond.assert_called_once_with(roles_help_text)
-
-
-@patch("modules.incident.incident_helper.incident_roles")
-def test_handle_roles_with_manage(mock_incident_roles):
-    client = MagicMock()
-    body = MagicMock()
-    respond = MagicMock()
-    ack = MagicMock()
-
-    incident_helper.handle_roles(client, body, respond, ack, "manage", [], {})
-    mock_incident_roles.manage_roles.assert_called_once_with(client, body, ack, respond)
-
-
-def test_handle_roles_with_show():
-    respond = MagicMock()
-    ack = MagicMock()
-    client = MagicMock()
-    body = MagicMock()
-
-    incident_helper.handle_roles(client, body, respond, ack, "show", [], {})
-    respond.assert_called_once_with("Upcoming feature: show current incident roles.")
-
-
 @pytest.mark.parametrize("action", ["add", "show", "help", "bogus"])
 def test_handle_updates_answers_every_action_with_the_status_update_pointer(action):
     """Every updates action replies once with the EN/FR pointer to /sre incident status-update.

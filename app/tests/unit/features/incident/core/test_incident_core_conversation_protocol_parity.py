@@ -144,6 +144,7 @@ async def test_inviting_nobody_succeeds(conversations: IncidentConversation) -> 
         lambda c: c.invite(GOOGLE, ["U1"]),
         lambda c: c.archive(GOOGLE),
         lambda c: c.is_writable(GOOGLE),
+        lambda c: c.purpose(GOOGLE),
         lambda c: c.set_topic(GOOGLE, "topic"),
         lambda c: c.create_canvas(GOOGLE, "# Canvas"),
         lambda c: c.group_members(GOOGLE, "S0SEC"),
@@ -255,3 +256,23 @@ async def test_an_unknown_group_is_not_found(conversations: IncidentConversation
 
     assert members.status is OperationStatus.NOT_FOUND
     assert members.error_code == "no_such_subteam"
+
+
+async def test_a_conversation_without_a_purpose_reads_an_empty_one(conversations: IncidentConversation) -> None:
+    purpose = await conversations.purpose(OPEN)
+
+    assert purpose.is_success
+    assert purpose.data == ""
+
+
+async def test_the_purpose_read_is_the_one_last_set(conversations: IncidentConversation) -> None:
+    await conversations.set_purpose(OPEN, "Payments outage")
+
+    assert (await conversations.purpose(OPEN)).data == "Payments outage"
+
+
+async def test_the_purpose_of_an_unknown_conversation_is_not_found(conversations: IncidentConversation) -> None:
+    purpose = await conversations.purpose(UNKNOWN)
+
+    assert purpose.status is OperationStatus.NOT_FOUND
+    assert purpose.error_code == "channel_not_found"

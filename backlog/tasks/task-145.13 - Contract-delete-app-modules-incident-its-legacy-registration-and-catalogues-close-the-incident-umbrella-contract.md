@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T16:05:00Z'
+updated_date: '2026-11-16T19:34:00Z'
 labels:
   - incident
   - features
@@ -49,6 +49,8 @@ THIS SLICE
 - [ ] #6 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [ ] #7 The TASK-173 host rule (a Slack transport switched on with GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID unset fails boot, server/configuration/host_configuration.py) and its tests are deleted with the legacy handlers it exists for, and decisions/configuration.md Tolerated no longer lists it (dated Changes line)
 - [ ] #8 features/incident/core/legacy_upgrade.py and features/incident/response/legacy_upgrade_job.py are deleted with the job's registration, and their app/bin/baselines/package_shape.txt entries go with them
+- [ ] #9 legacy_sre_web_client_seam (tests/integration/legacy_surface/conftest.py) and app/bin/baselines/test_seams_legacy.txt line 20 are deleted once no pin reaches a legacy /sre incident subcommand (moved from TASK-145.8.5, OQ4 2026-11-16)
+- [ ] #10 The value-scoped legacy attachment aliases (archive_channel: archive, ignore, schedule_retro) are removed, and the core roles read bridge and the job's Drive roles input (TASK-145.8.5.1, TASK-145.7.12) are deleted once a production run reports nothing pending
 <!-- AC:END -->
 
 ## Implementation Plan
