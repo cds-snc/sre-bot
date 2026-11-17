@@ -78,11 +78,11 @@ async def test_the_capability_registers_and_the_rotations_source_answers_without
     assert opsgenie.error_code == ErrorCode.CONFIG_NOT_CONFIGURED
 
 
-async def test_the_provider_and_the_config_time_accessor_work_with_no_rotation_files() -> None:
+async def test_the_provider_and_the_config_time_accessor_agree_on_the_packaged_rotation_files() -> None:
     lookup = get_oncall_lookup()
 
     result = await lookup.list_schedules(ROTATIONS)
 
-    assert configured_rotations() == ()
     assert result.is_success
-    assert result.data == ()
+    assert result.data == configured_rotations()
+    assert ScheduleReference(ROTATIONS, "canadalogin-website-atc") in configured_rotations()

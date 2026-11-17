@@ -83,7 +83,7 @@ def test_duplicate_handles_fail_the_load_naming_them(tmp_path: Path) -> None:
 def test_invalid_json_fails_the_load_naming_the_file(tmp_path: Path) -> None:
     (tmp_path / "broken.json").write_text("{not json")
 
-    with pytest.raises(ValueError, match=r"Invalid JSON in rotations/broken\.json"):
+    with pytest.raises(ValueError, match=r"Invalid JSON in rotation_files/broken\.json"):
         load_rotation_schedules(tmp_path)
 
 
@@ -144,3 +144,10 @@ async def test_an_unknown_rotation_is_not_found() -> None:
 
     assert result.status is OperationStatus.NOT_FOUND
     assert result.error_code == ErrorCode.NOT_FOUND
+
+
+def test_the_packaged_default_directory_loads_the_rotation_files_shipped_with_the_capability() -> None:
+    schedules = load_rotation_schedules()
+
+    references = [schedule.reference for schedule in schedules]
+    assert ScheduleReference(ROTATIONS, "canadalogin-website-atc") in references

@@ -47,13 +47,13 @@ from slack_sdk import WebClient
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.webhook import WebhookClient
 
+import capabilities.oncall.plugin as oncall_plugin_module
 import features.incident.comms as incident_comms_module
 import features.incident.response.plugin as incident_response_module
 import features.incident.scribe as incident_scribe_module
 import packages.access.sync as access_sync_module
 import packages.geolocate as geolocate_module
 import packages.rant as rant_module
-import packages.user_rotations as user_rotations_module
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.workplace import WorkplaceSystem
@@ -81,7 +81,7 @@ from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authoriz
 
 SLACK_COMMAND_HOOKIMPLS: tuple[ModuleType, ...] = (
     rant_module,
-    user_rotations_module,
+    oncall_plugin_module,
     access_sync_module,
     incident_scribe_module,
     incident_comms_module,

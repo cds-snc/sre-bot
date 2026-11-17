@@ -33,7 +33,7 @@ from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookimpl
 from contracts.plugins.requirements import Requirement
 from contracts.workplace import WorkplaceSystem
 from features.incident import scribe
-from packages import oncall_sync, rant, user_rotations
+from packages import oncall_sync, rant
 from server.plugins import requirements as host
 from server.plugins.requirements import (
     PluginRequirementsUnmetError,
@@ -126,7 +126,6 @@ PLUGIN_DECLARATIONS = [
     ),
     pytest.param(oncall_sync, ("slack.tenant", "slack.user_token", "opsgenie.tenant"), id="oncall_sync"),
     pytest.param(rant, ("slack.tenant",), id="rant"),
-    pytest.param(user_rotations, ("slack.tenant",), id="user_rotations"),
 ]
 
 

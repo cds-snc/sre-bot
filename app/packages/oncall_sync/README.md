@@ -6,7 +6,7 @@ Sync OpsGenie on-call schedules and self-managed user rotations to Slack UserGro
 
 Synced rotations are defined in [rotations.json](./rotations.json). Defined rotations are synced with UserGroups in Slack. Schedule-level Slack UserGroups can also be synced that will contain all members of the nested rotations. The schedule-level Slack UserGroup is created if `slack_handle` and `slack_name` are set on the schedule object.
 
-Self-managed (non-OpsGenie) rotations are defined in [user_rotations](../user_rotations/).
+Self-managed (non-OpsGenie) rotations are defined in the [on-call capability](../../capabilities/oncall/README.md) and read through its `api.py`; a rotation it cannot answer for is skipped, never emptied.
 
 Every 5 minutes, SRE Bot will fetch the current on-call individual for each rotation and the current user for each self-managed rotation, then update the linked Slack UserGroups if necessary. SRE Bot will also update the schedule-level UserGroup to contain all folks on-call for the nested rotations.
 

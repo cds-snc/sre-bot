@@ -19,7 +19,7 @@ The bot was named for site reliability engineering and the root README described
 
 | Area | Packages |
 | --- | --- |
-| Incident response | `incident`, `webhooks`, `oncall` capability, `oncall_sync`, `user_rotations` (an on-call schedule source, [oncall.md](oncall.md)) |
+| Incident response | `incident`, `webhooks`, `oncall` capability (with the self-managed rotations, an on-call schedule source, and `/sre rotations`, [oncall.md](oncall.md)), `oncall_sync` |
 | Cloud operations | AWS account health, spending, Lambda surfaces |
 | Platform access | `access` umbrella, AWS Identity Center, Google Workspace provisioning |
 | Workplace utilities | `talent`, ATIP, `secret`, `geolocate`, `rant` |

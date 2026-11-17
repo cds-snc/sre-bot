@@ -46,7 +46,6 @@ geolocate = "packages.geolocate"
 "incident.scribe" = "features.incident.scribe"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
-user_rotations = "packages.user_rotations"
 oncall = "capabilities.oncall.plugin"
 
 [tool.ruff]
@@ -131,9 +130,9 @@ env = [
     # plugin enable it explicitly. access.sync switched on from app/.env would make
     # lifespan build the AWS Identity Center adapter (and assume its role) at startup.
     'PLUGINS__PLATFORM_ACCESS={{"access.catalog": false, "access.request": false, "access.sync": false}}',
-    # Likewise the plugins that declare a requirement (scribe, oncall_sync, user_rotations, rant): switched on
+    # Likewise the plugins that declare a requirement (scribe, oncall_sync, rant): switched on
     # from app/.env they would abort every lifespan test boot. Each table is pinned whole, as the ci files set it.
-    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.response": false, "incident.scribe": false, "oncall": true, "oncall_sync": false, "user_rotations": false}}',
+    'PLUGINS__INCIDENT_RESPONSE={{"incident.comms": true, "incident.response": false, "incident.scribe": false, "oncall": true, "oncall_sync": false}}',
     'PLUGINS__WORKPLACE_UTILITIES={{"geolocate": true, "rant": false}}',
     # Likewise the scheduler: SCHEDULER__ENABLED=true in app/.env would start the real
     # jobs thread in every lifespan test. Tests that need it enable it explicitly.
@@ -361,15 +360,6 @@ modules = [
     "packages.oncall_sync",
     "packages.rant",
     "packages.talent",
-    "packages.user_rotations",
-]
-unmatched_ignore_imports_alerting = "error"
-ignore_imports = [
-    # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/feature-packages.md; TASK-146.1 removes the oncall_sync -> user_rotations coupling).
-    # Shrink-only: remove an entry when its import is fixed; never add one.
-    "packages.oncall_sync -> packages.user_rotations.settings",
-    "packages.oncall_sync.ports -> packages.user_rotations.service",
-    "packages.oncall_sync.providers -> packages.user_rotations.providers",
 ]
 
 [[tool.importlinter.contracts]]
@@ -461,17 +451,12 @@ protected_modules = [
     "features.incident.scribe",
     "packages.oncall_sync",
     "packages.rant",
-    "packages.user_rotations",
     "capabilities.oncall.plugin",
 ]
 allowed_importers = []
 unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Existing violations, seeded 2026-10-26 by TASK-112.2. Shrink-only: remove an entry when its import is fixed; never add one.
-    # TASK-146.1 deletes user_rotations.
-    "packages.oncall_sync -> packages.user_rotations.settings",
-    "packages.oncall_sync.ports -> packages.user_rotations.service",
-    "packages.oncall_sync.providers -> packages.user_rotations.providers",
     # TASK-124.6 moves or retires the legacy GET /geolocate/{ip} route.
     "api.v1.routes.geolocate -> packages.geolocate.schemas",
 ]

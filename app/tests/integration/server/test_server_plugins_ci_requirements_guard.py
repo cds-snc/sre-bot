@@ -41,5 +41,5 @@ def test_ci_files_switch_off_every_plugin_that_states_a_requirement() -> None:
     stating = _plugins_stating_requirements()
     enabled = _ci_enablement()
 
-    assert {"incident.response", "incident.scribe", "oncall_sync", "rant", "user_rotations"} <= stating
+    assert {"incident.response", "incident.scribe", "oncall_sync", "rant"} <= stating
     assert sorted(name for name in stating if enabled.get(name, False)) == []

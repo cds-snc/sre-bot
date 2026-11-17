@@ -14,7 +14,6 @@ announce_channel_id = "C033L7RGCT0"
 "incident.response" = false
 "incident.scribe" = false
 oncall_sync = false
-user_rotations = false
 
 [plugins.workplace_utilities]
 rant = false

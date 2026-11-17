@@ -37,7 +37,7 @@ class _Logger:
 def test_register_background_jobs_with_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
     monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [object()])
-    monkeypatch.setattr(pkg, "get_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "configured_rotations", lambda: [])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -52,7 +52,7 @@ def test_register_background_jobs_with_schedules(monkeypatch) -> None:
 def test_register_background_jobs_with_user_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
     monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
-    monkeypatch.setattr(pkg, "get_rotations", lambda: [object()])
+    monkeypatch.setattr(pkg, "configured_rotations", lambda: [object()])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -64,7 +64,7 @@ def test_register_background_jobs_with_user_rotations(monkeypatch) -> None:
 def test_register_background_jobs_noop_without_schedules_or_user_rotations(monkeypatch) -> None:
     pkg = _reload_pkg()
     monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
-    monkeypatch.setattr(pkg, "get_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "configured_rotations", lambda: [])
 
     registry = _Registry()
     pkg.register_background_jobs(registry=registry)
@@ -95,7 +95,7 @@ def test_startup_warmup_logs_schedule_and_rotation_counts_at_debug(monkeypatch) 
 def test_startup_warmup_warns_when_no_schedules(monkeypatch) -> None:
     pkg = _reload_pkg()
     monkeypatch.setattr(pkg, "get_oncall_schedules", lambda: [])
-    monkeypatch.setattr(pkg, "get_rotations", lambda: [])
+    monkeypatch.setattr(pkg, "configured_rotations", lambda: [])
 
     logger = _Logger()
     pkg.startup_warmup(logger=logger)

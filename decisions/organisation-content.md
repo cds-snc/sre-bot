@@ -12,7 +12,7 @@ scope: What an adopting organisation supplies and how to choose its category (de
 The bot is built as a framework another organisation can adopt ([product-scope.md](product-scope.md)): nothing specific to one organisation belongs in its code. Deployment configuration ([configuration.md](configuration.md)) and code extensions ([plugins.md](plugins.md)) are decided; the organisation's own data has no record, and the code holds four diverging patterns (inventory of 2026-10-28):
 - Python modules per webhook sender in `modules/webhooks/patterns/`, found by an import-time directory walk ([webhooks.md](webhooks.md)), while the webhook instances are created from Slack and stored in the `webhooks` table;
 - the access catalogue behind a four-way loader switch (`ACCESS_CONFIG_SOURCE`: `bundle`, `inline_json`, `file_json`, `env`), whose bundle is empty;
-- this organisation's on-call data packaged inside the code: `packages/oncall_sync/rotations.json` maps Opsgenie schedule ids and rotation names to Slack user groups (pointers only; who is on call and every swap live in Opsgenie), and each file in `packages/user_rotations/rotations/` is a self-managed roster (members, weekly cadence, start date) from which the app computes who is on call, so changing a roster's members or order is a pull request and a deploy;
+- this organisation's on-call data packaged inside the code: `packages/oncall_sync/rotations.json` maps Opsgenie schedule ids and rotation names to Slack user groups (pointers only; who is on call and every swap live in Opsgenie), and each file in `packages/user_rotations/rotations/` (since TASK-146.1.2 `capabilities/oncall/adapters/rotation_files/`) is a self-managed roster (members, weekly cadence, start date) from which the app computes who is on call, so changing a roster's members or order is a pull request and a deploy;
 - the organisation's wording in the app's strings (`cyber.gc.ca` and `security@cds-snc.ca` in `locales/incident.*.yml`, "CDS Staff" in scribe, the ATIP letter) and a default admin group (`sre-ifs@cds-snc.ca`) in `infrastructure/configuration/features/aws_ops.py`.
 TASK-165's team playbooks and TASK-166's entitlement catalogue are planned and need a home. The app already has a store (the records contract over DynamoDB, [cloud-portability.md](cloud-portability.md)); PostgreSQL is a gated option, not a precondition.
 
@@ -74,7 +74,7 @@ A kind starts provisioned unless its owners need in-flight change, because manag
 Tickets: TASK-165, TASK-166, TASK-168, the TASK-146 re-cut, the incident surface rebuilds (TASK-145) and TASK-39, TASK-88, TASK-170 (the deployment repository). Tolerated until closed:
 - per-sender Python in `modules/webhooks/patterns/` and its import-time walk (TASK-168 slices);
 - `ACCESS_CONFIG_SOURCE` and its four loaders (TASK-166);
-- the schedule mappings in `oncall_sync/rotations.json` and the rosters in `user_rotations/rotations/` inside the code (TASK-146 re-cut);
+- the schedule mappings in `oncall_sync/rotations.json` and the rosters in `capabilities/oncall/adapters/rotation_files/` inside the code, beside the adapter that owns their format (TASK-146 re-cut);
 - organisation wording in `locales/` and scribe, and the ATIP letter (the incident surface rebuilds, TASK-39);
 - the `sre-ifs@cds-snc.ca` default in `aws_ops.py` (TASK-111.14 moves it to `production.toml` as `[cloud_operations] aws_admin_groups`; TASK-88 deletes it with `modules/permissions`).
 
@@ -82,3 +82,4 @@ Tickets: TASK-165, TASK-166, TASK-168, the TASK-146 re-cut, the incident surface
 - 2026-10-28: Draft (TASK-167). Category and source chosen from two tables; content through a consumer-owned port; one source per item, explicit moves; never executable; each source and each kind has its own record (human: the store exists, so in-flight change is designed for, not ruled out; one record per content type).
 - 2026-10-28: Accepted (human review, TASK-167).
 - 2026-11-05: products added to the kinds table: the product catalogue's default source is the bot's own content, an external catalogue an optional adapter (TASK-145.6 re-plan, human).
+- 2026-11-17: the tolerated in-code rosters moved byte-identical to `capabilities/oncall/adapters/rotation_files/`, inside the layout table's `adapters/` slot rather than a new capability-level name, since rosters end as managed content (TASK-146.1.2, human).

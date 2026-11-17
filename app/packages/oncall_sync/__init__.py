@@ -5,7 +5,8 @@ matching messaging user groups so they mirror the current on-call users.
 For each schedule, each rotation gets its own single-user group, and the
 schedule itself gets an aggregate group containing all on-call users across
 its rotations. Missing user groups are created automatically. The job runs
-whenever at least one schedule is configured in ``rotations.json``.
+whenever at least one schedule is configured in ``rotations.json`` or one
+self-managed rotation is loaded by the on-call capability.
 
 Business logic lives in ``service.py`` and is platform-neutral; concrete
 vendor adapters live under ``adapters/``. Swapping OpsGenie or Slack is a
@@ -15,10 +16,10 @@ vendor adapters live under ``adapters/``. Swapping OpsGenie or Slack is a
 import asyncio
 from datetime import timedelta
 
+from capabilities.oncall.api import configured_rotations
 from contracts.plugins.namespace import hookimpl
 from contracts.plugins.requirements import Requirement
 from packages.oncall_sync.settings import get_oncall_schedules
-from packages.user_rotations.settings import get_rotations
 
 SYNC_INTERVAL = timedelta(minutes=5)
 
@@ -41,7 +42,7 @@ def register_requirements() -> tuple[Requirement, ...]:
 def register_background_jobs(registry) -> None:
     """Register the recurring on-call sync job."""
 
-    if not get_oncall_schedules() and not get_rotations():
+    if not get_oncall_schedules() and not configured_rotations():
         return
 
     registry.register_interval(
@@ -56,7 +57,7 @@ def startup_warmup(logger) -> None:
     """Log effective configuration at startup."""
 
     schedules = get_oncall_schedules()
-    user_rotations = get_rotations()
+    user_rotations = configured_rotations()
     rotation_count = sum(len(s.rotations) for s in schedules)
     logger.debug(
         "oncall_sync_settings_loaded",

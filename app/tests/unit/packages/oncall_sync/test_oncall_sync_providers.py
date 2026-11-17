@@ -130,7 +130,7 @@ def test_get_oncall_sync_service_includes_user_rotations_provider(monkeypatch: p
         context.setattr(providers, "get_oncall_schedule_provider", lambda: on_call)
         context.setattr(providers, "get_user_group_sync_target", lambda: target)
         context.setattr(providers, "get_oncall_schedules", lambda: [])
-        context.setattr(providers, "get_user_rotations_service", lambda: user_rotations)
+        context.setattr(providers, "get_user_rotations_provider", lambda: user_rotations)
 
         service = providers.get_oncall_sync_service()
 

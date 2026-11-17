@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
+import capabilities.oncall.plugin as oncall_plugin_module
 import contracts.slack
-import packages.user_rotations as user_rotations_module
 from contracts.slack.registrar import SlackCommandRegistrar
 from contracts.slack.reply import SlackReplySender
 from integrations.slack.provider import SlackPlatformProvider
@@ -44,7 +44,7 @@ def test_plugin_scoped_registrar_satisfies_the_registrar_protocol() -> None:
 def test_hookimpl_registers_its_commands_through_the_registrar() -> None:
     registrar = FakeSlackRegistrar()
 
-    user_rotations_module.register_slack_commands(registrar=registrar)
+    oncall_plugin_module.register_slack_commands(registrar=registrar)
 
     assert [(entry["command"], entry["parent"]) for entry in registrar.commands] == [
         ("rotations", "sre"),

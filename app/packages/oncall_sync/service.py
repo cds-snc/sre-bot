@@ -52,7 +52,7 @@ class OnCallSyncService:
         for schedule in self._schedules:
             await self._sync_schedule(schedule)
         if self._user_rotations is not None:
-            for rotation in self._user_rotations.get_current_rotations():
+            for rotation in await self._user_rotations.get_current_rotations():
                 self._sync_user_rotation(rotation.slack_usergroup_handle, rotation.slack_usergroup_name, rotation.slack_user_id)
 
     def _sync_user_rotation(self, handle: str, name: str, user_id: str) -> None:

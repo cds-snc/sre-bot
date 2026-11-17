@@ -33,7 +33,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 
-ROTATIONS_DIRECTORY = "rotations"
+ROTATIONS_DIRECTORY = "rotation_files"
 SLACK_PLATFORM = "slack"
 DEFAULT_ROTATION_START = datetime(1970, 1, 5, 9, tzinfo=ZoneInfo("America/Toronto"))
 _HANDLE_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]*")
@@ -86,13 +86,13 @@ class RotationFile(BaseModel):
 def load_rotation_schedules(directory: Traversable | None = None) -> tuple[Schedule, ...]:
     """Load and validate every ``*.json`` rotation file of ``directory``, sorted by file name.
 
-    ``directory`` defaults to ``rotations/`` beside the capability; an absent directory is no rotations.
+    ``directory`` defaults to ``rotation_files/`` beside this module; an absent directory is no rotations.
 
     Raises:
         ValueError: A file is not valid JSON, or two files share a handle.
         pydantic.ValidationError: A file does not match ``RotationFile``.
     """
-    directory = directory or files("capabilities.oncall").joinpath(ROTATIONS_DIRECTORY)
+    directory = directory or files("capabilities.oncall.adapters").joinpath(ROTATIONS_DIRECTORY)
     if not directory.is_dir():
         return ()
     parsed: list[RotationFile] = []
