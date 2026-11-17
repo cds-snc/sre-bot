@@ -1155,22 +1155,6 @@ def test_declare_stores_security_incident_none_for_other_values(
     assert incident_data["security_incident"] is None
 
 
-@patch("modules.incident.core.logger")
-@patch("modules.incident.core.db_operations")
-def test_recreate_database_record_leaves_security_incident_unset(mock_db_operations, _mock_logger):
-    """The recreate-missing-resources path has no security answer, so its incident data
-    carries no security_incident key and the model default stores the flag as unknown."""
-    mock_db_operations.create_incident.return_value = "incident_id"
-    results: dict = {"success": [], "errors": []}
-
-    core._create_database_record(
-        "channel_id", "channel_name", "incident_name", "product", "user_id", "doc_link", "meet_url", results
-    )
-
-    incident_data = mock_db_operations.create_incident.call_args.args[0]
-    assert "security_incident" not in incident_data
-
-
 # -- policy help group invite -------------------------------------------------------------------
 
 _POLICY_GROUP = _SETTINGS.policy_group_id

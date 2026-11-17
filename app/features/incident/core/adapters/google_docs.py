@@ -290,14 +290,6 @@ def _log_http_failure(event: str, file_id: str, exc: HttpError) -> None:
     )
 
 
-def list_folder_files(parent_folder_id: str) -> list[dict[str, Any]]:
-    result = _list_all(f"parents in '{parent_folder_id}' and mimeType != '{_FOLDER_MIME_TYPE}' and trashed=false", "list_files")
-    if not result.is_success:
-        _log_failure("incident_drive_list_files_failed", result)
-        return []
-    return result.data or []
-
-
 def list_child_folders(parent_folder_id: str) -> list[dict[str, Any]]:
     result = _list_all(f"parents in '{parent_folder_id}' and mimeType = '{_FOLDER_MIME_TYPE}' and trashed=false", "list_folders")
     if not result.is_success:
@@ -341,22 +333,6 @@ def create_document_from_template(name: str, parent_folder_id: str, template_id:
         _log_failure("incident_drive_create_document_failed", result)
         return None
     return result.data
-
-
-def find_document_by_channel_name(channel_name: str) -> dict[str, Any] | None:
-    # The name is not escaped, as before: a quote in a channel name fails the query.
-    result = _list_all(f"trashed=false and name='{channel_name}'", "find_files_by_name")
-    if not result.is_success:
-        _log_failure("incident_drive_find_document_failed", result)
-        return None
-
-    matches = result.data or []
-    if not matches:
-        return None
-
-    document_id = matches[0]["id"]
-    metadata = get_metadata(document_id, fields="id, name, appProperties")
-    return {"id": document_id, "appProperties": metadata.get("appProperties", {})}
 
 
 def add_metadata(file_id: str, key: str, value: str) -> dict[str, Any]:

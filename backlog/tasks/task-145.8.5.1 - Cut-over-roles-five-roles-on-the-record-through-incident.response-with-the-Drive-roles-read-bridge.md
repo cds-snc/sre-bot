@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-16T19:33:00Z'
-updated_date: '2026-11-16T19:54:00Z'
+updated_date: '2026-11-16T23:09:00Z'
 labels:
   - incident
   - features
@@ -99,4 +99,6 @@ Affects /sre incident roles manage and its modal only. Roles land on the record;
 - Gates (agent run, from app/): ruff clean; import contracts 13 kept; package shape OK (3 baselined); test seams OK (47/12 baselined); key ownership OK; fake coverage OK; mypy 40 errors in 13 files (baseline, none in touched files); pytest 7458 passed. Rechecked by the session: targeted roles/status/response/core tests 234 passed with -W error::RuntimeWarning; ruff clean.
 - Size: ~535 production LOC added (+~30 YAML lines per locale), ~185 deleted; above the plan's ~420 estimate and the ~400 gate (one subsystem, one behaviour change; flagged to the human).
 - PR body prepared (named changes with kinds, revert target, merge order after L6b).
+
+2026-11-16: rebased above L6b b40706ae (head feff6cd2, force-pushed to #1862); conflicts only in the core README line and TASK-176 notes; no code change needed (its new ports were already async).
 <!-- SECTION:NOTES:END -->

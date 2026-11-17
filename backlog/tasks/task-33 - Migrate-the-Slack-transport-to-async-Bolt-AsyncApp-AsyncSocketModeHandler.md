@@ -3,8 +3,8 @@ id: TASK-33
 title: Migrate the Slack transport to async Bolt (AsyncApp + AsyncSocketModeHandler)
 status: To Do
 assignee: []
-created_date: '2026-07-07 19:56'
-updated_date: '2026-09-29 19:20'
+created_date: 2026-07-07 19:56
+updated_date: '2026-11-16T20:19:00Z'
 labels:
   - slack
   - phase-4
@@ -14,7 +14,7 @@ dependencies:
   - TASK-26.2
 references:
   - decisions/transport-slack.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1287'
+  - https://github.com/cds-snc/sre-bot/issues/1287
   - decisions/platform-entrypoints.md
 priority: medium
 ordinal: 33000
@@ -49,6 +49,8 @@ Steps:
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-25: decisions/workplace-systems.md, people-and-accounts.md and platform-entrypoints.md are Accepted. Earlier mentions of their Draft status in this task are historical.
+
+2026-11-16 (TASK-145.8.5.2 OQ6, human): the provider attaches value-scoped legacy attachment aliases with a sync value matcher (app.attachment_action(callback_id, matchers=[...])); under AsyncApp, Bolt awaits matcher functions (AsyncCustomListenerMatcher), so this migration makes the provider's value matcher async. No feature code changes.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

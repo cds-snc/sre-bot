@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T16:27:00Z'
+updated_date: '2026-11-17T15:47:00Z'
 labels:
   - incident
   - features
@@ -115,6 +115,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-06 (TASK-36.1.2 pins): legacy bugs pinned as is, to rule in this plan: /sre incident products answers Unknown command (dispatcher key product, help text products); archive sends incident_channel_archived to Sentinel twice (close_incident and archive_channel_action); a refused archive in a non-incident channel still sends it; re-saving roles with no roles line in the purpose leaves a doubled newline. The pins' one internal seam, legacy_sre_web_client_seam, is deleted here.
 
 2026-11-10 (TASK-145.8.1 full plan, human rulings): L3 kept whole under an approved size exception (~530 / 6 incl. the timeline store from OQ13); IncidentChanges has no retrospective link (dropped at L6a, see TASK-145.8.3 notes); close/reopen are one set_status with the bucket rules; the outline's expected_version parameter is replaced by a guard on record_version plus the read values of the changed attributes.
+
+2026-11-17 (TASK-145.8.6, human-approved): /sre incident create is retired (kind (d); 90-day usage: resources 0, new 1, bare 3). The rule 'The recreate path replaces a missing resource's reference map whole ... guarded on the old channel_id scalar' no longer applies (the surface is retired; the guard was record_version anyway). ACs #1 and #5: recreate is checked by its retirement. Reword 'archive and recreate' in the title once 145.8.5.3 and 145.8.6 land.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -17,7 +17,7 @@ logger = get_logger()
 def get_on_call_users(schedule: str) -> list[str]:
     """Return the names (emails) of the people on call for an Opsgenie schedule now.
 
-    Legacy declare and recreate are sync Bolt handlers, so this runs the async lookup with one
+    The legacy declare is a sync Bolt handler, so this runs the async lookup with one
     ``asyncio.run``. A missing or failing source invites nobody and says so, never failing the
     declare (decisions/oncall.md): Opsgenie not configured, a classified failure and a response of
     the wrong shape all return ``[]`` with a warning. Unexpected exceptions propagate.

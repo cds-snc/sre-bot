@@ -1,6 +1,6 @@
 """The legacy ``create_space`` keeps its contract after moving into core.
 
-The legacy declare and recreate call ``create_space()`` and read ``meetingUri``
+The legacy declare calls ``create_space()`` and read ``meetingUri``
 from the payload it returns. The gateway factory is replaced by a ``MagicMock``
 returning a stubbed Meet service, so the tests pin the request (scopes only,
 the space config body, retries off) and that failures still propagate as the

@@ -3,10 +3,10 @@ id: TASK-145.8.8
 title: >-
   Incident report and transcript reader ports are async: IncidentReport and
   IncidentTranscriptReader
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-10T21:44:00Z'
-updated_date: '2026-11-16T18:18:00Z'
+updated_date: '2026-11-16T23:11:00Z'
 labels:
   - incident
   - features

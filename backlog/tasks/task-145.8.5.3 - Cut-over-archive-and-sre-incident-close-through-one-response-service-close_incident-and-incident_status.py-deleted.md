@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T19:34:00Z'
+updated_date: '2026-11-16T20:19:00Z'
 labels:
   - incident
   - features
@@ -39,3 +40,9 @@ Stack L L7a.3 (doc-11 row 18.L7a.3), stacked above L7a.1. Split from TASK-145.8.
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams, make check-settings-key-ownership and pytest tests --ignore=tests/smoke pass
 - [ ] #6 The PR body lists each named change with its kind (Sentinel once and none on refusal: a; refusal by record, record failure stops, minimal event payload: b), the revert target (one git revert; the L5r guard) and the merge order (after L6b)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-16 (human, TASK-145.8.5.2 OQ7): once the archive value is claimed by incident.response.archive, the archive branch of modules/incident/incident_conversation.py archive_channel_action is unreachable; this task deletes that branch (it calls close_incident, deleted here). The listener keeps ignore and schedule_retro until TASK-145.9.2 and TASK-145.10.
+<!-- SECTION:NOTES:END -->
