@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 from googleapiclient.errors import HttpError
 
+from contracts.operations import OperationStatus
 from features.incident.core.adapters import google_docs
 
 
@@ -67,7 +68,7 @@ def test_apply_document_edits_success(mock_get_docs_service):
 
     result = google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1")
 
-    assert result is True
+    assert result.is_success
     mock_service.documents.return_value.batchUpdate.assert_called_once_with(
         documentId="document-id",
         body={
@@ -75,17 +76,21 @@ def test_apply_document_edits_success(mock_get_docs_service):
             "writeControl": {"requiredRevisionId": "rev-1"},
         },
     )
-    mock_service.documents.return_value.batchUpdate.return_value.execute.assert_called_once_with(num_retries=0)
+    # The revision guard makes an SDK replay safe, so the write keeps the factory's retry default.
+    mock_service.documents.return_value.batchUpdate.return_value.execute.assert_called_once_with()
 
 
+@pytest.mark.parametrize("message", ["The provided revision ID does not match the current revision ID.", "Invalid index"])
 @patch("features.incident.core.adapters.google_docs.get_docs_service")
-def test_apply_document_edits_reports_stale_revision_rejection(mock_get_docs_service):
-    """Google answers 400 when the document moved past the required revision; the edit is reported as not applied."""
+def test_apply_document_edits_reports_any_400_as_a_rejected_edit(mock_get_docs_service, message):
+    """Google documents no text for a stale revision, so every 400 is one rejected edit; the caller's re-read tells a lost guard from a bad request."""
     mock_service = MagicMock()
     mock_get_docs_service.return_value = mock_service
-    mock_service.documents.return_value.batchUpdate.return_value.execute.side_effect = _http_error(400)
+    mock_service.documents.return_value.batchUpdate.return_value.execute.side_effect = _http_error(400, message)
 
-    assert google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1") is False
+    result = google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1")
+    assert result.status is OperationStatus.PERMANENT_ERROR
+    assert result.error_code == "HTTP_ERROR"
 
 
 @patch("features.incident.core.adapters.google_docs.get_docs_service")
@@ -96,8 +101,10 @@ def test_apply_document_edits_reports_timeout_as_not_confirmed(mock_get_docs_ser
     execute = mock_service.documents.return_value.batchUpdate.return_value.execute
     execute.side_effect = TimeoutError("The read operation timed out")
 
-    assert google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1") is False
-    execute.assert_called_once_with(num_retries=0)
+    result = google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1")
+    assert result.status is OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "TIMEOUT"
+    execute.assert_called_once_with()
 
 
 @patch("features.incident.core.adapters.google_docs.get_docs_service")
@@ -130,7 +137,8 @@ def test_apply_document_edits_degrades_on_classified_http_error(mock_get_docs_se
 
     result = google_docs.apply_document_edits("document-id", [{"insertText": {"text": "hello"}}], "rev-1")
 
-    assert result is False
+    assert result.status is OperationStatus.TRANSIENT_ERROR
+    assert result.error_code == "429"
 
 
 @patch("features.incident.core.adapters.google_docs.get_docs_service")

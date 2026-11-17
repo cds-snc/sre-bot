@@ -627,6 +627,12 @@ class FakeDocsDocuments:
     def _bump(self, document_id: str) -> None:
         self.revisions[document_id] = self.revisions.get(document_id, 1) + 1
 
+    @staticmethod
+    def _offset(text: str, index: int) -> int:
+        encoded = text.encode("utf-16-le")
+        assert 1 <= index <= len(encoded) // 2 + 1
+        return len(encoded[: (index - 1) * 2].decode("utf-16-le"))
+
     def get(self, *, documentId: str, **_: Any) -> _Request:
         text, links = self.texts[documentId], self._links(documentId)
         content: list[dict[str, Any]] = []
@@ -638,12 +644,20 @@ class FakeDocsDocuments:
                 continue
             style = {"link": {"url": links[start]}} if links[start] else {}
             elements.append(
-                {"startIndex": start + 1, "endIndex": end + 1, "textRun": {"content": text[start:end], "textStyle": style}}
+                {
+                    "startIndex": len(text[:start].encode("utf-16-le")) // 2 + 1,
+                    "endIndex": len(text[:end].encode("utf-16-le")) // 2 + 1,
+                    "textRun": {"content": text[start:end], "textStyle": style},
+                }
             )
             start = end
             if char == "\n" or end == len(text):
                 content.append(
-                    {"startIndex": elements[0]["startIndex"], "endIndex": end + 1, "paragraph": {"elements": elements}}
+                    {
+                        "startIndex": elements[0]["startIndex"],
+                        "endIndex": elements[-1]["endIndex"],
+                        "paragraph": {"elements": elements},
+                    }
                 )
                 elements = []
         return _Request({"documentId": documentId, "revisionId": self._revision(documentId), "body": {"content": content}})
@@ -671,17 +685,18 @@ class FakeDocsDocuments:
             return {"replaceAllText": {"occurrencesChanged": changed}}
         if "deleteContentRange" in request:
             span = request["deleteContentRange"]["range"]
-            start, end = span["startIndex"] - 1, span["endIndex"] - 1
+            start, end = self._offset(text, span["startIndex"]), self._offset(text, span["endIndex"])
             self.texts[document_id] = text[:start] + text[end:]
             del links[start:end]
         elif "insertText" in request:
-            at, inserted = request["insertText"]["location"]["index"] - 1, request["insertText"]["text"]
+            at, inserted = self._offset(text, request["insertText"]["location"]["index"]), request["insertText"]["text"]
             self.texts[document_id] = text[:at] + inserted + text[at:]
             links[at:at] = [None] * len(inserted)
         elif "updateTextStyle" in request:
             span = request["updateTextStyle"]["range"]
-            url = request["updateTextStyle"]["textStyle"]["link"]["url"]
-            links[span["startIndex"] - 1 : span["endIndex"] - 1] = [url] * (span["endIndex"] - span["startIndex"])
+            url = request["updateTextStyle"]["textStyle"].get("link", {}).get("url")
+            start, end = self._offset(text, span["startIndex"]), self._offset(text, span["endIndex"])
+            links[start:end] = [url] * (end - start)
         else:
             assert "updateParagraphStyle" in request, request
         return {}

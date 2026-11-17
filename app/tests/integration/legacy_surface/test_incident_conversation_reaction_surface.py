@@ -37,6 +37,12 @@ ALERT_ENTRY = (
 )
 
 
+REPLY = {"ts": "1760000350.000100", "thread_ts": ALERT["ts"], "user": AUTHOR_ID, "text": "Replying in the thread"}
+REPLY_ENTRY = (
+    " ➡️ [2025-10-09 04:59:10 ET](https://cds.slack.com/archives/C0INCIDENT/p1760000350000100) Jane Doe: Replying in the thread\n"
+)
+
+
 def permalink(ts: str) -> str:
     return f"https://cds.slack.com/archives/{CHANNEL_ID}/p{ts.replace('.', '')}"
 
@@ -49,11 +55,11 @@ def surface(incident_surface: IncidentSurface) -> IncidentSurface:
     client.replies["conversations_info"] = {"ok": True, "channel": {"id": CHANNEL_ID, "name": INCIDENT_CHANNEL_NAME}}
     client.replies["bookmarks_list"] = {"ok": True, "bookmarks": [{"title": "Incident report", "link": REPORT_URL}]}
     client.replies["users_profile_get"] = {"ok": True, "profile": {"real_name": "Jane Doe", "display_name": "jane"}}
-    messages = {message["ts"]: message for message in (ROLLBACK, ALERT)}
-    client.replies["conversations_history"] = lambda **request: {
+    messages = {message["ts"]: message for message in (ROLLBACK, ALERT, REPLY)}
+    client.replies["reactions_get"] = lambda **request: {
         "ok": True,
-        "messages": [dict(messages[request["ts"]])],
-        "has_more": False,
+        "type": "message",
+        "message": dict(messages[request["timestamp"]]),
     }
     client.replies["chat_getPermalink"] = lambda **request: {"ok": True, "permalink": permalink(request["message_ts"])}
     return incident_surface
@@ -112,6 +118,30 @@ def test_floppy_disk_reaction_retries_when_the_report_changed_underneath(surface
 
     assert timeline(surface) == "\n" + ROLLBACK_ENTRY
     assert len(surface.google.docs.edits) == 2
+
+
+def test_floppy_disk_reaction_on_a_thread_reply_saves_the_reply_not_its_parent(surface: IncidentSurface) -> None:
+    """A floppy disk on a reply in a thread captures that reply, even where channel history would answer with the parent."""
+    surface.slack.client.replies["conversations_history"] = {"ok": True, "messages": [dict(ALERT)], "has_more": True}
+    surface.slack.client.replies["conversations_replies"] = {"ok": True, "messages": [dict(ALERT), dict(REPLY)]}
+
+    react(surface, "reaction_added", REPLY)
+
+    assert timeline(surface) == "\n" + REPLY_ENTRY
+
+
+def test_floppy_disk_reaction_that_cannot_be_saved_tells_the_reacting_user(surface: IncidentSurface) -> None:
+    """When every write loses to another editor, nothing is claimed: the user who reacted gets a private notice in both languages."""
+    surface.google.docs.concurrent_edits = 3
+
+    react(surface, "reaction_added", ROLLBACK)
+
+    assert timeline(surface) == "\n"
+    notices = [request for name, request in surface.slack.client.calls if name == "chat_postEphemeral"]
+    assert [(notice["channel"], notice["user"]) for notice in notices] == [(CHANNEL_ID, USER_ID)]
+    assert permalink(ROLLBACK["ts"]) in notices[0]["text"]
+    assert "incident timeline" in notices[0]["text"]
+    assert "chronologie de l'incident" in notices[0]["text"]
 
 
 def test_floppy_disk_removal_deletes_the_message_from_the_timeline(surface: IncidentSurface) -> None:

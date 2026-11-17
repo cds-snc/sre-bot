@@ -30,3 +30,9 @@ en-US:
     next_steps_instructions: "Ask yourself these questions:"
     brief_up: ":alphabet-yellow-question: Is this a `cybersecurity incident` (secret/data leak, account compromise, attack)?\nPlease initiate the briefing process for CCCS and TBS OCIO Cyber.\nThis just means we send a summary of the incident (or initial findings and updates if incident is ongoing) to cyberincident@cyber.gc.ca and CC zztbscybers@tbs-sct.gc.ca, and security@cds-snc.ca! CCCS will reach out with a case number, and any questions if they need more information."
     planned_testing: ":alphabet-yellow-question: Is someone `penetration or performance testing`? Please stop it to make your life easier."
+  timeline:
+    this_message: "this message"
+    save_failed: "I could not save %{link} to the incident timeline. Check the report, then retry or add it manually."
+    save_unconfirmed: "I could not confirm that %{link} was saved to the incident timeline. Check the report before you retry."
+    remove_failed: "I could not remove %{link} from the incident timeline. Check the report, then retry or remove it manually."
+    remove_unconfirmed: "I could not confirm that %{link} was removed from the incident timeline. Check the report before you retry."

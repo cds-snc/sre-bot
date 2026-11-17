@@ -29,6 +29,18 @@ Units the decision record names that do not exist yet:
 | `retrospective/` (entry point `incident.retrospective`) | Attendee selection, availability search and the retro meeting through the calendar capability; later rescheduling, reminders and action items. |
 | `features/incident/` | Where this whole umbrella moves (TASK-124.5). |
 
+## Legacy floppy-disk timeline capture (until TASK-145.9.2)
+
+The legacy reaction handlers still write to the report's Google Doc. A capture is the
+exact reacted-to message (`reactions.get`, thread replies included), keyed by its
+channel and full Slack timestamp; removal targets that key. Each rewrite is guarded by
+the snapshot's `requiredRevisionId`: a lost guard or an unconfirmed write is re-read
+and recomputed, at most three writes and no sleep, and the SDK owns transport retries
+([outbound-clients.md](../../../decisions/outbound-clients.md)). A failed or unconfirmed
+save or removal posts a bilingual ephemeral notice to the reacting user; look for
+`incident_timeline_update_failed` and `incident_timeline_notice_failed`. Delivery is
+not durable: recover a missing entry from Slack and the document's version history.
+
 ## Rules that hold today
 
 - **Layers.** The import-linter contract `incident-umbrella` in

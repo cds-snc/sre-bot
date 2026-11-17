@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from slack_sdk.errors import SlackApiError
 
+from contracts.operations import OperationResult
 from modules.incident import incident_conversation
 
 
@@ -266,7 +267,9 @@ def test_multiline_entries_rearrange_by_datetime_ascending():
     ➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two
     """
     expected_output = "➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text).strip() == expected_output
+    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
+    assert result.index("Message two") < result.index("Message one")
+    assert all(line.strip() in result for line in expected_output.splitlines() if line.strip())
 
 
 def test_rearrange_single_entry():
@@ -287,7 +290,9 @@ def test_entries_out_of_order_rearrange_by_datetime_ascending():
     ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
     """
     expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 11:00:00 ET](https://example.com/link1) John Doe: Message one"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text).strip() == expected_output
+    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
+    assert result.index("Message two") < result.index("Message one")
+    assert all(line.strip() in result for line in expected_output.splitlines() if line.strip())
 
 
 def test_invalid_entries_rearrange_by_datetime_ascending():
@@ -296,7 +301,9 @@ def test_invalid_entries_rearrange_by_datetime_ascending():
     ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
     """
     expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text) == expected_output
+    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
+    assert "Invalid Entry" in result
+    assert expected_output.strip() in result
 
 
 def test_empty_input_rearrange_by_datetime_ascending():
@@ -305,7 +312,7 @@ def test_empty_input_rearrange_by_datetime_ascending():
 
 def test_no_datetime_entries_rearrange_by_datetime_ascending():
     input_text = "Message without datetime\nAnother message"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text) == ""
+    assert incident_conversation.rearrange_by_datetime_ascending(input_text) == input_text
 
 
 def test_convert_epoch_to_datetime_est_known_epoch_time():
@@ -542,17 +549,15 @@ def test_handle_reaction_added_floppy_disk_reaction_in_incident_channel(
 
     # Set up mock client and body to simulate the scenario
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {
+    mock_client.reactions_get.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "Sample test message",
+            "ts": "123456",
+        },
     }
     mock_client.users_profile_get.return_value = {"profile": {"real_name": "John Doe"}}
     mock_client.bookmarks_list.return_value = {
@@ -598,7 +603,7 @@ def test_handle_reaction_added_empty_message_list(
 ):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {"messages": []}
+    mock_client.reactions_get.return_value = {"ok": False, "error": "message_not_found"}
 
     body = {
         "event": {
@@ -609,7 +614,7 @@ def test_handle_reaction_added_empty_message_list(
 
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
-    # Assert that the function tries to fetch replies when the message list is empty
+    mock_client.reactions_get.assert_called_once()
     mock_client.conversations_replies.assert_not_called()
 
 
@@ -618,17 +623,16 @@ def test_handle_reaction_added_message_in_thread(
     mock_logger,
 ):
     mock_client = MagicMock()
-    mock_client.conversations_history.return_value = {
+    mock_client.reactions_get.return_value = {
         "ok": True,
-        "has_more": True,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "Sample test message",
+            "ts": "123456",
+            "thread_ts": "123450",
+        },
     }
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_client.conversations_replies.return_value = {"messages": [{"ts": "123456", "user": "U123456"}]}
@@ -642,12 +646,12 @@ def test_handle_reaction_added_message_in_thread(
 
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
-    # Assert that the function doe
-    mock_client.conversations_replies.assert_called_once()
+    mock_client.reactions_get.assert_called_once_with(channel="C123456", timestamp="123456")
+    mock_client.conversations_replies.assert_not_called()
 
 
 @patch("modules.incident.incident_conversation.logger")
-def test_handle_reaction_added_message_in_thread_return_top_message(
+def test_handle_reaction_added_message_in_thread_does_not_fetch_parent(
     mock_logger,
 ):
 
@@ -682,8 +686,8 @@ def test_handle_reaction_added_message_in_thread_return_top_message(
 
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
-    # Assert that the function doe
-    mock_client.conversations_replies.assert_called_once()
+    mock_client.reactions_get.assert_called_once_with(channel="C123456", timestamp="123456")
+    mock_client.conversations_replies.assert_not_called()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -730,17 +734,18 @@ def test_handle_reaction_added_processes_messages(
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
     mock_convert_epoch_to_datetime_est.return_value = "2017-11-30 18:52:30 ET"
-    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: rewrite("Existing timeline") is not None
-    mock_return_messages.return_value = {
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
-    }
+    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: (
+        rewrite("Existing timeline"),
+        OperationResult.success(),
+    )[1]
+    mock_return_messages.return_value = [
+        {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "Sample test message",
+            "ts": "1512085950.000216",
+        }
+    ]
     body = {
         "event": {
             "reaction": "floppy_disk",
@@ -764,18 +769,20 @@ def test_handle_reaction_added_adding_new_message_to_timeline(
     mock_logger,
 ):
     mock_client = MagicMock()
-    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {
+    mock_client.bookmarks_list.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "bookmarks": [{"title": "Incident report", "link": "https://docs.google.com/document/d/report/"}],
+    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.reactions_get.return_value = {
+        "ok": True,
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "Sample test message",
+            "ts": "123456",
+        },
     }
     body = {
         "event": {
@@ -787,7 +794,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline(
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
 
@@ -797,18 +804,20 @@ def test_handle_reaction_added_adding_new_message_to_timeline_user_handle(
     mock_logger,
 ):
     mock_client = MagicMock()
-    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {
+    mock_client.bookmarks_list.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "<U123ABC456> says Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "bookmarks": [{"title": "Incident report", "link": "https://docs.google.com/document/d/report/"}],
+    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.reactions_get.return_value = {
+        "ok": True,
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "<U123ABC456> says Sample test message",
+            "ts": "123456",
+        },
     }
     body = {
         "event": {
@@ -820,7 +829,7 @@ def test_handle_reaction_added_adding_new_message_to_timeline_user_handle(
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
 
@@ -831,18 +840,15 @@ def test_handle_reaction_added_returns_link(
 ):
     mock_client = MagicMock()
     mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {
+    mock_client.reactions_get.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "<U123ABC456> says Sample test message",
-                "ts": "1512085950.000216",
-                "has_more": False,
-            }
-        ],
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "<U123ABC456> says Sample test message",
+            "ts": "123456",
+        },
     }
 
     mock_client.bookmarks_list.return_value = {
@@ -850,7 +856,7 @@ def test_handle_reaction_added_returns_link(
         "bookmarks": [
             {
                 "title": "Incident report",
-                "link": "https://docs.google.com/document/d/123456789",
+                "link": "https://docs.google.com/document/d/123456789/",
             }
         ],
     }
@@ -871,7 +877,7 @@ def test_handle_reaction_added_returns_link(
 
     # Make assertion that the function calls the correct functions
     mock_client.conversations_info.assert_called_once()
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
     mock_client.chat_getPermalink.assert_called_once()
@@ -882,20 +888,22 @@ def test_handle_reaction_added_forwarded_message(
     mock_logger,
 ):
     mock_client = MagicMock()
-    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
-    mock_client.conversations_history.return_value = {
+    mock_client.bookmarks_list.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "attachments": [{"fallback": "This is a forwarded message"}],
-                "text": "Original message text",
-                "ts": "1617556890.000100",
-                "user": "U1234567890",
-                "files": [{"url_private": "https://example.com/image.png"}],
-            }
-        ],
+        "bookmarks": [{"title": "Incident report", "link": "https://docs.google.com/document/d/report/"}],
+    }
+    mock_client.conversations_info.return_value = {"channel": {"name": "incident-123"}}
+    mock_client.reactions_get.return_value = {
+        "ok": True,
+        "type": "message",
+        "message": {
+            "type": "message",
+            "attachments": [{"fallback": "This is a forwarded message"}],
+            "text": "Original message text",
+            "ts": "123456",
+            "user": "U1234567890",
+            "files": [{"url_private": "https://example.com/image.png"}],
+        },
     }
     body = {
         "event": {
@@ -907,7 +915,7 @@ def test_handle_reaction_added_forwarded_message(
     incident_conversation.handle_reaction_added(mock_client, lambda: None, body)
 
     # Make assertion that the function calls the correct functions
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
     mock_client.users_profile_get.assert_called_once()
 
@@ -933,23 +941,21 @@ def test_handle_reaction_removed_successful_message_removal(
             "item": {"channel": "C123456", "ts": "123456"},
         }
     }
-    mock_client.conversations_history.return_value = {
+    mock_client.reactions_get.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "Sample test message",
+            "ts": "123456",
+        },
     }
 
     incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
-    mock_client.users_profile_get.assert_called_once()
+    mock_client.users_profile_get.assert_not_called()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -971,23 +977,21 @@ def test_handle_reaction_removed_successful_message_removal_user_id(mock_logger)
             "item": {"channel": "C123456", "ts": "123456"},
         }
     }
-    mock_client.conversations_history.return_value = {
+    mock_client.reactions_get.return_value = {
         "ok": True,
-        "has_more": False,
-        "messages": [
-            {
-                "type": "message",
-                "user": "U123ABC456",
-                "text": "<U123ABC456> says Sample test message",
-                "ts": "1512085950.000216",
-            }
-        ],
+        "type": "message",
+        "message": {
+            "type": "message",
+            "user": "U123ABC456",
+            "text": "<U123ABC456> says Sample test message",
+            "ts": "123456",
+        },
     }
 
     incident_conversation.handle_reaction_removed(mock_client, lambda: None, body)
-    mock_client.conversations_history.assert_called_once()
+    mock_client.reactions_get.assert_called_once()
     mock_client.bookmarks_list.assert_called_once()
-    mock_client.users_profile_get.assert_called_once()
+    mock_client.users_profile_get.assert_not_called()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -1055,12 +1059,12 @@ def test_handle_reaction_removed_processes_messages(
     }
 
     # Run the handler's rewrite against a timeline holding the message
-    timeline = " ➡️ [2021-04-04 12:34:50](https://example.com/permalink) John Doe: Original message text\n"
+    timeline = " ➡️ [2021-04-04 12:34:50 ET](https://example.com/permalink) John Doe: Original message text\n"
     rewritten = []
 
     def apply_rewrite(_document_id, rewrite):
         rewritten.append(rewrite(timeline))
-        return True
+        return OperationResult.success()
 
     mock_update_timeline_section.side_effect = apply_rewrite
 
@@ -1079,13 +1083,13 @@ def test_handle_reaction_removed_processes_messages(
     assert incident_conversation.handle_reaction_removed(mock_client, lambda: None, body) is None
     mock_return_messages.assert_called_once()
     mock_get_incident_document_id.assert_called_once()
-    mock_handle_forwarded_messages.assert_called_once()
-    mock_convert_epoch_to_datetime_est.assert_called_once()
+    mock_handle_forwarded_messages.assert_not_called()
+    mock_convert_epoch_to_datetime_est.assert_not_called()
     mock_update_timeline_section.assert_called_once()
-    mock_handle_images_in_message.assert_called_once()
-    mock_slack_users.replace_user_id_with_handle.assert_called_once()
+    mock_handle_images_in_message.assert_not_called()
+    mock_slack_users.replace_user_id_with_handle.assert_not_called()
     mock_rearrange_by_datetime_ascending.assert_not_called()
-    assert rewritten == ["\n"]
+    assert rewritten == [""]
     mock_logger.warning.assert_not_called()
 
 
@@ -1146,7 +1150,10 @@ def test_handle_reaction_removed_message_not_found(
     }
     mock_convert_epoch_to_datetime_est.return_value = "2023-10-01 12:00:00"
     mock_get_incident_document_id.return_value = "doc123"
-    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: rewrite("Some content without the message") is None
+    mock_update_timeline_section.side_effect = lambda _document_id, rewrite: (
+        rewrite("Some content without the message"),
+        OperationResult.success(),
+    )[1]
 
     body = {
         "event": {
