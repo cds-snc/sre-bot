@@ -4,8 +4,6 @@ import datetime
 import re
 from collections.abc import Callable
 from itertools import groupby
-from random import uniform
-from time import sleep
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -20,10 +18,11 @@ from features.incident.core.adapters.google_docs import (
     fetch_document_snapshot,
     replace_placeholders,
 )
-from features.incident.response.settings import get_incident_response_settings
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 END_HEADING = "Trigger"
+# Writes per timeline update; each is preceded by a fresh read (optimistic-concurrency recompute, no sleep).
+TIMELINE_UPDATE_ATTEMPTS = 3
 TIMELINE_ENTRY_PATTERN = re.compile(
     r"^[ \t]*➡️[ \t]*\[(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((?P<url>https?://[^\s)]+)\)",
     re.MULTILINE,
@@ -100,22 +99,29 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
 
     rewrite receives the current timeline text and returns the new text, or None when
     nothing needs to change. The edit only applies while the document is still at the
-    revision it was read at, so an edit built from a stale read is rejected instead of
-    written over newer content. After a rejected or unconfirmed write the document is read
-    again and rewrite is re-evaluated, which lets it see an edit that already landed.
+    revision it was read at, so an edit built from a stale read is refused instead of
+    written over newer content.
 
-    A final read reconciles an unconfirmed last write without replaying stale edits.
+    A refused edit whose re-read shows the document moved on (a lost revision guard) and an
+    unconfirmed edit (a timeout) are re-read and recomputed, at most TIMELINE_UPDATE_ATTEMPTS
+    writes and without sleeping. This is optimistic-concurrency recompute, not a retry of the
+    same request: transport retries belong to the SDK (decisions/outbound-clients.md). A
+    final read reconciles the last unconfirmed write, so an edit that landed is a success.
+    Any other failure, or a refused edit on a document that did not move, stops at once.
     """
-    settings = get_incident_response_settings()
-    write_limit = settings.timeline_update_attempts
-    waited = 0.0
     result: OperationResult[None] = OperationResult.transient_error(
         "Document could not be read", error_code=ErrorCode.DOCUMENT_UNREADABLE
     )
-    for attempt in range(1, write_limit + 2):
+    sent_revision: str | None = None
+    for attempt in range(1, TIMELINE_UPDATE_ATTEMPTS + 2):
         snapshot = fetch_document_snapshot(document_id)
         if snapshot is None:
             logger.error("incident_timeline_update_failed", document_id=document_id, error="Document unreadable", attempt=attempt)
+            return result
+        if result.status is OperationStatus.PERMANENT_ERROR and snapshot.revision_id == sent_revision:
+            logger.error(
+                "incident_timeline_update_failed", document_id=document_id, attempt=attempt, error_code=result.error_code
+            )
             return result
 
         timeline_content = extract_timeline_section(snapshot.content)
@@ -132,7 +138,7 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
         new_content = rewrite(timeline_content)
         if new_content is None:
             return OperationResult.success()
-        if attempt > write_limit:
+        if attempt > TIMELINE_UPDATE_ATTEMPTS:
             break
 
         requests = build_timeline_replacement(snapshot.content, new_content, START_HEADING, END_HEADING)
@@ -141,10 +147,11 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
                 OperationStatus.PERMANENT_ERROR, "Timeline boundaries unavailable", error_code=ErrorCode.RANGE_NOT_FOUND
             )
 
-        result = apply_document_edits(document_id, requests, snapshot.revision_id)
+        sent_revision = snapshot.revision_id
+        result = apply_document_edits(document_id, requests, sent_revision)
         if result.is_success:
             return result
-        if result.status is not OperationStatus.TRANSIENT_ERROR:
+        if not _recompute_after(result):
             logger.error(
                 "incident_timeline_update_failed", document_id=document_id, attempt=attempt, error_code=result.error_code
             )
@@ -155,28 +162,22 @@ def update_timeline_section(document_id: str, rewrite: Callable[[str], str | Non
             attempt=attempt,
             error_code=result.error_code,
         )
-        if attempt < write_limit:
-            delay = (
-                result.retry_after
-                if result.retry_after is not None
-                else uniform(  # noqa: S311 -- retry jitter
-                    0, min(settings.timeline_retry_cap_seconds, settings.timeline_retry_base_seconds * 2 ** (attempt - 1))
-                )
-            )
-            if delay > settings.timeline_retry_wait_seconds - waited:
-                write_limit = attempt
-            else:
-                sleep(delay)
-                waited += delay
 
     logger.error(
         "incident_timeline_update_failed",
         document_id=document_id,
         error="Edit not confirmed",
-        attempts=write_limit,
+        attempts=TIMELINE_UPDATE_ATTEMPTS,
         error_code=result.error_code,
     )
     return result
+
+
+def _recompute_after(result: OperationResult[None]) -> bool:
+    """A timeout may have landed and a refused edit may have lost its revision guard: both are re-read."""
+    if result.status is OperationStatus.TRANSIENT_ERROR:
+        return result.error_code == ErrorCode.TIMEOUT
+    return result.status is OperationStatus.PERMANENT_ERROR and result.error_code == ErrorCode.HTTP_ERROR
 
 
 def extract_timeline_section(content):

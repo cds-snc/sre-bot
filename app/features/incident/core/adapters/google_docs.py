@@ -98,7 +98,7 @@ def extract_google_doc_id(url):
 # --- Report edits ---
 
 _DOCS_SCOPES = ["https://www.googleapis.com/auth/documents"]
-_STALE_REVISION_STATUS = 400
+_REJECTED_EDIT_STATUS = 400
 
 
 @dataclass(frozen=True)
@@ -174,27 +174,27 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]], requi
     """Apply a batchUpdate only if the document is still at required_revision_id.
 
     Callers send index-based edits computed from a snapshot, so applying them to any other
-    revision corrupts the document. A timeout is unconfirmed: callers must take a new
-    snapshot and reconcile the intent before deciding to send anything again.
+    revision corrupts the document. The revision guard is the write's idempotency mechanism
+    (decisions/outbound-clients.md), so the call keeps the factory's SDK retries: a replay of
+    an edit that already landed is refused, not applied twice.
+
+    A 400 is one rejected edit, a permanent HTTP_ERROR: Google documents no text that tells a
+    stale revision from a malformed request, so the caller re-reads to tell them apart. A
+    timeout is unconfirmed (TIMEOUT): the caller re-reads and reconciles before sending again.
     """
     service = get_docs_service(scopes=_DOCS_SCOPES)
     body = cast("Any", {"requests": requests, "writeControl": {"requiredRevisionId": required_revision_id}})
     try:
-        # The revision guard makes a second send harmless, but retries stay off: a replay of a
-        # landed edit would only come back as a stale-revision rejection of a successful write.
-        service.documents().batchUpdate(documentId=document_id, body=body).execute(num_retries=0)
+        service.documents().batchUpdate(documentId=document_id, body=body).execute()
     except TimeoutError:
         logger.warning("incident_document_edit_unconfirmed", document_id=document_id)
         return OperationResult.transient_error("Document edit unconfirmed", error_code=ErrorCode.TIMEOUT)
     except HttpError as exc:
-        if int(exc.resp.status) == _STALE_REVISION_STATUS and re.search(
-            r"revision.*(?:does not match|not the latest)", exc.reason, re.IGNORECASE
-        ):
-            logger.warning("incident_document_edit_rejected", document_id=document_id)
-            return OperationResult.transient_error("Document revision changed", error_code=ErrorCode.DOCUMENT_REVISION_CONFLICT)
-        if int(exc.resp.status) == _STALE_REVISION_STATUS:
-            logger.warning("incident_document_edit_failed", document_id=document_id, error_code=ErrorCode.HTTP_ERROR, status=400)
-            return OperationResult.error(OperationStatus.PERMANENT_ERROR, "Invalid document edit", error_code=ErrorCode.HTTP_ERROR)
+        if int(exc.resp.status) == _REJECTED_EDIT_STATUS:
+            logger.warning("incident_document_edit_rejected", document_id=document_id, status=_REJECTED_EDIT_STATUS)
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Document edit rejected", error_code=ErrorCode.HTTP_ERROR
+            )
         status, error_code, retry_after = classify_google_error(exc)
         logger.warning(
             "incident_document_edit_failed",

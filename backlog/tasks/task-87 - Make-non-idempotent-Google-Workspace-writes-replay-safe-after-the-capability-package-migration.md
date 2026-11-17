@@ -5,8 +5,8 @@ title: >-
   capability-package migration
 status: To Do
 assignee: []
-created_date: '2026-09-11 13:59'
-updated_date: '2026-10-15 17:47'
+created_date: 2026-09-11 13:59
+updated_date: '2026-11-17T00:25:00Z'
 labels:
   - clients
 dependencies: []
@@ -16,9 +16,9 @@ references:
   - app/integrations/google_workspace/client.py
   - >-
     https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
-  - 'https://developers.google.com/workspace/drive/api/guides/create-file'
+  - https://developers.google.com/workspace/drive/api/guides/create-file
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1637'
+  - https://github.com/cds-snc/sre-bot/issues/1637
 priority: medium
 type: enhancement
 ordinal: 187000
@@ -69,6 +69,12 @@ NOT IN SCOPE: the Google timeout; retry counts for reads; AWS writes; BatchHttpR
 - [ ] #8 decisions/outbound-clients.md's Migration section no longer lists non-idempotent Google writes on the retrying handle or the per-call num_retries override
 - [ ] #9 Full test suite, ruff, mypy and app/bin/check_sdk_typing.py pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-17 (human, #1858 production fix, Q1 approved): the 2026-10-02 question is settled for the incident report's documents.batchUpdate: features/incident/core/adapters/google_docs.py::apply_document_edits keeps the factory's SDK retries (no per-call num_retries=0); its writeControl.requiredRevisionId is the write's idempotency mechanism (an SDK replay of a landed edit is refused). A 400 on it is a rejected edit (PERMANENT_ERROR, HTTP_ERROR), classified by the caller's re-read: revision moved = lost guard, recompute; unmoved = malformed, stop. decisions/outbound-clients.md now names optimistic-concurrency recompute (bounded, re-read every attempt, no sleep) as distinct from a retry. Scope: this site leaves the replay-safety list; the scribe/incident_draft index-based batchUpdate can take the same guard when this task is re-scoped.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

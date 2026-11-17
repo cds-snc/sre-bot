@@ -1,6 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import i18n  # type: ignore
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
 from slack_sdk.errors import SlackApiError  # type: ignore
@@ -132,9 +133,7 @@ def rearrange_by_datetime_ascending(text: str) -> str:
         end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
         entries[key] = (posted_at, text[match.start() : end].rstrip("\n"))
     return (
-        text[: matches[0].start()]
-        + "\n".join(entry for _, entry in sorted(entries.values(), key=lambda entry: entry[0]))
-        + "\n"
+        text[: matches[0].start()] + "\n".join(entry for _, entry in sorted(entries.values(), key=lambda entry: entry[0])) + "\n"
     )
 
 
@@ -412,10 +411,11 @@ def _notify_timeline_failure(client: WebClient, body: dict, action: str, link: s
     if not event.get("user"):
         logger.error("incident_timeline_notice_failed", channel=event["item"]["channel"], action=action, error="Missing actor")
         return
-    text = (
-        f"I could not confirm the timeline {action} for {link}. Check the report before you retry."
-        if error_code == ErrorCode.TIMEOUT
-        else f"I could not {action} {link} in the incident timeline. Check the report, then retry or update it manually."
+    # The reacting user's locale is not resolved here, so the notice carries both languages, as the stale nudge does.
+    key = f"incident.timeline.{action}_{'unconfirmed' if error_code == ErrorCode.TIMEOUT else 'failed'}"
+    text = "\n".join(
+        i18n.t(key, locale=locale, link=link or i18n.t("incident.timeline.this_message", locale=locale))
+        for locale in ("en-US", "fr-FR")
     )
     try:
         client.chat_postEphemeral(channel=event["item"]["channel"], user=event["user"], text=text)

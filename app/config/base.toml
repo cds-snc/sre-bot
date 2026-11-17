@@ -210,11 +210,6 @@ report_template_id = ""
 list_sheet_id = ""
 
 [incident_response]
-# Legacy timeline conflict retries: fresh reads, capped full jitter, and a total sleep budget.
-timeline_update_attempts = 6
-timeline_retry_base_seconds = 0.1
-timeline_retry_cap_seconds = 1.0
-timeline_retry_wait_seconds = 3.0
 # Where the declare path announces an incident and which user groups it invites. Slack ids
 # are deployment configuration, never a secret; empty means none. Local shares the
 # production workspace, so no production id is a default here.

@@ -653,7 +653,11 @@ class FakeDocsDocuments:
             start = end
             if char == "\n" or end == len(text):
                 content.append(
-                    {"startIndex": elements[0]["startIndex"], "endIndex": elements[-1]["endIndex"], "paragraph": {"elements": elements}}
+                    {
+                        "startIndex": elements[0]["startIndex"],
+                        "endIndex": elements[-1]["endIndex"],
+                        "paragraph": {"elements": elements},
+                    }
                 )
                 elements = []
         return _Request({"documentId": documentId, "revisionId": self._revision(documentId), "body": {"content": content}})
@@ -666,7 +670,7 @@ class FakeDocsDocuments:
                 self.concurrent_edits -= 1
                 self._bump(documentId)
             if required != self._revision(documentId):
-                return _Request(google_http_error(400, "The provided revision ID does not match the current revision ID."))
+                return _Request(google_http_error(400, "The document was modified after the required revision"))
         replies = [self._apply(documentId, request) for request in body["requests"]]
         self._bump(documentId)
         return _Request({"replies": replies})

@@ -30,3 +30,9 @@ fr-FR:
     next_steps_instructions: "Posez-vous ces questions:"
     brief_up: "S'agit-il d'un `incident de cybersécurité` (fuite de secrets/données, comptes compromis, attaque) ?\nVeuillez lancer le processus de breffage pour le Centre canadien pour la cybersécurité (CCC) et le Bureau du dirigeant principal de l'information du SCT.\nCela veut simplement dire que nous enverrons un résumé de l'incident (ou les conclusions préliminaires et les mises à jour si l'incident est toujours en cours) à cyberincident@cyber.gc.ca, avec zztbscybers@tbs-sct.gc.ca en CC, et à security@cds-snc.ca! Le CCC nous assignera un numéro de dossier et nous demandera plus de détails si nécessaire."
     planned_testing: "Êtes-vous en train d'effectuer un `test de pénétration ou de performance` ? Veuillez cesser pour faciliter les choses."
+  timeline:
+    this_message: "ce message"
+    save_failed: "Je n'ai pas pu enregistrer %{link} dans la chronologie de l'incident. Vérifiez le rapport, puis réessayez ou ajoutez-le manuellement."
+    save_unconfirmed: "Je n'ai pas pu confirmer l'enregistrement de %{link} dans la chronologie de l'incident. Vérifiez le rapport avant de réessayer."
+    remove_failed: "Je n'ai pas pu retirer %{link} de la chronologie de l'incident. Vérifiez le rapport, puis réessayez ou retirez-le manuellement."
+    remove_unconfirmed: "Je n'ai pas pu confirmer le retrait de %{link} de la chronologie de l'incident. Vérifiez le rapport avant de réessayer."

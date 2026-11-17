@@ -5,8 +5,8 @@ title: >-
   Google service handle configured at construction
 status: To Do
 assignee: []
-created_date: '2026-09-18 15:43'
-updated_date: '2026-10-15 17:47'
+created_date: 2026-09-18 15:43
+updated_date: '2026-11-17T00:25:00Z'
 labels:
   - clients
   - reliability
@@ -15,7 +15,7 @@ references:
   - decisions/outbound-clients.md
   - app/integrations/google_workspace/client.py
   - app/packages/aws_platform/adapters/identity_center.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1638'
+  - https://github.com/cds-snc/sre-bot/issues/1638
 parent_task_id: TASK-87
 priority: medium
 ordinal: 235000
@@ -55,6 +55,12 @@ NOT IN SCOPE: Drive files.create/files.copy in infrastructure/drive and Director
 - [ ] #5 decisions/outbound-clients.md's Migration section no longer tolerates the per-call num_retries=0 override, with a dated Changes line
 - [ ] #6 ruff, mypy, pytest tests --ignore=tests/smoke, make check-sdk-typing and make check-vendor-package-contract pass, with output recorded in notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-17 (human, #1858 production fix): the incident documents apply_document_edits override is gone (the write keeps the SDK retries under its revision guard; decisions/outbound-clients.md tolerated list updated). Five of the original six per-call overrides remain (Calendar insert, Meet create, scribe Docs batchUpdate and Drive copy, Sheets values.append), plus the incident list projection append added by TASK-145.12.1.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

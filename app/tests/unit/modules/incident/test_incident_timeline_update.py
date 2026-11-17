@@ -2,7 +2,9 @@
 
 The Docs adapter seam (fetch_document_snapshot / apply_document_edits) is replaced by a
 fake that applies batchUpdate requests to real text and enforces the required revision
-the way the Docs API does, so the tests assert on what ends up in the document.
+the way the Docs API does: a stale write is refused as the adapter reports a 400, a
+permanent HTTP_ERROR, with no message text to parse. The tests assert on what ends up in
+the document and on the notice the reacting user receives.
 """
 
 from datetime import datetime
@@ -14,7 +16,6 @@ from slack_sdk.errors import SlackApiError
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters.google_docs import DocumentSnapshot
-from features.incident.response.settings import IncidentResponseSettings
 from modules.incident import incident_conversation, incident_document
 from modules.incident.incident_document import END_HEADING, START_HEADING
 
@@ -39,7 +40,9 @@ class FakeDocument:
         self.write_attempts += 1
         self.before_write()
         if required_revision_id != str(self.revision):
-            return OperationResult.transient_error("Stale revision", error_code="DOCUMENT_REVISION_CONFLICT")
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Document edit rejected", error_code=ErrorCode.HTTP_ERROR
+            )
         self.apply_unguarded(requests)
         if self.confirm_write():
             return OperationResult.success()
@@ -116,13 +119,6 @@ def document():
     with (
         patch.object(incident_document, "fetch_document_snapshot", fake.fetch_snapshot),
         patch.object(incident_document, "apply_document_edits", fake.apply_edits),
-        patch.object(incident_document, "sleep"),
-        patch.object(
-            incident_document,
-            "get_incident_response_settings",
-            return_value=IncidentResponseSettings(),
-            create=True,
-        ),
     ):
         yield fake
 
@@ -249,7 +245,7 @@ def test_update_gives_up_after_bounded_attempts_when_no_write_is_confirmed(docum
     updated = incident_document.update_timeline_section("document-id", lambda content: content + " ➡️ note")
 
     assert not updated.is_success
-    assert document.write_attempts == IncidentResponseSettings().timeline_update_attempts
+    assert document.write_attempts == incident_document.TIMELINE_UPDATE_ATTEMPTS == 3
     assert "note" not in document.timeline()
 
 
@@ -357,6 +353,7 @@ def test_retry_exhaustion_notifies_actor_for_add_and_remove(document, handler):
     assert notice["channel"] == "C123"
     assert "could not" in notice["text"].lower()
     assert "retry" in notice["text"].lower()
+    assert "chronologie de l'incident" in notice["text"]
 
 
 def test_two_distinct_interleaved_saves_both_survive(document):
@@ -375,24 +372,33 @@ def test_two_distinct_interleaved_saves_both_survive(document):
     assert document.timeline().count("second") == 1
 
 
-def test_contended_save_succeeds_after_three_rejections(document):
-    """Contention beyond the former three attempts can recover after a fresh read and backoff."""
+def test_contended_save_succeeds_on_the_last_attempt_from_a_fresh_read(document):
+    """Two lost revision guards are each re-read and recomputed; the third write lands quietly."""
 
     def compete():
-        if document.write_attempts <= 3:
+        if document.write_attempts <= 2:
             document.revision += 1
 
     document.before_write = compete
     client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
     assert document.timeline().count("first") == 1
-    assert document.write_attempts == 4
+    assert document.write_attempts == 3
     client.chat_postEphemeral.assert_not_called()
-    assert incident_document.sleep.call_count == 3
+
+
+def test_a_rejected_write_on_an_unmoved_document_is_not_sent_again(document):
+    """A 400 while the revision did not move is a malformed edit, not a conflict: one write, then a notice."""
+    rejected = OperationResult.error(OperationStatus.PERMANENT_ERROR, "Document edit rejected", error_code=ErrorCode.HTTP_ERROR)
+    with patch.object(incident_document, "apply_document_edits", return_value=rejected) as edit:
+        client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
+    assert edit.call_count == 1
+    assert "first" not in document.timeline()
+    client.chat_postEphemeral.assert_called_once()
 
 
 def test_final_unconfirmed_write_is_reconciled_without_duplicate(document):
     """A write that lands on the last allowed attempt is confirmed by a final snapshot."""
-    limit = IncidentResponseSettings().timeline_update_attempts
+    limit = incident_document.TIMELINE_UPDATE_ATTEMPTS
     document.before_write = lambda: setattr(document, "revision", document.revision + (document.write_attempts < limit))
     document.confirm_write = lambda: False
     client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
@@ -402,22 +408,19 @@ def test_final_unconfirmed_write_is_reconciled_without_duplicate(document):
 
 
 @pytest.mark.parametrize(
-    ("result", "attempts", "wait"),
+    "result",
     [
-        (OperationResult.error(OperationStatus.UNAUTHORIZED, "Forbidden", error_code="403"), 1, None),
-        (OperationResult.transient_error("Rate limited", error_code="429", retry_after=60), 1, None),
-        (OperationResult.transient_error("Rate limited", error_code="429", retry_after=1), 2, 1),
+        OperationResult.error(OperationStatus.UNAUTHORIZED, "Forbidden", error_code="403"),
+        OperationResult.error(OperationStatus.NOT_FOUND, "Gone", error_code="404"),
+        OperationResult.transient_error("Rate limited", error_code="429", retry_after=1),
     ],
 )
-def test_permanent_and_rate_limit_errors_bound_inline_retry(document, result, attempts, wait):
-    """Permanent errors stop, short Retry-After hints are honored, and long hints are not shortened."""
+def test_failures_other_than_a_lost_guard_or_a_timeout_stop_after_one_write(document, result):
+    """Transport retries belong to the SDK, so a 429 it gave up on is not sent again here; the user is told."""
     with patch.object(incident_document, "apply_document_edits", side_effect=[result, OperationResult.success()]) as edit:
-        _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
-    assert edit.call_count == attempts
-    if wait is None:
-        incident_document.sleep.assert_not_called()
-    else:
-        assert incident_document.sleep.call_args.args[0] >= wait
+        client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
+    assert edit.call_count == 1
+    client.chat_postEphemeral.assert_called_once()
 
 
 @pytest.mark.parametrize(
