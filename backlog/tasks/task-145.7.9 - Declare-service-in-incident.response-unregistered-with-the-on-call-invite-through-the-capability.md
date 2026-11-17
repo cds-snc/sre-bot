@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T15:47:00Z'
+updated_date: '2026-11-17T19:10:00Z'
 labels:
   - incident
   - features
@@ -69,6 +69,14 @@ created: 2026-11-10T21:00:00Z
 ---
 
 2026-11-10 (human-approved, TASK-145.7.6 OQ3 R1-R3): declare awaits async ports only (IncidentStore, IncidentReport, VideoCall, IncidentConversation); adapters offload blocking SDK calls, the declare service never calls to_thread. Depends on TASK-145.8.7.
+
+---
+
+created: 2026-11-17T19:10:00Z
+
+---
+
+2026-11-17 (found at the Stack L sync, TASK-145.8.5.3 session): #1853 (fba4ff8b, merged to main, not a Stack L change) added a policy-help answer to the legacy declare: production-only invite of the policy group ([incident] policy_group_id in features/incident/response/settings.py; modules/incident/core.py and incident.py; pinned in tests/modules/incident/test_incident_core.py and test_incident.py, 15 policy tests). The declare rebuild carries it (pins rewired, not dropped) or rules it a named change at planning.
 
 ---
 <!-- COMMENTS:END -->

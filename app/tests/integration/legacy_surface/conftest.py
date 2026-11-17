@@ -884,6 +884,21 @@ def incident_surface(
     get_spreadsheet_provider.cache_clear()
 
 
+def attach_rebuilt_listeners_first(surface: IncidentSurface) -> None:
+    """Attach the plugins' registered interaction listeners ahead of the legacy handlers, as production orders them.
+
+    Production attaches them in ``initialize_app`` before ``_register_legacy_handlers``
+    (server/lifespan.py), and Bolt runs the first listener whose matchers pass, so a
+    value-scoped alias answers its values and every other value reaches the legacy
+    listener (decisions/transport-slack.md). The harness registers the legacy handlers
+    first, so the newly attached listeners are moved to the front of Bolt's list.
+    """
+    listeners = surface.slack.app._listeners
+    legacy = list(listeners)
+    surface.provider._attach_interaction_listeners()
+    listeners[:] = listeners[len(legacy) :] + legacy
+
+
 # Reading a recorded view and answering it, so a test never hard-codes a modal-internal id.
 
 _VIEW_CALLS = ("views_open", "views_push", "views_update")

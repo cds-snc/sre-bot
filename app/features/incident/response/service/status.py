@@ -1,8 +1,8 @@
 """Status change: the record first, then the report status line, the list projection and the channel.
 
 ``change_status`` is the one status engine of the response subdomain: the slash
-``status update`` command calls it, and the update modal and close call it once
-they are rebuilt (TASK-145.8.3, TASK-145.8.5).
+``status update`` command and the archive (service/archive.py) call it, and the
+update modal calls it once it is rebuilt (TASK-145.8.3).
 
 The record write is the commit point (decisions/incident-management.md): a
 refused command check or a failed record write returns that failure and writes
@@ -120,7 +120,7 @@ async def change_status(
         incident=incident,
         previous=previous,
         report=await _report_stage(reports, incident, status),
-        projection=_stage(await projection.update_status(incident, status)),
+        projection=stage_result(await projection.update_status(incident, status)),
         channel=await _channel_stage(conversations, incident, notice),
     )
     for name, stage in (("report", change.report), ("projection", change.projection), ("channel", change.channel)):
@@ -143,19 +143,20 @@ async def change_status(
 async def _report_stage(reports: IncidentReport, incident: Incident, status: IncidentStatus) -> StageResult:
     if incident.report is None:
         return StageResult(StageOutcome.SKIPPED, reason="no_report")
-    return _stage(await reports.set_status_text(incident.report, status))
+    return stage_result(await reports.set_status_text(incident.report, status))
 
 
 async def _channel_stage(conversations: IncidentConversation, incident: Incident, notice: str) -> StageResult:
     writable = await conversation_is_writable(conversations, incident.conversation)
     if not writable.is_success:
-        return _stage(writable)
+        return stage_result(writable)
     if not writable.data or incident.conversation is None:
         return StageResult(StageOutcome.SKIPPED, reason="not_writable")
-    return _stage(await conversations.post(incident.conversation, notice))
+    return stage_result(await conversations.post(incident.conversation, notice))
 
 
-def _stage[T](result: OperationResult[T]) -> StageResult:
+def stage_result[T](result: OperationResult[T]) -> StageResult:
+    """Map one write's result to its stage outcome: done, or failed with its status and code."""
     if result.is_success:
         return _DONE
     return StageResult(StageOutcome.FAILED, status=result.status, error_code=result.error_code)

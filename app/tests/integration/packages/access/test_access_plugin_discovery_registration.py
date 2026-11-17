@@ -52,6 +52,9 @@ class _FakeSlackProvider:
     def register_view_submission(self, callback_id: str, listener) -> None:
         _ = (callback_id, listener)
 
+    def register_attachment_action(self, callback_id: str, listener, **aliases) -> None:
+        _ = (callback_id, listener, aliases)
+
 
 def test_access_plugins_register_routes_and_slack_commands_from_interactions() -> None:
     """Access plugins should remain discoverable and register interactions endpoints."""

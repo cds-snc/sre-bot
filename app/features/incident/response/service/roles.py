@@ -33,7 +33,7 @@ from features.incident.core.api import (
     find_incident_for_conversation,
     read_incident_roles,
 )
-from features.incident.response.service.status import StageOutcome, StageResult
+from features.incident.response.service.status import StageOutcome, StageResult, stage_result
 
 logger = structlog.get_logger()
 
@@ -108,7 +108,7 @@ async def assign_roles(
     )
     writable = await conversation_is_writable(conversations, incident.conversation)
     if not writable.is_success:
-        announcements = purpose = _stage(writable)
+        announcements = purpose = stage_result(writable)
         announced: tuple[IncidentRole, ...] = ()
     elif not writable.data or incident.conversation is None:
         announcements = purpose = StageResult(StageOutcome.SKIPPED, reason="not_writable")
@@ -148,7 +148,7 @@ async def _announce(
         if posted.is_success:
             announced.append(role)
         elif failure.outcome is not StageOutcome.FAILED:
-            failure = _stage(posted)
+            failure = stage_result(posted)
     return tuple(announced), failure
 
 
@@ -159,18 +159,12 @@ async def _purpose_stage(
         return StageResult(StageOutcome.SKIPPED, reason="no_commander_or_lead")
     current = await conversations.purpose(conversation)
     if not current.is_success or current.data is None:
-        return _stage(current)
+        return stage_result(current)
     updated = purpose_with_roles(current.data, incident.incident_commander, incident.operations_lead)
-    return _stage(await conversations.set_purpose(conversation, updated))
+    return stage_result(await conversations.set_purpose(conversation, updated))
 
 
 def _failure(result: OperationResult[Incident]) -> OperationResult[RolesChange]:
     return OperationResult.error(
         status=result.status, message=result.message or "", error_code=result.error_code, retry_after=result.retry_after
     )
-
-
-def _stage[T](result: OperationResult[T]) -> StageResult:
-    if result.is_success:
-        return _DONE
-    return StageResult(StageOutcome.FAILED, status=result.status, error_code=result.error_code)

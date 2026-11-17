@@ -86,10 +86,10 @@ its own configuration file.
     reached by `load_incidents` at `app/modules/dev/incident.py:47`), removed by TASK-145.12.2.
 
   All three write through `db_operations.create_incident`. Recreate, a fourth, was retired with
-  `/sre incident create` by TASK-145.8.6. The field updaters
-  (`information_update.py:322`, `incident_status.py:59`, through `update_incident_field`) create no
-  items and are removed by TASK-145.8.3 and TASK-145.8.5 (close is the last caller of
-  `incident_status.py`; the slash status path left it in TASK-145.8.4).
+  `/sre incident create` by TASK-145.8.6. The field updater
+  (`information_update.py:322`) creates no items and is removed by TASK-145.8.3; close and the
+  stale notice's archive button left the legacy `incident_status.py` in TASK-145.8.5.3, which
+  deleted it.
 - **Rerun rule.** After TASK-145.12.2 deploys, run the job again (`dry_run`, then `apply`) and
   confirm `pending` 0 and `unbound` empty before TASK-145.13 deletes the job. Items written by a
   legacy writer after the last run have no marker and no binding.

@@ -4,7 +4,7 @@ title: Retire /sre incident create (create resources and the create new stub)
 status: In Progress
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T16:02:00Z'
+updated_date: '2026-11-17T16:29:00Z'
 labels:
   - incident
   - features
@@ -100,6 +100,8 @@ bookmarks() and find() ports, set_reference upgrade-on-write (OQ13), report titl
 - Diff: 22 insertions, 1068 deletions over 16 files plus the new pin (~75 lines). Production code: 0 lines added except wording.
 - Gates: ruff check and format clean; import contracts 14 kept; settings key ownership OK; package shape OK (3 baselined); test seams OK (47/12 baselined); mypy 40 errors in 13 files (baseline, none new); pytest tests --ignore=tests/smoke 7555 passed.
 - AC #4 and #5 are PR-body ACs: the body is prepared (session scratchpad pr-145.8.6.md) with the revert target and both kind (d) named changes.
+
+2026-11-17: submitted as #1865 (stack-l/task-145.8.6-retire-create, ddac794d above L7a.1 a366d6de after #1859 merged; tree identical to the gated commit cea53e52). Top of Stack L: stays open until L7a.3 is added above it.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

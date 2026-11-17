@@ -13,7 +13,7 @@ from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters import google_docs as incident_documents
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
-from modules.incident import incident_helper, schedule_retro
+from modules.incident import schedule_retro
 from modules.incident.incident_document import (
     TIMELINE_ENTRY_PATTERN,
     timeline_message_key,
@@ -426,6 +426,12 @@ def _notify_timeline_failure(client: WebClient, body: dict, action: str, link: s
 
 
 def archive_channel_action(client: WebClient, body, ack, respond):
+    """Answer the stale notice's ignore and schedule_retro buttons.
+
+    The archive button is incident.response's (TASK-145.8.5.3, the archive_channel
+    alias scoped to the archive value); ignore moves in TASK-145.9.2 and
+    schedule_retro in TASK-145.10.
+    """
     ack()
     channel_id = body["channel"]["id"]
     action = body["actions"][0]["value"]
@@ -443,11 +449,6 @@ def archive_channel_action(client: WebClient, body, ack, respond):
         msg = f"<@{user}> has delayed scheduling and archiving this channel for 14 days."
         client.chat_update(channel=channel_id, text=msg, ts=body["message_ts"], attachments=[])
         log_to_sentinel("incident_channel_archive_delayed", body)
-    elif action == "archive":
-        # Call the close_incident function to update the incident document to closed, update the spreadsheet and archive the channel
-        incident_helper.close_incident(client, channel_info, ack, respond)
-        # log the event to sentinel
-        log_to_sentinel("incident_channel_archived", body)
     elif action == "schedule_retro":
         channel_info["trigger_id"] = body["trigger_id"]
         schedule_retro.open_incident_retro_modal(client, channel_info, ack)

@@ -284,6 +284,8 @@ def build_incident_transcript_reader() -> SlackIncidentTranscriptReader:
 # error; for the incident the invite is done.
 _INVITE_DONE = frozenset({"already_in_channel", "cant_invite_self"})
 _ARCHIVE_DONE = frozenset({"already_archived"})
+# Slack refuses a bot's join of a private channel; for the incident the channel is not writable.
+_JOIN_REFUSED = frozenset({"method_not_supported_for_channel_type"})
 _CANVAS_DONE = frozenset({"channel_canvas_already_exists"})
 _NAME_TAKEN = "name_taken"
 _OWN_CONVERSATION_TYPES = "public_channel,private_channel"
@@ -502,6 +504,31 @@ class SlackIncidentConversation:
             return _conversation_failure("archive", conversation, exc)
         return OperationResult.success()
 
+    async def join(self, conversation: ConversationReference) -> OperationResult[None]:
+        """Join the channel unless the bot is already a member; an archived or unjoinable channel is not writable.
+
+        ``conversations.info`` is read first because Slack refuses
+        ``conversations.join`` on a private channel even when the bot is a member.
+        """
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        try:
+            response = await self._reads.conversations_info(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            return _conversation_failure("join", conversation, exc)
+        channel: Mapping[str, Any] = response.get("channel") or {}
+        if channel.get("is_archived"):
+            return _conversation_not_writable("join", conversation, "is_archived")
+        if channel.get("is_member") is True:
+            return OperationResult.success()
+        try:
+            await self._writes.conversations_join(channel=conversation.vendor_id)
+        except SlackApiError as exc:
+            if exc.response.get("error") in _JOIN_REFUSED:
+                return _conversation_not_writable("join", conversation, str(exc.response.get("error")))
+            return _conversation_failure("join", conversation, exc)
+        return OperationResult.success()
+
     async def purpose(self, conversation: ConversationReference) -> OperationResult[str]:
         """Return the channel's purpose text; an empty string when it has none."""
         if conversation.system is not WorkplaceSystem.SLACK:
@@ -545,6 +572,12 @@ def _conversation_unsupported[T](conversation: ConversationReference) -> Operati
 def _conversation_failure[T](operation: str, conversation: ConversationReference, exc: SlackApiError) -> OperationResult[T]:
     """Classify a Slack error on ``operation``; a code the Slack table does not name propagates."""
     return _classified_failure(operation, exc, conversation_id=conversation.vendor_id)
+
+
+def _conversation_not_writable[T](operation: str, conversation: ConversationReference, code: str) -> OperationResult[T]:
+    """A refusal Slack's error table does not classify as not writable, or one read from ``conversations.info``."""
+    logger.warning(f"incident_conversation_{operation}_failed", conversation_id=conversation.vendor_id, slack_error=code)
+    return OperationResult.permanent_error(f"Slack {operation} failed: {code}", ErrorCode.CONVERSATION_NOT_WRITABLE)
 
 
 def _named_failure[T](operation: str, name: str, exc: SlackApiError) -> OperationResult[T]:

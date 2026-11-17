@@ -3,10 +3,10 @@ id: TASK-145.8.5.1
 title: >-
   Cut over roles: five roles on the record through incident.response, with the
   Drive roles read bridge
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T19:33:00Z'
-updated_date: '2026-11-16T23:09:00Z'
+updated_date: '2026-11-17T19:05:00Z'
 labels:
   - incident
   - features

@@ -17,7 +17,8 @@ def slack_error(code: str) -> SlackApiError:
 class StubSlack:
     """Read and write Web clients over a few channels, answering as the Slack Web API does.
 
-    ``channels`` maps a channel id to its ``is_archived`` and ``is_member`` flags; any
+    ``channels`` maps a channel id to its ``is_archived`` and ``is_member`` flags (and
+    ``is_private``, whose join Slack refuses with ``method_not_supported_for_channel_type``); any
     other id is ``channel_not_found``. Writes to an archived channel answer
     ``is_archived`` and writes where the bot is no member ``not_in_channel``;
     ``fail_with`` makes every call raise that Slack code instead. Posted messages get
@@ -60,6 +61,7 @@ class StubSlack:
         self.writes.bookmarks_add.side_effect = self._channel_write("channel_id")
         self.writes.conversations_invite.side_effect = self._invite
         self.writes.conversations_archive.side_effect = self._archive
+        self.writes.conversations_join.side_effect = self._join
         self.writes.conversations_create.side_effect = self._create
         self.writes.conversations_setTopic.side_effect = self._channel_write("channel")
         self.writes.conversations_canvases_create.side_effect = self._canvas
@@ -119,6 +121,16 @@ class StubSlack:
             raise slack_error("not_in_channel")
         state["is_archived"] = True
         return {"ok": True}
+
+    async def _join(self, *, channel: str, **_: Any) -> dict[str, Any]:
+        state = self._check(channel)
+        if state["is_archived"]:
+            raise slack_error("is_archived")
+        if state.get("is_private"):
+            raise slack_error("method_not_supported_for_channel_type")
+        already = state["is_member"]
+        state["is_member"] = True
+        return {"ok": True, **({"warning": "already_in_channel"} if already else {})}
 
     async def _create(self, *, name: str, is_private: bool = False, **_: Any) -> dict[str, Any]:
         if self.fail_with:

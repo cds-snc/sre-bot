@@ -37,6 +37,7 @@ from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.api import translate as t
 from features.incident.response import providers
 from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.slack_archive import register_archive
 from features.incident.response.entrypoints.slack_roles import register_roles
 from features.incident.response.service.status import StageOutcome, StageResult, StatusChange, change_status
 
@@ -94,6 +95,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
         example_keys=[f"{STATUS_DOMAIN}.update.examples.default"],
     )
     register_roles(registrar, scopes)
+    register_archive(registrar, scopes)
 
 
 def handle_status_command(payload: CommandPayload) -> CommandResponse:

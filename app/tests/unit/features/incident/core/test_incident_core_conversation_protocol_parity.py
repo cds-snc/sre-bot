@@ -6,7 +6,9 @@ test runs against both, so a consumer tested on the fake sees the adapter's
 observable rules: writes to an open conversation succeed, a post returns the
 message's reference, an archived or non-member conversation is not writable
 and refuses writes with ``CONVERSATION_NOT_WRITABLE``, an unknown one is not
-found, and another system's reference is unsupported without a call. Both are
+found, and another system's reference is unsupported without a call. Joining
+makes a conversation the bot left writable, joining one it is in succeeds, and
+an archived one refuses the join as not writable. Both are
 seeded with the same channel names and user groups: a new name creates a
 channel the bot can write to, a taken name is ``CONVERSATION_NAME_TAKEN``, and
 ``find_own`` finds only the bot's open channels by exact name.
@@ -148,6 +150,7 @@ async def test_inviting_nobody_succeeds(conversations: IncidentConversation) -> 
         lambda c: c.set_topic(GOOGLE, "topic"),
         lambda c: c.create_canvas(GOOGLE, "# Canvas"),
         lambda c: c.group_members(GOOGLE, "S0SEC"),
+        lambda c: c.join(GOOGLE),
     ],
 )
 async def test_another_systems_reference_is_unsupported(
@@ -276,3 +279,27 @@ async def test_the_purpose_of_an_unknown_conversation_is_not_found(conversations
 
     assert purpose.status is OperationStatus.NOT_FOUND
     assert purpose.error_code == "channel_not_found"
+
+
+@pytest.mark.parametrize("conversation", [OPEN, LEFT])
+async def test_joining_makes_the_conversation_writable(
+    conversations: IncidentConversation, conversation: ConversationReference
+) -> None:
+    joined = await conversations.join(conversation)
+
+    assert joined.is_success
+    assert (await conversations.is_writable(conversation)).data is True
+
+
+async def test_joining_an_archived_conversation_is_refused_as_not_writable(conversations: IncidentConversation) -> None:
+    joined = await conversations.join(ARCHIVED)
+
+    assert joined.status is OperationStatus.PERMANENT_ERROR
+    assert joined.error_code == ErrorCode.CONVERSATION_NOT_WRITABLE
+
+
+async def test_joining_an_unknown_conversation_is_not_found(conversations: IncidentConversation) -> None:
+    joined = await conversations.join(UNKNOWN)
+
+    assert joined.status is OperationStatus.NOT_FOUND
+    assert joined.error_code == "channel_not_found"
