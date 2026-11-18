@@ -48,7 +48,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         job: Callable[[], None],
         lease_ttl: timedelta | None = None,
     ) -> None:
-        job_to_run = _leased_or_plain(job_name, job, lease_ttl)
+        job_to_run, min_hold = _leased_or_plain(job_name, job, lease_ttl, every=timedelta(days=1))
         schedule_lib.every().day.at(schedule).do(safe_run(job_to_run))
         logger.debug(
             "background_job_scheduled",
@@ -56,6 +56,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
             cadence="daily",
             schedule=schedule,
             lease_ttl_seconds=_seconds(lease_ttl),
+            lease_min_hold_seconds=_seconds(min_hold),
         )
 
     def register_interval(
@@ -66,7 +67,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
         job: Callable[[], None],
         lease_ttl: timedelta | None = None,
     ) -> None:
-        job_to_run = _leased_or_plain(job_name, job, lease_ttl)
+        job_to_run, min_hold = _leased_or_plain(job_name, job, lease_ttl, every=every)
         seconds = int(every.total_seconds())
         schedule_lib.every(seconds).seconds.do(safe_run(job_to_run))
         logger.debug(
@@ -75,6 +76,7 @@ class _ScheduleBackgroundJobRegistry(BackgroundJobRegistry):
             cadence="interval",
             every_seconds=seconds,
             lease_ttl_seconds=_seconds(lease_ttl),
+            lease_min_hold_seconds=_seconds(min_hold),
         )
 
 
@@ -82,26 +84,36 @@ def _seconds(ttl: timedelta | None) -> int | None:
     return None if ttl is None else int(ttl.total_seconds())
 
 
-def _leased_or_plain(job_name: str, job: Callable[[], None], lease_ttl: timedelta | None) -> Callable[[], None]:
-    """Return the job as is (Tier-1) or wrapped in a lease named scheduler:<job_name> (Tier-2).
+def _leased_or_plain(
+    job_name: str, job: Callable[[], None], lease_ttl: timedelta | None, *, every: timedelta
+) -> tuple[Callable[[], None], timedelta | None]:
+    """Return the job as is (Tier-1) or wrapped in a lease named scheduler:<job_name> (Tier-2), with its hold.
 
     The TTL is the job's own, never the scheduler default; one under a second is
     rejected here, at registration, so a bad value fails startup instead of a run.
+    A Tier-2 lease is held after a short run for min(TTL, every - margin), the
+    margin being [scheduler] lease_hold_margin_seconds (decisions/reliability.md);
+    `every` is one day for a daily job, so its hold is its TTL. A leased interval
+    not above the margin leaves no room for a hold and is rejected here too.
     """
     if lease_ttl is None:
-        return job
+        return job, None
     ttl_seconds = int(lease_ttl.total_seconds())
     if ttl_seconds < 1:
         raise ValueError(f"lease_ttl for {job_name} must be at least one second, got {lease_ttl}")
+    margin = timedelta(seconds=get_scheduler_settings().lease_hold_margin_seconds)
+    if every <= margin:
+        raise ValueError(f"interval of leased job {job_name} must be longer than the lease hold margin {margin}, got {every}")
+    min_hold = min(timedelta(seconds=ttl_seconds), every - margin)
     lock_store = get_lease_store(ttl_seconds)
 
     def leased() -> None:
-        run_if_leased(lock_store, f"scheduler:{job_name}", job)
+        run_if_leased(lock_store, f"scheduler:{job_name}", job, min_hold=min_hold)
 
     # safe_run logs the module and name of the job it wraps.
     leased.__module__ = job.__module__
     leased.__name__ = getattr(job, "__name__", "leased_job")
-    return leased
+    return leased, min_hold
 
 
 def safe_run(job: Callable[..., Any]) -> Callable[..., None]:

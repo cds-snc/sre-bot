@@ -53,5 +53,10 @@ class BackgroundJobRegistry(Protocol):
         replica runs it at a time. The lease only avoids duplicate runs; the job body
         must stay idempotent. The TTL comes from the job's own settings and is sized
         to its longest run (decisions/reliability.md); one under a second is rejected.
+        After a short run, failed runs included, the lease is held until
+        min(``lease_ttl``, ``every`` - the scheduler's lease hold margin) after the
+        start, so another replica ticking a moment later does not run the same tick;
+        the TTL stays the maximum hold, and a daily job holds its TTL. A Tier-2
+        interval not longer than the margin is rejected.
         """
         ...

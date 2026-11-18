@@ -47,8 +47,8 @@ class ConditionalWriteStore(Protocol):
     callers to deduplicate retries or hold a lease without exposing vendor
     details.
 
-    Ownership: complete() and release() apply only for the caller holding the
-    claim token of the current claim. A claimant whose in-progress TTL elapsed
+    Ownership: complete(), release() and expire_at() apply only for the caller
+    holding the claim token of the current claim. A claimant whose in-progress TTL elapsed
     and whose claim was taken over gets False and changes nothing, so a stale
     holder cannot destroy a live holder's record. This is not fencing: the
     protected work itself may still run twice.
@@ -76,5 +76,15 @@ class ConditionalWriteStore(Protocol):
 
         Returns False, deleting nothing, when claim_token does not hold the key
         or the key is already completed.
+        """
+        ...
+
+    def expire_at(self, key: str, claim_token: str, at: int) -> bool:
+        """Set the in-progress claim held by claim_token to expire at epoch second `at`.
+
+        The claim stays in progress through second `at` and is claimable after it;
+        nothing is deleted. A lease uses it to hold for a minimum time after a short
+        run. Returns False, changing nothing, when claim_token does not hold the key
+        in progress: a stale or foreign token, a missing key, or a completed key.
         """
         ...

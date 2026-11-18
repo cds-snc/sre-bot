@@ -4,11 +4,7 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
-<<<<<<< Updated upstream
-updated_date: '2026-11-18T16:42:00Z'
-=======
-updated_date: '2026-11-18T17:57:00Z'
->>>>>>> Stashed changes
+updated_date: '2026-11-18T20:11:00Z'
 labels:
   - configuration
   - human
@@ -84,15 +80,15 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-18: asked at TASK-145.7.12 (row 18.L7c) implementation start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 
-<<<<<<< Updated upstream
 2026-11-18: asked at TASK-145.7.9 (row 18.L9a) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
 
 2026-11-18: TASK-145.7.9 implementation start (same session as planning): unchanged per the planning-start answer.
-=======
+
 2026-11-18: AC #1 checked: the human cleared both blob values, redeployed the running image through build_and_deploy.yml (image_tag dispatch) with a clean boot, then deleted sre-bot-config and sre-bot-config-infrastructure in the console (ca-central-1); describe-parameters for both names returns an empty table. Terraform never declared them as resources (only IAM ARNs, removed by #1808), so no code change. AC #4 checked: the human checked TASK-54 AC #4 and set TASK-54 Done. Only AC #2 (old GCP key, live in production) remains; TASK-182 deletes it after TASK-180's keyless cutover.
 
 2026-11-18: asked at TASK-64 (row 18f) planning start; unchanged (human): only #2 open, waits on TASK-182.
->>>>>>> Stashed changes
+
+2026-11-18: asked at TASK-64.2 (row 18f.2) planning start; unchanged (human): only #2 open, waits on TASK-182. Stash conflict markers committed with TASK-64.1 resolved (both note blocks kept in date order).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

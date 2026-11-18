@@ -77,3 +77,17 @@ class InMemoryConditionalWriteStore(ConditionalWriteStore):
                 return False
             del self._store[key]
             return True
+
+    def expire_at(self, key: str, claim_token: str, at: int) -> bool:
+        """Move the expiry of an in-progress record held by claim_token to `at`; never delete it."""
+        with self._lock:
+            existing = self._store.get(key)
+            if (
+                existing is None
+                or existing.get("claim_token") != claim_token
+                or existing.get("status") != ClaimResult.IN_PROGRESS.name
+            ):
+                return False
+            existing["in_progress_expires_at"] = at
+            existing["ttl"] = at
+            return True

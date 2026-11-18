@@ -101,3 +101,7 @@ class TestIdempotencyStoreReadFailure:
         assert dedup.complete(KEY, {"status": "done"}, "a" * 32) is False
         assert dedup.release(KEY, "a" * 32) is False
         assert store.calls == [("complete", KEY, "a" * 32), ("release", KEY, "a" * 32)]
+
+    def test_dedup_facade_does_not_expose_expire_at(self, in_memory_store: InMemoryConditionalWriteStore) -> None:
+        """Holding a claim for a minimum time is a lease concern; dedup releases or completes."""
+        assert not hasattr(_idempotency_store(in_memory_store), "expire_at")
