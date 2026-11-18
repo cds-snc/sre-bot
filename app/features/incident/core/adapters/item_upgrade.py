@@ -12,17 +12,24 @@ and only lacks its binding. An item at ``RECORD_VERSION`` or above is left
 alone (``None``). The binding is the primary chat binding of the item's
 conversation, bound by the item's declarer at its declared time, so a rerun
 builds the identical item (decisions/incident-management.md, Migration).
+
+The legacy roles step is the batch job's alone: ``roles_report`` names the
+report whose Drive properties hold a roleless item's legacy roles, and
+``with_legacy_roles`` adds the roles read there to the item's plan, guarded on
+all five roles at their read value. It raises no marker: the guard on the roles
+being unset is what keeps a rerun from writing (Migration rule 4).
+TODO(TASK-145.13): delete the roles step with the legacy roles bridge.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
 from contracts.records import ExpectedValue, RecordChange, SetAttribute
 from contracts.workplace import WorkplaceSystem
-from features.incident.common.vocabulary import IncidentStatus
+from features.incident.common.vocabulary import IncidentRole, IncidentStatus
 from features.incident.core.adapters.incident_items import (
     END_STATE_VERSION,
     OPEN_BUCKET,
@@ -30,7 +37,7 @@ from features.incident.core.adapters.incident_items import (
     read_reference,
 )
 from features.incident.core.adapters.legacy_items import UnreadableLegacyItem, upgrade_legacy_item
-from features.incident.core.domain import BindingKind, ConversationReference, IncidentBinding
+from features.incident.core.domain import BindingKind, ConversationReference, IncidentBinding, ReportReference
 
 # Every scalar the bridge reads, guarded at its read value so a write never lands on a changed item.
 _READ_ATTRIBUTES = (
@@ -65,6 +72,7 @@ class ItemUpgrade:
         changes: The attributes to set, the version marker last.
         expected: The read value of every guarded attribute (``None`` for an absent one).
         dropped: The legacy attributes whose optional value could not be matched.
+        roles: The legacy roles the plan sets, read from the report (``RECORD_VERSION`` plans set only these).
     """
 
     incident_id: str
@@ -73,6 +81,7 @@ class ItemUpgrade:
     changes: tuple[RecordChange, ...]
     expected: dict[str, ExpectedValue]
     dropped: tuple[str, ...] = ()
+    roles: tuple[IncidentRole, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -81,6 +90,17 @@ class UnboundOpenItem:
 
     Attributes:
         incident_id: The stored ``id`` of the item, whatever its type.
+    """
+
+    incident_id: object
+
+
+@dataclass(frozen=True)
+class RolesUnmappable:
+    """A roleless item whose legacy roles cannot be mapped: no Google report, or a stored role no guard can hold.
+
+    Attributes:
+        incident_id: The stored ``id`` of the item.
     """
 
     incident_id: object
@@ -163,6 +183,63 @@ def _plan_raise(item: Mapping[str, Any], version: int) -> ItemUpgrade | Unreadab
         return UnreadableLegacyItem(incident_id=incident_id, field=exc.field, value=None)
     expected["record_version"] = version
     return ItemUpgrade(incident_id, version, binding, (SetAttribute("record_version", RECORD_VERSION),), expected)
+
+
+def roles_report(item: Mapping[str, Any], plan: ItemUpgrade | None) -> ReportReference | RolesUnmappable | None:
+    """Return the report to read a roleless item's legacy roles from, why they cannot be mapped, or ``None``.
+
+    ``plan`` is the item's ``plan_item_upgrade`` result; ``None`` (nothing to plan) is read only for an item at
+    ``RECORD_VERSION``. ``None`` is returned when the item's end-state form holds any of the five roles, as the
+    read bridge decides (``read_incident_roles``), or the item is above ``RECORD_VERSION``.
+    TODO(TASK-145.13): delete.
+    """
+    if plan is None and _stored_version(item) != RECORD_VERSION:
+        return None
+    form: dict[str, Any] = dict(item)
+    if plan is not None:
+        form.update((change.attribute, change.value) for change in plan.changes if isinstance(change, SetAttribute))
+    if any(isinstance(value := form.get(role.value), str) and value.strip() for role in IncidentRole):
+        return None
+    incident_id = item.get("id")
+    try:
+        _role_guards(item)
+    except UnguardableValueError:
+        return RolesUnmappable(incident_id)
+    report = read_reference(form, "report", ReportReference, incident_id)
+    if report is None or report.system is not WorkplaceSystem.GOOGLE:
+        return RolesUnmappable(incident_id)
+    return report
+
+
+def with_legacy_roles(item: Mapping[str, Any], plan: ItemUpgrade | None, roles: Mapping[IncidentRole, str]) -> ItemUpgrade:
+    """Return ``plan`` setting ``roles`` before its marker, or a roles-only plan for an item at ``RECORD_VERSION``.
+
+    Every one of the five roles is guarded at its read value, so a role set since the read wins over the mapped
+    one. Call it only for an item ``roles_report`` returned a report for. TODO(TASK-145.13): delete.
+    """
+    changes = tuple(SetAttribute(role.value, roles[role]) for role in IncidentRole if role in roles)
+    mapped = tuple(role for role in IncidentRole if role in roles)
+    guards = _role_guards(item)
+    if plan is None:
+        expected: dict[str, ExpectedValue] = {"record_version": RECORD_VERSION, **guards}
+        return ItemUpgrade(str(item.get("id")), RECORD_VERSION, None, changes, expected, roles=mapped)
+    marker = [change for change in plan.changes if isinstance(change, SetAttribute) and change.attribute == "record_version"]
+    shape = tuple(change for change in plan.changes if change not in marker)
+    return replace(plan, changes=(*shape, *changes, *marker), expected={**plan.expected, **guards}, roles=mapped)
+
+
+def _role_guards(item: Mapping[str, Any]) -> dict[str, ExpectedValue]:
+    return {role.value: guard_value(role.value, item.get(role.value)) for role in IncidentRole}
+
+
+def _stored_version(item: Mapping[str, Any]) -> ExpectedValue:
+    version = item.get("record_version")
+    if isinstance(version, bool):
+        return None
+    try:
+        return guard_value("record_version", version)
+    except UnguardableValueError:
+        return None
 
 
 def _binding_for(item: Mapping[str, Any]) -> IncidentBinding | UnreadableLegacyItem | None:

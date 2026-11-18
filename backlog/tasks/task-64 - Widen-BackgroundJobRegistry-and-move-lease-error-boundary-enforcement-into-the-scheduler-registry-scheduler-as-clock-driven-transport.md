@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-28 16:29
-updated_date: '2026-11-04T23:00:00Z'
+updated_date: '2026-11-18T00:01:00Z'
 labels:
   - architecture
   - reliability
@@ -51,6 +51,7 @@ BREAKDOWN GUIDANCE FOR THE PLANNING CODING AGENT: check the single-PR size gate.
 - [ ] #3 TASK-6's central _tier2 wrapper in scheduled_tasks.py is deleted; its behavior now lives in the registry adapter
 - [ ] #4 The two host-owned jobs (scheduler_heartbeat, integration_healthchecks) register as Tier-1 through the widened path; existing Tier-2 jobs are migrated onto it with no behavior change (tests)
 - [ ] #5 The single shared default lease TTL from TASK-6 is retained (removed later by TASK-B); this task does NOT colocate per-job TTLs into feature settings
+- [ ] #6 A Tier-2 lease is held for a minimum time (just under the interval for an interval job, a fixed hold for a daily job; decisions/reliability.md, 2026-11-18): a run that ends before that time keeps the lease until its start plus the minimum hold, through a conditional update under its claim token, never a delete; the TTL stays the maximum hold. A test runs a short job on two simulated replicas whose ticks are about a second apart and asserts a single run per tick.
 <!-- AC:END -->
 
 ## Definition of Done
@@ -71,22 +72,42 @@ BREAKDOWN GUIDANCE FOR THE PLANNING CODING AGENT: check the single-PR size gate.
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-07-28 16:33
+
 ---
+
 Placeholder IDs resolved: 'THIS TASK'/'TASK-A' in the description = TASK-64 (this task); 'TASK-B' = TASK-65 (strangle the pull-hub into feature hookimpls). Predecessor TASK-6 rewritten 2026-07-28 to the minimal single-default-TTL scope; this task delivers the declarative tier/TTL/schedule registry that lets features (and the eventual migrated modules jobs) declare leasing through the boundary.
+
 ---
 
 created: 2026-09-14 15:27
+
 ---
+
 2026-09-14: AC#4 registers integration_healthchecks as a host-owned Tier-1 job. TASK-92 (service health model, AC#4) decides whether that log-only vendor-probe job should exist at all, or be replaced by per-dependency metrics or a narrower credential probe. Re-check AC#4 against TASK-92's outcome before planning. Current state: jobs/scheduled_tasks.py integration_healthchecks guards each entry against exceptions, and the 'aws' entry uses build_identity_center_adapter (TASK-25.2.3.2.4).
+
 ---
 
 created: 2026-09-24 20:07
+
 ---
+
 2026-09-24 alignment with decisions/plugin-architecture.md: the widened BackgroundJobRegistry Protocol is the scheduler contract and moves to app/contracts/ with the hookspecs (TASK-107). The runtime that applies safe_run and the Tier-2 lease moves to app/server/scheduler/ (TASK-52, rescoped: server/, not infrastructure/). The lease comes from the coordination contract (TASK-58). This task still lands in place under app/jobs/ first, as planned; its placeholder reference 'TASK-B' is TASK-65.
+
 ---
 
 created: 2026-09-25 15:00
+
 ---
+
 2026-09-25: TASK-92 was narrowed to the service health model; the fate of integration_healthchecks moved to TASK-127, now a dependency. Re-check AC#4 against TASK-127 before planning.
+
+---
+
+created: 2026-11-18T00:01:00Z
+
+---
+
+2026-11-18 (human, from TASK-145.7.8's first production dry run): run_if_leased releases at job end (infrastructure/coordination/lease.py:14-17), so the incident legacy upgrade dry run, which takes under a second, ran on both replicas 0.7 s apart and logged two reports per interval. reliability.md now requires a minimum hold (ShedLock lockAtLeastFor). New AC added. Ordering: this task, or a subtask split from it under the size gate, lands before TASK-145.9.2 (stale-channel nudge) and TASK-147.6 (postmortem reminders) register their leased jobs; both now depend on it. The upgrade job needs no change: its writes are guarded.
+
 ---
 <!-- COMMENTS:END -->

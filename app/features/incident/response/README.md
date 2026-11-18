@@ -38,8 +38,9 @@ the archive call it today; the update modal calls it once it is rebuilt (TASK-14
   submitter privately, never roll the record back.
 - What the modal shows is `read_incident_roles` (`core/api.py`): the record's roles, or for an
   incident with no role on the record the report's Drive properties `ic_id` and `ol_id` through
-  the legacy-only `LegacyRolesReader`. Nothing writes those properties. TASK-145.7.12 backfills
-  them into the record and TASK-145.13 deletes the reader and the read (`providers.legacy_roles_reader`).
+  the legacy-only `LegacyRolesReader`. Nothing writes those properties. The legacy upgrade job's
+  roles step (TASK-145.7.12) backfills them into the record on the same condition, through the
+  same reader, and TASK-145.13 deletes the reader and the read (`providers.legacy_roles_reader`).
 
 ## Archive
 

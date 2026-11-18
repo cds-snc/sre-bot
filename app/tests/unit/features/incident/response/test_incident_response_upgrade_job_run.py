@@ -4,7 +4,9 @@ The job is the one the plugin registers, taken from a recording registry, so
 the run under test is the scheduled one. Its scope opener is a fake resolving a
 counting in-memory record store seeded with one legacy item, the configured
 Slack and Google tenants and a verifier confirming the Slack tenant; the real
-runner and bridge run over them. Assertions are on the scopes opened and closed
+runner and bridge run over them. The legacy roles reader is substituted at
+the response provider with the in-memory reader, which records the reports it
+reads. Assertions are on the scopes opened and closed
 and on the writes the store recorded, which is what the mode controls; the
 report itself is covered by the runner's tests.
 """
@@ -17,12 +19,24 @@ import pytest
 
 from contracts.records import RecordStore
 from contracts.services import ServiceScopeOpener
-from contracts.workplace import ConfiguredSystems, TenantVerifier
+from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
+from features.incident.common.vocabulary import IncidentRole
+from features.incident.core.adapters.in_memory import InMemoryLegacyRolesReader
 from features.incident.core.adapters.incident_items import RECORD_VERSION
-from features.incident.response import plugin
+from features.incident.core.domain import ReportReference
+from features.incident.response import plugin, providers
 from features.incident.response.settings import get_incident_response_settings
 from tests.factories.incident import FakeConfiguredSystems
-from tests.factories.legacy_upgrade import TABLE, TENANTS, InterceptingRecordStore, legacy_item, records_with, verified_slack
+from tests.factories.legacy_upgrade import (
+    GOOGLE_TENANT,
+    REPORT_URL,
+    TABLE,
+    TENANTS,
+    InterceptingRecordStore,
+    legacy_item,
+    records_with,
+    verified_slack,
+)
 from tests.factories.services import FakeServiceScopeOpener
 
 pytestmark = pytest.mark.unit
@@ -111,3 +125,19 @@ def test_a_failed_resolution_propagates_and_still_closes_the_scope(monkeypatch: 
         job()
 
     assert (scopes.opened, scopes.closed, records.writes) == (1, 1, [])
+
+
+def test_an_apply_run_maps_a_roleless_items_roles_through_the_legacy_reader(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two roleless items are read in one run: both reads run on the run's one event loop."""
+    report = ReportReference(system=WorkplaceSystem.GOOGLE, tenant=GOOGLE_TENANT, vendor_id="doc123", url=REPORT_URL)
+    legacy = InMemoryLegacyRolesReader()
+    legacy.seed(report, {IncidentRole.INCIDENT_COMMANDER: "U0IC"})
+    monkeypatch.setattr(providers, "legacy_roles_reader", lambda: legacy)
+    no_roles: dict[str, Any] = {"incident_commander": None, "operations_lead": None}
+    records = records_with(legacy_item("inc-1", **no_roles), legacy_item("inc-2", **no_roles))
+
+    _registered_job(monkeypatch, "apply", _scopes(records))()
+
+    stored = [records.get(TABLE, {"id": incident_id}).data for incident_id in ("inc-1", "inc-2")]
+    assert legacy.reads == [report, report]
+    assert [item["incident_commander"] for item in stored if item is not None] == ["U0IC", "U0IC"]

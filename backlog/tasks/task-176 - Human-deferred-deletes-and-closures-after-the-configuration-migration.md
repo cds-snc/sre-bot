@@ -4,7 +4,7 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
-updated_date: '2026-11-17T22:27:00Z'
+updated_date: '2026-11-18T14:29:00Z'
 labels:
   - configuration
   - human
@@ -71,6 +71,8 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 2026-11-17: asked at TASK-145.8.6 implementation start; unchanged (human).
 
 2026-11-17: asked at TASK-145.7.8 (row 18.L8, dry run) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
+
+2026-11-18: asked at TASK-145.7.12 (row 18.L7c) implementation start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -5,8 +5,8 @@ title: >-
   migration
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 18:10'
+created_date: 2026-09-10 16:18
+updated_date: '2026-11-18T14:42:00Z'
 labels:
   - identity
 dependencies:
@@ -14,7 +14,7 @@ dependencies:
 references:
   - packages/access/request/store.py
   - terraform/dynamodb.tf
-  - 'https://github.com/cds-snc/sre-bot/issues/1621'
+  - https://github.com/cds-snc/sre-bot/issues/1621
 parent_task_id: TASK-83
 priority: low
 ordinal: 178000
@@ -39,3 +39,15 @@ Each reference migration follows the shared legacy backfill rule set described i
 - [ ] #2 No stored data is changed by this task
 - [ ] #3 Each reference has a follow-up task describing its expand, backfill, switch-reads and contract steps under the shared backfill rule set (shared upgrade function, TASK-145.5.7 runner pattern, version marker)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-18T14:42:00Z
+
+---
+
+2026-11-18 (TASK-145.7.12 OQ1, human approved; decisions/incident-management.md Migration rule 4): incident role holders are stored Slack user ids. A person-reference migration that resolves them through a directory lookup is a side-store input: the batch runner alone maps it (never an upgrade on write), it selects and guards on the end-state attribute's absence with no new marker value, its report counts are its own pending, and a read bridge covers it until that report shows nothing pending (the legacy roles backfill is the precedent). A pure reshaping step raises the marker only after its own expand PR widens the store's record_version checks.
+
+---
+<!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: 'Switch the legacy upgrade job on in production: dry run, then apply'
 status: In Progress
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T22:39:00Z'
+updated_date: '2026-11-17T23:52:00Z'
 labels:
   - incident
   - config
@@ -136,6 +136,17 @@ Gates (from app/):
 - Targeted: settings load and job registration tests, 30 passed; the configuration-file suites, 167 passed.
 AC #2 checked. AC #1 stays open: the dry-run report (human, after deploy) and the apply report (second PR) go into these notes.
 Human after merge and deploy: read incident_legacy_upgrade_report about 30 min after the task starts (README command) and record it here: tenant_check, scanned, already_upgraded, to_upgrade, dropped count, blockers by id. Blocked or noisy (10 or more drops a run): a PR sets the mode to off while items are fixed.
+
+2026-11-17: first production dry-run report (human ran the README command; image 203aeea1, 23:30:04Z):
+mode dry_run, outcome succeeded, failures [], cap 10000, scanned 336, already_upgraded 1, to_upgrade 335, pending 335, binding_skipped 0, unbound [], unmatched_status [], unreadable [], dropped [], tenant_check verified (tenant T2G2S06PM).
+Reading:
+- Zero blockers: the apply's dry-run gate is met.
+- D10 confirmed: the auth.test org-token shape verifies under the team_id-only [slack.tenant].
+- Every item has a conversation (binding_skipped 0, unbound empty).
+- No drops, so TASK-145.7.12's conditional drop sink (OQ4) is not needed.
+- already_upgraded 1: one legacy item upgraded on write since #1859.
+Finding: the same report was logged twice per interval, by two replicas (instance 6c30fec7 at 23:30:04.497Z, 5636151a at 23:30:05.196Z). run_if_leased releases the lease when the job ends (infrastructure/coordination/lease.py:14-17), so a run shorter than the replicas' tick offset (about 1 s here) runs again on the other replica. Harmless here: a dry run writes nothing, and an apply run is guarded on record_version, so a second run counts the items as already_upgraded. It doubles the scan (still about 4% of an interval's read capacity) and gives two reports per interval. ADR gap raised with the human (reliability.md lease semantics, TASK-64 scope).
+AC #1 stays open until the apply report. The apply now waits only on 145.8.3 (L6a) and 145.8.5.3 (L7a.3) deployed and soaked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
