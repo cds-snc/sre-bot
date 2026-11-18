@@ -1,8 +1,8 @@
 """Status change: the record first, then the report status line, the list projection and the channel.
 
 ``change_status`` is the one status engine of the response subdomain: the slash
-``status update`` command and the archive (service/archive.py) call it, and the
-update modal calls it once it is rebuilt (TASK-145.8.3).
+``status update`` command the archive (service/archive.py) and the update modal's
+status field (entrypoints/slack_show.py) call it.
 
 The record write is the commit point (decisions/incident-management.md): a
 refused command check or a failed record write returns that failure and writes
@@ -121,7 +121,7 @@ async def change_status(
         previous=previous,
         report=await _report_stage(reports, incident, status),
         projection=stage_result(await projection.update_status(incident, status)),
-        channel=await _channel_stage(conversations, incident, notice),
+        channel=await channel_stage(conversations, incident, notice),
     )
     for name, stage in (("report", change.report), ("projection", change.projection), ("channel", change.channel)):
         if stage.outcome is StageOutcome.FAILED:
@@ -146,7 +146,8 @@ async def _report_stage(reports: IncidentReport, incident: Incident, status: Inc
     return stage_result(await reports.set_status_text(incident.report, status))
 
 
-async def _channel_stage(conversations: IncidentConversation, incident: Incident, notice: str) -> StageResult:
+async def channel_stage(conversations: IncidentConversation, incident: Incident, notice: str) -> StageResult:
+    """Post ``notice`` to the record's conversation when it is writable; skipped otherwise, never blocking the record."""
     writable = await conversation_is_writable(conversations, incident.conversation)
     if not writable.is_success:
         return stage_result(writable)

@@ -12,13 +12,11 @@ from structlog import get_logger
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.google_docs import (
     apply_document_edits,
     fetch_document_snapshot,
     replace_placeholders,
-    status_line_replacements,
 )
 
 START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
@@ -61,23 +59,6 @@ def update_boilerplate_text(document_id, name, product, slack_channel, on_call_n
     }
 
     replace_placeholders(document_id, replacements, match_case=True)
-
-
-def update_incident_document_status(document_id, new_status="Closed"):
-    """Update the status of the incident document.
-
-    Args:
-        document_id (str): The ID of the document to update.
-        new_status (str, optional): The new status to set. Defaults to "Closed".
-
-    Returns:
-        bool: True if the status was updated, False otherwise.
-    """
-    if new_status not in set(IncidentStatus):
-        raise ValueError(f"Invalid status: {new_status}")
-
-    # The mapping lives in core (decisions/migration.md rule 5); TASK-145.8.3 deletes this function with its last caller (information_update.py).
-    return replace_placeholders(document_id, status_line_replacements(IncidentStatus(new_status)), match_case=False)
 
 
 def timeline_message_key(url: str) -> tuple[str, str]:

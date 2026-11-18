@@ -74,13 +74,21 @@ class SlackWebReply:
 
     def open_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
         """Open a modal view and return its id."""
-        response = self._request("views_open", lambda client: client.views_open(trigger_id=trigger_id, view=view))
+        return self._view_call("views_open", lambda client: client.views_open(trigger_id=trigger_id, view=view))
+
+    def push_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
+        """Push a modal view onto the interaction's view stack and return its id."""
+        return self._view_call("views_push", lambda client: client.views_push(trigger_id=trigger_id, view=view))
+
+    def _view_call(self, method: str, call: Callable[[WebClient], object]) -> OperationResult[str]:
+        """Run one view-creating Web API call and return the created view's id."""
+        response = self._request(method, call)
         if not response.is_success:
             return _carry_error(response)
         view_id = _view_id(response.data)
         if view_id is None:
             return OperationResult.permanent_error(
-                "Slack views_open returned no view id",
+                f"Slack {method} returned no view id",
                 error_code=ErrorCode.MISSING_VIEW_ID,
             )
         return OperationResult.success(data=view_id)

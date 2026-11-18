@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T20:19:00Z'
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - incident
   - features
@@ -47,6 +47,7 @@ THIS SLICE
 - [ ] #7 Meeting scheduling comes from the incident-owned features/incident/scheduling and features/incident/meet over integrations/google_workspace, not a calendar capability (TASK-138 superseded by TASK-169 ruling, 2026-11-05 (human))
 - [ ] #8 features/incident/scheduling/availability.py takes a layout-table name (scheduling/service.py or domain.py, or core/ under feature-packages.md rule 4), and its app/bin/baselines/package_shape.txt entry is deleted
 - [ ] #9 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
+- [ ] #10 incident show displays the postmortem meeting link from the record (a read-only line of the response show view built by TASK-145.8.3), replacing the Retro Link dropped there (TASK-145.8.3 OQ11, human 2026-11-17)
 <!-- AC:END -->
 
 ## Implementation Plan

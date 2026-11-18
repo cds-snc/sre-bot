@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T15:51:00Z'
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - incident
   - features
@@ -48,6 +48,14 @@ created: 2026-11-16T15:51:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (TASK-145.8.3 OQ8): the legacy sheet-status writer (incident_folder.update_spreadsheet_incident_status, return_channel_name, channel_slug) is deleted by TASK-145.8.3 with its last caller; the status cell moves through the list projection (change_status). Nothing of it is left for this task.
 
 ---
 <!-- COMMENTS:END -->

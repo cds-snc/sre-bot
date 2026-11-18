@@ -68,6 +68,7 @@ class FakeSlackClient:
         self.replies: dict[str, dict[str, Any] | Exception | Callable[..., dict[str, Any]]] = {
             "auth_test": {"ok": True, "user_id": "UBOT", "bot_id": "BBOT", "user": "sre-bot"},
             "views_open": {"ok": True, "view": {"id": "VFAKE"}},
+            "views_push": {"ok": True, "view": {"id": "VFAKEPUSHED"}},
         }
 
     def __getattr__(self, name: str) -> Callable[..., dict[str, Any]]:

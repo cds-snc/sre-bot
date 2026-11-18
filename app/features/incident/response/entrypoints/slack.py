@@ -11,7 +11,9 @@ a bare valid status (``status Closed``, the form retired after 2025-11-01)
 answers a pointer to ``status update`` and changes nothing. TASK-145.13 deletes
 the pointer with the legacy contract.
 
-``register`` also registers the roles commands and modal (``slack_roles.py``).
+``register`` also registers the roles commands and modal (``slack_roles.py``), ``close``
+and the archive button (``slack_archive.py``), and ``show`` with its update modal
+(``slack_show.py``).
 
 A handler opens one service scope, builds the ``IncidentStore`` there from the
 resolved ``RecordStore`` and the configured systems, and runs the service in one
@@ -39,6 +41,7 @@ from features.incident.response import providers
 from features.incident.response.entrypoints.scope import incident_scope
 from features.incident.response.entrypoints.slack_archive import register_archive
 from features.incident.response.entrypoints.slack_roles import register_roles
+from features.incident.response.entrypoints.slack_show import register_show
 from features.incident.response.service.status import StageOutcome, StageResult, StatusChange, change_status
 
 logger = structlog.get_logger()
@@ -96,6 +99,7 @@ def register(registrar: SlackCommandRegistrar) -> None:
     )
     register_roles(registrar, scopes)
     register_archive(registrar, scopes)
+    register_show(registrar, scopes)
 
 
 def handle_status_command(payload: CommandPayload) -> CommandResponse:

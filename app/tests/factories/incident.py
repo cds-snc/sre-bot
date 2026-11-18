@@ -156,12 +156,18 @@ def status_update_store_in(records: RecordStore) -> StatusUpdateStore:
 
 
 def seed_legacy_incident(
-    records: RecordStore, channel_id: str, *, incident_id: str = "inc-legacy", report_url: str | None = None
+    records: RecordStore,
+    channel_id: str,
+    *,
+    incident_id: str = "inc-legacy",
+    report_url: str | None = None,
+    **attributes: Any,
 ) -> None:
     """Store a legacy incident item on ``channel_id`` in the configured incidents table, as the legacy declare wrote it.
 
     The read path upgrades it through the legacy item bridge, so ``report_url`` becomes
-    the record's report reference only when the Google tenant is configured. Storing
+    the record's report reference only when the Google tenant is configured. ``attributes``
+    add or replace legacy attributes (``name``, ``severity``, ``meet_url``, ...). Storing
     again under the same ``incident_id`` replaces the item.
     """
     item: dict[str, Any] = {
@@ -175,6 +181,7 @@ def seed_legacy_incident(
     }
     if report_url is not None:
         item["report_url"] = report_url
+    item.update(attributes)
     assert records.put(incidents_table(get_incident_core_settings().incidents_table), item).is_success
 
 

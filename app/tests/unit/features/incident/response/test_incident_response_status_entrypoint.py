@@ -198,7 +198,7 @@ def test_status_without_update_answers_its_help(text: str) -> None:
     )
 
 
-def test_the_hookimpl_registers_status_status_update_roles_and_close_under_sre_incident() -> None:
+def test_the_hookimpl_registers_status_status_update_roles_close_and_show_under_sre_incident() -> None:
     registrar = FakeSlackRegistrar(service_scopes=incident_scopes())
 
     plugin.register_slack_commands(registrar=registrar)
@@ -209,6 +209,7 @@ def test_the_hookimpl_registers_status_status_update_roles_and_close_under_sre_i
         ("sre.incident", "roles"),
         ("sre.incident.roles", "manage"),
         ("sre.incident", "close"),
+        ("sre.incident", "show"),
     ]
 
 
@@ -231,4 +232,5 @@ def test_every_registered_command_carries_its_catalogue_keys() -> None:
         "incident_response.roles.description",
         "incident_response.roles.manage.description",
         "incident_response.archive.description",
+        "incident_response.show.description",
     ]

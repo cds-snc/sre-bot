@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-17T15:47:00Z'
+updated_date: '2026-11-17T20:56:00Z'
 labels:
   - incident
   - features
@@ -51,7 +51,7 @@ RULES
 - [ ] #3 Status change writes the record first (the commit point), then the report text, the projection and the channel in that order; a failed record write stops and is reported; a failure of report, projection or channel is logged and reported, never rolls the record back, and the rest continue (decisions/incident-management.md, 2026-11-16 TASK-145.8.4 OQ2)
 - [ ] #4 The pinned behaviour of status, show, update, roles and archive passes unchanged
 - [ ] #5 Recreate replaces a reference map whole, guarded on the old channel_id scalar; show renders links through the owning adapter with the stored url as a hint
-- [ ] #6 security_incident is editable from the update modal; the flip-action decision is recorded in the plan
+- [ ] #6 security_incident is a yes/no field of the update modal, editable by anyone who passes the incident's command check; the change is recorded and announced in the channel; flipping it triggers no other action (the security group's invitation stays declare's) (TASK-145.8.3 OQ2, 2026-11-17)
 - [ ] #7 Writes in the end-state shape set record_version = RECORD_VERSION from core/store.py; reopen sets open_bucket and opened_at and Closed removes them in one update; an item without record_version is never stamped by a partial update (tested)
 - [ ] #8 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 - [x] #9 IncidentReport gains set_status_text(ReportReference, status) in core/api.py with its Google Docs adapter and fake (parity test); the legacy status mapping in modules/incident/incident_document.py (lines 55-80 at main 5deb8406) moves into core/adapters/google_docs.py and the legacy caller is repointed or deleted
@@ -143,6 +143,14 @@ created: 2026-11-09T18:37:00Z
 ---
 
 Stack L OQ assessment 2026-11-09: proposed AC text change: the update modal's severity options gain SEV0 at the declare cutover (L9b, with the declare picker), not in 145.8's own cutover (OQ14). AC #7 upgrade-on-write needs incident-management.md Migration rules 3-4 amended (A1, L0). Rollback guard L5r proposed (OQ18). Full assessment on TASK-145.7.
+
+---
+
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (human, TASK-145.8.3 OQ1-OQ11): the L6a line's "update writes through L3 in today's order" is superseded by the record-first rule (incident-management.md Writes that fan out, TASK-145.8.4 2026-11-16); AC #6 reworded per OQ2 (flip editable by anyone passing the command check, no flip action); OQ3: posts to a shared conversation are bilingual (i18n.md 2026-11-17), the status, roles and close notices align in the new subtask TASK-145.8.9.
 
 ---
 <!-- COMMENTS:END -->

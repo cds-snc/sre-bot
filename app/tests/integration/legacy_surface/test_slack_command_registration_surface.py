@@ -98,6 +98,7 @@ REGISTERED_COMMAND_TREE: dict[str, bool] = {
     "sre.incident.draft": False,
     "sre.incident.roles": False,
     "sre.incident.roles.manage": False,
+    "sre.incident.show": False,
     "sre.incident.status": False,
     "sre.incident.status.update": False,
     "sre.incident.status-update": False,
