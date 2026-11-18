@@ -10,11 +10,12 @@ report port both run. Assertions are on returned text and request indexes, the v
 Docs consumes.
 """
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 
+from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.google_docs import (
     TIMELINE_END_HEADING,
     TIMELINE_START_HEADING,
@@ -22,10 +23,12 @@ from features.incident.core.adapters.google_docs import (
     extract_timeline_section,
     find_heading_indices,
     rearrange_by_datetime_ascending,
+    timeline_entry_line,
     timeline_message_key,
     timeline_with_entry,
     timeline_without_entry,
 )
+from features.incident.core.domain import MessageReference, TimelineEntry
 
 pytestmark = pytest.mark.unit
 
@@ -287,3 +290,19 @@ def test_without_entry_removes_every_copy_and_leaves_others() -> None:
 
 def test_without_entry_absent_is_no_change() -> None:
     assert timeline_without_entry(_entry("1759435320.000100", "first"), PERMALINK.format("1759435380000200")) is None
+
+
+@pytest.mark.parametrize(
+    ("posted_at", "shown"),
+    [
+        (datetime(2026, 7, 2, 20, 2, tzinfo=UTC), "2026-07-02 16:02:00"),
+        (datetime(2026, 12, 2, 20, 2, tzinfo=UTC), "2026-12-02 15:02:00"),
+    ],
+)
+def test_an_entry_renders_as_the_reaction_handler_line_in_eastern_time(posted_at: datetime, shown: str) -> None:
+    """Same line the 💾 handler writes, so entries from either path sort and dedupe together."""
+    url = PERMALINK.format("1759435320000100")
+    message = MessageReference(WorkplaceSystem.SLACK, "T0SLACK", "C123", "1759435320.000100", url)
+    entry = TimelineEntry("I0", "e1", posted_at, "Jane Doe", "first", message)
+
+    assert timeline_entry_line(entry, url) == f"\n ➡️ [{shown} ET]({url}) Jane Doe: first\n"

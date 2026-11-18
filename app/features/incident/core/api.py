@@ -12,7 +12,8 @@ the conversation reference they build, to the subdomain services.
 ``build_legacy_upgrade`` builds the incident legacy upgrade (``LegacyUpgrade``,
 reporting an ``UpgradeReport``) from the services its job resolves per run.
 ``IncidentReport`` works on the incident report the record references
-(``ReportReference``); ``get_incident_report`` provides the Google Docs one.
+(``ReportReference``), its timeline of captured messages included;
+``get_incident_report`` provides the Google Docs one.
 ``IncidentConversation`` writes to the incident's conversation
 (``ConversationReference``); ``get_incident_conversation`` provides the Slack one,
 and ``conversation_is_writable`` is the check every caller applies before a write.
@@ -379,6 +380,31 @@ class IncidentReport(Protocol):
 
         Each call creates a new copy beside the report; the report itself is never
         written to. Nothing to write (no drafts and no fields) is a failure.
+        """
+        ...
+
+    async def append_timeline_entry(self, report: ReportReference, entry: TimelineEntry) -> OperationResult[None]:
+        """Add a captured message to the report's timeline, in chronological order, once per message.
+
+        The report identifies an entry by its message link (for Slack, the channel and
+        the full ts of the permalink), so only a ``MESSAGE`` entry whose
+        ``source_message`` holds a url can be held; any other entry (a manual note, a
+        system kind, no link) is a PERMANENT_ERROR with ``UNSUPPORTED_OPERATION`` naming
+        the cause. A message already in the timeline is a success with no write.
+        Concurrent edits are absorbed by one bounded optimistic-concurrency recompute
+        ([incident_core] ``timeline_update_attempts`` guarded writes, each from a fresh
+        read, no sleep), never a retry. A report that cannot be read is TRANSIENT_ERROR
+        ``DOCUMENT_UNREADABLE``; one without the timeline markers ``RANGE_NOT_FOUND``;
+        other write failures are the classified results of the write.
+        """
+        ...
+
+    async def remove_timeline_entry(self, report: ReportReference, message: MessageReference) -> OperationResult[None]:
+        """Remove every timeline entry of ``message`` from the report.
+
+        The message needs its url, as for ``append_timeline_entry``; without one it is
+        ``UNSUPPORTED_OPERATION``. A message not in the timeline is a success. Failures
+        follow ``append_timeline_entry``.
         """
         ...
 

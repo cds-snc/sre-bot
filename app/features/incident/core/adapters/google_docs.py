@@ -26,7 +26,8 @@ Sections, in order:
 - GoogleDocsIncidentReport: the core ``IncidentReport`` over the functions
   above, for references of the Google system; each awaited method runs its
   one blocking call with ``asyncio.to_thread`` (the functions stay sync for
-  their legacy callers).
+  their legacy callers); a timeline method's one call is the whole bounded
+  rewrite.
 
 Every service is built through the gateway factories with scopes only: no
 function passes a delegation subject or builds credentials, so who the calls
@@ -55,9 +56,12 @@ from features.incident.core.domain import (
     DocumentField,
     DocumentSection,
     DraftWriteResult,
+    MessageReference,
     ReportPlacement,
     ReportReference,
     SectionDraft,
+    TimelineEntry,
+    TimelineEntryKind,
 )
 from integrations.google_workspace import client as google_workspace_client
 from integrations.google_workspace.client import classify_google_error, get_docs_service
@@ -298,6 +302,22 @@ def timeline_without_entry(content: str, url: str) -> str | None:
     for start, end in reversed(spans):
         content = content[:start] + content[end:]
     return content
+
+
+def timeline_entry_url(entry: TimelineEntry) -> str | None:
+    """Return the link the report identifies ``entry`` by, or None when the report cannot hold it.
+
+    The report holds captured messages only: a ``MESSAGE`` entry whose source message has a url.
+    """
+    if entry.kind is not TimelineEntryKind.MESSAGE or entry.source_message is None:
+        return None
+    return entry.source_message.url or None
+
+
+def timeline_entry_line(entry: TimelineEntry, url: str) -> str:
+    """Render ``entry`` as the report's timeline line: Eastern time linked to the message, author, text."""
+    posted_at = entry.posted_at.astimezone(_REPORT_TIMEZONE).strftime("%Y-%m-%d %H:%M:%S")
+    return f"\n ➡️ [{posted_at} ET]({url}) {entry.author}: {entry.text}\n"
 
 
 def update_timeline_section(document_id: str, rewrite: Callable[[str], str | None]) -> OperationResult[None]:
@@ -1033,9 +1053,50 @@ class GoogleDocsIncidentReport:
             return OperationResult.transient_error(message="The draft copy could not be written")
         return OperationResult.success(data=written)
 
+    async def append_timeline_entry(self, report: ReportReference, entry: TimelineEntry) -> OperationResult[None]:
+        """Add a captured message to the report's timeline in one bounded rewrite run off the event loop.
+
+        Returns ``update_timeline_section``'s result unchanged (``DOCUMENT_UNREADABLE``,
+        ``RANGE_NOT_FOUND``, ``TIMEOUT``, ``HTTP_ERROR`` or the write's classification);
+        an entry the report cannot hold is ``UNSUPPORTED_OPERATION``.
+        """
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _unsupported(report)
+        url = timeline_entry_url(entry)
+        if url is None:
+            return _unholdable_entry(entry)
+        line = timeline_entry_line(entry, url)
+        return await asyncio.to_thread(
+            update_timeline_section, report.vendor_id, lambda content: timeline_with_entry(content, url, line)
+        )
+
+    async def remove_timeline_entry(self, report: ReportReference, message: MessageReference) -> OperationResult[None]:
+        """Remove every entry of ``message`` from the report's timeline in one bounded rewrite run off the event loop."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _unsupported(report)
+        url = message.url
+        if not url:
+            logger.warning("incident_timeline_entry_unsupported", reason="message without a link")
+            return OperationResult.permanent_error(
+                "The report identifies a timeline entry by its message link, and this message has none",
+                ErrorCode.UNSUPPORTED_OPERATION,
+            )
+        return await asyncio.to_thread(
+            update_timeline_section, report.vendor_id, lambda content: timeline_without_entry(content, url)
+        )
+
     def link(self, report: ReportReference) -> str | None:
         """Return the stored link of the report."""
         return report.url
+
+
+def _unholdable_entry[T](entry: TimelineEntry) -> OperationResult[T]:
+    reason = f"a {entry.kind.value} entry" if entry.kind is not TimelineEntryKind.MESSAGE else "an entry without a message link"
+    logger.warning("incident_timeline_entry_unsupported", reason=reason)
+    return OperationResult.permanent_error(
+        f"The report timeline cannot hold {reason}: it holds captured messages identified by their link",
+        ErrorCode.UNSUPPORTED_OPERATION,
+    )
 
 
 def _unsupported[T](report: ReportReference) -> OperationResult[T]:
