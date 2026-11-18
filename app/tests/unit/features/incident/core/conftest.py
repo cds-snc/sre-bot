@@ -29,7 +29,8 @@ class StubSlack:
     ``name_taken``; a new channel is open, the bot a member, with id ``C0NEW<n>``.
     ``users.conversations`` lists the named channels the bot is a member of and that are
     not archived, ``page_size`` per page. ``groups`` maps a user group id to its members;
-    any other id is ``no_such_subteam``. A second channel canvas is
+    any other id is ``no_such_subteam``. ``accounts`` maps an email to its user id for
+    ``users.lookupByEmail``; any other email is ``users_not_found``. A second channel canvas is
     ``channel_canvas_already_exists``. A channel's purpose is absent from ``conversations.info``
     until ``purposes`` holds one (a set purpose is stored there).
     """
@@ -42,6 +43,7 @@ class StubSlack:
         names: dict[str, str] | None = None,
         foreign_names: Sequence[str] = (),
         groups: dict[str, list[str]] | None = None,
+        accounts: dict[str, str] | None = None,
         page_size: int = 1,
     ) -> None:
         self.channels = channels if channels is not None else {"C0OPEN": {"is_archived": False, "is_member": True}}
@@ -49,6 +51,7 @@ class StubSlack:
         self.names = dict(names or {})
         self.foreign_names = set(foreign_names)
         self.groups = dict(groups or {})
+        self.accounts = dict(accounts or {})
         self.page_size = page_size
         self.canvases: dict[str, str] = {}
         self.purposes: dict[str, str] = {}
@@ -67,6 +70,7 @@ class StubSlack:
         self.writes.conversations_canvases_create.side_effect = self._canvas
         self.reads.users_conversations.side_effect = self._own_conversations
         self.reads.usergroups_users_list.side_effect = self._group_members
+        self.reads.users_lookupByEmail.side_effect = self._lookup_by_email
         self._posted = 0
 
     error = staticmethod(slack_error)
@@ -169,6 +173,13 @@ class StubSlack:
         if usergroup not in self.groups:
             raise slack_error("no_such_subteam")
         return {"ok": True, "users": list(self.groups[usergroup])}
+
+    async def _lookup_by_email(self, *, email: str, **_: Any) -> dict[str, Any]:
+        if self.fail_with:
+            raise slack_error(self.fail_with)
+        if email not in self.accounts:
+            raise slack_error("users_not_found")
+        return {"ok": True, "user": {"id": self.accounts[email]}}
 
 
 @pytest.fixture

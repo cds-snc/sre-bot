@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-18T14:42:00Z'
+updated_date: '2026-11-18T16:36:00Z'
 labels:
   - identity
 dependencies:
@@ -48,6 +48,14 @@ created: 2026-11-18T14:42:00Z
 ---
 
 2026-11-18 (TASK-145.7.12 OQ1, human approved; decisions/incident-management.md Migration rule 4): incident role holders are stored Slack user ids. A person-reference migration that resolves them through a directory lookup is a side-store input: the batch runner alone maps it (never an upgrade on write), it selects and guards on the end-state attribute's absence with no new marker value, its report counts are its own pending, and a read bridge covers it until that report shows nothing pending (the legacy roles backfill is the precedent). A pure reshaping step raises the marker only after its own expand PR widens the store's record_version checks.
+
+---
+
+created: 2026-11-18T16:36:00Z
+
+---
+
+2026-11-18 (TASK-145.7.9 OQ7, human): two new-code email-to-Slack-account resolutions are tolerated until TASK-83.6 (people-and-accounts.md): the incident core Slack adapter (IncidentConversation.account_ids_for, on-call invites) and oncall_sync's Slack adapter (packages/oncall_sync/adapters/slack.py, users.lookupByEmail). The incident record's declared_by and five role fields store Slack user ids for every new declare until TASK-83 migrates them to person ids.
 
 ---
 <!-- COMMENTS:END -->

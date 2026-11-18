@@ -1,4 +1,4 @@
-"""Unit tests for the [incident_response] slice: the declare path's Slack ids, the handbook id and the upgrade job keys.
+"""Unit tests for the [incident_response] slice: the declare path's Slack ids, its non-public ids, its initial status and the upgrade job keys.
 
 Settings are built from the checked-in configuration files the test run installs (or the
 real loader for one environment) and from the environment with monkeypatch; nothing is
@@ -7,8 +7,10 @@ production.toml only. The handbook id is non-public: declared empty in base.toml
 environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. The
 legacy upgrade job keys are declared in base.toml at their defaults (mode off); ci and local
 leave the job unregistered, and production.toml sets only the mode, to dry_run, so production
-reports what the upgrade would write and writes nothing. A value outside its range fails naming
-the key. An unknown key fails naming it.
+reports what the upgrade would write and writes nothing. The Notify placement folder id is
+non-public like the handbook id. A declared incident's initial status is a setting, declared Open
+in base.toml, so an organisation changes it in configuration, never in code; only an open status
+is accepted. A value outside its range fails naming the key. An unknown key fails naming it.
 """
 
 import tomllib
@@ -19,14 +21,16 @@ from pathlib import Path
 import pytest
 
 from contracts.configuration import ConfigurationError, install_configuration_files, uninstall_configuration_files
+from features.incident.common.vocabulary import IncidentStatus
 from features.incident.response.settings import IncidentResponseSettings, UpgradeMode, get_incident_response_settings
 from server.configuration.loader import CONFIG_DIR, load_configuration_files
 
 pytestmark = pytest.mark.unit
 
-_FIELDS = ("handbook_id",)
+_FIELDS = ("handbook_id", "notify_management_placement_id")
 _SLACK_IDS = ("announcement_channel_id", "security_group_id", "policy_group_id", "notify_management_group_id")
 _UPGRADE_KEYS = {"upgrade_mode": "off", "upgrade_interval_minutes": 30, "upgrade_lease_ttl_seconds": 900}
+_DECLARE_KEYS = {"initial_status": "Open"}
 
 
 @dataclass(frozen=True)
@@ -38,7 +42,7 @@ class _Files:
 @pytest.fixture(autouse=True)
 def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setitem(IncidentResponseSettings.model_config, "env_file", None)
-    for name in (f"INCIDENT_RESPONSE__{field.upper()}" for field in (*_SLACK_IDS, *_UPGRADE_KEYS)):
+    for name in (f"INCIDENT_RESPONSE__{field.upper()}" for field in (*_SLACK_IDS, *_UPGRADE_KEYS, *_DECLARE_KEYS, *_FIELDS)):
         monkeypatch.delenv(name, raising=False)
     get_incident_response_settings.cache_clear()
     yield
@@ -48,7 +52,7 @@ def _isolated(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 def test_base_declares_every_id_empty_and_the_upgrade_keys_at_their_defaults() -> None:
     base = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))
 
-    assert base["incident_response"] == {**dict.fromkeys((*_SLACK_IDS, *_FIELDS), ""), **_UPGRADE_KEYS}
+    assert base["incident_response"] == {**dict.fromkeys((*_SLACK_IDS, *_FIELDS), ""), **_DECLARE_KEYS, **_UPGRADE_KEYS}
     assert "incident" not in base
 
 
@@ -207,3 +211,21 @@ def test_building_before_install_raises() -> None:
 
 def test_the_provider_returns_one_cached_instance() -> None:
     assert get_incident_response_settings() is get_incident_response_settings()
+
+
+def test_a_declared_incident_opens_as_open_by_default() -> None:
+    assert IncidentResponseSettings().initial_status is IncidentStatus.OPEN
+
+
+def test_the_initial_status_is_changed_in_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INCIDENT_RESPONSE__INITIAL_STATUS", "In Progress")
+
+    assert IncidentResponseSettings().initial_status is IncidentStatus.IN_PROGRESS
+
+
+@pytest.mark.parametrize("value", ["Closed", "Reviewed", "Ready to be Reviewed", "Triage"])
+def test_an_initial_status_that_is_not_open_fails_naming_the_key(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("INCIDENT_RESPONSE__INITIAL_STATUS", value)
+
+    with pytest.raises(ConfigurationError, match="initial_status"):
+        IncidentResponseSettings()

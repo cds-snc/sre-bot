@@ -4,7 +4,7 @@ title: Incident declare invites the on-call people through the on-call capabilit
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:44
-updated_date: '2026-11-09T19:04:00Z'
+updated_date: '2026-11-18T16:57:00Z'
 labels:
   - oncall
   - capabilities
@@ -31,15 +31,19 @@ THIS SLICE
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No module under the incident umbrella imports integrations.opsgenie or names Opsgenie
-- [ ] #2 Declare invites the people the on-call fake returns and continues when the lookup fails
-- [ ] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
+- [x] #1 No module under the incident umbrella imports integrations.opsgenie or names Opsgenie, except the OPSGENIE constant (from capabilities.oncall.api) in the interim schedule adapter, tolerated until TASK-165.1 (oncall.md Checks, 2026-11-18)
+- [x] #2 Declare invites the people the on-call fake returns and continues when the lookup fails
+- [x] #3 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-09 (human, Stack L OQ1): delivered inside TASK-145.7's declare-service subtask (L9a): response depends on capabilities.oncall.api only; a ScheduleSource port in core resolves the chosen placement to a ScheduleReference; its interim adapter reads the placement folder's genie_schedule through the Drive gateway, read only, tolerated with owner TASK-165.1. This task's ACs are checked by that subtask.
+
+2026-11-18 (human, TASK-145.7.9 OQ6): AC #1 reworded: the interim adapter builds ScheduleReference(OPSGENIE, genie_schedule), the one tolerated Opsgenie name, removed by TASK-165.1.
+
+2026-11-18: ACs #1-#3 checked by TASK-145.7.9 (L9a): import contract (n) kept (no umbrella import of integrations.opsgenie; the OPSGENIE constant only in core/adapters/legacy_schedule.py, tolerated until TASK-165.1); declare invites the people InMemoryOnCallLookup returns and continues when the lookup fails (test_incident_response_declare_run.py); gates green (pytest 7735 passed). Status stays the human's.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

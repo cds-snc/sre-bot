@@ -20,6 +20,7 @@ from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
 
+from capabilities.oncall.api import ScheduleReference
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
@@ -525,7 +526,8 @@ class InMemoryIncidentConversation:
     ``CONVERSATION_NAME_TAKEN``. A ``ConversationName`` is rendered with the Slack
     adapter's ``slack_channel_name``, the platform this fake stands in for. A created conversation is open, the bot a member,
     with id ``C0NEW<n>``. ``find_own`` finds named conversations that are open and
-    where the bot is a member. ``groups`` maps a user group id to its members.
+    where the bot is a member. ``groups`` maps a user group id to its members and
+    ``accounts`` an email to its account id.
     """
 
     def __init__(
@@ -539,8 +541,10 @@ class InMemoryIncidentConversation:
         names: Mapping[str, str] | None = None,
         foreign_names: Sequence[str] = (),
         groups: Mapping[str, Sequence[str]] | None = None,
+        accounts: Mapping[str, str] | None = None,
     ) -> None:
         self._tenant = tenant
+        self._accounts = dict(accounts or {})
         self._conversations: dict[str, _StoredConversation] = {}
         for vendor_id in open_ids:
             self._conversations[vendor_id] = _StoredConversation(archived=False, member=True)
@@ -631,6 +635,14 @@ class InMemoryIncidentConversation:
                 message_id=f"1700000000.{self._posted:06d}",
             )
         )
+
+    async def account_ids_for(
+        self, conversation: ConversationReference, emails: Sequence[str]
+    ) -> OperationResult[tuple[str, ...]]:
+        """Return the known emails' account ids in order, skipping unknown emails."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        return OperationResult.success(tuple(self._accounts[email] for email in emails if email in self._accounts))
 
     async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
         """Record the purpose; refused where the bot cannot write."""
@@ -872,3 +884,16 @@ class InMemoryLegacyRolesReader:
         if roles is None:
             return OperationResult.error(OperationStatus.NOT_FOUND, "No such report")
         return OperationResult.success(dict(roles))
+
+
+class InMemoryPlacementScheduleLookup:
+    """Answer seeded schedules by placement folder id; any other placement has none. ``asked`` records each placement."""
+
+    def __init__(self, schedules: Mapping[str, ScheduleReference] | None = None) -> None:
+        self._schedules = dict(schedules or {})
+        self.asked: list[ReportPlacement] = []
+
+    async def schedule_for(self, placement: ReportPlacement) -> OperationResult[ScheduleReference | None]:
+        """Return the seeded schedule of the placement's folder, or ``None``."""
+        self.asked.append(placement)
+        return OperationResult.success(self._schedules.get(placement.vendor_id))

@@ -55,6 +55,30 @@ the archive call it today; the update modal calls it once it is rebuilt (TASK-14
   successful archive, through `adapters/sentinel.py` (`{event, message}` with the incident,
   conversation, user and time only; TODO(TASK-122): the audit capability's sink).
 
+## Declare
+
+`service/declare.py` holds `declare`; nothing registers it yet (TASK-145.7.10 cuts the Slack
+declare and the alert buttons over to it, TASK-165.2 adds the HTTP route). It names no platform:
+the caller passes a `DeclareRequest`, the ports (`DeclarePorts`; `chat` is `None` without a chat
+platform), the `DeclarePolicy` from `[incident_response]` and the texts (`DeclareTexts`).
+
+- The record first, under `incident_id_for(idempotency_key)`: the commit point, never rolled back.
+- Then the conversation (`service/conversation.py`, `ensure_conversation`: the five
+  one-conversation rules) and its primary binding, who is on call for the placement's schedule
+  (`PlacementScheduleLookup`, then the on-call capability), the report filed in the placement with
+  its placeholders, the video call, the conversation's set-up, links and messages, the invites,
+  and last the list row, written whatever failed before it.
+- A failed step leaves its reference empty and is reported in `Declared`; the declare continues.
+- Running it again with the same key is the retry: a step whose reference is set is skipped and
+  each one-time message is posted once (a claim per message through `Claims`). One run per
+  incident at a time: a second is refused with `DECLARE_IN_PROGRESS`.
+- Invites, each account once: the declarer, the on-call people (by account, or by email through
+  `IncidentConversation.account_ids_for`), the security group for a security incident, the policy
+  group when policy help is asked and the Notify management group for the Notify placement, each
+  group only when its id is configured. A missing schedule or a failing source invites nobody on
+  call and posts `on_call_unavailable`.
+- The first status is `[incident_response] initial_status` (Open or In Progress, default Open).
+
 ## Layout
 
 - `plugin.py`: the entry point `incident.response` (requirements, the new-incident policy
@@ -65,8 +89,12 @@ the archive call it today; the update modal calls it once it is rebuilt (TASK-14
   `entrypoints/scope.py`: the service scope they open. Replies come from `locales/` in the
   invoker's locale, or English then French when the payload names none.
 - `service/status.py`: `change_status`; `service/roles.py`: `assign_roles`; `service/archive.py`:
-  `archive_incident`.
-- `interfaces.py`: `ArchiveEventSink` and `ArchivedEvent`; `adapters/sentinel.py` implements it.
-- `providers.py`: the core report, list projection, conversation and legacy roles reader, and
-  the archive event sink, the services use; tests substitute them here.
+  `archive_incident`; `service/declare.py`: `declare`; `service/conversation.py`:
+  `ensure_conversation`.
+- `interfaces.py`: `ArchiveEventSink` and `ArchivedEvent`, `adapters/sentinel.py` implements it;
+  `Claims` (async claims), `adapters/claims.py` implements it over the `IdempotencyStore`;
+  `DeclareTexts`, the declare's words, which the cutover's entry points render.
+- `providers.py`: the core report, list projection, conversation, video call, placement schedule
+  lookup and legacy roles reader, the on-call lookup, claims over the scope's conditional-write
+  store, the declare policy and the archive event sink, the services use; tests substitute them here.
 - `settings.py`, `legacy_upgrade_job.py`: see the umbrella README.

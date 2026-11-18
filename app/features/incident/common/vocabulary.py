@@ -20,6 +20,11 @@ class IncidentStatus(StrEnum):
         """Whether the incident is still open: every status except Closed."""
         return self is not IncidentStatus.CLOSED
 
+    @property
+    def is_declarable(self) -> bool:
+        """Whether an incident may be declared in this status: Open or In Progress, the two before review."""
+        return self in (IncidentStatus.OPEN, IncidentStatus.IN_PROGRESS)
+
 
 class Severity(IntEnum):
     """Incident severity, 0 the most severe; an unset severity is None on the record."""

@@ -166,18 +166,30 @@ async def test_a_replay_on_the_real_store_writes_no_item() -> None:
 @pytest.mark.parametrize(
     ("incident", "message"),
     [
-        (dataclasses.replace(declared_incident(INCIDENT_ID), status=IncidentStatus.CLOSED), "open"),
-        (dataclasses.replace(declared_incident(INCIDENT_ID), status=IncidentStatus.IN_PROGRESS), "open"),
+        (dataclasses.replace(declared_incident(INCIDENT_ID), status=IncidentStatus.CLOSED), "Open or In Progress"),
+        (dataclasses.replace(declared_incident(INCIDENT_ID), status=IncidentStatus.REVIEWED), "Open or In Progress"),
         (incident_on("C0INCIDENT", INCIDENT_ID), "attach_conversation"),
     ],
-    ids=["closed", "in-progress", "with-conversation"],
+    ids=["closed", "reviewed", "with-conversation"],
 )
 @pytest.mark.parametrize("kind", sorted(STORES))
 async def test_a_caller_error_raises_and_writes_nothing(incident: Incident, message: str, kind: str) -> None:
-    """Only a new open incident is created; its conversation arrives only through attach_conversation."""
+    """Only a new incident in a declarable status is created; its conversation arrives only through attach_conversation."""
     store = STORES[kind]()
 
     with pytest.raises(ValueError, match=message):
         await store.create(incident)
 
     assert (await store.get(INCIDENT_ID)).status is OperationStatus.NOT_FOUND
+
+
+@pytest.mark.parametrize("kind", sorted(STORES))
+async def test_an_incident_declared_in_progress_is_created(kind: str) -> None:
+    """The initial status is the organisation's setting (TASK-145.7.9 OQ4): In Progress is declarable."""
+    store = STORES[kind]()
+    incident = dataclasses.replace(declared_incident(INCIDENT_ID), status=IncidentStatus.IN_PROGRESS)
+
+    assert (await store.create(incident)).is_success
+
+    stored = await store.get(INCIDENT_ID)
+    assert stored.data is not None and stored.data.status is IncidentStatus.IN_PROGRESS

@@ -217,8 +217,13 @@ announcement_channel_id = ""
 security_group_id = ""
 policy_group_id = ""
 notify_management_group_id = ""
+# The status a declared incident starts in: Open or In Progress (organisation policy).
+initial_status = "Open"
 # Non-public: set from the environment as INCIDENT_RESPONSE__HANDBOOK_ID.
 handbook_id = ""
+# Non-public: the report placement (Drive folder) whose incidents invite the Notify management
+# group, set from the environment as INCIDENT_RESPONSE__NOTIFY_MANAGEMENT_PLACEMENT_ID.
+notify_management_placement_id = ""
 # The incident legacy upgrade job (features/incident/README.md, run procedure): off registers
 # nothing; an environment sets dry_run, then apply, in its own file. The lease is sized to the
 # longest run (one whole-table read, one guarded write per item) and stays under the interval.
