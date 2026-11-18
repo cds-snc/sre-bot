@@ -9,6 +9,10 @@ Sections, in order:
   documents().get/.batchUpdate, each owning its try/except and
   classify_google_error, exposing incident-domain operations rather than
   SDK-shaped passthroughs;
+- report timeline: the section between the template's timeline markers, rewritten
+  from one revision-guarded read with a bounded optimistic-concurrency recompute
+  (``update_timeline_section``) and the pure entry rewrites the 💾 reaction
+  handlers and the report's timeline methods share;
 - Drive: file and folder operations and metadata (Drive appProperties) through
   the gateway's Drive service, shared drives included and list results paged
   to the end; the Drive healthcheck;
@@ -34,7 +38,10 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from itertools import groupby
 from typing import TYPE_CHECKING, Any, cast
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo
 
 import structlog
 from googleapiclient.errors import HttpError
@@ -225,6 +232,274 @@ def apply_document_edits(document_id: str, requests: list[dict[str, Any]], requi
     return OperationResult.success()
 
 
+# --- Report timeline ---
+
+# The report template's timeline markers: every existing report holds these exact lines,
+# so they never change. The reaction handlers in ``modules.incident`` and the timeline
+# methods below find the timeline between them; the section writer drops the start line
+# from a draft copy.
+TIMELINE_START_HEADING = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
+TIMELINE_END_HEADING = "Trigger"
+TIMELINE_ENTRY_PATTERN = re.compile(
+    r"^[ \t]*➡️[ \t]*\[(?P<date>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) ET\]\((?P<url>https?://[^\s)]+)\)",
+    re.MULTILINE,
+)
+_REPORT_TIMEZONE = ZoneInfo("US/Eastern")
+
+
+def timeline_message_key(url: str) -> tuple[str, str]:
+    """Identify a Slack message independently of permalink query parameters."""
+    match = re.fullmatch(r"/archives/([^/]+)/p(\d{16,})/?", urlsplit(url).path)
+    return (match[1], match[2]) if match else ("", url)
+
+
+def rearrange_by_datetime_ascending(text: str) -> str:
+    """Return ``text`` with its timeline entries in chronological order, one per message.
+
+    A permalink's full Slack ts orders its entry; any other link falls back to the
+    displayed Eastern time. Text before the first entry is kept in place.
+    """
+    matches = list(TIMELINE_ENTRY_PATTERN.finditer(text))
+    if not matches:
+        return text
+    entries: dict[tuple[str, str], tuple[int, str]] = {}
+    for index, match in enumerate(matches):
+        key = timeline_message_key(match["url"])
+        posted_at = (
+            int(key[1])
+            if key[0]
+            else int(datetime.strptime(match["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=_REPORT_TIMEZONE).timestamp())
+            * 1_000_000
+        )
+        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
+        entries[key] = (posted_at, text[match.start() : end].rstrip("\n"))
+    return (
+        text[: matches[0].start()] + "\n".join(entry for _, entry in sorted(entries.values(), key=lambda entry: entry[0])) + "\n"
+    )
+
+
+def timeline_with_entry(content: str, url: str, entry_line: str) -> str | None:
+    """Return the timeline with ``entry_line`` added in order, or None when the message at ``url`` is already in it."""
+    if any(timeline_message_key(match["url"]) == timeline_message_key(url) for match in TIMELINE_ENTRY_PATTERN.finditer(content)):
+        return None
+    return rearrange_by_datetime_ascending(content + entry_line)
+
+
+def timeline_without_entry(content: str, url: str) -> str | None:
+    """Return the timeline without any entry of the message at ``url``, or None when it holds none."""
+    matches = list(TIMELINE_ENTRY_PATTERN.finditer(content))
+    spans = [
+        (match.start(), matches[index + 1].start() if index + 1 < len(matches) else len(content))
+        for index, match in enumerate(matches)
+        if timeline_message_key(match["url"]) == timeline_message_key(url)
+    ]
+    if not spans:
+        return None
+    for start, end in reversed(spans):
+        content = content[:start] + content[end:]
+    return content
+
+
+def update_timeline_section(document_id: str, rewrite: Callable[[str], str | None]) -> OperationResult[None]:
+    """Rewrite the timeline section from a single document snapshot.
+
+    rewrite receives the current timeline text and returns the new text, or None when
+    nothing needs to change. The edit only applies while the document is still at the
+    revision it was read at, so an edit built from a stale read is refused instead of
+    written over newer content.
+
+    A refused edit whose re-read shows the document moved on (a lost revision guard) and an
+    unconfirmed edit (a timeout) are re-read and recomputed, at most [incident_core]
+    ``timeline_update_attempts`` writes and without sleeping. This is optimistic-concurrency
+    recompute, not a retry of the same request: transport retries belong to the SDK
+    (decisions/outbound-clients.md). A final read reconciles the last unconfirmed write, so
+    an edit that landed is a success. Any other failure, or a refused edit on a document
+    that did not move, stops at once.
+    """
+    attempts = get_incident_core_settings().timeline_update_attempts
+    result: OperationResult[None] = OperationResult.transient_error(
+        "Document could not be read", error_code=ErrorCode.DOCUMENT_UNREADABLE
+    )
+    sent_revision: str | None = None
+    for attempt in range(1, attempts + 2):
+        snapshot = fetch_document_snapshot(document_id)
+        if snapshot is None:
+            logger.error("incident_timeline_update_failed", document_id=document_id, error="Document unreadable", attempt=attempt)
+            return result
+        if result.status is OperationStatus.PERMANENT_ERROR and snapshot.revision_id == sent_revision:
+            logger.error(
+                "incident_timeline_update_failed", document_id=document_id, attempt=attempt, error_code=result.error_code
+            )
+            return result
+
+        timeline_content = extract_timeline_section(snapshot.content)
+        if timeline_content is None:
+            logger.warning(
+                "incident_timeline_update_failed",
+                document_id=document_id,
+                error="Headings not found",
+            )
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Timeline unavailable", error_code=ErrorCode.RANGE_NOT_FOUND
+            )
+
+        new_content = rewrite(timeline_content)
+        if new_content is None:
+            return OperationResult.success()
+        if attempt > attempts:
+            break
+
+        requests = build_timeline_replacement(snapshot.content, new_content, TIMELINE_START_HEADING, TIMELINE_END_HEADING)
+        if requests is None:
+            return OperationResult.error(
+                OperationStatus.PERMANENT_ERROR, "Timeline boundaries unavailable", error_code=ErrorCode.RANGE_NOT_FOUND
+            )
+
+        sent_revision = snapshot.revision_id
+        result = apply_document_edits(document_id, requests, sent_revision)
+        if result.is_success:
+            return result
+        if not _recompute_after(result):
+            logger.error(
+                "incident_timeline_update_failed", document_id=document_id, attempt=attempt, error_code=result.error_code
+            )
+            return result
+        logger.warning(
+            "incident_timeline_update_not_applied",
+            document_id=document_id,
+            attempt=attempt,
+            error_code=result.error_code,
+        )
+
+    logger.error(
+        "incident_timeline_update_failed",
+        document_id=document_id,
+        error="Edit not confirmed",
+        attempts=attempts,
+        error_code=result.error_code,
+    )
+    return result
+
+
+def _recompute_after(result: OperationResult[None]) -> bool:
+    """A timeout may have landed and a refused edit may have lost its revision guard: both are re-read."""
+    if result.status is OperationStatus.TRANSIENT_ERROR:
+        return result.error_code == ErrorCode.TIMEOUT
+    return result.status is OperationStatus.PERMANENT_ERROR and result.error_code == ErrorCode.HTTP_ERROR
+
+
+def extract_timeline_section(content: list[dict[str, Any]]) -> str | None:
+    """Return the text between the timeline headings of a document body, or None if a heading is missing."""
+    timeline_content = ""
+    record = False
+    found_start = False
+
+    # Iterate through the elements of the document
+    for element in content:
+        if "paragraph" in element:
+            paragraph_elements = element["paragraph"].get("elements", [])
+            paragraph_text = "".join(elem.get("textRun", {}).get("content", "") for elem in paragraph_elements).strip()
+            if paragraph_text == TIMELINE_START_HEADING:
+                record = found_start = True
+                continue
+            if paragraph_text == TIMELINE_END_HEADING and found_start:
+                return timeline_content
+            if not record:
+                continue
+            for link, group in groupby(
+                paragraph_elements,
+                key=lambda elem: elem.get("textRun", {}).get("textStyle", {}).get("link", {}).get("url"),
+            ):
+                runs = list(group)
+                if any("textRun" not in elem for elem in runs):
+                    logger.warning("incident_timeline_unsupported_content")
+                    return None
+                text = "".join(elem["textRun"]["content"] for elem in runs)
+                if link and text.strip():
+                    leading = text[: len(text) - len(text.lstrip())]
+                    trailing = text[len(text.rstrip()) :]
+                    text = f"{leading}[{text.strip()}]({link}){trailing}"
+                timeline_content += text
+        elif record:
+            logger.warning("incident_timeline_unsupported_content")
+            return None
+
+    # Return None if either heading is not found
+    return None
+
+
+def find_heading_indices(content: list[dict[str, Any]], start_heading: str, end_heading: str) -> tuple[int | None, int | None]:
+    """Find the start and end indices of content between two headings."""
+    start_index, end_index = None, None
+    for element in content:
+        if "paragraph" in element:
+            text_runs = element["paragraph"].get("elements", [])
+            text = "".join(run.get("textRun", {}).get("content", "") for run in text_runs).strip()
+            if text == start_heading:
+                start_index = text_runs[-1].get("endIndex")
+            elif text == end_heading and start_index is not None:
+                return start_index, text_runs[0].get("startIndex")
+    return start_index, end_index
+
+
+def build_timeline_replacement(
+    content: list[dict[str, Any]], new_content: str, start_heading: str, end_heading: str
+) -> list[dict[str, Any]] | None:
+    """Build the batchUpdate requests replacing the text between two headings, or None if a heading is missing.
+
+    The request indices are only valid against the document body they were computed from.
+    """
+    # Find the start and end indices
+    start_index, end_index = find_heading_indices(content, start_heading, end_heading)
+
+    if start_index is not None and end_index is not None:
+        new_content = new_content.strip("\n")
+        links: list[dict[str, Any]] = []
+        pieces = ["\n"]
+        end = 0
+        for match in re.finditer(r"\[([^\]\n]+)\]\((https?://[^\s)]+)\)", new_content):
+            pieces.append(new_content[end : match.start()])
+            index = start_index + _utf16_len("".join(pieces))
+            pieces.append(match[1])
+            links.append(
+                {
+                    "updateTextStyle": {
+                        "range": {"startIndex": index, "endIndex": index + _utf16_len(match[1])},
+                        "textStyle": {"link": {"url": match[2]}},
+                        "fields": "link",
+                    }
+                }
+            )
+            end = match.end()
+        pieces.extend([new_content[end:], "\n"])
+        text = "".join(pieces)
+        span = {"startIndex": start_index, "endIndex": start_index + _utf16_len(text)}
+        requests: list[dict[str, Any]] = []
+        if end_index > start_index:
+            requests.append({"deleteContentRange": {"range": {"startIndex": start_index, "endIndex": end_index}}})
+        requests.extend(
+            [
+                {"insertText": {"location": {"index": start_index}, "text": text}},
+                {"updateTextStyle": {"range": span, "textStyle": {}, "fields": "link"}},
+                {
+                    "updateParagraphStyle": {
+                        "range": span,
+                        "paragraphStyle": {"namedStyleType": "NORMAL_TEXT"},
+                        "fields": "namedStyleType",
+                    }
+                },
+                *links,
+            ]
+        )
+        return requests
+
+    logger.warning(
+        "build_timeline_replacement_failed",
+        error="Headings not found",
+    )
+    return None
+
+
 # --- Drive ---
 
 _DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive"]
@@ -384,10 +659,6 @@ def incident_drive_healthcheck() -> bool:
 
 _DRAFT_TITLE_SUFFIX = " - AI draft"
 _SUBHEADING_STYLE = "HEADING_3"
-# The line marking where the SRE bot's generated timeline begins.
-# ``modules.incident`` locates the timeline by this exact string to append
-# 💾-reacted messages, so it must survive every rewrite of the report.
-_SRE_BOT_GENERATED_TIMELINE = "DO NOT REMOVE this line as the SRE bot needs it as a placeholder."
 
 # Only these delimit sections; deeper headings are content within one.
 _SECTION_HEADING_STYLES = frozenset({"HEADING_1", "HEADING_2"})
@@ -1440,7 +1711,7 @@ def _empty_bullet_spans(document: dict, span: tuple[int, int]) -> list[tuple[int
 def _sre_bot_generated_timeline_spans(document: dict) -> list[tuple[int, int]]:
     """Spans of the bot's timeline marker, which a draft has no use for.
 
-    It exists so ``modules.incident`` can find the timeline in the *report*;
+    It exists so the timeline rewrite can find the timeline in the *report*;
     the draft is a copy nothing appends to, where it is only noise. The report's
     own copy is untouched.
     """
@@ -1450,7 +1721,7 @@ def _sre_bot_generated_timeline_spans(document: dict) -> list[tuple[int, int]]:
         if not isinstance(element_start, int) or not isinstance(element_end, int):
             continue
         paragraph = element.get("paragraph")
-        if paragraph and _SRE_BOT_GENERATED_TIMELINE in _paragraph_text(paragraph):
+        if paragraph and TIMELINE_START_HEADING in _paragraph_text(paragraph):
             spans.append((element_start, element_end))
     return spans
 

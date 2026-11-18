@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-18T19:00:00Z'
+updated_date: '2026-11-18T21:26:00Z'
 labels:
   - incident
   - features
@@ -35,6 +35,7 @@ Stack L L10b. Reaction handlers registered by incident.response write timeline r
 - [ ] #1 The capture and nudge pins pass with assertions unchanged; captured entries keep the same key on re-capture (checks parent ACs #1, #2, #5, #7, #8)
 - [ ] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 - [ ] #3 The stale notice's ignore button moves to incident.response (moved from TASK-145.8, TASK-145.8.5 OQ3): registered with the archive_channel alias scoped to the ignore value (TASK-145.8.5.2); new notices are Block Kit with one action id per button owner (incident.response archive and ignore, incident.postmortem schedule)
+- [ ] #4 The report's timeline document read returns a classified OperationResult (a missing document is NOT_FOUND, a refused read UNAUTHORIZED, a timeout TIMEOUT) instead of collapsing every failure to DOCUMENT_UNREADABLE; the reacting user's notice is unchanged and decisions/incident-management.md's report-errors line drops the timeline exception (TASK-145.9.1 OQ4, human 2026-11-18)
 <!-- AC:END -->
 
 ## Implementation Notes

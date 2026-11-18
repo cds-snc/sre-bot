@@ -261,60 +261,6 @@ def test_is_incident_dev_channel_true():
     client.conversations_join.assert_called_once_with(channel=channel_id)
 
 
-def test_multiline_entries_rearrange_by_datetime_ascending():
-    input_text = """
-    ➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one
-    ➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two
-    """
-    expected_output = "➡️ [2024-03-05 18:24:30 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Message one"
-    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
-    assert result.index("Message two") < result.index("Message one")
-    assert all(line.strip() in result for line in expected_output.splitlines() if line.strip())
-
-
-def test_rearrange_single_entry():
-    input_text = "➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Only one message"
-    expected_output = "➡️ [2024-03-07 21:53:26 ET](https://example.com/link1) John Doe: Only one message"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text).strip() == expected_output
-
-
-def test_rearrange_no_entries():
-    input_text = ""
-    expected_output = ""
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text).strip() == expected_output
-
-
-def test_entries_out_of_order_rearrange_by_datetime_ascending():
-    input_text = """
-    ➡️ [2024-03-07 11:00:00 ET](https://example.com/link1) John Doe: Message one
-    ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
-    """
-    expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n\n\n➡️ [2024-03-07 11:00:00 ET](https://example.com/link1) John Doe: Message one"
-    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
-    assert result.index("Message two") < result.index("Message one")
-    assert all(line.strip() in result for line in expected_output.splitlines() if line.strip())
-
-
-def test_invalid_entries_rearrange_by_datetime_ascending():
-    input_text = """
-    ➡️ Invalid Entry
-    ➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two
-    """
-    expected_output = "➡️ [2024-03-07 10:00:00 ET](https://example.com/link2) Jane Smith: Message two\n"
-    result = incident_conversation.rearrange_by_datetime_ascending(input_text)
-    assert "Invalid Entry" in result
-    assert expected_output.strip() in result
-
-
-def test_empty_input_rearrange_by_datetime_ascending():
-    assert incident_conversation.rearrange_by_datetime_ascending("") == ""
-
-
-def test_no_datetime_entries_rearrange_by_datetime_ascending():
-    input_text = "Message without datetime\nAnother message"
-    assert incident_conversation.rearrange_by_datetime_ascending(input_text) == input_text
-
-
 def test_convert_epoch_to_datetime_est_known_epoch_time():
     # Example: 0 epoch time corresponds to 1969-12-31 19:00:00 EST
     assert incident_conversation.convert_epoch_to_datetime_est(0) == "1969-12-31 19:00:00 ET"
@@ -712,7 +658,6 @@ def test_handle_reaction_added_incident_report_document_not_found(
 
 
 @patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
 @patch("modules.incident.incident_conversation.handle_images_in_message")
 @patch("modules.incident.incident_conversation.update_timeline_section")
@@ -728,7 +673,6 @@ def test_handle_reaction_added_processes_messages(
     mock_update_timeline_section,
     mock_handle_images_in_message,
     mock_slack_users,
-    mock_rearrange_by_datetime_ascending,
     mock_logger,
 ):
     mock_client = MagicMock()
@@ -761,7 +705,6 @@ def test_handle_reaction_added_processes_messages(
     mock_update_timeline_section.assert_called_once()
     mock_handle_images_in_message.assert_called_once()
     mock_slack_users.replace_user_id_with_handle.assert_called_once()
-    mock_rearrange_by_datetime_ascending.assert_called_once()
 
 
 @patch("modules.incident.incident_conversation.logger")
@@ -1020,7 +963,6 @@ def test_handle_reaction_removed_message_not_in_timeline(
 
 
 @patch("modules.incident.incident_conversation.logger")
-@patch("modules.incident.incident_conversation.rearrange_by_datetime_ascending")
 @patch("modules.incident.incident_conversation.slack_users")
 @patch("modules.incident.incident_conversation.handle_images_in_message")
 @patch("modules.incident.incident_conversation.update_timeline_section")
@@ -1036,7 +978,6 @@ def test_handle_reaction_removed_processes_messages(
     mock_update_timeline_section,
     mock_handle_images_in_message,
     mock_slack_users,
-    mock_rearrange_by_datetime_ascending,
     mock_logger,
 ):
     mock_client = MagicMock()
@@ -1088,7 +1029,6 @@ def test_handle_reaction_removed_processes_messages(
     mock_update_timeline_section.assert_called_once()
     mock_handle_images_in_message.assert_not_called()
     mock_slack_users.replace_user_id_with_handle.assert_not_called()
-    mock_rearrange_by_datetime_ascending.assert_not_called()
     assert rewritten == [""]
     mock_logger.warning.assert_not_called()
 

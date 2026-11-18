@@ -205,6 +205,9 @@ status_updates_table = "sre_bot_incident_status_updates"
 bindings_table = "sre_bot_incident_bindings"
 # Most incident items a whole-table read (the legacy upgrade job) returns; past it the read fails.
 full_read_max_items = 10000
+# Most revision-guarded writes one report timeline update (the 💾 capture) makes, each from
+# a fresh read; a lost guard or an unconfirmed write is recomputed without sleeping.
+timeline_update_attempts = 3
 folder_id = ""
 report_template_id = ""
 list_sheet_id = ""

@@ -23,7 +23,7 @@ class IncidentCoreSettings(ConfigurationSlice):
 
     Keys of [incident_core]:
         incidents_table, timeline_table, status_updates_table, bindings_table, full_read_max_items,
-        new_incident_system (absent: unset).
+        timeline_update_attempts, new_incident_system (absent: unset).
 
     Environment only (non-public values):
         INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, INCIDENT_CORE__LIST_SHEET_ID.
@@ -49,6 +49,14 @@ class IncidentCoreSettings(ConfigurationSlice):
         default=10000,
         ge=1,
         description="Most items a whole-table read of the incidents table returns; past it the read fails instead of truncating.",
+    )
+    timeline_update_attempts: int = Field(
+        default=3,
+        ge=1,
+        description=(
+            "Most revision-guarded writes one report timeline update makes, each from a fresh read; "
+            "a lost guard or an unconfirmed write is recomputed, never slept on."
+        ),
     )
     new_incident_system: WorkplaceSystem | None = Field(
         default=None,
