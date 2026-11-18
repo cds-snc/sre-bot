@@ -13,8 +13,21 @@ from structlog.testing import capture_logs
 
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
+from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
-from tests.factories.legacy_upgrade import MEET_URL, REPORT_URL, end_state_item, legacy_item, legacy_upgrade, records_with
+from features.incident.common.vocabulary import IncidentRole
+from features.incident.core.adapters.in_memory import InMemoryLegacyRolesReader
+from features.incident.core.adapters.incident_items import RECORD_VERSION
+from features.incident.core.domain import ReportReference
+from tests.factories.legacy_upgrade import (
+    GOOGLE_TENANT,
+    MEET_URL,
+    REPORT_URL,
+    end_state_item,
+    legacy_item,
+    legacy_upgrade,
+    records_with,
+)
 from tests.factories.tenant_verifier import FakeTenantVerifier
 
 pytestmark = pytest.mark.unit
@@ -38,6 +51,10 @@ KEYS = {
     "unmatched_status",
     "unreadable",
     "dropped",
+    "roles_to_map",
+    "roles_mapped",
+    "roles_none",
+    "roles_unread",
     "tenant_check",
 }
 
@@ -123,3 +140,32 @@ def test_the_event_of_an_applied_run_counts_puts_and_raises() -> None:
 
     [event] = _reports(logs)
     assert (event["bindings_put"], event["marker_raised"], event["binding_skipped"], event["unbound"]) == (2, 1, 1, [])
+
+
+def test_the_event_counts_the_roles_step_and_never_names_a_role_holder() -> None:
+    no_roles: dict[str, Any] = {"incident_commander": None, "operations_lead": None}
+    report = ReportReference(system=WorkplaceSystem.GOOGLE, tenant=GOOGLE_TENANT, vendor_id="doc123", url=REPORT_URL)
+    reader = InMemoryLegacyRolesReader()
+    reader.seed(report, {IncidentRole.INCIDENT_COMMANDER: "U0SECRETIC", IncidentRole.OPERATIONS_LEAD: "U0SECRETOL"})
+    records = records_with(
+        legacy_item("inc-1", **no_roles), end_state_item("inc-2", version=RECORD_VERSION, **no_roles, report=None)
+    )
+
+    with capture_logs() as logs:
+        legacy_upgrade(records, roles=reader).run(apply=True)
+
+    [event] = _reports(logs)
+    assert (event["roles_to_map"], event["roles_mapped"], event["roles_none"], event["roles_unread"]) == (1, 1, 0, [])
+    assert {"incident_id": "inc-2", "field": "roles"} in event["dropped"]
+    assert "U0SECRET" not in repr(event)
+
+
+def test_the_event_names_an_unread_item_by_id_and_status() -> None:
+    reader = InMemoryLegacyRolesReader(fail_with=OperationResult.error(OperationStatus.TRANSIENT_ERROR, "throttled"))
+    records = records_with(end_state_item("inc-1", version=RECORD_VERSION, incident_commander=None, operations_lead=None))
+
+    with capture_logs() as logs:
+        legacy_upgrade(records, roles=reader).run(apply=False)
+
+    [event] = _reports(logs)
+    assert event["roles_unread"] == [{"incident_id": "inc-1", "status": "transient_error"}]

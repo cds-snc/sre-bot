@@ -2,18 +2,24 @@
 
 Items are put into an in-memory record store as the legacy writers stored them;
 the upgrade reads them back with a whole-table read, so a test observes the same
-read, guard and write path the scheduled job takes.
+read, guard and write path the scheduled job takes. A roleless item's legacy
+roles are read through an in-memory legacy roles reader, run to completion per
+read as the job's event loop runs it.
 """
 
+import asyncio
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 from contracts.operations import OperationResult
 from contracts.records import ExpectedValue, RecordChange, RecordTable
 from contracts.workplace import WorkplaceSystem
+from features.incident.common.vocabulary import IncidentRole
+from features.incident.core.adapters.in_memory import InMemoryLegacyRolesReader
 from features.incident.core.adapters.incident_items import END_STATE_VERSION, OPEN_BUCKET
 from features.incident.core.adapters.legacy_items import UpgradedItem, upgrade_legacy_item
-from features.incident.core.legacy_upgrade import LegacyUpgrade
+from features.incident.core.domain import ReportReference
+from features.incident.core.legacy_upgrade import LegacyUpgrade, RolesRead
 from features.incident.core.store import bindings_table, incidents_table
 from tests.factories.incident import SLACK_TENANT, CountingRecordStore
 from tests.factories.tenant_verifier import FakeTenantVerifier
@@ -107,8 +113,25 @@ def legacy_upgrade(
     verifier: FakeTenantVerifier | None = None,
     tenants: Mapping[WorkplaceSystem, str] = TENANTS,
     max_items: int = 100,
+    roles: InMemoryLegacyRolesReader | None = None,
+    read_roles: RolesRead | None = None,
 ) -> LegacyUpgrade:
-    """The upgrade over ``records`` with the configured tenants and, by default, a verifier confirming the Slack tenant."""
+    """The upgrade over ``records`` with the configured tenants and, by default, a verifier confirming the Slack tenant.
+
+    ``read_roles`` replaces the roles read; otherwise ``roles`` (an empty in-memory reader by default) serves it.
+    """
+    if read_roles is None:
+        reader = InMemoryLegacyRolesReader() if roles is None else roles
+
+        def read_roles(report: ReportReference) -> OperationResult[Mapping[IncidentRole, str]]:
+            return asyncio.run(reader.read(report))
+
     return LegacyUpgrade(
-        records, TABLE, tenants, verified_slack() if verifier is None else verifier, max_items, bindings=BINDINGS
+        records,
+        TABLE,
+        tenants,
+        verified_slack() if verifier is None else verifier,
+        max_items,
+        bindings=BINDINGS,
+        read_roles=read_roles,
     )

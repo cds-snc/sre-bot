@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T19:03:00Z'
+updated_date: '2026-11-18T00:01:00Z'
 labels:
   - incident
   - features
@@ -15,6 +15,7 @@ dependencies:
   - TASK-145.8.5
   - TASK-145.7.10
   - TASK-145.8.5.2
+  - TASK-64
 references:
   - decisions/incident-management.md
 parent_task_id: TASK-145.9
@@ -72,6 +73,14 @@ created: 2026-11-17T19:03:00Z
 ---
 
 2026-11-17 (human, TASK-145.8.5.3 OQ2 and OQ6): (1) the rebuilt stale notice and the ignore reply follow the new i18n.md line: a request whose payload names no locale (block actions carry none) is answered in English and French, each from its catalogue. (2) /sre dev stale (modules/dev/platforms/slack.py handle_stale_dev_command) posts its own copy of the legacy notice with archive_channel and has no other owner: this task repoints it to the rebuilt notice's renderer or deletes it, before TASK-145.13 (AC #10) removes the value-scoped aliases.
+
+---
+
+created: 2026-11-18T00:01:00Z
+
+---
+
+2026-11-18 (human): depends on TASK-64's minimum-hold lease (reliability.md, 2026-11-18) before the stale-channel nudge registers as a leased job; a short run would otherwise nudge twice, once from each replica.
 
 ---
 <!-- COMMENTS:END -->

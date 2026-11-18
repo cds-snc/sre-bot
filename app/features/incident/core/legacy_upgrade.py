@@ -19,10 +19,18 @@ attributes the legacy and the end-state shapes share by name (status, severity,
 security_incident and the two legacy roles) take their end-state value, which is
 safe once no legacy reader of them remains (the first run follows TASK-145.8).
 
+The legacy roles step (TODO(TASK-145.13): delete) reads, one call at a time and
+before any write, the report Drive properties of every plannable or current
+item that holds none of the five roles, and adds the roles read to the item's
+guarded update. It is keyed on the roles being unset, not on the marker, so a
+rerun reads such items again and writes only what it newly maps. A report that
+is missing or cannot be read is dropped (Migration rule 7); a read that may
+succeed later is pending; an exception the read does not classify propagates.
+
 Registered by the response subdomain, which runs it from a scheduled job.
 """
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -33,11 +41,27 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import READ_LIMIT_EXCEEDED, RecordStore, RecordTable
 from contracts.workplace import TenantVerifier, WorkplaceSystem
+from features.incident.common.vocabulary import IncidentRole
 from features.incident.core.adapters.binding_items import binding_item
-from features.incident.core.adapters.item_upgrade import ItemUpgrade, UnboundOpenItem, plan_item_upgrade
+from features.incident.core.adapters.incident_items import RECORD_VERSION
+from features.incident.core.adapters.item_upgrade import (
+    ItemUpgrade,
+    RolesUnmappable,
+    UnboundOpenItem,
+    plan_item_upgrade,
+    roles_report,
+    with_legacy_roles,
+)
 from features.incident.core.adapters.legacy_items import UnreadableLegacyItem
+from features.incident.core.domain import ReportReference
 
 logger = structlog.get_logger()
+
+# Reads the legacy roles of one report, synchronously. TODO(TASK-145.13): delete with the roles step.
+type RolesRead = Callable[[ReportReference], OperationResult[Mapping[IncidentRole, str]]]
+
+# A roles read that may succeed on a later run: the item stays pending.
+_UNREAD_LATER = frozenset({OperationStatus.TRANSIENT_ERROR, OperationStatus.UNAUTHORIZED})
 
 type Failure = Literal[
     "read_failed",
@@ -83,7 +107,15 @@ class UpgradeReport:
     put (a Closed item without a conversation). ``unbound`` holds the ids of open
     items without a conversation, which block the run.
     ``unmatched_status`` holds (id, stored status); ``unreadable`` and ``dropped``
-    hold (id, legacy attribute) and never a stored value.
+    hold (id, legacy attribute) and never a stored value; ``dropped`` holds
+    (id, ``roles``) for an item whose legacy roles cannot be mapped.
+
+    The roles step: ``roles_to_map`` counts the plans setting a legacy role
+    (planned items and items already current), ``roles_mapped`` those written
+    (apply only), ``roles_none`` the reports read with no role, and
+    ``roles_unread`` holds (id, read status) for reads that may succeed later.
+    ``pending`` also counts the current items' roles plans not written and
+    every unread item. No count or list names a role holder.
     """
 
     mode: Literal["dry_run", "apply"]
@@ -103,6 +135,10 @@ class UpgradeReport:
     unmatched_status: tuple[tuple[object, object], ...] = ()
     unreadable: tuple[tuple[object, str], ...] = ()
     dropped: tuple[tuple[object, str], ...] = ()
+    roles_to_map: int = 0
+    roles_mapped: int = 0
+    roles_none: int = 0
+    roles_unread: tuple[tuple[object, str], ...] = ()
     tenant_check: TenantCheck | None = None
 
     @property
@@ -117,6 +153,7 @@ class LegacyUpgrade:
     ``tenants`` is the configured tenant per workplace system, as the read path's
     bridge gets it; the Slack one must be the tenant the verifier confirms.
     ``bindings`` is the bindings table the item bindings are put into.
+    ``read_roles`` reads a report's legacy roles; an exception it raises propagates.
     """
 
     def __init__(
@@ -128,8 +165,10 @@ class LegacyUpgrade:
         max_items: int,
         *,
         bindings: RecordTable,
+        read_roles: RolesRead,
     ) -> None:
         self._records = records
+        self._read_roles = read_roles
         self._table = table
         self._bindings = bindings
         self._tenants = dict(tenants)
@@ -152,6 +191,8 @@ class LegacyUpgrade:
         items: list[Mapping[str, Any]] = read.data or []
         already_upgraded = 0
         plans: list[ItemUpgrade] = []
+        current: list[Mapping[str, Any]] = []
+        planned_items: list[Mapping[str, Any]] = []
         unmatched_status: list[tuple[object, object]] = []
         unreadable: list[tuple[object, str]] = []
         unbound: list[object] = []
@@ -159,6 +200,7 @@ class LegacyUpgrade:
             planned = plan_item_upgrade(item, self._tenants)
             if planned is None:
                 already_upgraded += 1
+                current.append(item)
             elif isinstance(planned, UnreadableLegacyItem):
                 if planned.field == "status":
                     unmatched_status.append((planned.incident_id, planned.value))
@@ -168,7 +210,9 @@ class LegacyUpgrade:
                 unbound.append(planned.incident_id)
             else:
                 plans.append(planned)
-        dropped = [(plan.incident_id, field) for plan in plans for field in plan.dropped]
+                planned_items.append(item)
+        dropped: list[tuple[object, str]] = [(plan.incident_id, field) for plan in plans for field in plan.dropped]
+        roles = self._map_roles(plans, planned_items, current, dropped)
 
         failures: list[Failure] = []
         if unmatched_status or unreadable:
@@ -179,9 +223,9 @@ class LegacyUpgrade:
         if tenant_check.outcome != "verified":
             failures.append("tenant_check_failed")
 
-        upgraded = marker_raised = guard_lost = bindings_put = bindings_existing = 0
+        upgraded = marker_raised = guard_lost = bindings_put = bindings_existing = roles_mapped = roles_only_written = 0
         if apply and not failures:
-            for plan in plans:
+            for plan in (*roles.plans, *roles.roles_only):
                 if plan.binding is not None:
                     put = self._records.put_if_not_exists(self._bindings, binding_item(plan.binding))
                     if not put.is_success:
@@ -193,8 +237,11 @@ class LegacyUpgrade:
                         bindings_existing += 1
                 result = self._records.update(self._table, {"id": plan.incident_id}, plan.changes, expected=plan.expected)
                 if result.is_success and result.data is not None:
+                    roles_mapped += bool(plan.roles)
                     if plan.from_version is None:
                         upgraded += 1
+                    elif plan.from_version == RECORD_VERSION:
+                        roles_only_written += 1
                     else:
                         marker_raised += 1
                 elif result.is_success or result.status is OperationStatus.NOT_FOUND:
@@ -212,7 +259,7 @@ class LegacyUpgrade:
             to_upgrade=len(plans),
             upgraded=upgraded,
             guard_lost=guard_lost,
-            pending=len(plans) - upgraded - marker_raised,
+            pending=len(plans) - upgraded - marker_raised + len(roles.roles_only) - roles_only_written + len(roles.unread),
             bindings_put=bindings_put,
             bindings_existing=bindings_existing,
             marker_raised=marker_raised,
@@ -221,8 +268,52 @@ class LegacyUpgrade:
             unmatched_status=tuple(unmatched_status),
             unreadable=tuple(unreadable),
             dropped=tuple(dropped),
+            roles_to_map=sum(1 for plan in (*roles.plans, *roles.roles_only) if plan.roles),
+            roles_mapped=roles_mapped,
+            roles_none=roles.none,
+            roles_unread=tuple(roles.unread),
             tenant_check=tenant_check,
         )
+
+    def _map_roles(
+        self,
+        plans: list[ItemUpgrade],
+        planned_items: list[Mapping[str, Any]],
+        current: list[Mapping[str, Any]],
+        dropped: list[tuple[object, str]],
+    ) -> _RolesStep:
+        """Read the legacy roles of every roleless planned or current item and add them to its plan.
+
+        TODO(TASK-145.13): delete with the legacy roles bridge.
+        """
+        mapped_plans: list[ItemUpgrade] = []
+        roles_only: list[ItemUpgrade] = []
+        unread: list[tuple[object, str]] = []
+        none = 0
+        candidates: list[tuple[Mapping[str, Any], ItemUpgrade | None]] = [
+            *zip(planned_items, plans, strict=True),
+            *((item, None) for item in current),
+        ]
+        for item, plan in candidates:
+            mapped = plan
+            source = roles_report(item, plan)
+            if isinstance(source, RolesUnmappable):
+                dropped.append((source.incident_id, "roles"))
+            elif source is not None:
+                read = self._read_roles(source)
+                if read.is_success and read.data:
+                    mapped = with_legacy_roles(item, plan, read.data)
+                elif read.is_success:
+                    none += 1
+                elif read.status in _UNREAD_LATER:
+                    unread.append((item.get("id"), read.status.value))
+                else:
+                    dropped.append((item.get("id"), "roles"))
+            if plan is not None and mapped is not None:
+                mapped_plans.append(mapped)
+            elif mapped is not None:
+                roles_only.append(mapped)
+        return _RolesStep(tuple(mapped_plans), tuple(roles_only), none, tuple(unread))
 
     def _check_tenant(self) -> TenantCheck:
         result: OperationResult[str] = self._verifier.verified_tenant(WorkplaceSystem.SLACK)
@@ -235,6 +326,16 @@ class LegacyUpgrade:
             return TenantCheck("mismatch", None, result.status.value, ErrorCode.TENANT_MISMATCH, message)
         outcome: Literal["mismatch", "failed"] = "mismatch" if result.error_code == ErrorCode.TENANT_MISMATCH else "failed"
         return TenantCheck(outcome, None, result.status.value, result.error_code, result.message)
+
+
+@dataclass(frozen=True)
+class _RolesStep:
+    """The planned items' plans with their legacy roles added, the current items' roles-only plans and the read counts."""
+
+    plans: tuple[ItemUpgrade, ...]
+    roles_only: tuple[ItemUpgrade, ...]
+    none: int
+    unread: tuple[tuple[object, str], ...]
 
 
 def _log(report: UpgradeReport) -> None:
@@ -257,6 +358,10 @@ def _log(report: UpgradeReport) -> None:
         "unmatched_status": [{"incident_id": incident_id, "value": value} for incident_id, value in report.unmatched_status],
         "unreadable": [{"incident_id": incident_id, "field": field} for incident_id, field in report.unreadable],
         "dropped": [{"incident_id": incident_id, "field": field} for incident_id, field in report.dropped],
+        "roles_to_map": report.roles_to_map,
+        "roles_mapped": report.roles_mapped,
+        "roles_none": report.roles_none,
+        "roles_unread": [{"incident_id": incident_id, "status": status} for incident_id, status in report.roles_unread],
         "tenant_check": None if report.tenant_check is None else vars(report.tenant_check).copy(),
     }
     if report.failures:

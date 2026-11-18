@@ -76,7 +76,7 @@ from features.incident.core.domain import (
     VideoCallReference,
     incident_conversation_names,
 )
-from features.incident.core.legacy_upgrade import LegacyUpgrade, UpgradeReport
+from features.incident.core.legacy_upgrade import LegacyUpgrade, RolesRead, UpgradeReport
 from features.incident.core.store import (
     IncidentStore,
     RecordIncidentStore,
@@ -401,7 +401,12 @@ def build_status_update_store(records: RecordStore, settings: IncidentCoreSettin
 
 
 def build_legacy_upgrade(
-    records: RecordStore, systems: ConfiguredSystems, verifier: TenantVerifier, settings: IncidentCoreSettings
+    records: RecordStore,
+    systems: ConfiguredSystems,
+    verifier: TenantVerifier,
+    settings: IncidentCoreSettings,
+    *,
+    read_roles: RolesRead,
 ) -> LegacyUpgrade:
     """Return the incident legacy upgrade over the resolved ``RecordStore``.
 
@@ -409,7 +414,9 @@ def build_legacy_upgrade(
     services it resolved there. The incidents and bindings table names and the
     whole-table read cap come from the incident core settings; the tenants are copied from the
     configured-systems read, as for the read path's bridge, and the verifier
-    confirms the Slack one before any write.
+    confirms the Slack one before any write. ``read_roles`` reads a report's
+    legacy roles synchronously; the job edge runs ``LegacyRolesReader.read`` on
+    its run's event loop (TODO(TASK-145.13): delete with the roles step).
     """
     return LegacyUpgrade(
         records,
@@ -418,6 +425,7 @@ def build_legacy_upgrade(
         verifier,
         settings.full_read_max_items,
         bindings=bindings_table(settings.bindings_table),
+        read_roles=read_roles,
     )
 
 

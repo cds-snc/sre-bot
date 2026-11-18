@@ -4,12 +4,13 @@ title: Due action-item reminders as a scheduled job behind the flag
 status: To Do
 assignee: []
 created_date: 2026-10-13 14:00
-updated_date: '2026-11-04T16:10:00Z'
+updated_date: '2026-11-18T00:01:00Z'
 labels:
   - incident
   - features
 dependencies:
   - TASK-147.3
+  - TASK-64
 references:
   - https://github.com/cds-snc/sre-bot/issues/1711
 parent_task_id: TASK-147
@@ -35,3 +36,15 @@ A background job, registered by postmortem/ through the hookimpl with a lease, r
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (TASK-145.5.7 planning, human approved): the reminders job takes its lease through the lease_ttl keyword on the feature job registry added by TASK-145.5.7.1, its TTL from the postmortem settings (reliability.md 2026-11-04).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-18T00:01:00Z
+
+---
+
+2026-11-18 (human): depends on TASK-64's minimum-hold lease (reliability.md, 2026-11-18) before the reminders job registers as a leased job; a short run would otherwise post each reminder twice.
+
+---
+<!-- COMMENTS:END -->
