@@ -965,12 +965,12 @@ def validate_new_incident(incident: Incident) -> None:
     """Refuse a create the record could not honour; shared by the real store and the fake.
 
     Raises:
-        ValueError: ``incident`` is not open, or already carries a conversation,
+        ValueError: ``incident`` is not in a declarable status (Open or In Progress), or already carries a conversation,
             which arrives only through ``attach_conversation`` so the record's copy
             and the binding cannot disagree.
     """
-    if incident.status is not IncidentStatus.OPEN:
-        raise ValueError(f"a created incident must be open, got {incident.status}")
+    if not incident.status.is_declarable:
+        raise ValueError(f"a created incident is Open or In Progress, got {incident.status}")
     if incident.conversation is not None:
         raise ValueError("a created incident has no conversation yet: attach it with attach_conversation")
 

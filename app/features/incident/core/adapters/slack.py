@@ -464,6 +464,27 @@ class SlackIncidentConversation:
             return _conversation_failure("group_members", conversation, exc)
         return OperationResult.success(tuple(str(user) for user in response.get("users") or []))
 
+    async def account_ids_for(
+        self, conversation: ConversationReference, emails: Sequence[str]
+    ) -> OperationResult[tuple[str, ...]]:
+        """Look each email up on the read client; an email with no Slack user is skipped."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        account_ids: list[str] = []
+        skipped = 0
+        for email in emails:
+            try:
+                response = await self._reads.users_lookupByEmail(email=email)
+            except SlackApiError as exc:
+                if exc.response.get("error") == "users_not_found":
+                    skipped += 1
+                    continue
+                return _conversation_failure("account_ids_for", conversation, exc)
+            account_ids.append(str((response.get("user") or {}).get("id")))
+        if skipped:
+            logger.info("incident_conversation_accounts_not_found", conversation_id=conversation.vendor_id, count=skipped)
+        return OperationResult.success(tuple(account_ids))
+
     async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
         """Add a link bookmark titled ``title`` to the channel."""
         if conversation.system is not WorkplaceSystem.SLACK:

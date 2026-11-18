@@ -9,9 +9,10 @@ and refuses writes with ``CONVERSATION_NOT_WRITABLE``, an unknown one is not
 found, and another system's reference is unsupported without a call. Joining
 makes a conversation the bot left writable, joining one it is in succeeds, and
 an archived one refuses the join as not writable. Both are
-seeded with the same channel names and user groups: a new name creates a
-channel the bot can write to, a taken name is ``CONVERSATION_NAME_TAKEN``, and
-``find_own`` finds only the bot's open channels by exact name.
+seeded with the same channel names, user groups and accounts: a new name creates a
+channel the bot can write to, a taken name is ``CONVERSATION_NAME_TAKEN``,
+``find_own`` finds only the bot's open channels by exact name, and
+``account_ids_for`` answers the account ids of the emails it knows, skipping the others.
 """
 
 from collections.abc import Callable
@@ -49,6 +50,7 @@ _NAMES = {
 }
 _FOREIGN = [slack_channel_name(FOREIGN_NAME)]
 _GROUPS = {"S0SEC": ["U1", "U2"]}
+_ACCOUNTS = {"ada@example.org": "U0ADA", "bo@example.org": "U0BO"}
 _CHANNELS = {
     "C0OPEN": {"is_archived": False, "is_member": True},
     "C0ARCHIVED": {"is_archived": True, "is_member": True},
@@ -60,7 +62,11 @@ _CHANNELS = {
 def conversations(request: pytest.FixtureRequest, stub_slack: Callable[..., Any]) -> IncidentConversation:
     if request.param == "slack":
         stub = stub_slack(
-            {key: dict(value) for key, value in _CHANNELS.items()}, names=_NAMES, foreign_names=_FOREIGN, groups=_GROUPS
+            {key: dict(value) for key, value in _CHANNELS.items()},
+            names=_NAMES,
+            foreign_names=_FOREIGN,
+            groups=_GROUPS,
+            accounts=_ACCOUNTS,
         )
         return SlackIncidentConversation(stub.reads, stub.writes, tenant=TENANT)
     return InMemoryIncidentConversation(
@@ -71,6 +77,7 @@ def conversations(request: pytest.FixtureRequest, stub_slack: Callable[..., Any]
         names=_NAMES,
         foreign_names=_FOREIGN,
         groups=_GROUPS,
+        accounts=_ACCOUNTS,
     )
 
 
@@ -151,6 +158,7 @@ async def test_inviting_nobody_succeeds(conversations: IncidentConversation) -> 
         lambda c: c.create_canvas(GOOGLE, "# Canvas"),
         lambda c: c.group_members(GOOGLE, "S0SEC"),
         lambda c: c.join(GOOGLE),
+        lambda c: c.account_ids_for(GOOGLE, ["ada@example.org"]),
     ],
 )
 async def test_another_systems_reference_is_unsupported(
@@ -303,3 +311,19 @@ async def test_joining_an_unknown_conversation_is_not_found(conversations: Incid
 
     assert joined.status is OperationStatus.NOT_FOUND
     assert joined.error_code == "channel_not_found"
+
+
+async def test_account_ids_for_answers_known_emails_in_order_and_skips_unknown_ones(
+    conversations: IncidentConversation,
+) -> None:
+    found = await conversations.account_ids_for(OPEN, ["bo@example.org", "nobody@example.org", "ada@example.org"])
+
+    assert found.is_success
+    assert found.data == ("U0BO", "U0ADA")
+
+
+async def test_account_ids_for_no_emails_is_empty(conversations: IncidentConversation) -> None:
+    found = await conversations.account_ids_for(OPEN, [])
+
+    assert found.is_success
+    assert found.data == ()

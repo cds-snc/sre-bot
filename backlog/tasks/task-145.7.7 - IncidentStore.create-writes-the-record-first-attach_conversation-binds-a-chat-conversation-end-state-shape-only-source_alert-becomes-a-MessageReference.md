@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-10T18:33:00Z'
+updated_date: '2026-11-18T16:36:00Z'
 labels:
   - incident
   - features
@@ -139,6 +139,8 @@ Handoff for TASK-145.7.9: retry create with the same incident id within one decl
 Gates (from app/): ruff clean, format clean; lint-imports 13 kept 0 broken; package shape OK (3 baselined); test seams OK (47 + 12); fake coverage OK (4 baselined); mypy 41 errors in 14 files, all pre-existing, none in features/incident/core or contracts (new test files and factories also type-check: no issues in 4 files); pytest tests --ignore=tests/smoke 6854 passed.
 Scope changes recorded the same session: TASK-145.7 (cardinality 0..n, OQ9 superseded), TASK-145.7.9 (AC #1 record first; AC #4 HTTP declare route), TASK-145.7.10 (record-first cutover), TASK-145.8.6 (AC: moving the primary), TASK-165.5 (AC #2 zero or more chat bindings).
 The task file name still carries the old title; rename with git mv (human).
+
+2026-11-18 (human, TASK-145.7.9 OQ3): R6's route placement superseded: POST /api/v1/incidents moved to TASK-165.2 (permission TASK-131, person reference TASK-83); R6's API-first intent stays: the declare service is platform-neutral.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

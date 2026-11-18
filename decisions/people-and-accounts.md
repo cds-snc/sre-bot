@@ -119,6 +119,7 @@ Tolerated until then:
 - no `app/capabilities/people/` package;
 - no people table and no person record;
 - email-based resolution in legacy modules, in `infrastructure/directory/` lookups and in `infrastructure/security/current_user.py`;
+- chat adapters resolving an email to a platform account for invites and usergroup sync (the incident core's `IncidentConversation.account_ids_for`, `oncall_sync`'s Slack adapter), until TASK-83.6 links Slack accounts through the IdP-asserted email;
 - Backstage callers resolved by `sso_email` until the deferred resolver-claim question is settled;
 - `actor_email` sort keys in access request decisions and the `user_email` audit index;
 - existing records that refer to humans by email or Slack id.
@@ -128,3 +129,4 @@ Tolerated until then:
 - 2026-09-25: Accepted. The IdP decides who exists, accounts link only through what the IdP asserted, and person kind and permissions move to per-feature access policies (TASK-129).
 - 2026-09-25: A person is offered a join across IdPs, proved by signing in to both, and merges leave a tombstone that resolves to the survivor.
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-11-18: chat-adapter email-to-account resolution tolerated until TASK-83.6 (TASK-145.7.9 OQ7): the on-call capability answers people by email or account, and invites need accounts.
