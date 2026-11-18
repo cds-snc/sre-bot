@@ -6,8 +6,9 @@ directly. get_lease_store is patched to return a real LeaseStore over the
 in-memory conditional-write store, so lease acquisition and a held lease behave
 as in production without DynamoDB. The tests assert that no lease is taken
 without lease_ttl, that a TTL leases the job under scheduler:<job_name> with the
-TTL in whole seconds, that a lease another replica holds skips the run, that a failing job is
-still caught by safe_run, and that a non-positive TTL is rejected at registration.
+TTL in whole seconds, that a lease another replica holds skips the run, that an expired lease
+lets the job run again, that a failing job is still caught by safe_run, and that a
+non-positive TTL is rejected at registration.
 """
 
 from collections.abc import Callable, Iterator
@@ -120,3 +121,20 @@ def test_a_ttl_under_one_second_is_rejected_at_registration(
         _register(cadence, MagicMock(__name__="job", __module__="tests"), ttl)
 
     schedule_lib.every.assert_not_called()
+
+
+@pytest.mark.parametrize("cadence", ["daily", "interval"])
+def test_a_leased_job_runs_again_once_its_lease_has_expired(schedule_lib: MagicMock, cadence: str) -> None:
+    """A lease that expired (here: a zero in-progress TTL) lets the next tick run the job again."""
+    expiring = LeaseStore(
+        InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=0),
+        read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,
+    )
+    job = MagicMock(__name__="job", __module__="tests")
+    with patch("jobs.scheduled_tasks.get_lease_store", return_value=expiring):
+        _register(cadence, job, timedelta(minutes=15))
+        run = _scheduled(schedule_lib, cadence)
+        run()
+        run()
+
+    assert job.call_count == 2

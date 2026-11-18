@@ -6,8 +6,8 @@ title: >-
   health_check methods
 status: To Do
 assignee: []
-created_date: '2026-09-25 14:58'
-updated_date: '2026-10-15 17:50'
+created_date: 2026-09-25 14:58
+updated_date: '2026-11-18T19:00:00Z'
 labels:
   - architecture
   - observability
@@ -19,7 +19,7 @@ references:
   - decisions/health-checks.md
   - decisions/observability.md
   - app/jobs/scheduled_tasks.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1673'
+  - https://github.com/cds-snc/sre-bot/issues/1673
 priority: medium
 ordinal: 275000
 ---
@@ -49,3 +49,9 @@ Output: a metrics-and-alarms section in decisions/observability.md, a vendor-dep
 - [ ] #4 DriveProvider.warmup/health_check, DirectoryProvider.health_check and GoogleDriveProvider.health_check are kept with a stated purpose or scheduled for removal, and the no-cheap-probe case is decided with Google Sheets as the example
 - [ ] #5 Every amended or new record has a mechanically verifiable Checks section; follow-up tasks are created; no production code changes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-18 (TASK-64 planning, human approved): TASK-64 no longer depends on this task. TASK-64.1 registers integration_healthchecks through the scheduler registry as a host Tier-1 job (registration only); its fate stays this task's, and a removal here deletes that one registration.
+<!-- SECTION:NOTES:END -->

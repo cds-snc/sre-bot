@@ -3,10 +3,10 @@ id: TASK-54
 title: >-
   Retire bin/entry.sh secret bootstrap once a secret service exists; classify
   app/bin/ as operator tooling
-status: To Do
+status: Done
 assignee: []
 created_date: 2026-07-27 16:07
-updated_date: '2026-10-29T00:46:00Z'
+updated_date: '2026-11-18T17:36:00Z'
 labels:
   - architecture
   - layers
@@ -33,7 +33,7 @@ app/bin/ is operator and dev tooling (entry.sh container entrypoint, db.sh, seed
 - [ ] #1 decisions/migration.md's directory table classifies app/bin/ as operator and dev tooling, exempt from the layer contracts
 - [ ] #2 decisions/migration.md's bin/ row states that entry.sh fetches no configuration and secrets come through task-definition secrets: (decisions/configuration.md), not a secrets contract implementation
 - [x] #3 app/bin/entry.sh fetches no SSM parameter and only starts the app, verified against the running task definition (TASK-111.15.1)
-- [ ] #4 No secret- or configuration-fetching logic exists in app/bin/
+- [x] #4 No secret- or configuration-fetching logic exists in app/bin/
 <!-- AC:END -->
 
 ## Implementation Notes

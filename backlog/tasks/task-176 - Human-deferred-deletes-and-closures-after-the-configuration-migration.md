@@ -4,7 +4,11 @@ title: Human deferred deletes and closures after the configuration migration
 status: To Do
 assignee: []
 created_date: '2026-10-29T14:15:00Z'
+<<<<<<< Updated upstream
 updated_date: '2026-11-18T16:42:00Z'
+=======
+updated_date: '2026-11-18T17:57:00Z'
+>>>>>>> Stashed changes
 labels:
   - configuration
   - human
@@ -23,10 +27,10 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SSM blob parameters sre-bot-config and sre-bot-config-infrastructure deleted in the AWS console (Systems Manager > Parameter Store, ca-central-1); unread since TASK-111.15.1, IAM read removed by TASK-111.15.2 (#1808)
+- [x] #1 SSM blob parameters sre-bot-config and sre-bot-config-infrastructure deleted in the AWS console (Systems Manager > Parameter Store, ca-central-1); unread since TASK-111.15.1, IAM read removed by TASK-111.15.2 (#1808)
 - [ ] #2 Old GCP service-account key deleted in Google Cloud (IAM & Admin > Service accounts > the SRE service account > Keys); its terraform resource was destroyed by TASK-111.15.2, the value sat in terraform state
 - [x] #3 doc-14 (production configuration inventory) archived, after the blobs are deleted; kept accurate until then
-- [ ] #4 TASK-54 AC #4 checked and TASK-54 set Done, after the blobs are deleted
+- [x] #4 TASK-54 AC #4 checked and TASK-54 set Done, after the blobs are deleted
 - [x] #5 TASK-158 archived (closed 2026-10-29 as superseded by TASK-111.10.3)
 - [x] #6 TASK-177 archived (folded into TASK-164 on 2026-10-29)
 <!-- AC:END -->
@@ -70,13 +74,25 @@ Human-only steps left by the TASK-111 configuration migration, tracked here inst
 
 2026-11-17: asked at TASK-145.8.6 implementation start; unchanged (human).
 
+2026-11-17: asked at TASK-145.8.3 (Stack L row 18.L6a) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
+
+2026-11-17: asked at TASK-145.8.3 implementation start; unchanged (human).
+
+2026-11-17: asked at TASK-145.7.12 (row 18.L7c) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
+
 2026-11-17: asked at TASK-145.7.8 (row 18.L8, dry run) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
 
 2026-11-18: asked at TASK-145.7.12 (row 18.L7c) implementation start; unchanged, #1 and #4 open, #2 waits on TASK-182 (human).
 
+<<<<<<< Updated upstream
 2026-11-18: asked at TASK-145.7.9 (row 18.L9a) planning start; unchanged (human): #1 and #4 open, #2 waits on TASK-182.
 
 2026-11-18: TASK-145.7.9 implementation start (same session as planning): unchanged per the planning-start answer.
+=======
+2026-11-18: AC #1 checked: the human cleared both blob values, redeployed the running image through build_and_deploy.yml (image_tag dispatch) with a clean boot, then deleted sre-bot-config and sre-bot-config-infrastructure in the console (ca-central-1); describe-parameters for both names returns an empty table. Terraform never declared them as resources (only IAM ARNs, removed by #1808), so no code change. AC #4 checked: the human checked TASK-54 AC #4 and set TASK-54 Done. Only AC #2 (old GCP key, live in production) remains; TASK-182 deletes it after TASK-180's keyless cutover.
+
+2026-11-18: asked at TASK-64 (row 18f) planning start; unchanged (human): only #2 open, waits on TASK-182.
+>>>>>>> Stashed changes
 <!-- SECTION:NOTES:END -->
 
 ## Comments
