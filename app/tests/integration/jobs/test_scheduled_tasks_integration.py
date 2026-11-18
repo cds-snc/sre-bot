@@ -4,6 +4,7 @@ Tests the scheduling system integration with all components,
 verifying task registration and error handling across the system.
 """
 
+from collections.abc import Iterator
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -21,64 +22,53 @@ def slack_tenant(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("jobs.scheduled_tasks.get_slack_settings", lambda: settings)
 
 
+@pytest.fixture
+def schedule_builders() -> Iterator[dict[tuple[int, ...], MagicMock]]:
+    """Mock the schedule library, one builder per every() argument, so each cadence is observable."""
+    builders: dict[tuple[int, ...], MagicMock] = {}
+    with patch("jobs.scheduled_tasks.schedule_lib") as schedule_lib:
+        schedule_lib.every.side_effect = lambda *interval: builders.setdefault(interval, MagicMock())
+        yield builders
+
+
 @pytest.mark.integration
 @pytest.mark.usefixtures("slack_tenant")
 class TestScheduledTasksInitialization:
-    """Integration tests for scheduled tasks initialization."""
+    """init() schedules every host and legacy job through the registry adapter.
 
-    @patch("jobs.scheduled_tasks.schedule")
-    def test_init_registers_all_required_tasks(self, mock_schedule) -> None:
-        """Test that init registers all required scheduled tasks.
+    Stub strategy: the schedule library is a MagicMock whose every() returns one
+    builder per interval argument, so the cadence of each registration is read
+    off its builder; the plugin callback is a MagicMock.
+    Assertion rationale: the schedule library sees exactly the five host and
+    legacy jobs, at the cadences the scheduler has always used, each wrapped by
+    the safe_run boundary.
+    """
 
-        Verifies:
-        - Stale incident channel notification (daily at 16:00)
-        - Scheduler heartbeat (every 5 minutes)
-        - Integration healthchecks (every 5 minutes)
-        - Reconciliation batch processor (every 5 minutes)
-        - AWS Identity Center provisioning (every 2 hours)
-        - Spending data generation (daily at 00:00)
-        """
+    def test_init_registers_all_required_tasks(self, schedule_builders) -> None:
+        """Two 5-minute jobs, one 2-hour job and two daily jobs (16:00 and 00:00) are scheduled."""
         scheduled_tasks.init(MagicMock(), MagicMock())
 
-        # Count schedule.do() calls - one per task
-        do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]
-        assert len(do_calls) == 5  # Five total scheduled tasks
+        assert set(schedule_builders) == {(300,), (7200,), ()}
+        assert schedule_builders[(300,)].seconds.do.call_count == 2
+        assert schedule_builders[(7200,)].seconds.do.call_count == 1
+        daily = schedule_builders[()].day.at
+        assert [call.args for call in daily.call_args_list] == [("16:00",), ("00:00",)]
+        assert daily.return_value.do.call_count == 2
 
-    @patch("jobs.scheduled_tasks.schedule")
-    def test_init_respects_scheduling_times(self, mock_schedule) -> None:
-        """Test that tasks are scheduled at correct times.
-
-        Verifies:
-        - Daily tasks scheduled with .at()
-        - Interval-based tasks with correct durations
-        """
+    @patch("jobs.scheduled_tasks.logger")
+    @patch("jobs.scheduled_tasks.integration_healthchecks", side_effect=RuntimeError("boom"))
+    def test_init_uses_safe_run_wrapper(self, healthchecks, mock_logger, schedule_builders) -> None:
+        """A scheduled host job that raises is caught and logged once by safe_run."""
+        healthchecks.__name__ = "integration_healthchecks"
+        healthchecks.__module__ = "jobs.scheduled_tasks"
         scheduled_tasks.init(MagicMock(), MagicMock())
 
-        # Verify daily task times were called (at least once each)
-        daily_do_calls = [call for call in mock_schedule.mock_calls if ".day.at(" in str(call) and ".do(" in str(call)]
-        assert len(daily_do_calls) >= 2  # At least two daily scheduled tasks
+        for registration in schedule_builders[(300,)].seconds.do.call_args_list:
+            registration.args[0]()
 
-        # Verify 5-minute intervals
-        minutes_do_calls = [call for call in mock_schedule.mock_calls if ".minutes.do(" in str(call)]
-        assert len(minutes_do_calls) >= 2  # At least two 5-minute tasks
-
-        # Verify 2-hour interval
-        hours_do_calls = [call for call in mock_schedule.mock_calls if ".hours.do(" in str(call)]
-        assert len(hours_do_calls) >= 1  # At least one 2-hour task
-
-    @patch("jobs.scheduled_tasks.schedule")
-    def test_init_uses_safe_run_wrapper(self, mock_schedule) -> None:
-        """Test that tasks are wrapped with safe_run for error handling.
-
-        This verifies that all scheduled tasks have error protection.
-        Since safe_run wraps the functions, we verify at least one
-        do() call references the safe_run mechanism.
-        """
-        scheduled_tasks.init(MagicMock(), MagicMock())
-
-        # Tasks should be registered and scheduled
-        do_calls = [call for call in mock_schedule.mock_calls if ".do(" in str(call)]
-        assert len(do_calls) > 0
+        healthchecks.assert_called_once_with()
+        errors = [call for call in mock_logger.error.call_args_list if call.args[:1] == ("safe_run_error",)]
+        assert len(errors) == 1
 
 
 @pytest.mark.integration

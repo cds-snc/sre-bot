@@ -4,7 +4,7 @@ title: Due action-item reminders as a scheduled job behind the flag
 status: To Do
 assignee: []
 created_date: 2026-10-13 14:00
-updated_date: '2026-11-18T00:01:00Z'
+updated_date: '2026-11-18T19:00:00Z'
 labels:
   - incident
   - features
@@ -35,6 +35,8 @@ A background job, registered by postmortem/ through the hookimpl with a lease, r
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-04 (TASK-145.5.7 planning, human approved): the reminders job takes its lease through the lease_ttl keyword on the feature job registry added by TASK-145.5.7.1, its TTL from the postmortem settings (reliability.md 2026-11-04).
+
+2026-11-18 (TASK-64 split, human approved): the minimum hold is TASK-64.2; this task waits on it (through its TASK-64 dependency). Register with lease_ttl only; the hold is derived by the registry.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

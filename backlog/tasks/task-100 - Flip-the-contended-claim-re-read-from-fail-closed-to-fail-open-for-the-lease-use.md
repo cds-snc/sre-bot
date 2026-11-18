@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-17 20:39
-updated_date: '2026-10-23T17:08:00Z'
+updated_date: '2026-11-18T19:00:00Z'
 labels:
   - infrastructure
   - reliability
@@ -54,3 +54,9 @@ SCOPE
 - [ ] #5 The tests pinning the lease's fail-closed resolution are updated in this PR rather than left contradicting the new behaviour
 - [ ] #6 ruff, mypy (no new errors in touched files) and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-18 (TASK-64.2 planning, human approved): LeaseStore.release gains not_before, which holds the lease through ConditionalWriteStore.expire_at under the claim token. A fail-open lease holds no record, so its held release must free and hold nothing too: expire_at with a token that matches no record returns False (covered by TASK-64.2's conformance cases).
+<!-- SECTION:NOTES:END -->

@@ -3,8 +3,8 @@ id: TASK-148
 title: Move the lease duration onto the conditional-write claim call
 status: To Do
 assignee: []
-created_date: '2026-10-14 18:57'
-updated_date: '2026-10-15 17:53'
+created_date: 2026-10-14 18:57
+updated_date: '2026-11-18T19:00:00Z'
 labels:
   - infrastructure
   - reliability
@@ -15,7 +15,7 @@ dependencies:
 references:
   - decisions/reliability.md
   - decisions/dependency-injection.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1715'
+  - https://github.com/cds-snc/sre-bot/issues/1715
 priority: medium
 ordinal: 382000
 ---
@@ -39,3 +39,9 @@ Blocks TASK-124.1 (Access Sync resolves the store from the registry when it move
 - [ ] #3 build_lease_store and get_lease_store are deleted; Access Sync and the scheduler acquire with their own durations from one store
 - [ ] #4 decisions/reliability.md describes per-call lease duration, with a dated change entry
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-18 (TASK-64 planning, human approved): TASK-64 no longer depends on this task; its per-job TTL is met by get_lease_store(ttl) since TASK-145.5.7.1. TASK-64.2 adds ConditionalWriteStore.expire_at (a per-call expiry under the claim token); when the claim's duration moves onto the call here, expire_at stays and the conformance suite keeps covering it.
+<!-- SECTION:NOTES:END -->

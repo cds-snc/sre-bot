@@ -23,8 +23,8 @@ def test_job_count_returns_the_number_of_scheduled_jobs() -> None:
         assert job_count() == 3
 
 
-def test_registering_a_feature_job_logs_at_debug_only() -> None:
-    """A feature job registered on the scheduler logs one debug line and no info line."""
+def test_registering_a_job_logs_at_debug_only() -> None:
+    """A job registered on the scheduler logs one debug line and no info line."""
     registry = _ScheduleBackgroundJobRegistry(MagicMock())
 
     with patch.object(scheduled_tasks, "schedule_lib"), capture_logs() as entries:
@@ -32,7 +32,7 @@ def test_registering_a_feature_job_logs_at_debug_only() -> None:
         registry.register_interval(job_name="interval_job", every=timedelta(minutes=5), job=MagicMock())
 
     assert [entry["log_level"] for entry in entries] == ["debug", "debug"]
-    assert {entry["event"] for entry in entries} == {"feature_background_job_scheduled"}
+    assert {entry["event"] for entry in entries} == {"background_job_scheduled"}
 
 
 def test_init_logs_no_info_event() -> None:
@@ -41,7 +41,7 @@ def test_init_logs_no_info_event() -> None:
     settings.tenant = None
 
     with (
-        patch.object(scheduled_tasks, "schedule"),
+        patch.object(scheduled_tasks, "schedule_lib"),
         patch.object(scheduled_tasks, "get_slack_settings", return_value=settings),
         capture_logs() as entries,
     ):
