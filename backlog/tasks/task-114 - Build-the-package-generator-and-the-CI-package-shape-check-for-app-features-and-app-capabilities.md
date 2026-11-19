@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-11-06T03:00:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - plugin-architecture
   - tooling
@@ -79,6 +79,8 @@ Correction 2026-11-06: TASK-138 is superseded (TASK-169 D5); its dependency was 
 2026-10-29 (TASK-172): the generator's __init__.py template includes a register_requirements hookimpl stub (decisions/plugins.md and feature-packages.md 2026-10-29): a plugin states each vendor or capability it cannot run without there, none it uses optionally.
 
 2026-10-29 (TASK-175 planning, human): register_requirements returns Requirement declarations the host resolves (decisions/plugins.md, feature-packages.md); the generator's __init__.py stub returns an empty list instead of resolving and raising.
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

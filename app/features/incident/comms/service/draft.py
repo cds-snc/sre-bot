@@ -38,7 +38,7 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 
-from capabilities.text_generation.api import TextGenerator, get_text_generator
+from capabilities.ai_writing.api import AIWriter, get_ai_writer
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import (
@@ -248,7 +248,7 @@ async def generate_status_update_draft(
     on_started: Callable[[], None] | None = None,
     reader: IncidentTranscriptReader | None = None,
     store: StatusUpdateStore,
-    generator: TextGenerator | None = None,
+    ai_writer: AIWriter | None = None,
     now: datetime | None = None,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
     """Fill the pending draft with AI from the responder's fields and store it as the next draft.
@@ -272,14 +272,14 @@ async def generate_status_update_draft(
         on_started: Called once just before the model call.
         reader: Reads the conversation; core's by default.
         store: Holds the incident's status updates.
-        generator: Fills the fields; the comms provider's by default.
+        ai_writer: Fills the fields; the capability's process AI writer by default.
         now: The current time; injected in tests.
 
     Returns:
         Success with the new draft, ``CARRIED_FORWARD`` (origin
         ``CARRIED_FORWARD``) or ``DRAFTED`` (origin ``MODEL``, or
         ``MODEL_INSTRUCTED`` with instructions). Otherwise the command check's refusal,
-        the store's or the generator's classified error, ``EMPTY_HISTORY`` with
+        the store's or the AI writer's classified error, ``EMPTY_HISTORY`` with
         no approved update, no person's message and no instructions,
         ``STATUS_UPDATE_CONFLICT`` when the latest record is not the draft at
         ``sequence`` or another writer took the next sequence,
@@ -355,7 +355,7 @@ async def generate_status_update_draft(
     if on_started is not None:
         on_started()
     generated = await _generate_fields(
-        generator or _default_generator(),
+        ai_writer or _default_ai_writer(),
         build_redraft_input(current, build_transcript(messages)),
         build_redraft_instructions(guidance) if guidance else INSTRUCTIONS,
         settings,
@@ -368,14 +368,14 @@ async def generate_status_update_draft(
 
 
 async def _generate_fields(
-    generator: TextGenerator,
+    ai_writer: AIWriter,
     transcript: str,
     instructions: str,
     settings: IncidentStatusUpdateSettings,
     log: structlog.stdlib.BoundLogger,
 ) -> OperationResult[DraftedFields]:
     """Make the one model call and parse its answer strictly; never logs the transcript or instructions."""
-    generated = await generator.generate(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
+    generated = await ai_writer.write(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
     if not generated.is_success or generated.data is None:
         log.warning("incident_status_update_generation_failed", status=generated.status, error_code=generated.error_code)
         return failure(generated)
@@ -587,5 +587,5 @@ def _posted_at(message: TranscriptMessage) -> datetime:
     return message.posted_at
 
 
-def _default_generator() -> TextGenerator:
-    return get_text_generator()
+def _default_ai_writer() -> AIWriter:
+    return get_ai_writer()

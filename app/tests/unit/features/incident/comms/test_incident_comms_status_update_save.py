@@ -2,7 +2,7 @@
 
 The service runs against the in-memory status-update store and an in-memory
 incident store holding one incident on the channel, with a fixed ``now``. No
-transcript reader, security flag read or text generator is involved, because saving never reads the conversation or calls a
+transcript reader, security flag read or AI writer is involved, because saving never reads the conversation or calls a
 model. Assertions compare the exact stored records and result codes, because a
 save must add one new draft (or none on a replay) and leave every earlier
 record as it was.

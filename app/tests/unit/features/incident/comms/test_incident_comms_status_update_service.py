@@ -5,8 +5,8 @@ incident store holding the incident on the channel, and a stub transcript
 reader, with a fixed ``now``, so each test controls exactly which records exist
 and which messages are read, and asserts what was stored. The reader records the
 conversation reference it was given (the record's) and can return a classified
-failure, which the service reads as an empty window. Starting takes no text
-generator and never reads the security flag, so no model call or security read
+failure, which the service reads as an empty window. Starting takes no AI
+writer and never reads the security flag, so no model call or security read
 can happen.
 """
 

@@ -32,7 +32,7 @@ and the copy-ready rendering then run in one event loop and the modal is updated
 by view id to the copy-ready text or an error.
 
 The review form carries the AI section (Draft with AI, optional instructions)
-only when text generation is configured. Draft with AI sends the responder's
+only when AI writing is configured. Draft with AI sends the responder's
 current form values and instructions to the generate service, which calls back
 just before a model call so the modal shows a generating state only then. A
 fill shows the new draft's form; nothing new carries the typed values forward

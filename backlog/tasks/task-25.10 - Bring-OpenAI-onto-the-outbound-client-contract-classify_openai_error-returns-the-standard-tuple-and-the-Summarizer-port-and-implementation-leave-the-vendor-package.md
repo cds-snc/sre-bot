@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-09T15:43:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - clients
   - phase-3
@@ -81,6 +81,8 @@ TARGET. integrations/openai/ exports build_openai_client (timeout plus a retry p
 Parent ACs, by slice: #1 (tuple: .1; files and baseline: .2), #2 .2, #3 .1, #4 .1, #5 (outbound-clients: .1 and .2; configuration.md: .3), #6 .2, #7 .3, #8 .3, #9 .2. Check each parent AC as its slice merges.
 
 2026-11-09 (human): AC #2 rewording approved as proposed in comment #1 (comms' local TextGenerator and adapters/text_generation.py deleted; comms depends on the capability's api.py Protocol), and aligned with the OQ3 ruling (no-op implementation plus is_available()). OQ6 ruled: the model is the organisation's value, so [text_generation] model is empty in base.toml and set in production.toml and local.toml; unset means unavailable, plus Requirement('text_generation.model') for required consumers; AC #8 reworded ('holds the default model' replaced). OQ4 ruled: TASK-114.3 as proposed (row 15g, before 25.10.2). TASK-25.10.1 merged (#1838, d3778e0a, 2026-11-09 15:06 UTC): ACs #3 and #4 checked (slice .1 only); #1 and #5 wait on .2 (and #5 on .3).
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

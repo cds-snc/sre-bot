@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-10T16:52:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - incident
   - features
@@ -103,6 +103,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-09 (human): ruled. The moved text-generation use is optional: it asks is_available() (TASK-25.10.2) and answers with an unavailable message otherwise. The plugin it moves into declares no text-generation requirement. TASK-172's 'scribe requires it' holds only while scribe exists. Record it in plugin-architecture.md and plugins.md with this task's PR.
 
 2026-11-10 (TASK-145.8.1 plan, OQ13 applied): timeline_table, entry_key, TimelineStore.append and TimelineEntry kinds (message, severity_changed) land in TASK-145.8.1; captured_entry_id (uuid5 over system, tenant, conversation and message id, under TASK-145.8.1's TIMELINE_NAMESPACE) stays with its first user TASK-145.9.2. AC #5 stands as worded.
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

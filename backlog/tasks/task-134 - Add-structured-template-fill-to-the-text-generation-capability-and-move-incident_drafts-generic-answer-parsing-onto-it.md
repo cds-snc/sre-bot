@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-01 14:05
-updated_date: '2026-11-06T20:10:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -55,4 +55,6 @@ TASK-145.11 (the report draft moves into incident/postmortem and scribe is delet
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-06 (human, TASK-186 review): both incident consumers of answer parsing move onto the capability (plugin-architecture.md, text generation is a capability), not only scribe.
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->

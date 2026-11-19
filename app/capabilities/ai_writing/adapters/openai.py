@@ -1,4 +1,4 @@
-"""OpenAI adapter of the text-generation capability: the chat completions API behind ``TextGenerator``.
+"""OpenAI adapter of the AI writing capability: the chat completions API behind ``AIWriter``.
 
 The capability's only importer of ``integrations.openai`` (import-linter contract (o)). It calls
 the vendor client inside ``try/except``, classifies failures via ``classify_openai_error`` and
@@ -10,7 +10,7 @@ from typing import Any
 
 import structlog
 
-from capabilities.text_generation.api import TextGenerator
+from capabilities.ai_writing.api import AIWriter
 from contracts.operations.result import OperationResult
 from integrations.openai.client import build_openai_client, classify_openai_error
 from integrations.openai.settings import OpenAISettings, get_openai_settings
@@ -18,8 +18,8 @@ from integrations.openai.settings import OpenAISettings, get_openai_settings
 logger = structlog.get_logger()
 
 
-class OpenAITextGenerator(TextGenerator):
-    """``TextGenerator`` backed by an OpenAI-compatible chat completions endpoint."""
+class OpenAIWriter(AIWriter):
+    """``AIWriter`` backed by an OpenAI-compatible chat completions endpoint."""
 
     def __init__(self, settings: OpenAISettings | None = None) -> None:
         self._settings = settings or get_openai_settings()
@@ -28,8 +28,8 @@ class OpenAITextGenerator(TextGenerator):
         """Always available: the provider builds this adapter only for a configured tenant."""
         return True
 
-    async def generate(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
-        """Generate text from ``source`` under ``instructions`` via the chat completions endpoint.
+    async def write(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+        """Write text from ``source`` under ``instructions`` via the chat completions endpoint.
 
         Args:
             source: The user content.
@@ -61,7 +61,7 @@ class OpenAITextGenerator(TextGenerator):
             # body names the offending parameter, which is the difference
             # between diagnosing this and guessing at it.
             logger.warning(
-                "openai_generate_failed",
+                "openai_write_failed",
                 error=str(exc),
                 response_body=_error_body(exc),
                 sent_parameters=sorted(payload),
@@ -78,7 +78,7 @@ class OpenAITextGenerator(TextGenerator):
         finish_reason = _finish_reason(body)
         usage = _usage(body)
         logger.info(
-            "openai_generate_usage",
+            "openai_write_usage",
             model=payload["model"],
             finish_reason=finish_reason,
             max_completion_tokens=payload["max_completion_tokens"],
@@ -89,13 +89,13 @@ class OpenAITextGenerator(TextGenerator):
             # The completion budget ran out mid-response, so the text is cut
             # off. Callers parsing structured output need to know this.
             logger.warning(
-                "openai_generate_truncated",
+                "openai_write_truncated",
                 max_completion_tokens=payload["max_completion_tokens"],
                 text_length=len(text),
                 **usage,
             )
         elif not text:
-            logger.warning("openai_generate_empty_content", finish_reason=finish_reason)
+            logger.warning("openai_write_empty_content", finish_reason=finish_reason)
 
         return OperationResult.success(data=text)
 
@@ -146,9 +146,9 @@ def _usage(body: dict) -> dict[str, int]:
     return {key: int(value) for key, value in counts.items() if isinstance(value, int)}
 
 
-def build_openai_text_generator() -> OpenAITextGenerator | None:
-    """Return the OpenAI generator when [openai.tenant] is set, else ``None`` (no client is built either way)."""
+def build_openai_writer() -> OpenAIWriter | None:
+    """Return the OpenAI writer when [openai.tenant] is set, else ``None`` (no client is built either way)."""
     settings = get_openai_settings()
     if settings.tenant is None:
         return None
-    return OpenAITextGenerator(settings)
+    return OpenAIWriter(settings)

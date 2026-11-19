@@ -8,7 +8,7 @@ proceeds without confirmation. A stale sequence and the carried-forward branch
 never read the flag. Refusal logs do not carry incident text. The service runs
 against the in-memory status-update store holding one pending draft and an
 incident store that counts flag reads, with stubbed transcript reader and
-generator.
+ai_writer.
 """
 
 import json
@@ -100,14 +100,14 @@ class _StubReader:
         return OperationResult.success(self._messages)
 
 
-class _StubGenerator:
+class _StubWriter:
     def __init__(self) -> None:
         self.calls: list[str] = []
 
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self,
         transcript: str,
         *,
@@ -177,7 +177,7 @@ async def _draft(
     store: InMemoryStatusUpdateStore | None = None,
     sequence: int | None = None,
     reader: _StubReader | None = None,
-    generator: _StubGenerator | None = None,
+    ai_writer: _StubWriter | None = None,
     incidents: IncidentStore | None = None,
     security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
@@ -193,7 +193,7 @@ async def _draft(
         on_started=None,
         reader=reader or _StubReader(),
         store=store,
-        generator=generator or _StubGenerator(),
+        ai_writer=ai_writer or _StubWriter(),
         security_confirmed=security_confirmed,
         now=_NOW,
     )
@@ -204,13 +204,13 @@ class TestSecurityGateRefusesASecurityIncident:
     async def test_refuses_a_security_incident_with_security_confirmation_required(self) -> None:
         """A security incident with security_confirmed=False refuses before any model call."""
         store = await _pending_store()
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _draft(store=store, incidents=_CountingIncidents(security_incident=True), generator=generator)
+        result = await _draft(store=store, incidents=_CountingIncidents(security_incident=True), ai_writer=ai_writer)
 
         assert not result.is_success
         assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
-        assert generator.calls == []
+        assert ai_writer.calls == []
         # The pending draft is still the only record
         listed = await store.list_for_incident(_INCIDENT)
         assert listed.data == (_PENDING,)
@@ -234,7 +234,7 @@ class TestSecurityGateRefusesASecurityIncident:
             on_started=mock_on_started,
             reader=_StubReader([_human("activity", 20)]),
             store=await _pending_store(),
-            generator=_StubGenerator(),
+            ai_writer=_StubWriter(),
             security_confirmed=False,
             now=_NOW,
         )
@@ -246,24 +246,24 @@ class TestSecurityGateAllowsANonSecurityIncident:
     @pytest.mark.asyncio
     async def test_a_non_security_incident_is_drafted_without_confirmation(self) -> None:
         """A false flag passes the gate: the model is called once and the draft is stored."""
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
         incidents = _CountingIncidents(security_incident=False)
 
-        result = await _draft(incidents=incidents, generator=generator)
+        result = await _draft(incidents=incidents, ai_writer=ai_writer)
 
         assert result.is_success
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
         assert incidents.calls == [_INCIDENT]
 
     @pytest.mark.asyncio
     async def test_a_legacy_incident_without_a_stored_flag_is_drafted_without_confirmation(self) -> None:
         """A legacy item stored before the flag existed reads as false, so the gate does not fire."""
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _draft(incidents=_legacy_item_store(), generator=generator)
+        result = await _draft(incidents=_legacy_item_store(), ai_writer=ai_writer)
 
         assert result.is_success
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
 
     @pytest.mark.asyncio
     async def test_a_legacy_incident_stored_as_a_security_incident_is_refused(self) -> None:
@@ -277,12 +277,12 @@ class TestSecurityGateWithConfirmed:
     @pytest.mark.asyncio
     async def test_a_security_incident_proceeds_when_security_confirmed(self) -> None:
         """A security incident with security_confirmed=True is drafted."""
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _draft(incidents=_CountingIncidents(security_incident=True), generator=generator, security_confirmed=True)
+        result = await _draft(incidents=_CountingIncidents(security_incident=True), ai_writer=ai_writer, security_confirmed=True)
 
         assert result.is_success
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
 
     @pytest.mark.asyncio
     async def test_confirmed_does_not_read_the_flag(self) -> None:
@@ -299,13 +299,13 @@ class TestSecurityGateRefusesReadFailure:
     async def test_refuses_on_store_error_with_security_confirmation_required(self) -> None:
         """A store error reading the flag refuses with SECURITY_CONFIRMATION_REQUIRED, never as false."""
         failure: OperationResult[bool] = OperationResult.transient_error(message="store error", error_code="STORE_ERROR")
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _draft(incidents=_CountingIncidents(failure=failure), generator=generator)
+        result = await _draft(incidents=_CountingIncidents(failure=failure), ai_writer=ai_writer)
 
         assert not result.is_success
         assert result.error_code == ErrorCode.SECURITY_CONFIRMATION_REQUIRED
-        assert generator.calls == []
+        assert ai_writer.calls == []
 
     @pytest.mark.asyncio
     async def test_refuses_on_not_found_with_security_confirmation_required(self) -> None:

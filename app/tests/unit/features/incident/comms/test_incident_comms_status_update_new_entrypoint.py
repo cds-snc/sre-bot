@@ -2,7 +2,7 @@
 
 The New update button calls ``start_status_update_draft`` and replaces the
 modal with the review form for the returned draft, hand-started or already
-pending. The form carries the AI section only when text generation is
+pending. The form carries the AI section only when AI writing is
 configured. ``start_status_update_draft`` is patched with a ``MagicMock``, the
 availability predicate with a constant, and the Slack client is a
 ``MagicMock``, so the tests assert the service arguments and the view sent to
@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
+from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdateOutcomeKind
@@ -52,7 +52,7 @@ from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
 
-_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
+_WRITER = "capabilities.ai_writing.providers.get_ai_writer_singleton"
 
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C123"
@@ -119,8 +119,8 @@ def _service(kind: StatusUpdateOutcomeKind) -> AsyncMock:
 
 @pytest.fixture(autouse=True)
 def _ai_available(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Text generation is configured unless a test says otherwise."""
-    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
+    """AI writing is configured unless a test says otherwise."""
+    monkeypatch.setattr(_WRITER, lambda: InMemoryAIWriter(available=True))
 
 
 def _sent_view(client: MagicMock) -> dict[str, Any]:
@@ -192,9 +192,9 @@ class TestNewUpdateAction:
 
         assert _sent_view(client) == build_review_view(_DRAFT, "en-US", json.dumps(_METADATA), with_ai=True)
 
-    def test_without_text_generation_the_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """With the generator unconfigured the form opens on the stage select; Save draft and Approve remain."""
-        monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=False))
+    def test_without_ai_writing_the_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """With the ai_writer unconfigured the form opens on the stage select; Save draft and Approve remain."""
+        monkeypatch.setattr(_WRITER, lambda: InMemoryAIWriter(available=False))
         client = MagicMock()
 
         with patch(_TARGET, new=_service(StatusUpdateOutcomeKind.MANUAL)):

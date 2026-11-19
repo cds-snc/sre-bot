@@ -82,7 +82,7 @@ def test_filled_form_shows_the_fill_notice_without_instructions(kind: StatusUpda
     ("code", "key", "security_confirm", "with_ai"),
     [
         (ErrorCode.SECURITY_CONFIRMATION_REQUIRED, "generate_security", True, True),
-        (ErrorCode.TEXT_GENERATION_UNAVAILABLE, "generate_unavailable", False, False),
+        (ErrorCode.AI_WRITING_UNAVAILABLE, "generate_unavailable", False, False),
         (ErrorCode.EMPTY_HISTORY, "generate_empty_history", False, True),
         (DRAFT_UNPARSEABLE_CODE, "generate_unparseable", False, True),
         (ErrorCode.RATE_LIMITED, "generate_failed", False, True),

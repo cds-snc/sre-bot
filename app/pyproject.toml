@@ -47,7 +47,7 @@ geolocate = "packages.geolocate"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
 oncall = "capabilities.oncall.plugin"
-text_generation = "capabilities.text_generation.plugin"
+ai_writing = "capabilities.ai_writing.plugin"
 
 [tool.ruff]
 target-version = "py314"
@@ -452,7 +452,7 @@ protected_modules = [
     "packages.oncall_sync",
     "packages.rant",
     "capabilities.oncall.plugin",
-    "capabilities.text_generation.plugin",
+    "capabilities.ai_writing.plugin",
 ]
 allowed_importers = []
 unmatched_ignore_imports_alerting = "error"
@@ -480,10 +480,10 @@ ignore_imports = [
 
 [[tool.importlinter.contracts]]
 id = "openai-importers"
-name = "(o) integrations.openai is imported only by the text-generation OpenAI adapter, besides the host"
-# decisions/plugin-architecture.md: a new model vendor is an adapter inside the text-generation
-# capability. The host (server) reads the settings slice for the configuration phase and the
-# plugin requirements.
+name = "(o) integrations.openai is imported only by the AI writing OpenAI adapter, besides the host"
+# decisions/plugin-architecture.md: a new model vendor is an adapter inside the AI writing
+# capability, and another AI use is its own capability, added here by review. The host (server)
+# reads the settings slice for the configuration phase and the plugin requirements.
 type = "protected"
 protected_modules = ["integrations.openai"]
-allowed_importers = ["server", "capabilities.text_generation.adapters.openai"]
+allowed_importers = ["server", "capabilities.ai_writing.adapters.openai"]

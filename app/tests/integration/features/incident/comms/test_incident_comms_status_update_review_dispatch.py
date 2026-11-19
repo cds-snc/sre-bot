@@ -23,7 +23,7 @@ from typing import Any
 import pytest
 
 import features.incident.comms as comms_module
-from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
+from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
 from contracts.operations import OperationResult
 from features.incident.comms import providers
 from features.incident.comms.domain import CopyReadyText, ProfileLabels, StatusUpdateEdit
@@ -47,7 +47,7 @@ from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fix
 
 pytestmark = pytest.mark.integration
 
-_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
+_WRITER = "capabilities.ai_writing.providers.get_ai_writer_singleton"
 
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C0INCIDENT"
@@ -123,7 +123,7 @@ def fakes(monkeypatch: pytest.MonkeyPatch) -> ServiceFakes:
     monkeypatch.setattr(form, "get_draft_for_review", service_fakes.get_draft_for_review)
     monkeypatch.setattr(approval, "approve_status_update", service_fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: service_fakes)
-    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
+    monkeypatch.setattr(_WRITER, lambda: InMemoryAIWriter(available=True))
     return service_fakes
 
 

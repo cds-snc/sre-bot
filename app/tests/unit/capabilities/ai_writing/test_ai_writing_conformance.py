@@ -1,4 +1,4 @@
-"""Conformance tests for the text-generation fakes against the implementations they stand in for.
+"""Conformance tests for the AI writing fakes against the implementations they stand in for.
 
 The available pair is the OpenAI adapter (its vendor-client factory replaced at the edge by an
 httpx client over a MockTransport echoing the request) and the in-memory fake scripted to echo;
@@ -15,10 +15,10 @@ import httpx
 import pytest
 
 from bin.check_fake_coverage import find_covered_protocols, find_fakes
-from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
-from capabilities.text_generation.adapters.openai import OpenAITextGenerator
-from capabilities.text_generation.adapters.unconfigured import UnconfiguredTextGenerator
-from capabilities.text_generation.api import TextGenerator
+from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
+from capabilities.ai_writing.adapters.openai import OpenAIWriter
+from capabilities.ai_writing.adapters.unconfigured import UnconfiguredAIWriter
+from capabilities.ai_writing.api import AIWriter
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
@@ -34,38 +34,38 @@ def _echo(request: httpx.Request) -> httpx.Response:
 
 
 @pytest.fixture(params=["openai", "in_memory"])
-def available(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -> Iterator[TextGenerator]:
+def available(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -> Iterator[AIWriter]:
     if request.param == "in_memory":
-        yield InMemoryTextGenerator(respond=lambda source, instructions: f"{instructions}|{source}")
+        yield InMemoryAIWriter(respond=lambda source, instructions: f"{instructions}|{source}")
         return
     client = httpx.AsyncClient(base_url=openai_settings.base_url, transport=httpx.MockTransport(_echo))
-    with patch("capabilities.text_generation.adapters.openai.build_openai_client", return_value=client):
-        yield OpenAITextGenerator(settings=openai_settings)
+    with patch("capabilities.ai_writing.adapters.openai.build_openai_client", return_value=client):
+        yield OpenAIWriter(settings=openai_settings)
 
 
 @pytest.fixture(params=["unconfigured", "in_memory"])
-def unavailable(request: pytest.FixtureRequest) -> TextGenerator:
-    return UnconfiguredTextGenerator() if request.param == "unconfigured" else InMemoryTextGenerator(available=False)
+def unavailable(request: pytest.FixtureRequest) -> AIWriter:
+    return UnconfiguredAIWriter() if request.param == "unconfigured" else InMemoryAIWriter(available=False)
 
 
-async def test_an_available_generator_answers_from_the_instructions_and_the_source(available: TextGenerator) -> None:
-    result = await available.generate("the source", instructions="the instructions", max_output_tokens=50)
+async def test_an_available_writer_answers_from_the_instructions_and_the_source(available: AIWriter) -> None:
+    result = await available.write("the source", instructions="the instructions", max_output_tokens=50)
 
     assert available.is_available() is True
     assert (result.status, result.data) == (OperationStatus.SUCCESS, "the instructions|the source")
 
 
-async def test_an_unavailable_generator_reports_it_on_every_call(unavailable: TextGenerator) -> None:
-    result = await unavailable.generate("the source", instructions="the instructions")
+async def test_an_unavailable_writer_reports_it_on_every_call(unavailable: AIWriter) -> None:
+    result = await unavailable.write("the source", instructions="the instructions")
 
     assert unavailable.is_available() is False
-    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.TEXT_GENERATION_UNAVAILABLE)
+    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.AI_WRITING_UNAVAILABLE)
 
 
 async def test_the_fake_records_each_call() -> None:
-    fake = InMemoryTextGenerator()
+    fake = InMemoryAIWriter()
 
-    await fake.generate("the source", instructions="the instructions", max_output_tokens=50)
+    await fake.write("the source", instructions="the instructions", max_output_tokens=50)
 
     (call,) = fake.calls
     assert (call.source, call.instructions, call.max_output_tokens) == ("the source", "the instructions", 50)
@@ -74,11 +74,11 @@ async def test_the_fake_records_each_call() -> None:
 async def test_the_fake_returns_a_scripted_result() -> None:
     scripted = OperationResult.transient_error(message="busy", error_code=ErrorCode.RATE_LIMITED, retry_after=7)
 
-    result = await InMemoryTextGenerator(result=scripted).generate("s", instructions="i")
+    result = await InMemoryAIWriter(result=scripted).write("s", instructions="i")
 
     assert result is scripted
 
 
 def test_the_fake_is_enrolled_in_the_fake_coverage_rule() -> None:
-    assert "capabilities/text_generation/api.py:TextGenerator" in find_covered_protocols()
-    assert "TextGenerator" in find_fakes()
+    assert "capabilities/ai_writing/api.py:AIWriter" in find_covered_protocols()
+    assert "AIWriter" in find_fakes()

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-07 18:52
-updated_date: '2026-11-06T19:47:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - incident
 dependencies:
@@ -97,6 +97,8 @@ Re-ground at pickup (TASK-145.4): the status-update code is the comms subdomain,
 2026-10-14: TASK-152 grants <table arn>/index/* only for the audit trail, retry records and incidents tables; the GSI this task adds to sre_bot_incident_status_updates adds that table's index ARN to terraform/iam.tf in the same change. The store is on RecordStore after TASK-145.5.6, so the GSI is declared in its RecordTable.indexes with projection ALL (index reads return full items, TASK-145.5.4).
 
 2026-11-06: TASK-186 moves comms modules: service.py -> service/draft.py (overview -> service/history.py), history.py -> service/publication.py, approval/form/prompt -> service/, ports.py -> interfaces.py, comms_profile/publisher -> domain.py. Re-ground comms path and line references at pickup.
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

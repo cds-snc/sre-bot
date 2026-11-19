@@ -29,7 +29,7 @@ entrypoints/slack.py      parse payload → typed values → one service call �
 service/ (draft, form, approval, publication, history)      platform-agnostic; no Slack or OpenAI imports
   │
   ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader (the record's conversation; a failed read is an empty window) ── core/api.py
-  ├─► TextGenerator ──────── capabilities/text_generation/api.py           (the text-generation capability)
+  ├─► AIWriter ─────────── capabilities/ai_writing/api.py                   (the AI writing capability)
   └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (domain.render_copy_ready)
 ```
 
@@ -90,9 +90,9 @@ service/ (draft, form, approval, publication, history)      platform-agnostic; n
   time, from labels the caller has already localized), with
   `render_copy_ready`, which every `StatusPagePublisher` renders through. The
   `StatusUpdate` record itself comes from `features/incident/core`.
-- `interfaces.py` — the comms-owned interface `StatusPagePublisher`. Text
-  generation is the capability's `TextGenerator`, from
-  `capabilities/text_generation/api.py`; comms imports no integration.
+- `interfaces.py` — the comms-owned interface `StatusPagePublisher`. AI
+  writing is the capability's `AIWriter`, from
+  `capabilities/ai_writing/api.py`; comms imports no integration.
 - `adapters/copy_ready.py` — the `StatusPagePublisher` that renders copy-ready
   text for a person to paste; it calls no status page.
 - `providers.py` — feature-local DI wiring for the publisher.
@@ -150,8 +150,8 @@ another responder started meanwhile, and the modal switches to the review form.
 A first update with no message from a person yet is refused with the
 empty-history notice.
 
-Draft with AI: the review form opens with an AI section only when text
-generation is available (the capability's `TextGenerator.is_available()`): an optional
+Draft with AI: the review form opens with an AI section only when AI
+writing is available (the capability's `AIWriter.is_available()`): an optional
 instructions input and a Draft with AI button
 (`incident.comms.status_update.generate`). Without it the form has the stage,
 the fields, Save draft and Approve only. `generate_status_update_draft` takes

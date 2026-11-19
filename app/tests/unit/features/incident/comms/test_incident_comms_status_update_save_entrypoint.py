@@ -23,7 +23,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
+from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateEdit
@@ -49,7 +49,7 @@ from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
 
-_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
+_WRITER = "capabilities.ai_writing.providers.get_ai_writer_singleton"
 
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C123"
@@ -157,7 +157,7 @@ def _install(monkeypatch: pytest.MonkeyPatch, saved: OperationResult[StatusUpdat
     services = _Services(saved=saved, stored=OperationResult.success(data=_DRAFT))
     monkeypatch.setattr(form, "save_status_update_draft", services.save)
     monkeypatch.setattr(form, "get_draft_for_review", services.read)
-    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
+    monkeypatch.setattr(_WRITER, lambda: InMemoryAIWriter(available=True))
     return services
 
 
@@ -205,10 +205,10 @@ class TestSaved:
             _SAVED, locale, _metadata(locale, _SEQUENCE + 1), notice=_SAVED_NOTE[locale]
         )
 
-    def test_without_text_generation_the_saved_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """With the generator unconfigured the re-rendered form leaves the AI section out."""
+    def test_without_ai_writing_the_saved_form_has_no_ai_section(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """With the ai_writer unconfigured the re-rendered form leaves the AI section out."""
         services = _install(monkeypatch, OperationResult.success(data=_SAVED))
-        monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=False))
+        monkeypatch.setattr(_WRITER, lambda: InMemoryAIWriter(available=False))
         client = _client(services)
 
         handle_save_action(MagicMock(), _body(), client, incident_scopes())

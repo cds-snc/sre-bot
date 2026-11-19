@@ -44,7 +44,7 @@ ENABLED_PLUGINS = {
     "geolocate",
     "incident.comms",
     "oncall",
-    "text_generation",
+    "ai_writing",
 }
 RAISING_MODULE = "fake_plugin_raising_i18n"
 RAISING_SOURCE = """

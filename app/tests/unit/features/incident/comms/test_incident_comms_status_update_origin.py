@@ -3,7 +3,7 @@
 ``start_status_update_draft`` and ``generate_status_update_draft`` run against
 the in-memory status-update store, an in-memory incident store holding one
 non-security incident on the channel, and stubs for the transcript reader and
-the text generator, with a fixed ``now``. Each test
+the AI writer, with a fixed ``now``. Each test
 drives one path and asserts only the stored record's origin, since the record's
 other fields are pinned by the start and generate tests.
 """
@@ -92,11 +92,11 @@ class _StubReader:
         return OperationResult.success(self._messages)
 
 
-class _StubGenerator:
+class _StubWriter:
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self,
         transcript: str,
         *,
@@ -116,7 +116,7 @@ async def _store(*records: StatusUpdate) -> InMemoryStatusUpdateStore:
 def _stubs(messages: Sequence[TranscriptMessage]) -> dict[str, Any]:
     return {
         "reader": _StubReader(messages),
-        "generator": _StubGenerator(),
+        "ai_writer": _StubWriter(),
         "now": _NOW,
     }
 

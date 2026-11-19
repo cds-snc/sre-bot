@@ -2,7 +2,7 @@
 
 The service runs against the in-memory status-update store, an in-memory
 incident store holding one incident on the channel that counts security flag
-reads, and stubs for the transcript reader and the text generator, with a fixed
+reads, and stubs for the transcript reader and the AI writer, with a fixed
 ``now``, so each test controls which records exist, which messages are read and
 what the model answers. Assertions compare the
 exact model call, the exact stored records, the outcome kind and the result
@@ -136,7 +136,7 @@ class _StubReader:
         return OperationResult.success(self._messages)
 
 
-class _StubGenerator:
+class _StubWriter:
     def __init__(self, result: OperationResult[str] | None = None) -> None:
         self._result = result or OperationResult.success(data=_model_answer())
         self.calls: list[dict[str, Any]] = []
@@ -144,7 +144,7 @@ class _StubGenerator:
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self,
         transcript: str,
         *,
@@ -174,7 +174,7 @@ async def _generate(
     sequence: int = _PENDING.sequence,
     instructions: str = "",
     reader: _StubReader | None = None,
-    generator: _StubGenerator | None = None,
+    ai_writer: _StubWriter | None = None,
     incidents: _CountingIncidents | None = None,
     security_confirmed: bool = False,
 ) -> OperationResult[StatusUpdateDraftOutcome]:
@@ -189,7 +189,7 @@ async def _generate(
         security_confirmed=security_confirmed,
         reader=reader or _StubReader(),
         store=store,
-        generator=generator or _StubGenerator(),
+        ai_writer=ai_writer or _StubWriter(),
         now=_NOW,
     )
 
@@ -202,10 +202,10 @@ class TestNothingNew:
     ) -> None:
         """Code decides nothing is new: the typed fields are kept, current action takes the wording, nothing is sent out."""
         store = await _store(_APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
         incidents = _CountingIncidents()
 
-        result = await _generate(store=store, reader=_StubReader(messages), generator=generator, incidents=incidents)
+        result = await _generate(store=store, reader=_StubReader(messages), ai_writer=ai_writer, incidents=incidents)
 
         expected = replace(
             _PENDING,
@@ -218,32 +218,32 @@ class TestNothingNew:
             origin=StatusUpdateOrigin.CARRIED_FORWARD,
         )
         assert result.data == StatusUpdateDraftOutcome(update=expected, kind=StatusUpdateOutcomeKind.CARRIED_FORWARD)
-        assert (generator.calls, incidents.calls) == ([], [])
+        assert (ai_writer.calls, incidents.calls) == ([], [])
         assert await _stored(store) == (expected, _PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_a_message_at_the_approved_cutoff_is_not_new(self) -> None:
         """Only messages strictly after the approved update's cutoff count as new."""
         store = await _store(_APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, reader=_StubReader([_human("already covered", 90)]), generator=generator)
+        result = await _generate(store=store, reader=_StubReader([_human("already covered", 90)]), ai_writer=ai_writer)
 
         assert result.data is not None
         assert result.data.kind is StatusUpdateOutcomeKind.CARRIED_FORWARD
-        assert generator.calls == []
+        assert ai_writer.calls == []
 
     @pytest.mark.asyncio
     async def test_no_approved_update_and_no_people_is_empty_history_without_a_model_call(self) -> None:
         """A first draft with nothing anyone said has nothing to fill from."""
         first = _record(1, StatusUpdateState.DRAFT)
         store = await _store(first)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, sequence=1, reader=_StubReader([_bot("ALARM", 5)]), generator=generator)
+        result = await _generate(store=store, sequence=1, reader=_StubReader([_bot("ALARM", 5)]), ai_writer=ai_writer)
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.EMPTY_HISTORY)
-        assert generator.calls == []
+        assert ai_writer.calls == []
         assert await _stored(store) == (first,)
 
 
@@ -252,11 +252,11 @@ class TestModelCall:
     async def test_new_people_and_no_instructions_fill_from_the_base_prompt_over_the_typed_fields(self) -> None:
         """Blank instructions mean draft from the conversation: one call, the base rules, the typed fields as input."""
         store = await _store(_APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, reader=_StubReader([_human("rolled back", 10)]), generator=generator)
+        result = await _generate(store=store, reader=_StubReader([_human("rolled back", 10)]), ai_writer=ai_writer)
 
-        assert generator.calls == [
+        assert ai_writer.calls == [
             {"transcript": build_redraft_input(_CURRENT, "Ada: rolled back"), "instructions": INSTRUCTIONS}
         ]
         assert result.data is not None
@@ -272,11 +272,11 @@ class TestModelCall:
     ) -> None:
         """Instructions are a request, so the model is called even when nothing new was said."""
         store = await _store(_APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, instructions=f"  {_GUIDANCE} ", reader=_StubReader(messages), generator=generator)
+        result = await _generate(store=store, instructions=f"  {_GUIDANCE} ", reader=_StubReader(messages), ai_writer=ai_writer)
 
-        assert [call["instructions"] for call in generator.calls] == [build_redraft_instructions(_GUIDANCE)]
+        assert [call["instructions"] for call in ai_writer.calls] == [build_redraft_instructions(_GUIDANCE)]
         assert result.data is not None
         assert (result.data.kind, result.data.update.origin) == (
             StatusUpdateOutcomeKind.DRAFTED,
@@ -287,11 +287,11 @@ class TestModelCall:
     async def test_a_first_draft_with_people_is_filled_by_the_model(self) -> None:
         """Without an approved update every person's message is new."""
         store = await _store(_record(1, StatusUpdateState.DRAFT, cutoff_minutes_ago=600))
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, sequence=1, reader=_StubReader([_human("hello", 50)]), generator=generator)
+        result = await _generate(store=store, sequence=1, reader=_StubReader([_human("hello", 50)]), ai_writer=ai_writer)
 
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
         assert result.data is not None
         assert (result.data.update.sequence, result.data.update.origin) == (2, StatusUpdateOrigin.MODEL)
 
@@ -309,12 +309,12 @@ class TestSecurityGate:
     async def test_an_unconfirmed_security_incident_refuses_before_the_model(self, incident: dict[str, Any]) -> None:
         """A model call that may expose a security incident needs the responder's confirmation first."""
         store = await _store(_APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
         result = await _generate(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=generator,
+            ai_writer=ai_writer,
             incidents=_CountingIncidents(**incident),
         )
 
@@ -322,7 +322,7 @@ class TestSecurityGate:
             OperationStatus.PERMANENT_ERROR,
             ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
         )
-        assert generator.calls == []
+        assert ai_writer.calls == []
         assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
@@ -330,33 +330,33 @@ class TestSecurityGate:
         """The responder's confirmation is explicit consent, so the flag is not read."""
         store = await _store(_APPROVED, _PENDING)
         incidents = _CountingIncidents(security_incident=True)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
         result = await _generate(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=generator,
+            ai_writer=ai_writer,
             incidents=incidents,
             security_confirmed=True,
         )
 
         assert result.is_success
         assert incidents.calls == []
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
 
 
 class TestFailuresKeepThePendingDraft:
     @pytest.mark.asyncio
     async def test_a_model_failure_passes_through_and_stores_nothing(self) -> None:
-        """The generator's classified error reaches the caller; the pending draft stays latest."""
+        """The ai_writer's classified error reaches the caller; the pending draft stays latest."""
         store = await _store(_APPROVED, _PENDING)
         failure: OperationResult[str] = OperationResult.permanent_error(
-            message="not configured", error_code="TEXT_GENERATION_UNAVAILABLE"
+            message="not configured", error_code="AI_WRITING_UNAVAILABLE"
         )
 
-        result = await _generate(store=store, reader=_StubReader([_human("x", 5)]), generator=_StubGenerator(failure))
+        result = await _generate(store=store, reader=_StubReader([_human("x", 5)]), ai_writer=_StubWriter(failure))
 
-        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, "TEXT_GENERATION_UNAVAILABLE")
+        assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, "AI_WRITING_UNAVAILABLE")
         assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
@@ -367,7 +367,7 @@ class TestFailuresKeepThePendingDraft:
         result = await _generate(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=_StubGenerator(OperationResult.success(data="I would rather not.")),
+            ai_writer=_StubWriter(OperationResult.success(data="I would rather not.")),
         )
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, DRAFT_UNPARSEABLE_CODE)
@@ -379,10 +379,10 @@ class TestFailuresKeepThePendingDraft:
         """Only the pending draft the responder sees can be filled; anything else changed under them."""
         store = await _store(_APPROVED, _PENDING)
         reader = _StubReader([_human("x", 5)])
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _generate(store=store, sequence=sequence, reader=reader, generator=generator)
+        result = await _generate(store=store, sequence=sequence, reader=reader, ai_writer=ai_writer)
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
-        assert (reader.reads, generator.calls) == (0, [])
+        assert (reader.reads, ai_writer.calls) == (0, [])
         assert await _stored(store) == (_PENDING, _APPROVED)

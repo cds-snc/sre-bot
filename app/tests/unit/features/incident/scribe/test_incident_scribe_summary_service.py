@@ -25,7 +25,7 @@ def _fixed_clock_and_timezone(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 class _StubSummarizer:
-    """Minimal ``TextGenerator`` stub capturing the transcript it receives."""
+    """Minimal ``AIWriter`` stub capturing the transcript it receives."""
 
     def __init__(self, result: OperationResult[str]) -> None:
         self._result = result
@@ -36,7 +36,7 @@ class _StubSummarizer:
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self, transcript: str, *, instructions: str | None = None, max_output_tokens: int | None = None
     ) -> OperationResult[str]:
         self.calls += 1
