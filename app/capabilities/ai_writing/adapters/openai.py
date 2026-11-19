@@ -6,11 +6,13 @@ returns ``OperationResult``; unmapped exceptions propagate, as they are bugs, no
 model is the capability's [ai_writing] model; the output budget and temperature are the caller's.
 """
 
+from collections.abc import Sequence
 from typing import Any
 
 import structlog
 
-from capabilities.ai_writing.api import AIWriter
+from capabilities.ai_writing import service
+from capabilities.ai_writing.api import AIWriter, FilledTemplate, TemplateField, TemplateSection
 from contracts.operations.result import OperationResult
 from integrations.openai.client import build_openai_client, classify_openai_error
 from integrations.openai.settings import OpenAISettings, get_openai_settings
@@ -99,6 +101,27 @@ class OpenAIWriter(AIWriter):
             logger.warning("openai_write_empty_content", finish_reason=finish_reason)
 
         return OperationResult.success(data=text)
+
+    async def fill_template(
+        self,
+        source: str,
+        *,
+        sections: Sequence[TemplateSection],
+        instructions: str,
+        max_output_tokens: int,
+        temperature: float | None = None,
+        fields: Sequence[TemplateField] = (),
+    ) -> OperationResult[FilledTemplate]:
+        """Fill the template through ``write`` (the capability's template fill)."""
+        return await service.fill_template(
+            self,
+            source,
+            sections=sections,
+            instructions=instructions,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            fields=fields,
+        )
 
 
 def _error_body(exc: Exception) -> str:

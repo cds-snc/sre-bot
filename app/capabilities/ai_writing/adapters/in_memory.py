@@ -2,20 +2,22 @@
 
 Available, it answers ``respond(source, instructions)`` (a fixed text by default) or a scripted
 result; unavailable, it answers ``AI_WRITING_UNAVAILABLE`` like the unconfigured writer.
-Every call is recorded.
+Every call is recorded; ``fill_template`` runs the capability's real template fill over ``write``,
+so its recorded call carries the composed request.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from capabilities.ai_writing.api import AIWriter
+from capabilities.ai_writing import service
+from capabilities.ai_writing.api import AIWriter, FilledTemplate, TemplateField, TemplateSection
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 
 
 @dataclass(frozen=True)
 class WritingCall:
-    """One recorded ``write`` call."""
+    """One recorded ``write`` call (a ``fill_template`` call records the ``write`` it makes)."""
 
     source: str
     instructions: str
@@ -55,3 +57,24 @@ class InMemoryAIWriter(AIWriter):
         if self._result is not None:
             return self._result
         return OperationResult.success(data=self._respond(source, instructions))
+
+    async def fill_template(
+        self,
+        source: str,
+        *,
+        sections: Sequence[TemplateSection],
+        instructions: str,
+        max_output_tokens: int,
+        temperature: float | None = None,
+        fields: Sequence[TemplateField] = (),
+    ) -> OperationResult[FilledTemplate]:
+        """Fill the template through ``write``, recording that call."""
+        return await service.fill_template(
+            self,
+            source,
+            sections=sections,
+            instructions=instructions,
+            max_output_tokens=max_output_tokens,
+            temperature=temperature,
+            fields=fields,
+        )

@@ -14,6 +14,7 @@ import pytest
 from structlog.testing import capture_logs
 
 from capabilities.ai_writing.adapters.openai import OpenAIWriter
+from capabilities.ai_writing.api import TemplateSection
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
@@ -171,3 +172,28 @@ class TestErrorDiagnostics:
         assert result.status == OperationStatus.TRANSIENT_ERROR
         (failed,) = [entry for entry in logs if entry["event"] == "openai_write_failed"]
         assert failed["response_body"] == ""
+
+
+@pytest.mark.parametrize(("temperature", "expected"), [(None, None), (0.3, 0.3)])
+async def test_a_fill_sends_the_budget_and_a_temperature_only_when_set(
+    openai_settings: OpenAISettings, temperature: float | None, expected: float | None
+) -> None:
+    captured: dict = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = json.loads(request.read().decode())
+        return _completion('{"Trigger": "A deploy."}')
+
+    with patch(_CLIENT, return_value=_mock_client(handler, openai_settings)):
+        result = await OpenAIWriter(settings=openai_settings, model=MODEL).fill_template(
+            "the source",
+            sections=(TemplateSection("Trigger"),),
+            instructions="Answer in JSON.",
+            max_output_tokens=_BUDGET,
+            temperature=temperature,
+        )
+
+    assert result.status is OperationStatus.SUCCESS
+    assert captured["body"]["max_completion_tokens"] == _BUDGET
+    assert captured["body"].get("temperature") == expected
+    assert captured["body"]["messages"][0] == {"role": "system", "content": "Answer in JSON."}
