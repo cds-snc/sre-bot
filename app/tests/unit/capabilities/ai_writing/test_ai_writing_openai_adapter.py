@@ -110,6 +110,14 @@ async def test_a_rate_limit_is_transient_with_its_retry_after(openai_settings: O
     )
 
 
+async def test_an_unparseable_body_is_a_permanent_invalid_response(openai_settings: OpenAISettings) -> None:
+    with capture_logs() as logs:
+        result = await _write(openai_settings, lambda request: httpx.Response(200, text="<html>gateway page</html>"))
+
+    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE)
+    assert "openai_write_failed" in [entry["event"] for entry in logs]
+
+
 class TestTemperature:
     """Drafting wants reproducibility: the same channel should draft the same."""
 

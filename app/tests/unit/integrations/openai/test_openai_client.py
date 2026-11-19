@@ -7,6 +7,7 @@ factory's transport is observed through a recording stand-in for
 settings the client is built with rather than httpx internals.
 """
 
+import json
 from typing import Any
 
 import httpx
@@ -96,6 +97,11 @@ class TestClassifyOpenAIError:
             ErrorCode.CONNECTION_ERROR,
             None,
         )
+
+    def test_an_unparseable_body_is_a_permanent_invalid_response(self) -> None:
+        exc = json.JSONDecodeError("Expecting value", "<html>", 0)
+
+        assert classify_openai_error(exc) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE, None)
 
     def test_unmapped_exception_propagates(self) -> None:
         with pytest.raises(KeyError):
