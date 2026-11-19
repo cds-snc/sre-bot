@@ -18,8 +18,8 @@ Paths are relative to `app/features/incident/scribe/` unless they start with
 | --- | --- | --- |
 | Slack handler | `handle_draft_command` in `entrypoints/slack.py` | `handle_summarize_command` in `entrypoints/slack.py` |
 | Service function | `draft_incident_document_from_conversation` → `draft_incident_document` in `service.py` | `summarize_incident_conversation` → `summarize_transcript` in `service.py` |
-| Interfaces | `IncidentStore`, `IncidentReport`, `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) | `IncidentTranscriptReader` (`core/api.py`); `Summarizer` (`integrations.openai`) |
-| Adapters | `core/adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript), `app/integrations/openai/` | `core/adapters/slack.py` (transcript), `app/integrations/openai/` |
+| Interfaces | `IncidentStore`, `IncidentReport`, `IncidentTranscriptReader` (`core/api.py`); `TextGenerator` (`capabilities/text_generation/api.py`) | `IncidentTranscriptReader` (`core/api.py`); `TextGenerator` (`capabilities/text_generation/api.py`) |
+| Adapters | `core/adapters/google_docs.py` (read report, copy, fill copy), `core/adapters/slack.py` (transcript); the capability's OpenAI adapter | `core/adapters/slack.py` (transcript); the capability's OpenAI adapter |
 | Wiring | `entrypoints/slack.py` builds the `IncidentStore` per service scope (`core/api.py`: `build_incident_store`); `core/api.py`: `get_incident_report`, `get_incident_transcript_reader` | `core/api.py`: `get_incident_transcript_reader` |
 | Settings | `IncidentDraftSettings`, prefix `INCIDENT_DRAFT__` | `IncidentSummarySettings`, prefix `INCIDENT_SUMMARY__` |
 | Locale files | `locales/incident_draft.en-US.yml`, `locales/incident_draft.fr-FR.yml` | `locales/incident_summary.en-US.yml`, `locales/incident_summary.fr-FR.yml` |
@@ -45,7 +45,7 @@ entrypoints/slack.py      parse args → typed values → one service call → O
 service.py                platform-agnostic; no Slack, HTTP or Google SDK imports
   │
   ├─► IncidentTranscriptReader ── core/api.py ──► core/adapters/slack.py        (Slack history)
-  ├─► Summarizer ─────────────── integrations.openai                            (text generation)
+  ├─► TextGenerator ──────────── capabilities/text_generation/api.py            (text generation)
   │
   │   draft only:
   ├─► IncidentStore ──────────── core/api.py (built per service scope)          (the channel's incident and its report)
@@ -77,9 +77,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
   `DraftWriteResult`) come from `features/incident/core` through `core/api.py`.
 - `core/adapters/google_docs.py` — the umbrella's Google Docs and Drive
   adapter behind `IncidentReport` (Docs read + Drive copy + Docs populate); the scribe package itself
-  imports no Google code. `service.py` imports the
-  `Summarizer` interface and `entrypoints/slack.py` the transport models, both by
-  design.
+  imports no Google code. `service.py` imports the text-generation capability's
+  `api.py` and `entrypoints/slack.py` the transport models, both by design.
 - `settings.py` — partitioned feature settings, one class and one cached getter
   per use case.
 - `locales/` — EN/FR message catalogues, one pair per use case. One
@@ -92,10 +91,10 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
    returning `OperationResult`. Declare any new
    interface as a `Protocol` beside it. Read the channel through
    `IncidentTranscriptReader` from `core/api.py`; import nothing else from
-   `core`. Generate text through a scribe-local interface bound in
-   `adapters/` (as `comms/adapters/text_generation.py` does for status
-   updates): `service.py`'s direct `integrations.openai` import is a
-   shrink-only import-linter exemption that no new module may join.
+   `core`. Generate text through the text-generation capability's
+   `TextGenerator` (`capabilities/text_generation/api.py`), as `service.py`
+   and comms do; no feature module imports `integrations.openai`
+   (import-linter contract (o)).
 2. **Domain values.** Add frozen dataclasses to `domain.py` only if the use
    case needs its own values.
 3. **Adapters.** A new external call goes in `adapters/<system>.py`, wired
@@ -417,7 +416,7 @@ Two exceptions:
   empty completion, prose instead of JSON, and a cutoff otherwise look
   identical.
 
-`openai_summarize_truncated` records the budget and how much came back — the
+`openai_generate_truncated` records the budget and how much came back — the
 number to look at before raising `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS`, since a
 length well short of the budget means the model has its own ceiling and raising
 ours will not help.
@@ -444,8 +443,8 @@ channel, for someone jumping into an incident.
 Reads the incident conversation's transcript (recent channel history with
 author display names resolved, without this bot's own posts and Slack system
 events), builds a time-stamped transcript, and asks the
-`Summarizer` interface (OpenAI, see
-`app/integrations/openai/`) to produce a concise, factual summary: what is
+text-generation capability's `TextGenerator` (OpenAI, see
+`app/capabilities/text_generation/`) to produce a concise, factual summary: what is
 happening, current status, actions taken, and next steps. The summary is
 returned **ephemerally** — only the person who ran
 the command sees it, so it never adds noise to the incident channel.

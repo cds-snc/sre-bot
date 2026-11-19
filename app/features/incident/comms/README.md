@@ -29,7 +29,7 @@ entrypoints/slack.py      parse payload → typed values → one service call �
 service/ (draft, form, approval, publication, history)      platform-agnostic; no Slack or OpenAI imports
   │
   ├─► IncidentStore and StatusUpdateStore (passed in), IncidentTranscriptReader (the record's conversation; a failed read is an empty window) ── core/api.py
-  ├─► TextGenerator ──────── providers.py ──► adapters/text_generation.py   (integrations.openai)
+  ├─► TextGenerator ──────── capabilities/text_generation/api.py           (the text-generation capability)
   └─► StatusPagePublisher ── providers.py ──► adapters/copy_ready.py         (domain.render_copy_ready)
 ```
 
@@ -90,14 +90,12 @@ service/ (draft, form, approval, publication, history)      platform-agnostic; n
   time, from labels the caller has already localized), with
   `render_copy_ready`, which every `StatusPagePublisher` renders through. The
   `StatusUpdate` record itself comes from `features/incident/core`.
-- `interfaces.py` — the comms-owned interfaces: `TextGenerator` and
-  `StatusPagePublisher`.
-- `adapters/text_generation.py` — binds `TextGenerator` to the OpenAI
-  `Summarizer`; the subdomain's only integration import.
+- `interfaces.py` — the comms-owned interface `StatusPagePublisher`. Text
+  generation is the capability's `TextGenerator`, from
+  `capabilities/text_generation/api.py`; comms imports no integration.
 - `adapters/copy_ready.py` — the `StatusPagePublisher` that renders copy-ready
   text for a person to paste; it calls no status page.
-- `providers.py` — feature-local DI wiring for the text generator
-  (`text_generation_available`) and the publisher.
+- `providers.py` — feature-local DI wiring for the publisher.
 - `settings.py` — `IncidentStatusUpdateSettings` and its cached getter.
 - `locales/` — the EN/FR `incident_status_update` catalogue, loaded by one
   `register_i18n_resources` registration (resource domain `incident_comms`).
@@ -153,7 +151,7 @@ A first update with no message from a person yet is refused with the
 empty-history notice.
 
 Draft with AI: the review form opens with an AI section only when text
-generation is configured (`text_generation_available`): an optional
+generation is available (the capability's `TextGenerator.is_available()`): an optional
 instructions input and a Draft with AI button
 (`incident.comms.status_update.generate`). Without it the form has the stage,
 the fields, Save draft and Approve only. `generate_status_update_draft` takes

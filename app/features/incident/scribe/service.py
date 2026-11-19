@@ -4,8 +4,8 @@ Drafting: the incident document created at channel creation is a template:
 each heading is followed by guidance describing what belongs in that section.
 This service reads those heading/guidance pairs through the incident core ``IncidentReport``, treats
 the guidance as per-section drafting instructions, answers each one from the
-incident channel transcript via the ``Summarizer`` interface
-(``integrations.openai``), and writes the answers into a new draft document on
+incident channel transcript via the text-generation capability's
+``TextGenerator`` (``capabilities.text_generation.api``), and writes the answers into a new draft document on
 each run (a fresh copy of the incident report template). The incident report
 created at channel creation is only ever read, never modified.
 
@@ -17,7 +17,7 @@ and drafts from it.
 
 Summarizing: ``summarize_incident_conversation`` reads the conversation's
 transcript through the same ``IncidentTranscriptReader`` and delegates to the
-``Summarizer`` interface to produce a catch-up summary for a responder joining
+``TextGenerator`` to produce a catch-up summary for a responder joining
 an incident channel.
 
 This module is deliberately free of Slack, HTTP, and Google SDK imports: it
@@ -36,6 +36,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
+from capabilities.text_generation.api import TextGenerator, get_text_generator
 from contracts.operations import OperationResult, OperationStatus
 from features.incident.core.api import (
     ConversationReference,
@@ -58,7 +59,6 @@ from features.incident.scribe.settings import (
     get_incident_draft_settings,
     get_incident_summary_settings,
 )
-from integrations.openai import Summarizer, get_summarizer
 
 logger = structlog.get_logger()
 
@@ -300,7 +300,7 @@ async def draft_incident_document(
     messages: Sequence[TranscriptMessage],
     *,
     reports: IncidentReport | None = None,
-    summarizer: Summarizer | None = None,
+    summarizer: TextGenerator | None = None,
 ) -> OperationResult[DraftedDocument]:
     """Draft a filled-in copy of the incident report from channel history.
 
@@ -310,8 +310,8 @@ async def draft_incident_document(
             source of facts for the drafted content.
         reports: Optional ``IncidentReport``; defaults to the incident core's
             process singleton. Injected in tests.
-        summarizer: Optional ``Summarizer`` interface; defaults to the process
-            singleton. Injected in tests.
+        summarizer: Optional ``TextGenerator``; defaults to the capability's process
+            generator. Injected in tests.
 
     Returns:
         ``OperationResult`` carrying a ``DraftedDocument`` on success, or a
@@ -346,9 +346,9 @@ async def draft_incident_document(
             error_code=EMPTY_HISTORY_CODE,
         )
 
-    summarizer = summarizer or get_summarizer()
+    summarizer = summarizer or get_text_generator()
     payload = _build_payload(sections, messages)
-    result = await summarizer.summarize(
+    result = await summarizer.generate(
         payload,
         instructions=_DRAFT_INSTRUCTIONS,
         max_output_tokens=get_incident_draft_settings().MAX_OUTPUT_TOKENS,
@@ -950,7 +950,7 @@ async def summarize_transcript(
     messages: Sequence[TranscriptMessage],
     *,
     instructions: str | None = None,
-    summarizer: Summarizer | None = None,
+    summarizer: TextGenerator | None = None,
 ) -> OperationResult[str]:
     """Summarize a chronological sequence of channel messages.
 
@@ -958,9 +958,9 @@ async def summarize_transcript(
         messages: Chronologically ordered messages to summarize.
         instructions: Optional extra guidance appended after this feature's
             incident-content prompt and its Slack mrkdwn formatting rules
-            before being sent to the ``Summarizer`` interface.
-        summarizer: Optional ``Summarizer`` interface; defaults to the process
-            singleton. Injected in tests.
+            before being sent to the ``TextGenerator``.
+        summarizer: Optional ``TextGenerator``; defaults to the capability's process
+            generator. Injected in tests.
 
     Returns:
         ``OperationResult`` carrying the summary text on success, a permanent
@@ -977,11 +977,11 @@ async def summarize_transcript(
         )
 
     transcript = _build_summary_payload(messages, get_incident_summary_settings().TIMEZONE)
-    summarizer = summarizer or get_summarizer()
+    summarizer = summarizer or get_text_generator()
     full_instructions = f"{_CONTENT_INSTRUCTIONS}\n\n{_SUMMARY_FORMAT_INSTRUCTIONS}"
     if instructions:
         full_instructions = f"{full_instructions}\n\n{instructions}"
-    result = await summarizer.summarize(transcript, instructions=full_instructions)
+    result = await summarizer.generate(transcript, instructions=full_instructions)
 
     if result.is_success:
         log.info("incident_summary_generated")

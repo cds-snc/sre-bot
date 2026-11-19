@@ -20,10 +20,10 @@ result. This module imports only ``core.api`` from the core.
 from collections.abc import Callable
 from dataclasses import replace
 
+from capabilities.text_generation.api import TextGenerator, get_text_generator
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import NoNewInformationWording, StatusUpdateEdit, StatusUpdateFormState
-from features.incident.comms.providers import text_generation_available
 from features.incident.comms.service._results import failure
 from features.incident.comms.service.approval import get_draft_for_review
 from features.incident.comms.service.draft import (
@@ -35,7 +35,12 @@ from features.incident.core.api import ConversationReference, IncidentStore, Sta
 
 
 async def start_status_update_form(
-    incidents: IncidentStore, conversation: ConversationReference, *, author: str, store: StatusUpdateStore
+    incidents: IncidentStore,
+    conversation: ConversationReference,
+    *,
+    author: str,
+    store: StatusUpdateStore,
+    generator: TextGenerator | None = None,
 ) -> OperationResult[StatusUpdateFormState]:
     """Return the form for the pending draft, starting a hand-written draft when none is pending.
 
@@ -44,6 +49,7 @@ async def start_status_update_form(
         conversation: The incident conversation the form was opened from.
         author: Platform user id of the responder who pressed New update.
         store: Holds the incident's status updates.
+        generator: Asked whether to offer Draft with AI; defaults to the capability's process generator.
 
     Returns:
         Success with the draft and how it came to be; otherwise the start's classified error.
@@ -52,12 +58,12 @@ async def start_status_update_form(
     if not started.is_success or started.data is None:
         return failure(started)
     return OperationResult.success(
-        data=StatusUpdateFormState(update=started.data.update, ai_available=text_generation_available(), kind=started.data.kind)
+        data=StatusUpdateFormState(update=started.data.update, ai_available=_ai_available(generator), kind=started.data.kind)
     )
 
 
 async def open_status_update_form(
-    incident_id: str, sequence: int, *, store: StatusUpdateStore
+    incident_id: str, sequence: int, *, store: StatusUpdateStore, generator: TextGenerator | None = None
 ) -> OperationResult[StatusUpdateFormState]:
     """Return the form for the incident's pending draft at ``sequence``, read from ``store``.
 
@@ -68,7 +74,7 @@ async def open_status_update_form(
     stored = await get_draft_for_review(incident_id, sequence, store=store)
     if not stored.is_success or stored.data is None:
         return failure(stored)
-    return OperationResult.success(data=StatusUpdateFormState(update=stored.data, ai_available=text_generation_available()))
+    return OperationResult.success(data=StatusUpdateFormState(update=stored.data, ai_available=_ai_available(generator)))
 
 
 async def save_status_update_form(
@@ -80,6 +86,7 @@ async def save_status_update_form(
     edit: StatusUpdateEdit | None,
     author: str,
     store: StatusUpdateStore,
+    generator: TextGenerator | None = None,
 ) -> OperationResult[StatusUpdateFormState]:
     """Store the typed values as the next draft and return the form to show.
 
@@ -91,6 +98,7 @@ async def save_status_update_form(
         edit: The typed stage and fields; ``None`` when the form had no readable stage.
         author: Platform user id of the responder who pressed Save draft.
         store: Holds the incident's status updates.
+        generator: Asked whether to offer Draft with AI; defaults to the capability's process generator.
 
     Returns:
         Success with the saved draft; success with ``kept`` set when nothing
@@ -102,13 +110,11 @@ async def save_status_update_form(
     else:
         saved = await save_status_update_draft(incidents, conversation, sequence, edit=edit, author=author, store=store)
         if saved.is_success and saved.data is not None:
-            return OperationResult.success(
-                data=StatusUpdateFormState(update=saved.data, ai_available=text_generation_available())
-            )
+            return OperationResult.success(data=StatusUpdateFormState(update=saved.data, ai_available=_ai_available(generator)))
         if saved.error_code == ErrorCode.STATUS_UPDATE_CONFLICT:
             return failure(saved)
         failure_code = saved.error_code
-    return await _kept(store, incident_id, sequence, edit, failure_code, ai_available=text_generation_available())
+    return await _kept(store, incident_id, sequence, edit, failure_code, ai_available=_ai_available(generator))
 
 
 async def fill_status_update_form(
@@ -177,6 +183,11 @@ async def fill_status_update_form(
         return failure(filled)
     ai_available = filled.error_code != ErrorCode.TEXT_GENERATION_UNAVAILABLE
     return await _kept(store, incident_id, sequence, edit, filled.error_code, ai_available=ai_available, stored=base)
+
+
+def _ai_available(generator: TextGenerator | None) -> bool:
+    """Whether the form offers Draft with AI: the capability answers, backed or not (plugin-architecture.md)."""
+    return (generator or get_text_generator()).is_available()
 
 
 async def _kept(

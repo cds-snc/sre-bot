@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms.domain import StatusUpdateDraftOutcome, StatusUpdateEdit, StatusUpdateOutcomeKind
@@ -39,6 +40,8 @@ from features.incident.core.api import (
 from tests.factories.incident import incident_on, incident_store_with, slack_conversation
 
 pytestmark = pytest.mark.unit
+
+_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
 
 _NOW = datetime(2026, 10, 9, 15, 0, tzinfo=UTC)
 _CHANNEL = "C1"
@@ -100,7 +103,7 @@ class _Calls:
 def _install(monkeypatch: pytest.MonkeyPatch, calls: _Calls, *, ai: bool = True) -> None:
     monkeypatch.setattr(form, "save_status_update_draft", calls.save)
     monkeypatch.setattr(form, "get_draft_for_review", calls.get_draft)
-    monkeypatch.setattr(form, "text_generation_available", lambda: ai)
+    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=ai))
 
 
 async def test_a_save_returns_the_saved_draft_without_reading_the_stored_one(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -200,7 +203,7 @@ async def test_start_returns_the_started_draft_with_its_kind(monkeypatch: pytest
         return OperationResult.success(data=outcome)
 
     monkeypatch.setattr(form, "start_status_update_draft", started)
-    monkeypatch.setattr(form, "text_generation_available", lambda: True)
+    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
 
     result = await start_status_update_form(_incidents(), _CONVERSATION, author="U2", store=_STORE)
 

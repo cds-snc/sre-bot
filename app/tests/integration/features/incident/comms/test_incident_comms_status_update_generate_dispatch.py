@@ -31,6 +31,7 @@ from typing import Any
 import pytest
 
 import features.incident.comms as comms_module
+from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
 from contracts.operations import OperationResult
 from features.incident.comms.domain import StatusUpdateEdit
 from features.incident.comms.entrypoints.slack_views import (
@@ -59,6 +60,8 @@ from tests.factories.incident import incident_scopes, status_update_store_in
 from tests.factories.slack_bolt import TRIGGER_ID, USER_ID, Harness, harness_fixture
 
 pytestmark = pytest.mark.integration
+
+_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
 
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C0INCIDENT"
@@ -169,7 +172,10 @@ class _StubReader:
 class _StubGenerator:
     calls: list[dict[str, Any]] = field(default_factory=list)
 
-    async def summarize(
+    def is_available(self) -> bool:
+        return True
+
+    async def generate(
         self,
         transcript: str,
         *,
@@ -200,7 +206,7 @@ def store(monkeypatch: pytest.MonkeyPatch, generator: _StubGenerator, records: I
         "generate_status_update_draft",
         partial(generate_status_update_draft, reader=_StubReader(), generator=generator, now=_NOW),
     )
-    monkeypatch.setattr(form, "text_generation_available", lambda: True)
+    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
     return status_updates
 
 

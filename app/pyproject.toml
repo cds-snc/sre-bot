@@ -47,6 +47,7 @@ geolocate = "packages.geolocate"
 oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
 oncall = "capabilities.oncall.plugin"
+text_generation = "capabilities.text_generation.plugin"
 
 [tool.ruff]
 target-version = "py314"
@@ -343,7 +344,6 @@ ignore_imports = [
     "**.adapters.** -> integrations.**",
     # Existing violations, seeded 2026-09-28 by TASK-18 (decisions/outbound-clients.md Migration).
     # Shrink-only: remove an entry when its import is fixed; never add one.
-    "features.incident.scribe.service -> integrations.openai",
 ]
 
 [[tool.importlinter.contracts]]
@@ -452,6 +452,7 @@ protected_modules = [
     "packages.oncall_sync",
     "packages.rant",
     "capabilities.oncall.plugin",
+    "capabilities.text_generation.plugin",
 ]
 allowed_importers = []
 unmatched_ignore_imports_alerting = "error"
@@ -476,3 +477,13 @@ ignore_imports = [
     "modules.incident.on_call -> integrations.opsgenie",  # TASK-145.7.10
     "packages.oncall_sync.adapters.opsgenie -> integrations.opsgenie",  # TASK-146.2
 ]
+
+[[tool.importlinter.contracts]]
+id = "openai-importers"
+name = "(o) integrations.openai is imported only by the text-generation OpenAI adapter, besides the host"
+# decisions/plugin-architecture.md: a new model vendor is an adapter inside the text-generation
+# capability. The host (server) reads the settings slice for the configuration phase and the
+# plugin requirements.
+type = "protected"
+protected_modules = ["integrations.openai"]
+allowed_importers = ["server", "capabilities.text_generation.adapters.openai"]

@@ -38,9 +38,9 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 
+from capabilities.text_generation.api import TextGenerator, get_text_generator
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
-from features.incident.comms import providers
 from features.incident.comms.domain import (
     DraftedFields,
     NoNewInformationWording,
@@ -48,7 +48,6 @@ from features.incident.comms.domain import (
     StatusUpdateEdit,
     StatusUpdateOutcomeKind,
 )
-from features.incident.comms.interfaces import TextGenerator
 from features.incident.comms.service._results import STAGE_ORDER, failure
 from features.incident.comms.service.prompt import (
     INSTRUCTIONS,
@@ -376,7 +375,7 @@ async def _generate_fields(
     log: structlog.stdlib.BoundLogger,
 ) -> OperationResult[DraftedFields]:
     """Make the one model call and parse its answer strictly; never logs the transcript or instructions."""
-    generated = await generator.summarize(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
+    generated = await generator.generate(transcript, instructions=instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
     if not generated.is_success or generated.data is None:
         log.warning("incident_status_update_generation_failed", status=generated.status, error_code=generated.error_code)
         return failure(generated)
@@ -589,4 +588,4 @@ def _posted_at(message: TranscriptMessage) -> datetime:
 
 
 def _default_generator() -> TextGenerator:
-    return providers.get_status_update_text_generator()
+    return get_text_generator()

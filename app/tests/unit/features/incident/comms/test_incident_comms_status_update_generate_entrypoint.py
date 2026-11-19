@@ -673,7 +673,10 @@ class _RecordingGenerator:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
 
-    async def summarize(
+    def is_available(self) -> bool:
+        return True
+
+    async def generate(
         self, transcript: str, *, instructions: str | None = None, max_output_tokens: int | None = None
     ) -> OperationResult[str]:
         self.calls.append({"transcript": transcript, "instructions": instructions})
