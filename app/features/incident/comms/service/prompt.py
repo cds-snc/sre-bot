@@ -4,13 +4,14 @@ The model fills structured fields only; the text people read is rendered from
 those fields by the comms profile, never by the prompt
 (decisions/incident-management.md, External status updates). The parser is
 deliberately strict: a public update is never assembled from a partial or
-malformed answer. Generic answer parsing moves to the AI writing
-capability with TASK-134.
+malformed answer, so it reads the answer with the AI writing capability's
+strict extractor, never its salvaging template fill.
 """
 
 import json
 from collections.abc import Sequence
 
+from capabilities.ai_writing.api import extract_json_object
 from features.incident.comms.domain import DraftedFields, StatusUpdateEdit
 from features.incident.core.api import StatusUpdateStage, StatusUpdateText, TranscriptMessage
 
@@ -77,7 +78,7 @@ def parse_drafted_fields(raw: str) -> DraftedFields | None:
     prose are tolerated. A truncated object, a stage outside the vocabulary,
     or any missing, blank or non-string field rejects the whole answer.
     """
-    answer = _first_object(raw)
+    answer = extract_json_object(raw)
     if answer is None:
         return None
     stage_value = answer.get("stage")
@@ -94,15 +95,3 @@ def parse_drafted_fields(raw: str) -> DraftedFields | None:
             values[field] = value.strip()[:MAX_FIELD_CHARS]
         texts[language] = StatusUpdateText(**values)
     return DraftedFields(stage=stage, en=texts["en"], fr=texts["fr"])
-
-
-def _first_object(raw: str) -> dict[str, object] | None:
-    """Decode the first complete JSON object in ``raw``; ``None`` when there is none."""
-    start = raw.find("{")
-    if start < 0:
-        return None
-    try:
-        value, _ = json.JSONDecoder().raw_decode(raw, start)
-    except ValueError:
-        return None
-    return value if isinstance(value, dict) else None

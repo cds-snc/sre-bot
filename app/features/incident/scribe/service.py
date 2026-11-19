@@ -25,7 +25,6 @@ consumes domain values and Protocols and returns an ``OperationResult`` so any
 platform adapter can reuse it.
 """
 
-import json
 import re
 from collections.abc import Callable, Sequence
 from dataclasses import replace
@@ -36,8 +35,14 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import structlog
 
-from capabilities.ai_writing.api import AIWriter, get_ai_writer
-from contracts.operations import OperationResult, OperationStatus
+from capabilities.ai_writing.api import (
+    AIWriter,
+    FilledTemplate,
+    TemplateField,
+    TemplateSection,
+    get_ai_writer,
+)
+from contracts.operations import ErrorCode, OperationResult, OperationStatus
 from features.incident.core.api import (
     ConversationReference,
     DocumentField,
@@ -347,13 +352,19 @@ async def draft_incident_document(
         )
 
     summarizer = summarizer or get_ai_writer()
-    payload = _build_payload(sections, messages)
-    result = await summarizer.write(
-        payload,
+    result = await summarizer.fill_template(
+        _build_source(messages),
+        sections=[TemplateSection(s.heading, s.instructions) for s in sections],
+        fields=[TemplateField(label) for label in _MODEL_FIELD_LABELS],
         instructions=_DRAFT_INSTRUCTIONS,
         max_output_tokens=get_incident_draft_settings().MAX_OUTPUT_TOKENS,
     )
-    if not result.is_success:
+    if result.error_code == ErrorCode.AI_WRITING_UNPARSEABLE:
+        return OperationResult.permanent_error(
+            message="The model did not return a parseable JSON draft",
+            error_code=DRAFT_UNPARSEABLE_CODE,
+        )
+    if not result.is_success or result.data is None:
         log.warning(
             "incident_draft_summarizer_failed",
             status=result.status,
@@ -366,36 +377,19 @@ async def draft_incident_document(
             retry_after=result.retry_after,
         )
 
-    raw = result.data or ""
-    answers, was_truncated = _parse_answers(raw)
-    if answers is not None and was_truncated:
-        # Keep what arrived. Discarding it made sense when a run rewrote a
-        # long-lived draft, where a fragment would replace good content; every
-        # run now writes a fresh document, so a partial draft costs nothing and
-        # beats no draft at all. The timeline is the exception -- see below.
+    filled = result.data
+    if filled.truncated:
+        # Keep what arrived: every run writes a fresh document, so a partial
+        # draft costs nothing and beats no draft at all. The timeline is the
+        # exception -- see _split_run_on_timeline.
         log.warning(
             "incident_draft_truncated_response_salvaged",
-            recovered_sections=len(answers),
+            recovered_sections=sum(1 for answer in filled.sections if answer.text),
             section_count=len(sections),
-            raw_length=len(raw),
-        )
-    if answers is None:
-        # Log what actually came back -- an empty string, prose instead of
-        # JSON, and a response truncated by the token budget all look
-        # identical from the error code alone.
-        log.warning(
-            "incident_draft_unparseable_model_output",
-            raw_length=len(raw),
-            raw_preview=raw[:400],
-        )
-        return OperationResult.permanent_error(
-            message="The model did not return a parseable JSON draft",
-            error_code=DRAFT_UNPARSEABLE_CODE,
         )
 
-    drafts = _build_drafts(sections, answers)
-    _log_answer_coverage(log, sections, answers, drafts)
-    _log_timeline_shape(log, answers, drafts, raw)
+    drafts = _build_drafts(sections, filled)
+    _log_timeline_shape(log, filled, drafts)
     if not any(draft.is_drafted for draft in drafts):
         log.info("incident_draft_no_answers")
         return OperationResult.permanent_error(
@@ -403,7 +397,7 @@ async def draft_incident_document(
             error_code=NO_ANSWERS_CODE,
         )
 
-    fields = _build_fields(answers, messages)
+    fields = _build_fields(filled)
     # Links are resolved before the URLs are collapsed away, so a URL only the
     # model supplied still ends up hyperlinking its "PR <number>".
     links = _resolve_pr_links(messages, drafts)
@@ -419,7 +413,7 @@ async def draft_incident_document(
     outcome = DraftedDocument(
         document_id=written.document_id,
         created=written.created,
-        partial=was_truncated,
+        partial=filled.truncated,
         drafted_headings=tuple(d.heading for d in drafts if d.is_drafted),
         unanswered_headings=tuple(d.heading for d in drafts if not d.is_drafted),
     )
@@ -434,82 +428,34 @@ async def draft_incident_document(
     )
 
 
-def _log_timeline_shape(
-    log: Any,
-    answers: dict[str, str],
-    drafts: Sequence[SectionDraft],
-    raw: str,
-) -> None:
-    """Log how many timeline entries the model returned, and what they were.
+def _log_timeline_shape(log: Any, filled: FilledTemplate, drafts: Sequence[SectionDraft]) -> None:
+    """Log how many timeline entries the model returned and how many were written.
 
-    A one-entry timeline in the finished document has three possible causes
-    that are indistinguishable from the document itself: the model returned one
-    entry, it returned many that something here collapsed, or the running
-    process is not executing the current prompt. ``model_entries`` versus
-    ``written_entries`` separates the first two, and the preview shows which
-    prompt the answer was actually shaped by.
+    A one-entry timeline in the finished document has two causes that are
+    indistinguishable from the document itself: the model returned one entry,
+    or it returned many that something here collapsed. ``model_entries``
+    versus ``written_entries`` separates them.
     """
+    answers = dict(zip((d.heading for d in drafts), (a.text for a in filled.sections), strict=True))
     for draft in drafts:
         if "timeline" not in draft.heading.lower() or not draft.is_drafted:
             continue
 
-        answer = _match_answer(draft.heading, answers, {_normalize_heading(k): v for k, v in answers.items()}) or ""
-        written = len(draft.content.splitlines())
+        answer = answers[draft.heading]
         log.info(
             "incident_draft_timeline_shape",
             heading=draft.heading,
             model_entries=len(answer.splitlines()),
-            written_entries=written,
+            written_entries=len(draft.content.splitlines()),
             model_chars=len(answer),
-            raw_preview=raw[:400] if written < 10 else None,
         )
 
 
-def _log_answer_coverage(
-    log: Any,
-    sections: Sequence[DocumentSection],
-    answers: dict[str, str],
-    drafts: Sequence[SectionDraft],
-) -> None:
-    """Log why any section came out unanswered.
-
-    Distinguishes the three causes that all look identical in the finished
-    document: the model omitted the section, it answered under a key matching
-    no heading (so the response was probably truncated or the heading drifted),
-    or it deliberately returned an empty string.
-    """
-    matched = {_normalize_heading(s.heading) for s in sections}
-    unmatched_keys = [key for key in answers if _normalize_heading(key) not in matched]
-    blank_keys = [key for key, value in answers.items() if not value.strip()]
-    missing = [d.heading for d in drafts if not d.is_drafted]
-
-    if not missing and not unmatched_keys:
-        return
-
-    log.warning(
-        "incident_draft_answer_coverage",
-        section_count=len(sections),
-        answer_count=len(answers),
-        unanswered_headings=missing,
-        model_keys_matching_no_heading=unmatched_keys,
-        model_keys_left_blank=blank_keys,
-    )
-
-
-def _build_payload(
-    sections: Sequence[DocumentSection],
-    messages: Sequence[TranscriptMessage],
-) -> str:
-    """Render the sections (heading + instructions) and the transcript."""
-    blocks = []
-    for section in sections:
-        instructions = section.instructions.strip() or "(no instructions given)"
-        blocks.append(f"### {section.heading}\nInstructions: {instructions}")
-    fields_text = "\n".join(f"- {label}" for label in _MODEL_FIELD_LABELS)
-    sections_text = "\n\n".join(blocks)
+def _build_source(messages: Sequence[TranscriptMessage]) -> str:
+    """Render the transcript the template is filled from, one timed line per message."""
     tzname = get_incident_draft_settings().TIMEZONE
     transcript = "\n".join(_transcript_line(message, tzname) for message in messages)
-    return f"Report sections:\n\n{sections_text}\n\nMetadata fields:\n{fields_text}\n\nIncident channel transcript:\n{transcript}"
+    return f"Incident channel transcript:\n{transcript}"
 
 
 def _transcript_line(message: TranscriptMessage, tzname: str) -> str:
@@ -568,53 +514,6 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_answers(raw: str) -> tuple[dict[str, str] | None, bool]:
-    """Parse the model output into ``(answers, was_truncated)``.
-
-    Models do not reliably emit bare JSON, so parsing is forgiving: it strips
-    Markdown code fences and ignores prose wrapped around the object. When the
-    object never closes -- the response was cut off by the completion budget --
-    the key/value pairs that did arrive are salvaged and ``was_truncated`` is
-    ``True``. Callers must not treat a truncated parse as a complete draft:
-    the missing sections are an artefact of the cutoff, not the model's
-    judgement. ``answers`` is ``None`` only when nothing usable was recovered.
-    """
-    text = raw.strip()
-    fenced = re.search(r"```(?:json)?\s*(.*?)\s*```", text, re.DOTALL)
-    if fenced:
-        text = fenced.group(1).strip()
-
-    candidate = _first_json_object(text) or text
-    try:
-        parsed = json.loads(candidate)
-    except TypeError, ValueError:
-        parsed = None
-
-    if isinstance(parsed, dict):
-        return {str(key): text for key, value in parsed.items() if (text := _coerce_answer(value))}, False
-
-    return _salvage_pairs(text) or None, True
-
-
-def _coerce_answer(value: object) -> str:
-    """Normalise one JSON value into section text, or ``""`` if unusable.
-
-    Asking for "one event per line" reliably tempts a model into answering with
-    a JSON array instead of a newline-joined string; the list-shaped sections
-    (timeline, action items) are exactly the ones it does this to. Those values
-    used to be discarded silently, which read in the document as the model
-    having nothing to say. Lists are joined back into lines instead, and dict
-    entries (``{"time": ..., "text": ...}``) are flattened in field order.
-    """
-    if isinstance(value, str):
-        return value
-    if isinstance(value, list):
-        return "\n".join(line for item in value if (line := _coerce_answer(item).strip()))
-    if isinstance(value, dict):
-        return " ".join(str(item).strip() for item in value.values() if str(item).strip())
-    return ""
-
-
 def _split_run_on_timeline(content: str) -> str:
     """Break a timeline the model ran together into one entry per line.
 
@@ -646,71 +545,15 @@ def _split_run_on_timeline(content: str) -> str:
     return "\n".join(lines)
 
 
-def _first_json_object(text: str) -> str | None:
-    """Return the first balanced ``{...}`` span, ignoring braces inside strings.
-
-    Lets an object survive prose wrapped around it ("Here is the JSON: {...}").
-    Returns ``None`` when no complete object is present (e.g. truncated output).
-    """
-    start = text.find("{")
-    if start == -1:
-        return None
-
-    depth = 0
-    in_string = False
-    escaped = False
-    for index in range(start, len(text)):
-        char = text[index]
-        if escaped:
-            escaped = False
-        elif char == "\\":
-            escaped = True
-        elif char == '"':
-            in_string = not in_string
-        elif not in_string:
-            if char == "{":
-                depth += 1
-            elif char == "}":
-                depth -= 1
-                if depth == 0:
-                    return text[start : index + 1]
-    return None
-
-
-def _salvage_pairs(text: str) -> dict[str, str]:
-    """Recover complete ``"key": "value"`` pairs from unparseable output.
-
-    A response truncated mid-object still carries every section the model
-    finished writing; recovering those turns a total failure into a partial
-    draft, with the unfinished sections falling back to their template
-    instructions.
-    """
-    pairs: dict[str, str] = {}
-    pattern = re.compile(r'"((?:[^"\\]|\\.)*)"\s*:\s*"((?:[^"\\]|\\.)*)"')
-    for raw_key, raw_value in pattern.findall(text):
-        try:
-            key = json.loads(f'"{raw_key}"')
-            value = json.loads(f'"{raw_value}"')
-        except ValueError:
-            continue
-        pairs[key] = value
-    return pairs
-
-
-def _build_drafts(
-    sections: Sequence[DocumentSection],
-    answers: dict[str, str],
-) -> list[SectionDraft]:
+def _build_drafts(sections: Sequence[DocumentSection], filled: FilledTemplate) -> list[SectionDraft]:
     """Pair every section with its drafted content, in document order.
 
     A section the transcript could not answer keeps the source document's
     original instructions so the draft still tells a human what is needed.
     """
-    lookup = {_normalize_heading(key): value for key, value in answers.items()}
-
     drafts: list[SectionDraft] = []
-    for section in sections:
-        answer = _match_answer(section.heading, answers, lookup)
+    for section, filled_answer in zip(sections, filled.sections, strict=True):
+        answer = filled_answer.text
         if answer and "timeline" in section.heading.lower():
             answer = _split_run_on_timeline(answer)
         drafts.append(
@@ -724,27 +567,7 @@ def _build_drafts(
     return drafts
 
 
-def _match_answer(heading: str, answers: dict[str, str], lookup: dict[str, str]) -> str:
-    """Find the model's answer for ``heading``, tolerating key drift.
-
-    Models rarely echo a heading byte-for-byte: they drop numbering, change
-    case, or add punctuation. An exact-only lookup turns that into a silently
-    blank section, so fall back to a normalized comparison.
-    """
-    exact = (answers.get(heading) or "").strip()
-    if exact:
-        return exact
-    return (lookup.get(_normalize_heading(heading)) or "").strip()
-
-
-def _normalize_heading(text: str) -> str:
-    """Reduce a heading to a comparable form: no numbering, case or punctuation."""
-    without_numbering = re.sub(r"^\s*\d+\s*[.)\-:]\s*", "", text)
-    alphanumeric = re.sub(r"[^a-z0-9 ]+", " ", without_numbering.lower())
-    return re.sub(r"\s+", " ", alphanumeric).strip()
-
-
-def _build_fields(answers: dict[str, str], messages: Sequence[TranscriptMessage]) -> list[DocumentField]:
+def _build_fields(filled: FilledTemplate) -> list[DocumentField]:
     """Build the metadata values to write into the report's header block.
 
     The model fills what the transcript evidences -- on-call, facilitators and
@@ -754,12 +577,7 @@ def _build_fields(answers: dict[str, str], messages: Sequence[TranscriptMessage]
     omitted entirely, so an unestablished field keeps the template's blank line
     rather than acquiring a guess.
     """
-    fields: list[DocumentField] = []
-    for label in _MODEL_FIELD_LABELS:
-        value = _match_answer(label, answers, {_normalize_heading(k): v for k, v in answers.items()})
-        if value:
-            fields.append(DocumentField(label=label, value=value))
-
+    fields = [DocumentField(label=answer.key, value=answer.text) for answer in filled.fields if answer.text]
     fields.append(DocumentField(label=_AUTHORS_FIELD_LABEL, value=AI_AUTHOR))
     return fields
 
