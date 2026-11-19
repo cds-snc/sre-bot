@@ -22,6 +22,12 @@ roots = { features = "features", capabilities = "capabilities" }
 # both kinds must require it. The fake-coverage check reads it.
 public_api = "api.py"
 
+# The module that holds a package's hookimpls when the entry point must not name the package
+# itself (plugins.md): the capability kind requires it, so features can import its api.py
+# under contract (m); core must not declare it. The generator targets "<module>.plugin" for
+# the entry point and contract (m) whenever a package's entries hold it.
+plugin_module = "plugin.py"
+
 # A subdomain named like a layout-table directory or an umbrella kernel would be read as one.
 reserved_subdomains = ["core", "common", "adapters", "entrypoints", "locales", "service", "domain"]
 
@@ -82,16 +88,19 @@ optional = [
 [kinds.subdomain]
 extends = "feature"
 
-# A capability: the feature shape plus its public api.py and its own extension points.
-# service.py and entrypoints/ are optional: a driven-port capability is its api.py
-# Protocol and the adapters implementing it.
+# A capability: the feature shape plus its public api.py, its plugin module and its own
+# extension points. service.py and entrypoints/ are optional: a driven-port capability is
+# its api.py Protocol and the adapters implementing it. Its __init__.py is a docstring only;
+# the hookimpls live in plugin.py, which the entry point names.
 [kinds.capability]
 extends = "feature"
-exclude = ["service.py", "entrypoints/"]
-required = ["api.py"]
+exclude = ["service.py", "entrypoints/", "plugin.py"]
+required = ["api.py", "plugin.py"]
 optional = ["service.py", "entrypoints/", "hookspecs.py"]
 
 [kinds.capability.templates]
+"__init__.py" = "capability_init.py.tmpl"
+"plugin.py" = "plugin_init.py.tmpl"
 "README.md" = "capability_readme.md.tmpl"
 "api.py" = "api.py.tmpl"
 "hookspecs.py" = "hookspecs.py.tmpl"

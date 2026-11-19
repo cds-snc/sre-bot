@@ -3,10 +3,10 @@ id: TASK-114.5
 title: >-
   app/bin guards read shared definitions: package roots and names from the
   layout manifest, platform env names from one place
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T15:41:00Z'
-updated_date: '2026-11-19T13:37:00Z'
+updated_date: '2026-11-19T15:00:00Z'
 labels:
   - tooling
 milestone: m-3
@@ -143,4 +143,8 @@ Gates (from app/)
 - uv run pytest tests --ignore=tests/smoke -> 7814 passed, 231 warnings in 230.11s
 
 Blast radius: dev/CI tooling and ADR text only; merge deploys nothing. One git revert restores everything.
+
+2026-11-19: PR #1875 opened (base main, head d2e81c54).
+
+2026-11-19 correction: merged as #1874 (53fa634c, 14:01 UTC). #1875 duplicates the same commit and is closed unmerged; disregard the earlier PR #1875 line.
 <!-- SECTION:NOTES:END -->

@@ -7,8 +7,9 @@ and for the generator (bin/new_package.py) each kind's templates and the
 option flags that add an optional entry. This module reads it with tomllib into frozen dataclasses and refuses a
 malformed manifest, naming the key at fault, so a bad edit fails every tool
 that reads it instead of silently widening a check. The other app/bin guards
-take their package roots, the public api module, the adapters directory and the
-core and common kind names from here instead of keeping their own copies;
+take their package roots, the public api module, the plugin module, the
+adapters directory and the core and common kind names from here instead of
+keeping their own copies;
 ``layout()`` refuses the repository's manifest when one of those is missing.
 
 Usage:
@@ -26,7 +27,7 @@ from typing import Any, Final
 LAYOUT_PATH = Path(__file__).resolve().parent / "package_layout.toml"
 
 REQUIRED_TOP_LEVEL_KEYS = frozenset(
-    {"roots", "public_api", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"}
+    {"roots", "public_api", "plugin_module", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"}
 )
 TOP_LEVEL_KEYS = REQUIRED_TOP_LEVEL_KEYS | {"options"}
 ROOT_KEYS = frozenset({"features", "capabilities"})
@@ -41,6 +42,9 @@ COMMON_KIND: Final = "common"
 CAPABILITY_KIND: Final = "capability"
 # The kinds whose public surface is the public_api entry (feature-packages.md: a capability's api.py, core/api.py).
 PUBLIC_API_KINDS = (CAPABILITY_KIND, CORE_KIND)
+# The kind that must require the plugin_module entry, and the kind that must not declare it (plugins.md).
+PLUGIN_MODULE_KIND = CAPABILITY_KIND
+NO_PLUGIN_MODULE_KIND = CORE_KIND
 # The generator option whose entry is a package's adapters directory.
 ADAPTERS_OPTION = "adapters"
 
@@ -108,6 +112,8 @@ class Layout:
     roots: Roots
     public_api: str
     """The module that is a capability's and an umbrella core's only public surface."""
+    plugin_module: str
+    """The module holding the hookimpls when the entry point names it rather than the package."""
     kinds: Mapping[str, Kind]
     reserved_subdomains: frozenset[str]
     classification_heading: str
@@ -228,6 +234,16 @@ def _public_api(value: Any, kinds: Mapping[str, Kind]) -> str:
     return value
 
 
+def _plugin_module(value: Any, kinds: Mapping[str, Kind]) -> str:
+    if not isinstance(value, str) or not value.endswith(".py") or DIRECTORY_MARK in value:
+        raise LayoutError("plugin_module must name one module file, such as 'plugin.py'")
+    if PLUGIN_MODULE_KIND in kinds and value not in kinds[PLUGIN_MODULE_KIND].required:
+        raise LayoutError(f"kinds.{PLUGIN_MODULE_KIND}: must require plugin_module '{value}'")
+    if NO_PLUGIN_MODULE_KIND in kinds and value in kinds[NO_PLUGIN_MODULE_KIND].declared:
+        raise LayoutError(f"kinds.{NO_PLUGIN_MODULE_KIND}: must not declare plugin_module '{value}' (not a plugin)")
+    return value
+
+
 def load_layout(path: Path) -> Layout:
     """Read and validate the manifest at ``path``; raise ``LayoutError`` naming the key at fault."""
     try:
@@ -260,10 +276,12 @@ def load_layout(path: Path) -> Layout:
         raise LayoutError("kinds must declare at least one kind")
     parsed = {name: _kind(name, kinds, grows) for name in kinds}
     public_api = _public_api(data["public_api"], parsed)
+    plugin_module = _plugin_module(data["plugin_module"], parsed)
     declared = frozenset().union(*(kind.declared for kind in parsed.values()))
     return Layout(
         roots=Roots(features=roots["features"], capabilities=roots["capabilities"]),
         public_api=public_api,
+        plugin_module=plugin_module,
         kinds=parsed,
         reserved_subdomains=_names(data["reserved_subdomains"], "reserved_subdomains"),
         classification_heading=str(headings["classification_heading"]),
