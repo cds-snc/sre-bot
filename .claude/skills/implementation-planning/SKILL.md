@@ -38,6 +38,8 @@ The task MUST be decomposed into smaller tasks when ANY of these hold:
 
 This gate is non-negotiable: oversized PRs cannot be properly reviewed by the dev team, and unreviewable changes are a delivery risk regardless of code quality.
 
+**Counting a move.** A line moved verbatim from one module to another counts once, not as a deletion plus an insertion; state the moved and the new lines separately. Adding a port method that no production path calls yet is not a behaviour change for item 3, so a verbatim move plus a dark port method may share one PR under a rule-1 exception when it is reviewable as two commits (move, then the new API) (TASK-25.10.2, TASK-145.9.1 precedents).
+
 ## How to Decompose
 
 1. Slice by the expand/contract pattern, not by layer: each slice must be independently shippable, deployable, and revertible with main staying green after each merge.

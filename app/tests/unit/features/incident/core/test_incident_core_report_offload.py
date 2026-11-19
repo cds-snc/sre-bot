@@ -11,6 +11,7 @@ arbitrary.
 
 import threading
 from collections.abc import Callable, Coroutine
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
@@ -21,7 +22,7 @@ from contracts.operations.result import OperationResult
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.core.adapters import google_docs
-from features.incident.core.api import ReportReference, SectionDraft
+from features.incident.core.api import MessageReference, ReportReference, SectionDraft, TimelineEntry
 
 pytestmark = pytest.mark.unit
 
@@ -33,6 +34,21 @@ REPORT = ReportReference(
     url="https://docs.google.com/document/d/D0REPORT/edit",
 )
 DRAFT = SectionDraft(heading="Summary", content="What happened.", is_drafted=True)
+MESSAGE = MessageReference(
+    system=WorkplaceSystem.SLACK,
+    tenant="T0SLACK",
+    conversation_id="C123",
+    message_id="1759435320.000100",
+    url="https://example.slack.com/archives/C123/p1759435320000100",
+)
+ENTRY = TimelineEntry(
+    incident_id="I0INCIDENT",
+    entry_id="e1",
+    posted_at=datetime(2025, 10, 2, 20, 2, tzinfo=UTC),
+    author="Jane Doe",
+    text="first",
+    source_message=MESSAGE,
+)
 
 type ReportCall = Callable[[google_docs.GoogleDocsIncidentReport], Coroutine[Any, Any, OperationResult[Any]]]
 
@@ -42,6 +58,8 @@ CALLS: dict[str, ReportCall] = {
     "replace_placeholders": lambda report: report.replace_placeholders(REPORT, {"{{title}}": "Outage"}),
     "read_sections": lambda report: report.read_sections(REPORT),
     "write_draft_copy": lambda report: report.write_draft_copy(REPORT, [DRAFT], [], {}),
+    "append_timeline_entry": lambda report: report.append_timeline_entry(REPORT, ENTRY),
+    "remove_timeline_entry": lambda report: report.remove_timeline_entry(REPORT, MESSAGE),
 }
 
 

@@ -1,6 +1,7 @@
 """Timeline saves from the floppy-disk reaction, run against an in-memory Google Doc.
 
-The Docs adapter seam (fetch_document_snapshot / apply_document_edits) is replaced by a
+The Docs adapter functions the timeline rewrite calls (fetch_document_snapshot /
+apply_document_edits in features.incident.core.adapters.google_docs) are replaced by a
 fake that applies batchUpdate requests to real text and enforces the required revision
 the way the Docs API does: a stale write is refused as the adapter reports a 400, a
 permanent HTTP_ERROR, with no message text to parse. The tests assert on what ends up in
@@ -15,9 +16,12 @@ from slack_sdk.errors import SlackApiError
 
 from contracts.operations import OperationResult, OperationStatus
 from contracts.operations.codes import ErrorCode
+from features.incident.common.settings import get_incident_core_settings
+from features.incident.core.adapters import google_docs
+from features.incident.core.adapters.google_docs import TIMELINE_END_HEADING as END_HEADING
+from features.incident.core.adapters.google_docs import TIMELINE_START_HEADING as START_HEADING
 from features.incident.core.adapters.google_docs import DocumentSnapshot
-from modules.incident import incident_conversation, incident_document
-from modules.incident.incident_document import END_HEADING, START_HEADING
+from modules.incident import incident_conversation
 
 PERMALINK = "https://example.slack.com/archives/C123/p{}"
 
@@ -117,8 +121,8 @@ class FakeDocument:
 def document():
     fake = FakeDocument()
     with (
-        patch.object(incident_document, "fetch_document_snapshot", fake.fetch_snapshot),
-        patch.object(incident_document, "apply_document_edits", fake.apply_edits),
+        patch.object(google_docs, "fetch_document_snapshot", fake.fetch_snapshot),
+        patch.object(google_docs, "apply_document_edits", fake.apply_edits),
     ):
         yield fake
 
@@ -164,7 +168,7 @@ def _write_four_times_from_one_read(document: FakeDocument, ts: str, text: str) 
     """Leave the document as four unguarded saves of one message built from the same read would."""
     captured: list[list[dict]] = []
     with patch.object(
-        incident_document,
+        google_docs,
         "apply_document_edits",
         lambda _id, requests, _rev: captured.append(requests) or OperationResult.success(),
     ):
@@ -242,20 +246,20 @@ def test_update_gives_up_after_bounded_attempts_when_no_write_is_confirmed(docum
     """Every write is rejected, so the update stops after the attempt limit and reports failure."""
     document.before_write = lambda: setattr(document, "revision", document.revision + 1)
 
-    updated = incident_document.update_timeline_section("document-id", lambda content: content + " ➡️ note")
+    updated = google_docs.update_timeline_section("document-id", lambda content: content + " ➡️ note")
 
     assert not updated.is_success
-    assert document.write_attempts == incident_document.TIMELINE_UPDATE_ATTEMPTS == 3
+    assert document.write_attempts == get_incident_core_settings().timeline_update_attempts == 3
     assert "note" not in document.timeline()
 
 
 def test_update_reports_failure_without_writing_when_document_cannot_be_read():
     """A classified read failure surfaces as no snapshot; nothing is written."""
     with (
-        patch.object(incident_document, "fetch_document_snapshot", return_value=None),
-        patch.object(incident_document, "apply_document_edits") as apply_document_edits,
+        patch.object(google_docs, "fetch_document_snapshot", return_value=None),
+        patch.object(google_docs, "apply_document_edits") as apply_document_edits,
     ):
-        updated = incident_document.update_timeline_section("document-id", lambda content: content)
+        updated = google_docs.update_timeline_section("document-id", lambda content: content)
 
     assert not updated.is_success
     apply_document_edits.assert_not_called()
@@ -265,10 +269,10 @@ def test_update_reports_failure_without_writing_when_timeline_headings_are_missi
     """A document without the timeline placeholder headings is left untouched."""
     snapshot = DocumentSnapshot(content=[{"paragraph": {"elements": [{"textRun": {"content": "no headings"}}]}}], revision_id="1")
     with (
-        patch.object(incident_document, "fetch_document_snapshot", return_value=snapshot),
-        patch.object(incident_document, "apply_document_edits") as apply_document_edits,
+        patch.object(google_docs, "fetch_document_snapshot", return_value=snapshot),
+        patch.object(google_docs, "apply_document_edits") as apply_document_edits,
     ):
-        updated = incident_document.update_timeline_section("document-id", lambda content: content)
+        updated = google_docs.update_timeline_section("document-id", lambda content: content)
 
     assert not updated.is_success
     apply_document_edits.assert_not_called()
@@ -327,7 +331,7 @@ def test_emoji_body_uses_utf16_indexes_and_preserves_links(document):
     assert "second" in document.timeline()
     assert any(line.endswith("Jane Doe: first 😀") for line in document.timeline().splitlines())
     assert any(line.endswith("Jane Doe: second") for line in document.timeline().splitlines())
-    extracted = incident_document.extract_timeline_section(document._content())
+    extracted = google_docs.extract_timeline_section(document._content())
     assert PERMALINK.format("1759435320000100") in extracted
     assert PERMALINK.format("1759435380000200") in extracted
 
@@ -389,7 +393,7 @@ def test_contended_save_succeeds_on_the_last_attempt_from_a_fresh_read(document)
 def test_a_rejected_write_on_an_unmoved_document_is_not_sent_again(document):
     """A 400 while the revision did not move is a malformed edit, not a conflict: one write, then a notice."""
     rejected = OperationResult.error(OperationStatus.PERMANENT_ERROR, "Document edit rejected", error_code=ErrorCode.HTTP_ERROR)
-    with patch.object(incident_document, "apply_document_edits", return_value=rejected) as edit:
+    with patch.object(google_docs, "apply_document_edits", return_value=rejected) as edit:
         client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
     assert edit.call_count == 1
     assert "first" not in document.timeline()
@@ -398,7 +402,7 @@ def test_a_rejected_write_on_an_unmoved_document_is_not_sent_again(document):
 
 def test_final_unconfirmed_write_is_reconciled_without_duplicate(document):
     """A write that lands on the last allowed attempt is confirmed by a final snapshot."""
-    limit = incident_document.TIMELINE_UPDATE_ATTEMPTS
+    limit = get_incident_core_settings().timeline_update_attempts
     document.before_write = lambda: setattr(document, "revision", document.revision + (document.write_attempts < limit))
     document.confirm_write = lambda: False
     client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
@@ -417,7 +421,7 @@ def test_final_unconfirmed_write_is_reconciled_without_duplicate(document):
 )
 def test_failures_other_than_a_lost_guard_or_a_timeout_stop_after_one_write(document, result):
     """Transport retries belong to the SDK, so a 429 it gave up on is not sent again here; the user is told."""
-    with patch.object(incident_document, "apply_document_edits", side_effect=[result, OperationResult.success()]) as edit:
+    with patch.object(google_docs, "apply_document_edits", side_effect=[result, OperationResult.success()]) as edit:
         client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
     assert edit.call_count == 1
     client.chat_postEphemeral.assert_called_once()
@@ -496,7 +500,7 @@ def test_unconfirmed_write_and_failed_reconciliation_reports_uncertain_outcome(d
         return None if document.write_attempts else document.fetch_snapshot(_id)
 
     document.confirm_write = lambda: False
-    with patch.object(incident_document, "fetch_document_snapshot", fetch):
+    with patch.object(google_docs, "fetch_document_snapshot", fetch):
         client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
     assert document.timeline().count("first") == 1
     assert "could not confirm" in client.chat_postEphemeral.call_args.kwargs["text"].lower()
@@ -506,7 +510,7 @@ def test_non_text_timeline_content_is_not_destructively_rewritten(document):
     """Tables and inline objects cannot be represented losslessly as timeline text."""
     snapshot = document.fetch_snapshot("doc")
     snapshot.content.insert(2, {"table": {}, "startIndex": len(START_HEADING) + 10})
-    with patch.object(incident_document, "fetch_document_snapshot", return_value=snapshot):
+    with patch.object(google_docs, "fetch_document_snapshot", return_value=snapshot):
         client = _react(incident_conversation.handle_reaction_added, "1759435320.000100", "first")
     assert document.write_attempts == 0
     client.chat_postEphemeral.assert_called_once()
@@ -555,6 +559,6 @@ def test_styled_date_split_across_text_runs_keeps_message_identity(document):
                     break
         return snapshot
 
-    with patch.object(incident_document, "fetch_document_snapshot", fetch):
+    with patch.object(google_docs, "fetch_document_snapshot", fetch):
         _save("1759435320.000100", "first")
     assert document.timeline().count("first") == 1

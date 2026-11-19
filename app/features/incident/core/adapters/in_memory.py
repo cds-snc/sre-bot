@@ -7,7 +7,9 @@ with the same classifications as ``RecordIncidentStore``, and the field writes w
 its validation, replay and open-list rules. ``InMemoryTimelineStore``: one entry
 per key, a repeat a replay that succeeds. ``InMemoryIncidentReport``:
 the ``GoogleDocsIncidentReport`` rules (Google references only, unknown reports not
-found, empty document ids refused naming the key, no draft copy without content).
+found, empty document ids refused naming the key, no draft copy without content; the
+timeline holds one entry per message link, a message without a link or a system entry
+unsupported, and an unknown report's timeline unreadable).
 ``InMemoryIncidentConversation``: the ``SlackIncidentConversation`` rules (Slack
 references only, unknown conversations not found, archived or non-member
 conversations not writable and refusing writes, repeated archives and empty
@@ -26,6 +28,7 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
+from features.incident.core.adapters.google_docs import timeline_entry_url, timeline_message_key
 from features.incident.core.adapters.list_rows import list_row
 from features.incident.core.adapters.slack import slack_channel_name, slack_conversation_label, slack_conversation_link
 from features.incident.core.adapters.timeline_items import entry_key
@@ -331,6 +334,7 @@ class _StoredReport:
     sections: list[DocumentSection] = field(default_factory=list)
     placeholders: dict[str, str] = field(default_factory=dict)
     status: IncidentStatus | None = None
+    timeline: dict[tuple[str, str], TimelineEntry] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -387,6 +391,10 @@ class InMemoryIncidentReport:
     def placeholders_of(self, report: ReportReference) -> Mapping[str, str]:
         """Return the placeholder values applied to ``report`` so far."""
         return dict(self._reports[report.vendor_id].placeholders)
+
+    def timeline_of(self, report: ReportReference) -> tuple[TimelineEntry, ...]:
+        """Return the entries ``report``'s timeline holds, in chronological order."""
+        return tuple(sorted(self._reports[report.vendor_id].timeline.values(), key=lambda entry: entry.posted_at))
 
     async def list_placements(self) -> OperationResult[tuple[ReportPlacement, ...]]:
         """Return the seeded placements sorted by label; no incident folder refuses naming its key."""
@@ -478,9 +486,44 @@ class InMemoryIncidentReport:
             data=DraftWriteResult(document_id=f"{report.vendor_id}-draft-{len(self.draft_copies)}", created=True)
         )
 
+    async def append_timeline_entry(self, report: ReportReference, entry: TimelineEntry) -> OperationResult[None]:
+        """Hold ``entry`` once per message link on a known report; an unknown report is unreadable, as the adapter says."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        url = timeline_entry_url(entry)
+        if url is None:
+            return _unholdable_timeline_entry()
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _unreadable_report()
+        stored.timeline.setdefault(timeline_message_key(url), entry)
+        return OperationResult.success()
+
+    async def remove_timeline_entry(self, report: ReportReference, message: MessageReference) -> OperationResult[None]:
+        """Drop the entry of ``message`` from a known report; an absent one is a success."""
+        if report.system is not WorkplaceSystem.GOOGLE:
+            return _report_unsupported(report)
+        if not message.url:
+            return _unholdable_timeline_entry()
+        stored = self._reports.get(report.vendor_id)
+        if stored is None:
+            return _unreadable_report()
+        stored.timeline.pop(timeline_message_key(message.url), None)
+        return OperationResult.success()
+
     def link(self, report: ReportReference) -> str | None:
         """Return the stored link of the report."""
         return report.url
+
+
+def _unholdable_timeline_entry[T]() -> OperationResult[T]:
+    return OperationResult.permanent_error(
+        "The report timeline holds captured messages identified by their link", ErrorCode.UNSUPPORTED_OPERATION
+    )
+
+
+def _unreadable_report[T]() -> OperationResult[T]:
+    return OperationResult.transient_error("Document could not be read", error_code=ErrorCode.DOCUMENT_UNREADABLE)
 
 
 def _report_unsupported[T](report: ReportReference) -> OperationResult[T]:

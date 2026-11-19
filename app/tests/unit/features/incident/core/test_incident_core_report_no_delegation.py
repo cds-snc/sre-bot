@@ -9,6 +9,7 @@ pins that no module under ``core/adapters`` imports Google's credential packages
 """
 
 import ast
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -19,12 +20,19 @@ import pytest
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.core.adapters import google_docs, google_meet
-from features.incident.core.api import ReportReference, SectionDraft
+from features.incident.core.api import MessageReference, ReportReference, SectionDraft, TimelineEntry
 
 pytestmark = pytest.mark.unit
 
 ADAPTERS_DIR = Path(google_docs.__file__).parent
 REPORT = ReportReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="D0REPORT")
+MESSAGE = MessageReference(
+    system=WorkplaceSystem.SLACK,
+    tenant="T0SLACK",
+    conversation_id="C123",
+    message_id="1759435320.000100",
+    url="https://example.slack.com/archives/C123/p1759435320000100",
+)
 
 
 class _ScopesOnly:
@@ -78,8 +86,12 @@ async def test_every_report_operation_builds_its_services_with_scopes_only(facto
     await report.replace_placeholders(REPORT, {"a": "b"})
     await report.read_sections(REPORT)
     await report.write_draft_copy(REPORT, [SectionDraft("Summary", "x", True)], (), {})
+    await report.append_timeline_entry(
+        REPORT, TimelineEntry("I0", "e1", datetime(2025, 10, 2, tzinfo=UTC), "Jane Doe", "first", MESSAGE)
+    )
+    await report.remove_timeline_entry(REPORT, MESSAGE)
 
-    assert sum(len(factory.calls) for factory in factories) >= 4
+    assert sum(len(factory.calls) for factory in factories) >= 6
 
 
 def test_every_drive_function_builds_its_service_with_scopes_only(factories: list[_ScopesOnly]) -> None:

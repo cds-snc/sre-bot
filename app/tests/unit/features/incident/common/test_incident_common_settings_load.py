@@ -86,6 +86,20 @@ def test_a_full_read_cap_below_one_is_rejected_naming_the_key(monkeypatch: pytes
         IncidentCoreSettings()
 
 
+def test_the_timeline_recompute_bound_defaults_to_three_writes() -> None:
+    """Three guarded writes per timeline update, each from a fresh read, the bound #1858 shipped."""
+    assert IncidentCoreSettings().timeline_update_attempts == 3
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_timeline_recompute_bound_below_one_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    """A bound below one could never write an entry, so the slice fails naming the key."""
+    monkeypatch.setenv("INCIDENT_CORE__TIMELINE_UPDATE_ATTEMPTS", value)
+
+    with pytest.raises(ConfigurationError, match="timeline_update_attempts"):
+        IncidentCoreSettings()
+
+
 def test_the_new_incident_policy_is_unset_by_default() -> None:
     """Unset resolves later to the only configured system, so most instances never set it."""
     assert IncidentCoreSettings().new_incident_system is None
@@ -117,6 +131,7 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
         "status_updates_table": "sre_bot_incident_status_updates",
         "bindings_table": "sre_bot_incident_bindings",
         "full_read_max_items": 10000,
+        "timeline_update_attempts": 3,
         "folder_id": "",
         "report_template_id": "",
         "list_sheet_id": "",
