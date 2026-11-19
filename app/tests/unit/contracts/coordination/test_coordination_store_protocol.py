@@ -1,6 +1,6 @@
 """Tests for the ConditionalWriteStore Protocol contract.
 
-Validates the claim/complete/release Protocol shape, the ClaimResult enum,
+Validates the claim/complete/release/expire_at Protocol shape, the ClaimResult enum,
 the ClaimOutcome value object, and that no vendor (DynamoDB) vocabulary
 leaks into the Protocol surface.
 """
@@ -51,6 +51,13 @@ class FakeConditionalWriteStore:
         del self._records[key]
         return True
 
+    def expire_at(self, key: str, claim_token: str, at: int) -> bool:
+        record = self._records.get(key, {})
+        if record.get("token") != claim_token or record.get("status") != "IN_PROGRESS":
+            return False
+        record["expires_at"] = at
+        return True
+
 
 class TestConditionalWriteStoreProtocolShape:
     """The Protocol must be runtime-checkable and free of vendor vocabulary."""
@@ -70,13 +77,18 @@ class TestConditionalWriteStoreProtocolShape:
         params = list(inspect.signature(ConditionalWriteStore.release).parameters)
         assert params == ["self", "key", "claim_token"]
 
-    @pytest.mark.parametrize("method", ["complete", "release"])
+    def test_expire_at_method_takes_the_claim_token_and_an_epoch_second(self):
+        signature = inspect.signature(ConditionalWriteStore.expire_at)
+        assert list(signature.parameters) == ["self", "key", "claim_token", "at"]
+        assert signature.parameters["at"].annotation is int
+
+    @pytest.mark.parametrize("method", ["complete", "release", "expire_at"])
     def test_claim_token_is_required(self, method):
         """No default, so no caller can skip the ownership check by omission."""
         parameter = inspect.signature(getattr(ConditionalWriteStore, method)).parameters["claim_token"]
         assert parameter.default is inspect.Parameter.empty
 
-    @pytest.mark.parametrize("method", ["complete", "release"])
+    @pytest.mark.parametrize("method", ["complete", "release", "expire_at"])
     def test_ownership_checked_methods_report_whether_they_applied(self, method):
         assert inspect.signature(getattr(ConditionalWriteStore, method)).return_annotation is bool
 

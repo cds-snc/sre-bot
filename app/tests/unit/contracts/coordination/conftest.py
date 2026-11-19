@@ -12,7 +12,7 @@ class ScriptedConditionalWriteStore:
     """ConditionalWriteStore stub that returns scripted claim outcomes and records every call.
 
     It lets a test inject ClaimResult.INDETERMINATE, which no real store produces
-    without a failing read, and observe whether a facade calls complete() or release().
+    without a failing read, and observe whether a facade calls complete(), release() or expire_at().
     """
 
     def __init__(self, *claim_outcomes: ClaimOutcome, ownership: bool = True) -> None:
@@ -30,6 +30,10 @@ class ScriptedConditionalWriteStore:
 
     def release(self, key: str, claim_token: str) -> bool:
         self.calls.append(("release", key, claim_token))
+        return self._ownership
+
+    def expire_at(self, key: str, claim_token: str, at: int) -> bool:
+        self.calls.append(("expire_at", key, claim_token, str(at)))
         return self._ownership
 
 

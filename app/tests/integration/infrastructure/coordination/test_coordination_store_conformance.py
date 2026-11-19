@@ -2,17 +2,23 @@
 
 Parametrized across the in-memory fake and a moto-backed DynamoDB store so
 both implementations are held to the identical claim/complete/release
-contract, including the ownership rule: release and complete apply only for
-the holder of the claim token a NEW claim returned.
+contract, including the ownership rule: release, complete and expire_at apply
+only for the holder of the claim token a NEW claim returned. The expire_at cases
+move time with freezegun; moto evaluates conditions against the `:now` the store
+sends, so the frozen clock drives both stores alike.
 """
 
+import time
+
 import pytest
+from freezegun import freeze_time
 
 from contracts.coordination import ClaimResult
 
 pytestmark = pytest.mark.integration
 
 FOREIGN_CLAIM_TOKEN = "0" * 32
+FROZEN_START = "2026-11-18 12:00:00"
 
 
 class TestConditionalWriteStoreConformance:
@@ -240,3 +246,115 @@ class TestConditionalWriteStoreExpiredClaimTakeover:
         claimed = expiring_conditional_write_store.claim(key)
 
         assert expiring_conditional_write_store.release(key, claimed.claim_token) is True
+
+
+class TestConditionalWriteStoreExpireAt:
+    """expire_at moves the holder's in-progress expiry and never deletes; anyone else changes nothing.
+
+    The fixture's in-progress TTL is 300 s. A claim is held through its expiry second
+    inclusive and claimable from the next second, so each case probes both sides.
+    """
+
+    def test_holder_keeps_the_claim_in_progress_through_at_then_it_is_claimable(self, conditional_write_store):
+        key = "feature:intent:expire-at-shorten"
+        with freeze_time(FROZEN_START) as frozen:
+            claimed = conditional_write_store.claim(key)
+            at = int(time.time()) + 120
+
+            expired = conditional_write_store.expire_at(key, claimed.claim_token, at)
+            immediately = conditional_write_store.claim(key)
+            frozen.tick(120)
+            at_the_second = conditional_write_store.claim(key)
+            frozen.tick(1)
+            after = conditional_write_store.claim(key)
+
+        assert expired is True
+        assert immediately.result is ClaimResult.IN_PROGRESS
+        assert at_the_second.result is ClaimResult.IN_PROGRESS
+        assert after.result is ClaimResult.NEW
+
+    def test_holder_can_set_an_expiry_later_than_the_claim_ttl(self, conditional_write_store):
+        key = "feature:intent:expire-at-later"
+        with freeze_time(FROZEN_START) as frozen:
+            claimed = conditional_write_store.claim(key)
+            conditional_write_store.expire_at(key, claimed.claim_token, int(time.time()) + 600)
+            frozen.tick(400)
+            outcome = conditional_write_store.claim(key)
+
+        assert outcome.result is ClaimResult.IN_PROGRESS
+
+    def test_holder_repeating_expire_at_stays_true(self, conditional_write_store):
+        key = "feature:intent:expire-at-repeat"
+        with freeze_time(FROZEN_START):
+            claimed = conditional_write_store.claim(key)
+            at = int(time.time()) + 60
+
+            first = conditional_write_store.expire_at(key, claimed.claim_token, at)
+            second = conditional_write_store.expire_at(key, claimed.claim_token, at)
+
+        assert first is True
+        assert second is True
+
+    def test_holder_can_release_after_expire_at(self, conditional_write_store):
+        """The claim keeps its token and status, so the ordinary release still applies."""
+        key = "feature:intent:expire-at-then-release"
+        with freeze_time(FROZEN_START):
+            claimed = conditional_write_store.claim(key)
+            conditional_write_store.expire_at(key, claimed.claim_token, int(time.time()) + 60)
+
+            released = conditional_write_store.release(key, claimed.claim_token)
+            outcome = conditional_write_store.claim(key)
+
+        assert released is True
+        assert outcome.result is ClaimResult.NEW
+
+    def test_foreign_token_returns_false_and_leaves_the_expiry(self, conditional_write_store):
+        """A foreign expire_at far in the future must not extend the claim past its own TTL."""
+        key = "feature:intent:expire-at-foreign"
+        with freeze_time(FROZEN_START) as frozen:
+            conditional_write_store.claim(key)
+
+            expired = conditional_write_store.expire_at(key, FOREIGN_CLAIM_TOKEN, int(time.time()) + 3000)
+            frozen.tick(301)
+            outcome = conditional_write_store.claim(key)
+
+        assert expired is False
+        assert outcome.result is ClaimResult.NEW
+
+    def test_missing_key_returns_false_and_creates_nothing(self, conditional_write_store):
+        key = "feature:intent:expire-at-missing"
+        with freeze_time(FROZEN_START):
+            expired = conditional_write_store.expire_at(key, FOREIGN_CLAIM_TOKEN, int(time.time()) + 60)
+            outcome = conditional_write_store.claim(key)
+
+        assert expired is False
+        assert outcome.result is ClaimResult.NEW
+
+    def test_completed_key_returns_false_and_keeps_its_outcome(self, conditional_write_store):
+        key = "feature:intent:expire-at-completed"
+        with freeze_time(FROZEN_START):
+            claimed = conditional_write_store.claim(key)
+            conditional_write_store.complete(key, {"status": "ok"}, claimed.claim_token)
+
+            expired = conditional_write_store.expire_at(key, claimed.claim_token, int(time.time()) + 60)
+            outcome = conditional_write_store.claim(key)
+
+        assert expired is False
+        assert outcome.result is ClaimResult.COMPLETED
+        assert outcome.outcome == {"status": "ok"}
+
+
+class TestConditionalWriteStoreExpireAtAfterTakeover:
+    """Runs against the `expiring_conditional_write_store` fixture (in-progress TTL already elapsed)."""
+
+    def test_stale_holder_expire_at_returns_false_and_keeps_the_new_holder_record(self, expiring_conditional_write_store):
+        """The new holder's own release succeeding afterwards proves its record survived."""
+        key = "feature:intent:expire-at-stale"
+        stale = expiring_conditional_write_store.claim(key)
+        current = expiring_conditional_write_store.claim(key)
+
+        stale_expired = expiring_conditional_write_store.expire_at(key, stale.claim_token, int(time.time()) + 600)
+        current_released = expiring_conditional_write_store.release(key, current.claim_token)
+
+        assert stale_expired is False
+        assert current_released is True

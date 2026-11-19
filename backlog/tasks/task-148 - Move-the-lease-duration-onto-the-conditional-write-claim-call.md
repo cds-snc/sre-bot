@@ -4,7 +4,7 @@ title: Move the lease duration onto the conditional-write claim call
 status: To Do
 assignee: []
 created_date: 2026-10-14 18:57
-updated_date: '2026-11-18T19:00:00Z'
+updated_date: '2026-11-18T20:52:00Z'
 labels:
   - infrastructure
   - reliability
@@ -44,4 +44,6 @@ Blocks TASK-124.1 (Access Sync resolves the store from the registry when it move
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-18 (TASK-64 planning, human approved): TASK-64 no longer depends on this task; its per-job TTL is met by get_lease_store(ttl) since TASK-145.5.7.1. TASK-64.2 adds ConditionalWriteStore.expire_at (a per-call expiry under the claim token); when the claim's duration moves onto the call here, expire_at stays and the conformance suite keeps covering it.
+
+2026-11-18 (TASK-64.2): ConditionalWriteStore gained expire_at(key, claim_token, at), a conditional update of an in-progress claim's expiry under its token, used by LeaseStore.release(not_before=). It stays on the primitive if the lease duration moves onto claim.
 <!-- SECTION:NOTES:END -->

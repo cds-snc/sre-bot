@@ -3,12 +3,15 @@
 Lifecycle cases run on the real in-memory primitive, so takeover and ownership
 follow the store's actual rules. The INDETERMINATE case uses a scripted store,
 because no real store reports it without a failing read, and checks that a
-fail-closed lease is simply not acquired.
+fail-closed lease is simply not acquired. The held-release cases move time with
+freezegun; the store holds a lease through its expiry second inclusive.
 """
 
 import threading
+import time
 
 import pytest
+from freezegun import freeze_time
 
 from contracts.coordination import ClaimOutcome, ClaimResult, ConditionalWriteStore, LeaseStore, ReadFailurePolicy
 from infrastructure.coordination import InMemoryConditionalWriteStore
@@ -18,6 +21,7 @@ from .conftest import ScriptedConditionalWriteStore
 pytestmark = pytest.mark.unit
 
 NAME = "leases:access-sync:platform:aws"
+FROZEN_START = "2026-11-18 12:00:00"
 
 
 def _lease_store(store: ConditionalWriteStore) -> LeaseStore:
@@ -104,3 +108,96 @@ class TestLeaseStoreReadFailure:
 
         assert _lease_store(store).release(NAME, "a" * 32) is False
         assert store.calls == [("release", NAME, "a" * 32)]
+
+
+class TestLeaseStoreHeldRelease:
+    """release(not_before=) keeps the lease until that instant; None or a past instant deletes as before."""
+
+    def test_future_not_before_keeps_the_lease_until_then(self, in_memory_store: InMemoryConditionalWriteStore) -> None:
+        leases = _lease_store(in_memory_store)
+        with freeze_time(FROZEN_START) as frozen:
+            token = leases.acquire(NAME)
+            assert token is not None
+
+            released = leases.release(NAME, token, not_before=time.time() + 60)
+            frozen.tick(60)
+            during = leases.acquire(NAME)
+            frozen.tick(1)
+            after = leases.acquire(NAME)
+
+        assert released is True
+        assert during is None
+        assert after is not None
+
+    def test_fractional_not_before_is_floored_and_still_held_through_it(
+        self, in_memory_store: InMemoryConditionalWriteStore
+    ) -> None:
+        """Flooring keeps a hold equal to the TTL within the acquire-time expiry; the
+        inclusive expiry second still covers the instant itself."""
+        leases = _lease_store(in_memory_store)
+        with freeze_time("2026-11-18 12:00:00.400") as frozen:
+            token = leases.acquire(NAME)
+            assert token is not None
+            not_before = time.time() + 300
+
+            leases.release(NAME, token, not_before=not_before)
+            frozen.tick(300)
+            at_not_before = leases.acquire(NAME)
+            frozen.tick(0.6)
+            past_the_ttl_expiry = leases.acquire(NAME)
+
+        assert at_not_before is None
+        assert past_the_ttl_expiry is not None
+
+    def test_none_not_before_deletes_as_before(self, in_memory_store: InMemoryConditionalWriteStore) -> None:
+        leases = _lease_store(in_memory_store)
+        token = leases.acquire(NAME)
+        assert token is not None
+
+        assert leases.release(NAME, token, not_before=None) is True
+        assert leases.acquire(NAME) is not None
+
+    def test_past_not_before_deletes(self, in_memory_store: InMemoryConditionalWriteStore) -> None:
+        leases = _lease_store(in_memory_store)
+        with freeze_time(FROZEN_START):
+            token = leases.acquire(NAME)
+            assert token is not None
+
+            assert leases.release(NAME, token, not_before=time.time() - 1) is True
+            assert leases.acquire(NAME) is not None
+
+    def test_stale_holder_held_release_returns_false_and_keeps_the_new_holder_lease(
+        self, expired_store: InMemoryConditionalWriteStore
+    ) -> None:
+        leases = _lease_store(expired_store)
+        stale = leases.acquire(NAME)
+        current = leases.acquire(NAME)
+        assert stale is not None
+        assert current is not None
+
+        assert leases.release(NAME, stale, not_before=time.time() + 600) is False
+        assert leases.release(NAME, current) is True
+
+    def test_future_not_before_calls_expire_at_with_the_floored_second(self) -> None:
+        store = ScriptedConditionalWriteStore()
+        with freeze_time(FROZEN_START):
+            not_before = time.time() + 30.9
+
+            _lease_store(store).release(NAME, "a" * 32, not_before=not_before)
+
+        assert store.calls == [("expire_at", NAME, "a" * 32, str(int(not_before)))]
+
+    def test_past_or_absent_not_before_calls_release(self) -> None:
+        store = ScriptedConditionalWriteStore()
+        leases = _lease_store(store)
+        with freeze_time(FROZEN_START):
+            leases.release(NAME, "a" * 32, not_before=time.time())
+            leases.release(NAME, "b" * 32)
+
+        assert store.calls == [("release", NAME, "a" * 32), ("release", NAME, "b" * 32)]
+
+    def test_not_before_is_keyword_only(self) -> None:
+        store = ScriptedConditionalWriteStore()
+
+        with pytest.raises(TypeError):
+            _lease_store(store).release(NAME, "a" * 32, 1.0)  # type: ignore[misc]

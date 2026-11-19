@@ -183,6 +183,9 @@ log_type = "DevSREBot"
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.
 enabled = false
 default_tier2_lease_ttl_seconds = 1800
+# A Tier-2 lease is held after a short run until this many seconds before the job's next
+# interval (never longer than its TTL), so another replica cannot run the same tick.
+lease_hold_margin_seconds = 5
 
 [notify_api_key_leak]
 channel_id = ""
