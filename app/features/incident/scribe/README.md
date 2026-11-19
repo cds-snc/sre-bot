@@ -422,7 +422,8 @@ ours will not help.
 #### Credentials
 
 `OPENAI__API_KEY` (`integrations.openai`, whose `[openai.tenant]` entry also
-supplies the endpoint and model, and whose `[openai]` table the timeout) and the Google Workspace service account, with the `documents` and
+supplies the endpoint, and whose `[openai]` table the timeout), the `[ai_writing]`
+`model` (the plugin declares it, so boot names it when empty) and the Google Workspace service account, with the `documents` and
 `drive` scopes. The `[incident_core]` `folder_id` and `report_template_id`
 (`INCIDENT_CORE__FOLDER_ID`, `INCIDENT_CORE__REPORT_TEMPLATE_ID`) must be set:
 the plugin declares them, so boot stops naming the one that is empty.
@@ -492,9 +493,10 @@ have safe defaults:
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
 | `INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS` | `3000` | Completion budget for one catch-up summary |
 
-OpenAI credentials/model are **not** configured here — they belong to the
-vendor client (`OPENAI__API_KEY`, `[openai.tenant] model`, …) in
-`app/integrations/openai/settings.py`.
+OpenAI credentials and the model are **not** configured here: the key and
+endpoint belong to the vendor client (`OPENAI__API_KEY`, `[openai.tenant]
+base_url`) in `app/integrations/openai/settings.py`, and the model to the AI
+writing capability (`[ai_writing] model`) in `app/capabilities/ai_writing/settings.py`.
 
 #### Required Slack scopes
 

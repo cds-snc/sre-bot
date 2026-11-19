@@ -17,6 +17,7 @@ from capabilities.ai_writing.adapters.openai import OpenAIWriter
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
+from tests.unit.capabilities.ai_writing.conftest import MODEL
 
 pytestmark = pytest.mark.unit
 
@@ -36,11 +37,11 @@ def _completion(content: str, finish_reason: str = "stop") -> httpx.Response:
 async def _write(settings: OpenAISettings, handler: Handler, **kwargs: object):
     kwargs.setdefault("max_output_tokens", _BUDGET)
     with patch(_CLIENT, return_value=_mock_client(handler, settings)):
-        return await OpenAIWriter(settings=settings).write("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
+        return await OpenAIWriter(settings=settings, model=MODEL).write("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
 
 
 def test_a_configured_adapter_is_available(openai_settings: OpenAISettings) -> None:
-    assert OpenAIWriter(settings=openai_settings).is_available() is True
+    assert OpenAIWriter(settings=openai_settings, model=MODEL).is_available() is True
 
 
 async def test_success_returns_the_stripped_text_from_the_completions_endpoint(openai_settings: OpenAISettings) -> None:
@@ -52,12 +53,13 @@ async def test_success_returns_the_stripped_text_from_the_completions_endpoint(o
         return _completion("  A concise summary.  ")
 
     with patch(_CLIENT, return_value=_mock_client(handler, openai_settings)):
-        result = await OpenAIWriter(settings=openai_settings).write(
+        result = await OpenAIWriter(settings=openai_settings, model=MODEL).write(
             "alice: prod is down", instructions="Be terse.", max_output_tokens=_BUDGET
         )
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, "A concise summary.")
     assert captured["url"].endswith("/chat/completions")
+    assert captured["body"]["model"] == MODEL
     assert captured["body"]["messages"] == [
         {"role": "system", "content": "Be terse."},
         {"role": "user", "content": "alice: prod is down"},

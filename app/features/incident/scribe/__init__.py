@@ -2,8 +2,8 @@
 
 Exposes the ``/sre incident draft`` and ``/sre incident summarize`` Slack
 subcommands and the scribe i18n resources via pluggy hookimpls, and requires the
-OpenAI, Slack and Google Workspace tenants and the [incident_core] report folder and
-template ids (decisions/plugins.md register_requirements). Registration is
+OpenAI, Slack and Google Workspace tenants, the [ai_writing] model and the
+[incident_core] report folder and template ids (decisions/plugins.md register_requirements). Registration is
 startup-driven and side effect free at import time (only decorated hookimpls
 are defined here).
 """
@@ -19,13 +19,14 @@ from features.incident.scribe.entrypoints import slack
 
 @hookimpl
 def register_requirements() -> tuple[Requirement, ...]:
-    """Require the tenants and the incident report ids: drafting and summarizing have no fallback without them.
+    """Require the tenants, the AI writing model and the incident report ids: drafting and summarizing have no fallback without them.
 
-    The [incident_core] folder and template ids are the incident core's own keys;
-    the host resolves them against the slice the configuration phase built.
+    The [ai_writing] model and the [incident_core] folder and template ids are other
+    packages' keys; the host resolves them against the slices the configuration phase built.
     """
     return (
         Requirement("openai.tenant"),
+        Requirement("ai_writing.model"),
         Requirement("slack.tenant"),
         Requirement("google_workspace.tenant"),
         Requirement("incident_core.folder_id"),

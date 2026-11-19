@@ -2,9 +2,9 @@
 
 Each test installs a base and a local file from tmp_path (``install_openai_files``) with
 every OpenAI variable removed and the .env file disabled (the autouse isolation fixture),
-so it observes only the values it writes and sets. The tuning comes from [openai], the
-model endpoint from the optional [openai.tenant] entry, and the key only from
-OPENAI__API_KEY.
+so it observes only the values it writes and sets. The connection tuning comes from [openai],
+the endpoint from the optional [openai.tenant] entry, and the key only from OPENAI__API_KEY.
+Generation parameters are not the vendor's: they fail boot here.
 """
 
 from pathlib import Path
@@ -13,11 +13,11 @@ import pytest
 
 from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.openai.settings import OpenAISettings, get_openai_settings
-from tests.unit.integrations.openai.conftest import BASE_URL, MODEL, install_openai_files
+from tests.unit.integrations.openai.conftest import BASE_URL, install_openai_files
 
 pytestmark = pytest.mark.unit
 
-_TENANT = f'[openai.tenant]\nbase_url = "{BASE_URL}"\nmodel = "{MODEL}"\n'
+_TENANT = f'[openai.tenant]\nbase_url = "{BASE_URL}"\n'
 
 
 def test_openai_settings_is_a_slice_on_the_openai_table() -> None:
@@ -38,20 +38,26 @@ def test_openai_settings_fields_have_no_alias(field: str) -> None:
     assert (info.alias, info.validation_alias) == (None, None)
 
 
-def test_tuning_comes_from_the_openai_table(tmp_path: Path) -> None:
-    """[openai] sets the completion budget, temperature and timeout."""
-    install_openai_files(
-        tmp_path, base="[openai]\nmax_output_tokens = 1234\ntemperature = 0.25\ntimeout_seconds = 42.5\nconnect_retries = 4\n"
-    )
+def test_connection_tuning_comes_from_the_openai_table(tmp_path: Path) -> None:
+    """[openai] sets the request timeout and the connection retries."""
+    install_openai_files(tmp_path, base="[openai]\ntimeout_seconds = 42.5\nconnect_retries = 4\n")
 
     settings = OpenAISettings()
 
-    assert (settings.max_output_tokens, settings.temperature, settings.timeout_seconds, settings.connect_retries) == (
-        1234,
-        0.25,
-        42.5,
-        4,
-    )
+    assert (settings.timeout_seconds, settings.connect_retries) == (42.5, 4)
+
+
+def test_the_slice_holds_only_the_connection() -> None:
+    """The model, output budget and temperature are the AI writing capability's and its callers'."""
+    assert set(OpenAISettings.model_fields) == {"tenant", "api_key", "timeout_seconds", "connect_retries"}
+
+
+@pytest.mark.parametrize("files", ["[openai]\nmax_output_tokens = 3000\n", "[openai]\ntemperature = -1.0\n"])
+def test_a_generation_parameter_in_the_openai_table_fails_naming_it(tmp_path: Path, files: str) -> None:
+    install_openai_files(tmp_path, base=files)
+
+    with pytest.raises(ConfigurationError, match=files.splitlines()[1].split(" ")[0]):
+        OpenAISettings()
 
 
 def test_connect_retries_default_to_two(tmp_path: Path) -> None:
@@ -80,14 +86,14 @@ def test_no_tenant_and_no_key_is_openai_not_configured(tmp_path: Path) -> None:
 
 
 def test_the_tenant_entry_and_the_key_configure_openai(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """[openai.tenant] names the endpoint and model; OPENAI__API_KEY supplies the key."""
+    """[openai.tenant] names the endpoint; OPENAI__API_KEY supplies the key."""
     install_openai_files(tmp_path, environment=_TENANT)
     monkeypatch.setenv("OPENAI__API_KEY", "sk-load-0001")
 
     settings = OpenAISettings()
 
     assert settings.tenant is not None
-    assert (settings.base_url, settings.model) == (BASE_URL, MODEL)
+    assert settings.base_url == BASE_URL
     assert settings.api_key.get_secret_value() == "sk-load-0001"
 
 

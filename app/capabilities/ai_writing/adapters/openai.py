@@ -3,7 +3,7 @@
 The capability's only importer of ``integrations.openai`` (import-linter contract (o)). It calls
 the vendor client inside ``try/except``, classifies failures via ``classify_openai_error`` and
 returns ``OperationResult``; unmapped exceptions propagate, as they are bugs, not outcomes. The
-output budget and temperature are the caller's, per call; the model is read from the OpenAI slice.
+model is the capability's [ai_writing] model; the output budget and temperature are the caller's.
 """
 
 from typing import Any
@@ -21,8 +21,9 @@ logger = structlog.get_logger()
 class OpenAIWriter(AIWriter):
     """``AIWriter`` backed by an OpenAI-compatible chat completions endpoint."""
 
-    def __init__(self, settings: OpenAISettings | None = None) -> None:
-        self._settings = settings or get_openai_settings()
+    def __init__(self, *, settings: OpenAISettings, model: str) -> None:
+        self._settings = settings
+        self._model = model
 
     def is_available(self) -> bool:
         """Always available: the provider builds this adapter only for a configured tenant."""
@@ -41,7 +42,7 @@ class OpenAIWriter(AIWriter):
                 rejected parameter fails the whole request.
         """
         payload: dict[str, Any] = {
-            "model": self._settings.model,
+            "model": self._model,
             "max_completion_tokens": max_output_tokens,
             "messages": [
                 {"role": "system", "content": instructions},
@@ -146,9 +147,11 @@ def _usage(body: dict) -> dict[str, int]:
     return {key: int(value) for key, value in counts.items() if isinstance(value, int)}
 
 
-def build_openai_writer() -> OpenAIWriter | None:
-    """Return the OpenAI writer when [openai.tenant] is set, else ``None`` (no client is built either way)."""
-    settings = get_openai_settings()
-    if settings.tenant is None:
-        return None
-    return OpenAIWriter(settings)
+def openai_tenant_configured() -> bool:
+    """Whether [openai.tenant] is set, so a model endpoint exists to write with."""
+    return get_openai_settings().tenant is not None
+
+
+def build_openai_writer(model: str) -> OpenAIWriter:
+    """Return the OpenAI writer for the configured tenant, writing with ``model`` (no client is built yet)."""
+    return OpenAIWriter(settings=get_openai_settings(), model=model)

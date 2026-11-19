@@ -45,6 +45,9 @@ aws_admin_groups = ["sre-ifs@cds-snc.ca"]
 [openai.tenant]
 # The model gateway production drafts with; its key is the task-definition secret OPENAI__API_KEY.
 base_url = "https://ai.cdssandbox.xyz"
+
+[ai_writing]
+# The model production drafts with, served by the [openai.tenant] gateway.
 model = "gpt-5.6-luna"
 
 [notify.tenant]

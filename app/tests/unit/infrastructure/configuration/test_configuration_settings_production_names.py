@@ -194,8 +194,6 @@ def test_configuration_settings_slack_and_google_lower_case_names_accepted(monke
 
 
 OPENAI_NAMES: list[tuple[str, str, Any]] = [
-    ("OPENAI__MAX_OUTPUT_TOKENS", "max_output_tokens", 1234),
-    ("OPENAI__TEMPERATURE", "temperature", 0.25),
     ("OPENAI__TIMEOUT_SECONDS", "timeout_seconds", 42.5),
 ]
 
@@ -204,13 +202,12 @@ def test_configuration_settings_openai_key_and_tenant_names_configure_openai(mon
     """OPENAI__API_KEY reaches the secret field beside a tenant entry; compared through its secret value."""
     monkeypatch.setenv("OPENAI__API_KEY", "sk-sentinel")
     monkeypatch.setenv("OPENAI__TENANT__BASE_URL", "https://ai.sentinel.example")
-    monkeypatch.setenv("OPENAI__TENANT__MODEL", "sentinel-model")
 
     settings = OpenAISettings(_env_file=None)  # type: ignore[call-arg]
 
     assert isinstance(settings.api_key, SecretStr)
     assert settings.api_key.get_secret_value() == "sk-sentinel"
-    assert (settings.base_url, settings.model) == ("https://ai.sentinel.example", "sentinel-model")
+    assert settings.base_url == "https://ai.sentinel.example"
 
 
 @pytest.mark.parametrize(("env_name", "attribute", "expected"), OPENAI_NAMES, ids=[row[0] for row in OPENAI_NAMES])

@@ -23,6 +23,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
+from tests.unit.capabilities.ai_writing.conftest import MODEL
 
 pytestmark = pytest.mark.unit
 
@@ -40,7 +41,7 @@ def available(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -
         return
     client = httpx.AsyncClient(base_url=openai_settings.base_url, transport=httpx.MockTransport(_echo))
     with patch("capabilities.ai_writing.adapters.openai.build_openai_client", return_value=client):
-        yield OpenAIWriter(settings=openai_settings)
+        yield OpenAIWriter(settings=openai_settings, model=MODEL)
 
 
 @pytest.fixture(params=["unconfigured", "in_memory"])

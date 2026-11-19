@@ -354,9 +354,28 @@ async def test_openai_unknown_key_in_the_table_fails_boot_naming_the_key(monkeyp
 
 
 async def test_openai_tenant_without_the_key_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    _with_ci_file_lines(monkeypatch, tmp_path, '\n[openai.tenant]\nbase_url = "https://models.example.test"\nmodel = "m"\n')
+    _with_ci_file_lines(monkeypatch, tmp_path, '\n[openai.tenant]\nbase_url = "https://models.example.test"\n')
 
     await _boot_fails_naming("OPENAI__API_KEY")
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        '\n[openai.tenant]\nbase_url = "https://models.example.test"\nmodel = "m"\n',
+        "\n[openai]\nmax_output_tokens = 3000\n",
+        "\n[openai]\ntemperature = -1.0\n",
+    ],
+    ids=["tenant-model", "max-output-tokens", "temperature"],
+)
+async def test_a_generation_parameter_left_in_the_openai_slice_fails_boot(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, lines: str
+) -> None:
+    """The model moved to [ai_writing] and the budget and temperature to each call: a stale key never boots."""
+    _with_ci_file_lines(monkeypatch, tmp_path, lines)
+    monkeypatch.setenv("OPENAI__API_KEY", "sk-boot-0002")
+
+    await _boot_fails_naming(lines.split("\n")[-2].split(" ")[0])
 
 
 async def test_openai_key_without_the_tenant_fails_boot_naming_the_key(monkeypatch: pytest.MonkeyPatch) -> None:

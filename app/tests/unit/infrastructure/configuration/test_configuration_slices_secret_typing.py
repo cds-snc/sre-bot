@@ -134,7 +134,6 @@ _COMPANIONS = {
     "GOOGLE_WORKSPACE__TENANT__CUSTOMER_ID": "C0CANARY1",
     "NOTIFY__TENANT__API_URL": "https://notify.example",
     "OPENAI__TENANT__BASE_URL": "https://openai.example",
-    "OPENAI__TENANT__MODEL": "canary-model",
     "OPSGENIE__TENANT__API_URL": "https://opsgenie.example",
 }
 
@@ -170,9 +169,9 @@ def test_no_repr_and_no_json_dump_shows_a_canary(tmp_path: Path, monkeypatch: py
 
 
 # Shown field names a slice event logs as dict keys that the pipeline's key-name
-# redaction masks: "auth" in unauthorized_*, "token" in max_output_tokens. A table name
+# redaction masks: "auth" in unauthorized_*. A table name
 # is the slice event's value, so it is never masked.
-EXPECTED_MASKED_NAMES = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors"}
+EXPECTED_MASKED_NAMES = {"aws.unauthorized_codes", "slack.unauthorized_errors"}
 # The Fargate runtime splits a line over 16 KB, and Logs Insights extracts at most 200 fields of a JSON event.
 LINE_LIMIT_BYTES = 16 * 1024
 FIELD_LIMIT = 200

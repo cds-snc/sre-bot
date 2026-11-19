@@ -2,7 +2,7 @@
 
 Each environment's files are read with the real loader and the OpenAI slice is built on them,
 with OPENAI__API_KEY set where the environment names a tenant (the key is a secret, never in a
-file) and blanked otherwise. production.toml and local.toml name the deployment's model endpoint;
+file) and blanked otherwise. production.toml and local.toml name the deployment's endpoint;
 base.toml and ci.toml configure no tenant, so the test run has OpenAI not configured. The raw
 files are also searched for a key under the OpenAI tables.
 """
@@ -37,7 +37,6 @@ def test_deployed_environments_name_the_model_endpoint(environment: str, monkeyp
 
     assert settings.tenant is not None
     assert settings.base_url.startswith("https://")
-    assert settings.model
 
 
 def test_ci_configures_no_openai_tenant() -> None:
@@ -47,11 +46,11 @@ def test_ci_configures_no_openai_tenant() -> None:
     assert OpenAISettings().tenant is None
 
 
-def test_base_names_no_tenant_and_only_the_tuning() -> None:
-    """The base file holds the framework's tuning, never the deploying organisation's endpoint."""
+def test_base_names_no_tenant_and_only_the_connection_tuning() -> None:
+    """The base file holds the framework's connection tuning, never the organisation's endpoint or generation parameters."""
     table = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))["openai"]
 
-    assert set(table) == {"connect_retries", "max_output_tokens", "temperature", "timeout_seconds"}
+    assert set(table) == {"connect_retries", "timeout_seconds"}
 
 
 @pytest.mark.parametrize("name", ["base.toml", "local.toml", "ci.toml", "production.toml"])

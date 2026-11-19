@@ -4,7 +4,7 @@ title: Move summarize from scribe into incident.response
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-19T17:29:00Z'
+updated_date: '2026-11-19T19:30:00Z'
 labels:
   - incident
   - features
@@ -35,6 +35,8 @@ Stack L L10c (size exception approved 2026-11-09: pure move). summary and its pr
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
+
+2026-11-19 (TASK-25.10.3): supersedes the signature and keyword in the two notes above. AIWriter.write is write(source, *, instructions, max_output_tokens: int, temperature: float | None = None): the budget is required. When summarize moves, name scribe's summarizer= parameter ai_writer= (typed AIWriter), not text_generator=. The summary's budget moves with it: INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS (default 3000, IncidentSummarySettings.MAX_OUTPUT_TOKENS in features/incident/scribe/settings.py) goes to response's summary settings with the same env name, so production keeps sending 3000. The plugin that owns summarize declares Requirement('ai_writing.model') beside 'openai.tenant' only if it requires AI writing; per the 145.9/145.11 ruling (2026-11-09) response declares none, so the moved summarize meets an unset model as AI_WRITING_UNAVAILABLE (how it answers the invoker is this task's plan).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

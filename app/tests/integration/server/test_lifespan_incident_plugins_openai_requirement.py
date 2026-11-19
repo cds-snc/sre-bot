@@ -5,7 +5,8 @@ core services, security, the directory, the Slack provider, translation and feat
 registration are stubbed, since requirements are resolved before any of them. The
 ci files configure no tenant. With incident.scribe enabled (the
 configuration's disabled set replaced by the access plugins and the other plugins that declare requirements) startup must stop
-before the lifespan yields, naming each tenant and incident document id scribe declares: it has no fallback. With the ci
+before the lifespan yields, naming each tenant, the [ai_writing] model and each incident document id scribe
+declares: it has no fallback. With the ci
 files as they are (scribe off, comms on) startup must reach the yield and the AI writing
 capability must report itself unavailable, comms' designed fallback.
 """
@@ -21,6 +22,7 @@ from structlog.testing import capture_logs
 
 from capabilities.ai_writing.api import get_ai_writer
 from capabilities.ai_writing.providers import get_ai_writer_singleton
+from capabilities.ai_writing.settings import get_ai_writing_settings
 from integrations.openai import get_openai_settings
 from server.configuration import load_host_configuration
 from server.lifespan import build_lifespan
@@ -37,10 +39,12 @@ OTHER_REQUIRING_PLUGINS = frozenset({"incident.response", "oncall_sync", "rant"}
 def _fresh_plugin_manager() -> Iterator[None]:
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
+    get_ai_writing_settings.cache_clear()
     get_ai_writer_singleton.cache_clear()
     yield
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
+    get_ai_writing_settings.cache_clear()
     get_ai_writer_singleton.cache_clear()
 
 
@@ -69,6 +73,7 @@ async def test_lifespan_aborts_naming_every_tenant_scribe_lacks_when_it_is_enabl
     failures = [event for event in events if event["event"] == "plugin_boot_failed"]
     assert [(event["plugin"], event["setting"]) for event in failures] == [
         ("incident.scribe", "openai.tenant"),
+        ("incident.scribe", "ai_writing.model"),
         ("incident.scribe", "slack.tenant"),
         ("incident.scribe", "google_workspace.tenant"),
         ("incident.scribe", "incident_core.folder_id"),

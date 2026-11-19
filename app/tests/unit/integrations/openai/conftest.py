@@ -17,7 +17,6 @@ from integrations.openai.settings import OpenAISettings, OpenAITenant, get_opena
 from server.configuration.loader import TomlConfigurationFiles
 
 BASE_URL = "https://models.example.test"
-MODEL = "test-model"
 
 
 @pytest.fixture(autouse=True)
@@ -44,4 +43,4 @@ def install_openai_files(tmp_path: Path, base: str = "[openai]\n", environment: 
 def openai_settings(tmp_path: Path) -> OpenAISettings:
     """A configured ``OpenAISettings``: a tenant entry and a dummy API key."""
     install_openai_files(tmp_path)
-    return OpenAISettings(tenant=OpenAITenant(base_url=BASE_URL, model=MODEL), api_key="sk-test-key")
+    return OpenAISettings(tenant=OpenAITenant(base_url=BASE_URL), api_key="sk-test-key")

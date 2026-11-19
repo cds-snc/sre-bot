@@ -7,6 +7,7 @@ from pathlib import Path
 import structlog
 from pydantic import ValidationError
 
+from capabilities.ai_writing.settings import get_ai_writing_settings
 from contracts.configuration import (
     ConfigurationError,
     HostInfo,
@@ -231,6 +232,7 @@ def _validate_slices(identity: IdentitySettings) -> HostConfiguration:
     get_aws_settings()
     validate_legacy_incident_google_tenant(slack_transport, get_google_workspace_settings())
     get_openai_settings()
+    get_ai_writing_settings()
     get_notify_settings()
     get_trello_settings()
     get_opsgenie_settings()
