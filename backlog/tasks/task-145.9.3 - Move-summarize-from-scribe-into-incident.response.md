@@ -4,6 +4,7 @@ title: Move summarize from scribe into incident.response
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
+updated_date: '2026-11-19T14:28:00Z'
 labels:
   - incident
   - features
@@ -29,3 +30,15 @@ Stack L L10c (size exception approved 2026-11-09: pure move). summary and its pr
 - [ ] #1 summarize lives in response/service/; scribe holds no summary path, catalogue or test; make check-package-shape passes with no new baseline entry (checks parent ACs #3, #11)
 - [ ] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-19T14:28:00Z
+
+---
+
+2026-11-19 (TASK-25.10.2 Q4, human): scribe keeps its summarizer= keyword (typed against the text-generation capability's TextGenerator) through 25.10.2 to avoid churning ~52 test sites; when this task moves the function, name the parameter for its role (text_generator=).
+
+---
+<!-- COMMENTS:END -->

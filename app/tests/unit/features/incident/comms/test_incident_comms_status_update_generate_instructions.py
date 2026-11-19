@@ -167,7 +167,10 @@ class _StubGenerator:
         self._events = events
         self.calls: list[dict[str, Any]] = []
 
-    async def summarize(
+    def is_available(self) -> bool:
+        return True
+
+    async def generate(
         self,
         transcript: str,
         *,

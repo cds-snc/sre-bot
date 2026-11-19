@@ -6,8 +6,8 @@ registration are stubbed, since requirements are resolved before any of them. Th
 ci files configure no tenant. With incident.scribe enabled (the
 configuration's disabled set replaced by the access plugins and the other plugins that declare requirements) startup must stop
 before the lifespan yields, naming each tenant and incident document id scribe declares: it has no fallback. With the ci
-files as they are (scribe off, comms on) startup must reach the yield and comms must
-report text generation unavailable, its designed fallback.
+files as they are (scribe off, comms on) startup must reach the yield and the text-generation
+capability must report itself unavailable, comms' designed fallback.
 """
 
 import dataclasses
@@ -19,7 +19,8 @@ import pytest
 from fastapi import FastAPI
 from structlog.testing import capture_logs
 
-from features.incident.comms.providers import get_status_update_text_generator, text_generation_available
+from capabilities.text_generation.api import get_text_generator
+from capabilities.text_generation.providers import get_text_generator_singleton
 from integrations.openai import get_openai_settings
 from server.configuration import load_host_configuration
 from server.lifespan import build_lifespan
@@ -36,11 +37,11 @@ OTHER_REQUIRING_PLUGINS = frozenset({"incident.response", "oncall_sync", "rant"}
 def _fresh_plugin_manager() -> Iterator[None]:
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
-    get_status_update_text_generator.cache_clear()
+    get_text_generator_singleton.cache_clear()
     yield
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
-    get_status_update_text_generator.cache_clear()
+    get_text_generator_singleton.cache_clear()
 
 
 def _stub_startup(stack: ExitStack) -> None:
@@ -82,7 +83,7 @@ async def test_lifespan_boots_with_comms_reporting_text_generation_unavailable_w
         _stub_startup(stack)
         async with build_lifespan(configuration)(FastAPI()):
             registered = {get_plugin_manager().get_name(plugin) for plugin, _ in get_plugin_manager().list_plugin_distinfo()}
-            available = text_generation_available()
+            available = get_text_generator().is_available()
 
     assert "incident.scribe" in configuration.disabled_plugins
     assert "incident.comms" in registered

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-16T17:08:00Z'
+updated_date: '2026-11-19T14:28:00Z'
 labels:
   - identity
 dependencies:
@@ -75,6 +75,14 @@ created: 2026-11-03T19:00:00Z
 ---
 
 E4 coordination prerequisite: the roster uses person identities from this capability, with role-derived and manually added people. Do not add a temporary email, Google group, or Slack group expansion path. E4 waits on this capability before enabling person-based roster reads.
+
+---
+
+created: 2026-11-19T14:28:00Z
+
+---
+
+2026-11-19 (TASK-25.10.2 Q1/Q2, human): generate the people capability after TASK-114.6, so its entry point and contract (m) module are capabilities.people.plugin and api.py stays importable by features. Its [plugins.shared] key switches only the plugin module (surfaces, requirements, credential checks), never api.py; the capability is always present (platform/extension framing, ADR text with TASK-25.10.2).
 
 ---
 <!-- COMMENTS:END -->

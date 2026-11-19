@@ -171,11 +171,17 @@ def test_renaming_an_entry_point_and_its_contract_strings_keeps_comments_and_oth
     def rename(text: str) -> str:
         return text.replace("features.incident.scribe", "features.incident.notes")
 
-    data = tomllib.loads(PYPROJECT)
+    # The live file holds no package-scoped ignore string any more, so the test adds one to rename.
+    adapters_rule = '    "**.adapters.** -> integrations.**",\n'
+    assert PYPROJECT.count(adapters_rule) == 1
+    text = PYPROJECT.replace(adapters_rule, adapters_rule + '    "features.incident.scribe.service -> integrations.openai",\n')
+    data = tomllib.loads(text)
     edits = package_toml.rename_entry_point(data, "incident.scribe", "incident.notes", "features.incident.notes")
     edits += package_toml.rename_in_contracts(data, rename, keep=frozenset({"feature-independence"}))
 
-    result = _render_pyproject(edits)
+    new_text = package_toml.render(text, edits)
+    assert _comments(new_text) == _comments(text)
+    result = tomllib.loads(new_text)
 
     group = result["project"]["entry-points"]["sre_bot"]
     assert "incident.scribe" not in group

@@ -23,6 +23,7 @@ from unittest.mock import MagicMock, call
 import pytest
 from structlog.testing import capture_logs
 
+from capabilities.text_generation.adapters.in_memory import InMemoryTextGenerator
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.comms import providers
@@ -60,6 +61,8 @@ from tests.factories.incident import incident_scopes
 from tests.factories.slack import FakeSlackRegistrar
 
 pytestmark = pytest.mark.unit
+
+_GENERATOR = "capabilities.text_generation.providers.get_text_generator_singleton"
 
 _INCIDENT = "inc-uuid-1"
 _CHANNEL = "C123"
@@ -160,7 +163,7 @@ def services(monkeypatch: pytest.MonkeyPatch, events: list[str]) -> _Services:
     monkeypatch.setattr(form, "get_draft_for_review", fakes.get_draft_for_review)
     monkeypatch.setattr(approval, "approve_status_update", fakes.approve_status_update)
     monkeypatch.setattr(providers, "get_status_page_publisher", lambda: fakes)
-    monkeypatch.setattr(form, "text_generation_available", lambda: True)
+    monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=True))
     return fakes
 
 
@@ -326,7 +329,7 @@ class TestHandleReviewAction:
         self, ack: MagicMock, client: MagicMock, services: _Services, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """With the generator unconfigured the form is built without Draft with AI; Save draft and Approve remain."""
-        monkeypatch.setattr(form, "text_generation_available", lambda: False)
+        monkeypatch.setattr(_GENERATOR, lambda: InMemoryTextGenerator(available=False))
 
         handle_review_action(ack, _review_action_body(), client, incident_scopes())
 

@@ -4,7 +4,7 @@
 # (TASK-187); only ratchets down (decisions/migration.md coexistence rule 3). Removing an entry is always
 # safe. Do NOT add entries: net-new patches fail CI. A move PR re-keys its own entries, same count, and
 # says so in its PR body (decisions/testing.md). A trailing "# ..." comment is ignored.
-# Re-keyed from main 7b0b3810 for TASK-186's comms move (TASK-187): same patches; text_generation_available is a provider seam.
+# Re-keyed from main 7b0b3810 for TASK-186's comms move (TASK-187): same patches. Text generation is faked through capabilities.text_generation.providers (TASK-25.10.2).
 tests/integration/features/incident/comms/test_incident_comms_status_update_generate_dispatch.py::features.incident.comms.service.form.generate_status_update_draft
 tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.entrypoints.slack.get_status_update_overview
 tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.service.publication.get_approved_update

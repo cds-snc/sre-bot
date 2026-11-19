@@ -11,7 +11,7 @@ scope: The one package shape for features, capabilities and their subdomains, pl
 
 Features live in `app/packages/` today; `features/` and `capabilities/` do not exist yet ([plugin-architecture.md](plugin-architecture.md)). An earlier layout record was a closed filename list that banned names the code needed (no slot for persistence, no `locales/`), so this record was reconciled with the shipped shape. Nothing enforces it, and the shipped packages have drifted:
 - Two packages (`geolocate`, `rant`) put Slack handlers in `platforms/`, and `access` puts them in `interactions/`, instead of `entrypoints/`; `geolocate` also has `routes.py`, `oncall_sync` has `ports.py`, and `access/sync` has many extra top-level modules (`application.py`, `job_runner.py`, `presenters.py` and others).
-- Handler files in six packages import `integrations.slack` directly, `oncall_sync/providers.py` imports `integrations.slack.settings`, and the `incident/scribe` service imports `integrations.openai`.
+- Handler files in six packages import `integrations.slack` directly, and `oncall_sync/providers.py` imports `integrations.slack.settings`.
 - `access/sync` handlers are synchronous `def` functions.
 - `access/request` and `access/sync` publish and handle domain events through the blinker-backed `infrastructure.events` dispatcher.
 - `access/common` reads runtime-config files and holds a cached provider, although `common/` is meant to do no I/O.
@@ -116,7 +116,7 @@ Tickets: TASK-18 (import-linter contracts), TASK-145 (incident, replacing TASK-3
 Tolerated until then:
 - packages in `app/packages/`, with no generator and no shape check;
 - `platforms/` directories and the extra top-level modules listed in Context;
-- `integrations` imports outside `adapters/`: `integrations.slack` in handler files and `oncall_sync/providers.py`, and `integrations.openai` in the `incident/scribe` service;
+- `integrations` imports outside `adapters/`: `integrations.slack` in handler files and `oncall_sync/providers.py`;
 - `providers.py` files that import `infrastructure` providers instead of resolving contracts from the registry;
 - the runtime-config loaders and cached provider in `access/common`;
 - synchronous handlers in `access/sync/interactions/`;
@@ -143,3 +143,4 @@ Tolerated until then:
 - 2026-11-10: the generator reads the manifest and emits optional entries only on request; a capability requires only `__init__.py`, `README.md` and `api.py`; `service.py`, `entrypoints/`, `adapters/` and `locales/` are optional; options outside a kind, and any option on umbrella or promote, are refused (TASK-114.4).
 - 2026-11-19: the manifest names entry roles as well as entries: `public_api = "api.py"`, the only public surface of a capability and of an umbrella's `core/`, which both kinds must require; the app/bin guards take the package roots, the public api module, the adapters directory and the `core`/`common` kind names from `bin/package_layout.py` instead of their own copies (TASK-114.5).
 - 2026-11-19: `plugin.py` is required in a capability: the manifest declares `plugin_module = "plugin.py"`, the generator writes it from the hookimpl template beside a docstring-only `__init__.py` and names `<package>.plugin` as the entry point and protected module; features and subdomains are unchanged; the shape check adds `capability-entry-point` and `hookimpl-outside-plugin` (TASK-114.6, human).
+- 2026-11-19: TASK-25.10.2: the `incident/scribe` service no longer imports `integrations.openai`; it and `comms` import `capabilities.text_generation.api`.

@@ -1,81 +1,49 @@
-"""Summarizer behavior port and its OpenAI-backed adapter.
+"""OpenAI adapter of the text-generation capability: the chat completions API behind ``TextGenerator``.
 
-``Summarizer`` is the narrow behavior contract feature packages depend on
-(per the model-boundary rules: ``Protocol`` for service contracts). The
-``OpenAISummarizer`` adapter is the boundary tier: it calls the vendor client inside
-``try/except``, classifies failures via ``classify_openai_error``, and
-returns ``OperationResult``. Unmapped exceptions propagate -- they are bugs,
-not outcomes.
+The capability's only importer of ``integrations.openai`` (import-linter contract (o)). It calls
+the vendor client inside ``try/except``, classifies failures via ``classify_openai_error`` and
+returns ``OperationResult``; unmapped exceptions propagate, as they are bugs, not outcomes. The
+model, output budget and temperature are read from the OpenAI slice until TASK-25.10.3 moves them.
 """
 
-from functools import lru_cache
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
 import structlog
 
-from contracts.operations.codes import ErrorCode
+from capabilities.text_generation.api import TextGenerator
 from contracts.operations.result import OperationResult
 from integrations.openai.client import build_openai_client, classify_openai_error
 from integrations.openai.settings import OpenAISettings, get_openai_settings
 
 logger = structlog.get_logger()
 
-_DEFAULT_INSTRUCTIONS = (
-    "You are an incident-response assistant. Summarize the following chat "
-    "transcript from an incident channel so that a responder joining now can "
-    "quickly catch up. Be concise and factual. Cover: what is happening, "
-    "current status, actions taken, and next steps. Do not invent details "
-    "that are not in the transcript."
-)
 
-
-@runtime_checkable
-class Summarizer(Protocol):
-    """Behavior contract for producing a text summary of a transcript."""
-
-    async def summarize(
-        self,
-        transcript: str,
-        *,
-        instructions: str | None = None,
-        max_output_tokens: int | None = None,
-    ) -> OperationResult[str]:
-        """Return an ``OperationResult`` carrying the summary text on success."""
-        ...
-
-
-class OpenAISummarizer:
-    """``Summarizer`` implementation backed by the OpenAI chat completions API."""
+class OpenAITextGenerator(TextGenerator):
+    """``TextGenerator`` backed by an OpenAI-compatible chat completions endpoint."""
 
     def __init__(self, settings: OpenAISettings | None = None) -> None:
         self._settings = settings or get_openai_settings()
 
-    async def summarize(
-        self,
-        transcript: str,
-        *,
-        instructions: str | None = None,
-        max_output_tokens: int | None = None,
-    ) -> OperationResult[str]:
-        """Summarize ``transcript`` via the OpenAI chat completions endpoint.
+    def is_available(self) -> bool:
+        """Always available: the provider builds this adapter only for a configured tenant."""
+        return True
+
+    async def generate(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+        """Generate text from ``source`` under ``instructions`` via the chat completions endpoint.
 
         Args:
-            transcript: The user content to summarize.
-            instructions: Optional system prompt replacing the default.
-            max_output_tokens: Optional per-call completion budget. Callers
-                that need substantially more output than a catch-up summary
-                (e.g. structured multi-section drafts) raise it; ``None`` uses
-                the configured ``max_output_tokens``.
+            source: The user content.
+            instructions: The system prompt.
+            max_output_tokens: Optional per-call completion budget. Callers that need
+                substantially more output than a catch-up summary (structured multi-section
+                drafts) raise it; ``None`` uses the configured ``max_output_tokens``.
         """
-        if self._settings.tenant is None:
-            # OpenAI is not configured: answer without building a client or reaching any endpoint.
-            return OperationResult.permanent_error(message="OpenAI is not configured", error_code=ErrorCode.CONFIG_NOT_CONFIGURED)
         payload: dict[str, Any] = {
             "model": self._settings.model,
             "max_completion_tokens": max_output_tokens or self._settings.max_output_tokens,
             "messages": [
-                {"role": "system", "content": instructions or _DEFAULT_INSTRUCTIONS},
-                {"role": "user", "content": transcript},
+                {"role": "system", "content": instructions},
+                {"role": "user", "content": source},
             ],
         }
         if self._settings.temperature >= 0:
@@ -93,7 +61,7 @@ class OpenAISummarizer:
             # body names the offending parameter, which is the difference
             # between diagnosing this and guessing at it.
             logger.warning(
-                "openai_summarize_failed",
+                "openai_generate_failed",
                 error=str(exc),
                 response_body=_error_body(exc),
                 sent_parameters=sorted(payload),
@@ -106,32 +74,30 @@ class OpenAISummarizer:
                 retry_after=retry_after,
             )
 
-        summary = _extract_summary(body)
+        text = _extract_text(body)
         finish_reason = _finish_reason(body)
         usage = _usage(body)
         logger.info(
-            "openai_summarize_usage",
+            "openai_generate_usage",
             model=payload["model"],
             finish_reason=finish_reason,
             max_completion_tokens=payload["max_completion_tokens"],
-            summary_length=len(summary),
+            text_length=len(text),
             **usage,
         )
         if finish_reason == "length":
             # The completion budget ran out mid-response, so the text is cut
             # off. Callers parsing structured output need to know this.
             logger.warning(
-                "openai_summarize_truncated",
+                "openai_generate_truncated",
                 max_completion_tokens=payload["max_completion_tokens"],
-                summary_length=len(summary),
+                text_length=len(text),
                 **usage,
             )
-        elif not summary:
-            logger.warning("openai_summarize_empty_content", finish_reason=finish_reason)
+        elif not text:
+            logger.warning("openai_generate_empty_content", finish_reason=finish_reason)
 
-        return OperationResult.success(
-            data=summary,
-        )
+        return OperationResult.success(data=text)
 
 
 def _error_body(exc: Exception) -> str:
@@ -145,7 +111,7 @@ def _error_body(exc: Exception) -> str:
         return ""
 
 
-def _extract_summary(body: dict) -> str:
+def _extract_text(body: dict) -> str:
     """Pull the assistant message text out of a chat completions response."""
     choices = body.get("choices") or []
     if not choices:
@@ -180,7 +146,9 @@ def _usage(body: dict) -> dict[str, int]:
     return {key: int(value) for key, value in counts.items() if isinstance(value, int)}
 
 
-@lru_cache(maxsize=1)
-def get_summarizer() -> OpenAISummarizer:
-    """Return the process-wide ``OpenAISummarizer`` singleton (the ``Summarizer`` port)."""
-    return OpenAISummarizer()
+def build_openai_text_generator() -> OpenAITextGenerator | None:
+    """Return the OpenAI generator when [openai.tenant] is set, else ``None`` (no client is built either way)."""
+    settings = get_openai_settings()
+    if settings.tenant is None:
+        return None
+    return OpenAITextGenerator(settings)

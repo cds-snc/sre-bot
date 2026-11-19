@@ -4,7 +4,7 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T15:51:00Z'
+updated_date: '2026-11-19T14:28:00Z'
 labels:
   - incident
   - features
@@ -122,6 +122,14 @@ created: 2026-11-16T15:51:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.4 OQ4): decisions/migration.md step 4 amended (rides with L6b): a cutover changes behaviour only as a named change of kind (a) legacy bug no pin asserts, (b) behaviour an accepted end-state ADR replaces, (c) expired deprecated form after a usage check, (d) retired surface; additions only by an explicit plan ruling. At planning, classify each behaviour change of this task by kind, pin it (test_legacy_only_* or edited pin citing the ruling) and list it in the PR body.
+
+---
+
+created: 2026-11-19T14:28:00Z
+
+---
+
+2026-11-19 (TASK-25.10.2 Q4, human): scribe keeps its summarizer= keyword (typed against the text-generation capability's TextGenerator) through 25.10.2 to avoid churning ~52 test sites; when this task moves the function, name the parameter for its role (text_generator=).
 
 ---
 <!-- COMMENTS:END -->
