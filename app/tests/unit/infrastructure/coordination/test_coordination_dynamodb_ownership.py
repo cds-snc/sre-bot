@@ -1,9 +1,9 @@
-"""Ownership checks on DynamoDBConditionalWriteStore.complete() and release().
+"""Ownership checks on DynamoDBConditionalWriteStore.complete(), release() and expire_at().
 
 A real boto3 DynamoDB client built with static dummy credentials is wrapped in
 botocore.stub.Stubber, which validates each request against the service model
 and asserts its exact parameters. The tests pin the condition expressions that
-gate complete and release on the caller's claim token, the mapping of a failed
+gate complete, release and expire_at on the caller's claim token, the mapping of a failed
 condition to False, and the propagation of every other failure.
 """
 
@@ -74,6 +74,29 @@ def _release_params() -> dict[str, Any]:
     }
 
 
+def _expire_at_params(at: int) -> dict[str, Any]:
+    return {
+        "TableName": TABLE_NAME,
+        "Key": {"idempotency_key": {"S": KEY}},
+        "UpdateExpression": "SET #expires_at = :at, #ttl = :at",
+        "ConditionExpression": "#claim_token = :claim_token AND #status = :in_progress",
+        "ExpressionAttributeNames": {
+            "#claim_token": "claim_token",
+            "#status": "status",
+            "#expires_at": "in_progress_expires_at",
+            "#ttl": "ttl",
+        },
+        "ExpressionAttributeValues": {
+            ":claim_token": {"S": CLAIM_TOKEN},
+            ":in_progress": {"S": "IN_PROGRESS"},
+            ":at": {"N": str(at)},
+        },
+    }
+
+
+AT = 1_800_000_000
+
+
 class TestComplete:
     def test_complete_puts_conditionally_on_the_claim_token_and_keeps_it(self, client, store):
         """The COMPLETED item keeps the token so a replayed complete still matches."""
@@ -134,6 +157,36 @@ class TestRelease:
                 store.release(KEY, CLAIM_TOKEN)
 
 
+class TestExpireAt:
+    def test_expire_at_updates_the_expiry_of_an_in_progress_record_holding_the_claim_token(self, client, store):
+        """An UpdateItem, never a DeleteItem: the claim stays in place until `at`."""
+        with Stubber(client) as stub:
+            stub.add_response("update_item", {}, expected_params=_expire_at_params(AT))
+
+            assert store.expire_at(KEY, CLAIM_TOKEN, AT) is True
+
+    def test_expire_at_returns_false_when_the_condition_fails(self, client, store):
+        with Stubber(client) as stub:
+            stub.add_client_error(
+                "update_item", service_error_code="ConditionalCheckFailedException", expected_params=_expire_at_params(AT)
+            )
+
+            assert store.expire_at(KEY, CLAIM_TOKEN, AT) is False
+
+    def test_expire_at_raises_runtime_error_on_a_classified_failure(self, client, store, monkeypatch):
+        monkeypatch.setattr(client, "update_item", _raise(EndpointConnectionError(endpoint_url="https://dynamodb")))
+
+        with pytest.raises(RuntimeError, match="^Failed to expire idempotency key"):
+            store.expire_at(KEY, CLAIM_TOKEN, AT)
+
+    def test_expire_at_propagates_an_unclassified_error(self, client, store):
+        with Stubber(client) as stub:
+            stub.add_client_error("update_item", service_error_code="ValidationException")
+
+            with pytest.raises(ClientError):
+                store.expire_at(KEY, CLAIM_TOKEN, AT)
+
+
 class TestOwnershipLostLogging:
     def test_lost_ownership_logs_a_warning_without_the_token(self, client, store, monkeypatch):
         """The token is a bearer secret for the claim, so it never reaches the logs."""
@@ -145,6 +198,16 @@ class TestOwnershipLostLogging:
             store.release(KEY, CLAIM_TOKEN)
 
         assert warnings == [("claim_ownership_lost", {"key": KEY, "operation": "release"})]
+
+    def test_lost_ownership_on_expire_at_logs_a_warning_without_the_token(self, client, store, monkeypatch):
+        warnings: list[tuple[str, dict[str, Any]]] = []
+        monkeypatch.setattr(store, "log", _RecordingLogger(warnings))
+
+        with Stubber(client) as stub:
+            stub.add_client_error("update_item", service_error_code="ConditionalCheckFailedException")
+            store.expire_at(KEY, CLAIM_TOKEN, AT)
+
+        assert warnings == [("claim_ownership_lost", {"key": KEY, "operation": "expire_at"})]
 
 
 class TestClaimReturnsToken:

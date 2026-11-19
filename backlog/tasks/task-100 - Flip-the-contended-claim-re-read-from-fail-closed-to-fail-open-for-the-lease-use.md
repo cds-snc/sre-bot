@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-17 20:39
-updated_date: '2026-11-18T19:00:00Z'
+updated_date: '2026-11-18T20:42:00Z'
 labels:
   - infrastructure
   - reliability
@@ -48,7 +48,7 @@ SCOPE
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Under the lease facade, a classified failure of the contended re-read lets the caller run (fail-open); ReadFailurePolicy's docstring records why fail-open fits a lease whose body is idempotent
-- [ ] #2 A fail-open lease cannot delete or overwrite another holder's record: its release frees nothing (tested against the ownership-checked release)
+- [ ] #2 A fail-open lease cannot delete or overwrite another holder's record: its release, held (LeaseStore.release with not_before, through expire_at, TASK-64.2) or not, frees nothing and holds nothing (tested against the ownership-checked release and expire_at)
 - [ ] #3 The IdempotencyStore keeps FAIL_CLOSED; each facade's policy stays an explicit choice at construction, and the access sync lease's policy is stated explicitly
 - [ ] #4 An unclassified error on the re-read still propagates unchanged
 - [ ] #5 The tests pinning the lease's fail-closed resolution are updated in this PR rather than left contradicting the new behaviour
@@ -59,4 +59,6 @@ SCOPE
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-18 (TASK-64.2 planning, human approved): LeaseStore.release gains not_before, which holds the lease through ConditionalWriteStore.expire_at under the claim token. A fail-open lease holds no record, so its held release must free and hold nothing too: expire_at with a token that matches no record returns False (covered by TASK-64.2's conformance cases).
+
+2026-11-18 (TASK-64.2 planning, human): AC #2 widened to cover the held release. TASK-64.2 adds LeaseStore.release(..., not_before=) and run_if_leased(min_hold=), which releases through ConditionalWriteStore.expire_at after a short run. Whichever form this task picks for a fail-open acquire (a token that matches no record, or a marker the caller's release skips), the not_before path must free and hold nothing too. TASK-64.2 pins the token-matches-no-record case (its AC #7).
 <!-- SECTION:NOTES:END -->

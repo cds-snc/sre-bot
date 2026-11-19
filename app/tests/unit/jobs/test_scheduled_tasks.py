@@ -221,6 +221,7 @@ class TestInitJobRegistration:
         """
         # Arrange
         mock_get_settings.return_value.default_tier2_lease_ttl_seconds = 1800
+        mock_get_settings.return_value.lease_hold_margin_seconds = 5
         mock_get_lease_store.return_value = LeaseStore(
             InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
             read_failure_policy=ReadFailurePolicy.FAIL_CLOSED,

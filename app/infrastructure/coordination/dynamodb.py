@@ -194,3 +194,35 @@ class DynamoDBConditionalWriteStore(ConditionalWriteStore):
                 self.log.warning("claim_ownership_lost", key=key, operation="release")
                 return False
             raise RuntimeError(f"Failed to release idempotency key: {exc}") from exc
+
+    def expire_at(self, key: str, claim_token: str, at: int) -> bool:
+        """Set the expiry of the key claim_token holds in progress to `at`, never deleting it.
+
+        A conditional update under the same condition as release: a stale or foreign token,
+        a missing key (nothing is created) or a COMPLETED record fails it and returns False.
+        """
+        try:
+            self._dynamodb.update_item(
+                TableName=self.table_name,
+                Key={PARTITION_KEY: {"S": key}},
+                UpdateExpression="SET #expires_at = :at, #ttl = :at",
+                ConditionExpression="#claim_token = :claim_token AND #status = :in_progress",
+                ExpressionAttributeNames={
+                    "#claim_token": "claim_token",
+                    "#status": "status",
+                    "#expires_at": "in_progress_expires_at",
+                    "#ttl": "ttl",
+                },
+                ExpressionAttributeValues={
+                    ":claim_token": {"S": claim_token},
+                    ":in_progress": {"S": ClaimResult.IN_PROGRESS.name},
+                    ":at": {"N": str(at)},
+                },
+            )
+            return True
+        except (ClientError, BotoCoreError) as exc:
+            _, error_code, _ = classify_aws_error(exc)
+            if error_code == "ConditionalCheckFailedException":
+                self.log.warning("claim_ownership_lost", key=key, operation="expire_at")
+                return False
+            raise RuntimeError(f"Failed to expire idempotency key: {exc}") from exc
