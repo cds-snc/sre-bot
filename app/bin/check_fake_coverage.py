@@ -40,12 +40,11 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from bin.freeze_guard import iter_python_files, load_baseline, report
+from bin.package_layout import layout
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "fake_coverage.txt"
 FAKE_MODULE_NAME = "in_memory.py"
-CAPABILITY_API_MODULE_NAME = "api.py"
-CAPABILITY_ADAPTERS_DIR = "adapters"
 PROTOCOL_NAME = "Protocol"
 
 
@@ -98,8 +97,9 @@ def find_covered_protocols() -> set[str]:
     implemented = _infrastructure_implementations()
     covered = {f"{module}:{name}" for module, name in _contract_protocols() if name in implemented}
 
-    for api in sorted((APP_ROOT / "capabilities").glob(f"*/{CAPABILITY_API_MODULE_NAME}")):
-        adapters = _subclassed_names(iter_python_files(api.parent / CAPABILITY_ADAPTERS_DIR))
+    rules = layout()
+    for api in sorted((APP_ROOT / rules.roots.capabilities).glob(f"*/{rules.public_api}")):
+        adapters = _subclassed_names(iter_python_files(api.parent / rules.adapters_dir))
         covered |= {f"{_app_relative(api)}:{name}" for name in _protocols(api) if name in adapters}
 
     for path in iter_python_files(APP_ROOT / "infrastructure"):
@@ -112,7 +112,7 @@ def find_fakes() -> set[str]:
     """Return the names of every Protocol a package in_memory.py class explicitly subclasses."""
     fake_modules = (
         path
-        for root in ("infrastructure", "capabilities")
+        for root in ("infrastructure", layout().roots.capabilities)
         for path in iter_python_files(APP_ROOT / root)
         if path.name == FAKE_MODULE_NAME
     )

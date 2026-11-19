@@ -43,12 +43,10 @@ REPO_ROOT = APP_ROOT.parent
 WORKFLOW_DIR = REPO_ROOT / ".github"
 ACTIONS_LISTED = "actions-listed"  # marker source: the repository's Actions secrets could be listed
 
-# Read by the platform, an SDK or uvicorn, never by a settings class.
-RUNTIME = frozenset(
+# Read by the platform, an SDK or uvicorn, never by a settings class: the platform-provided names
+# (configuration.md's closed list, owned by the ownership check) and the AWS SDK's credential-chain names.
+RUNTIME = checker.PLATFORM_NAMES | frozenset(
     {
-        "ENVIRONMENT",
-        "GIT_SHA",
-        "FORWARDED_ALLOW_IPS",
         "AWS_ACCESS_KEY_ID",
         "AWS_SECRET_ACCESS_KEY",
         "AWS_SESSION_TOKEN",
@@ -59,6 +57,9 @@ RUNTIME = frozenset(
         "AWS_SHARED_CREDENTIALS_FILE",
     }
 )
+# Deliberately narrower than checker.SDK_NAMESPACE (configuration.md Checks): that regex marks every name a
+# slice may never declare, so it matches any AWS_x; here only names an SDK or uvicorn reads itself are runtime,
+# so an unread AWS_BUCKET is still checked.
 RUNTIME_PREFIXES = ("AWS_ENDPOINT_URL", "UVICORN_", "OTEL_")
 
 # Names no longer read, each with what replaced it: "secret <NAME>" (a Codespaces value is copied there

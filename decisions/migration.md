@@ -60,7 +60,7 @@ No migration is left half-done: each command or interaction is either legacy or 
 | `locales/` | Legacy `python-i18n` catalogues. Deleted with the last legacy surface, replaced by per-package catalogues ([i18n.md](i18n.md)). | TASK-41 |
 | `geodb/` | MaxMind database baked into the image by AWS-coupled CI. Rebuilt as a configurable, cloud-agnostic source. | TASK-57 |
 
-**Done means:** `app/modules/` deleted, `modules` removed from plugin discovery, `_register_legacy_handlers()` deleted, `python-i18n` removed, and no freeze baseline lists a `modules/` path.
+**Done means:** `app/modules/` deleted, `modules` removed from plugin discovery, `_register_legacy_handlers()` deleted, `python-i18n` removed, and no freeze baseline lists a `modules/` path; the test-seam guard's `LEGACY_ROOT` (`bin/check_test_seams.py`) is dropped with it.
 
 ## Consequences
 

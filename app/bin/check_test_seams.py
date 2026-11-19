@@ -57,15 +57,19 @@ from functools import cache
 from pathlib import Path
 
 from bin.freeze_guard import iter_python_files, report
+from bin.package_layout import layout
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 TESTS_ROOT = APP_ROOT / "tests"
-STRICT_ZONES = tuple(TESTS_ROOT / kind / area for kind in ("unit", "integration") for area in ("features", "capabilities"))
+PACKAGE_ROOTS = (layout().roots.features, layout().roots.capabilities)
+# The legacy root: guarded until migration.md's "Done means" deletes app/modules/, and dropped with it.
+LEGACY_ROOT = "modules"
+STRICT_ZONES = tuple(TESTS_ROOT / kind / area for kind in ("unit", "integration") for area in PACKAGE_ROOTS)
 LEGACY_ZONE = TESTS_ROOT / "integration" / "legacy_surface"
 STRICT_BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "test_seams_strict.txt"
 LEGACY_BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "test_seams_legacy.txt"
 
-GUARDED_ROOTS = frozenset({"features", "capabilities", "modules"})
+GUARDED_ROOTS = frozenset({*PACKAGE_ROOTS, LEGACY_ROOT})
 SEAM_MODULES = frozenset({"providers", "settings"})
 PATCH_RECEIVERS = frozenset({"mock", "unittest.mock", "mocker"})
 PATCH_OPTIONS = frozenset({"spec", "spec_set", "create", "autospec", "new_callable"})
