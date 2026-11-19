@@ -393,13 +393,11 @@ rest.
 | `INCIDENT_DRAFT__DEFAULT_HISTORY_LIMIT` | 500 | Messages fetched when `--limit` is absent |
 | `INCIDENT_DRAFT__MAX_HISTORY_LIMIT` | 1000 | Hard cap on `--limit` |
 | `INCIDENT_DRAFT__DEFAULT_SINCE_HOURS` | 24 | Fallback window when the channel creation time can't be read |
-| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
+| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than a catch-up summary; less truncates the JSON mid-object. |
 
-Vendor settings live in `integrations.openai`. Two matter here:
-`[openai] max_output_tokens` (the fallback budget, overridden per call by the
-row above) and `[openai] temperature`, which is **omitted by default** — the
-gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
-where the model supports it, for more reproducible drafts.
+The draft sends no temperature: the gateway's current model rejects the
+parameter with a 400. `write` takes one per call if a model that supports it
+should draft more reproducibly.
 
 #### Truncated responses
 
@@ -492,6 +490,7 @@ have safe defaults:
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
+| `INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS` | `3000` | Completion budget for one catch-up summary |
 
 OpenAI credentials/model are **not** configured here — they belong to the
 vendor client (`OPENAI__API_KEY`, `[openai.tenant] model`, …) in

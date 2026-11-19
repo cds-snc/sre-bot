@@ -3,7 +3,7 @@
 The capability's only importer of ``integrations.openai`` (import-linter contract (o)). It calls
 the vendor client inside ``try/except``, classifies failures via ``classify_openai_error`` and
 returns ``OperationResult``; unmapped exceptions propagate, as they are bugs, not outcomes. The
-model, output budget and temperature are read from the OpenAI slice until TASK-25.10.3 moves them.
+output budget and temperature are the caller's, per call; the model is read from the OpenAI slice.
 """
 
 from typing import Any
@@ -28,28 +28,28 @@ class OpenAIWriter(AIWriter):
         """Always available: the provider builds this adapter only for a configured tenant."""
         return True
 
-    async def write(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+    async def write(
+        self, source: str, *, instructions: str, max_output_tokens: int, temperature: float | None = None
+    ) -> OperationResult[str]:
         """Write text from ``source`` under ``instructions`` via the chat completions endpoint.
 
         Args:
             source: The user content.
             instructions: The system prompt.
-            max_output_tokens: Optional per-call completion budget. Callers that need
-                substantially more output than a catch-up summary (structured multi-section
-                drafts) raise it; ``None`` uses the configured ``max_output_tokens``.
+            max_output_tokens: The completion budget, sent as ``max_completion_tokens``.
+            temperature: Sent only when set: some models accept no temperature at all, and a
+                rejected parameter fails the whole request.
         """
         payload: dict[str, Any] = {
             "model": self._settings.model,
-            "max_completion_tokens": max_output_tokens or self._settings.max_output_tokens,
+            "max_completion_tokens": max_output_tokens,
             "messages": [
                 {"role": "system", "content": instructions},
                 {"role": "user", "content": source},
             ],
         }
-        if self._settings.temperature >= 0:
-            # Omitted when negative: some models accept no temperature at all,
-            # and a rejected parameter fails the whole request.
-            payload["temperature"] = self._settings.temperature
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         try:
             async with build_openai_client(self._settings) as client:

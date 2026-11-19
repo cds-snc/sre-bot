@@ -12,7 +12,9 @@ class UnconfiguredAIWriter(AIWriter):
         """Never available: no endpoint backs it."""
         return False
 
-    async def write(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+    async def write(
+        self, source: str, *, instructions: str, max_output_tokens: int, temperature: float | None = None
+    ) -> OperationResult[str]:
         """Return ``AI_WRITING_UNAVAILABLE`` without reaching any model."""
         return OperationResult.permanent_error(
             message="AI writing is not configured",

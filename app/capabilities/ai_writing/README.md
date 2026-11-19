@@ -3,8 +3,10 @@
 A language model writes text (a summary, a draft, a template filled section by section) from a
 source and the caller's instructions, in feature-free vocabulary: the caller supplies the source
 (a transcript, a draft), the instructions and any post-processing. `api.py` exposes the `AIWriter`
-Protocol (`is_available()`, and async `write(source, *, instructions, max_output_tokens=None)`
-returning an `OperationResult[str]`) and the provider `get_ai_writer()`.
+Protocol (`is_available()`, and async `write(source, *, instructions, max_output_tokens,
+temperature=None)` returning an `OperationResult[str]`) and the provider `get_ai_writer()`.
+Every caller states its own completion budget; a temperature is sent only when the call sets one,
+since some models reject the parameter outright.
 
 That is its only purpose. Any other AI use (classifying, extracting, searching) is a separate
 capability named for its purpose, sharing the vendor integration; adding it to import-linter

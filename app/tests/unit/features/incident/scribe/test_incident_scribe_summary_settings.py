@@ -17,6 +17,7 @@ class TestIncidentSummarySettings:
             "INCIDENT_SUMMARY__MAX_HISTORY_LIMIT",
             "INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS",
             "INCIDENT_SUMMARY__TIMEZONE",
+            "INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS",
         ):
             monkeypatch.delenv(var, raising=False)
 
@@ -26,17 +27,20 @@ class TestIncidentSummarySettings:
         assert settings.MAX_HISTORY_LIMIT == 1000
         assert settings.DEFAULT_SINCE_HOURS == 24
         assert settings.TIMEZONE == "America/Toronto"
+        assert settings.MAX_OUTPUT_TOKENS == 3000
 
     def test_overrides_from_env(self, monkeypatch):
         monkeypatch.setenv("INCIDENT_SUMMARY__DEFAULT_HISTORY_LIMIT", "50")
         monkeypatch.setenv("INCIDENT_SUMMARY__MAX_HISTORY_LIMIT", "250")
         monkeypatch.setenv("INCIDENT_SUMMARY__TIMEZONE", "America/Vancouver")
+        monkeypatch.setenv("INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS", "1500")
 
         settings = IncidentSummarySettings()
 
         assert settings.DEFAULT_HISTORY_LIMIT == 50
         assert settings.MAX_HISTORY_LIMIT == 250
         assert settings.TIMEZONE == "America/Vancouver"
+        assert settings.MAX_OUTPUT_TOKENS == 1500
 
     def test_get_incident_summary_settings_is_cached(self):
         assert get_incident_summary_settings() is get_incident_summary_settings()
