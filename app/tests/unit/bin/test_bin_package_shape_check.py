@@ -16,6 +16,7 @@ import pytest
 from bin import check_package_shape as checker
 
 PLUGIN_INIT = "from contracts.plugins.namespace import hookimpl\n\n\n@hookimpl\ndef register_requirements():\n    return []\n"
+CAPABILITY_INIT = '"""People capability; import api.py only, the hookimpls live in plugin.py."""\n'
 VALID_README = "# People\n\n## Classification\n\nsupporting\n\n## Feature consumers\n\n- features.incident\n"
 
 
@@ -153,14 +154,15 @@ class TestLayoutTable:
 
     def test_api_and_hookspecs_pass_in_a_capability(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         files = {
-            "capabilities/people/__init__.py": PLUGIN_INIT,
+            "capabilities/people/__init__.py": CAPABILITY_INIT,
+            "capabilities/people/plugin.py": PLUGIN_INIT,
             "capabilities/people/README.md": VALID_README,
             "capabilities/people/api.py": "",
             "capabilities/people/hookspecs.py": "",
             "capabilities/people/service.py": "",
             "features/incident/__init__.py": PLUGIN_INIT,
         }
-        entry_points = {"people": "capabilities.people", "incident": "features.incident"}
+        entry_points = {"people": "capabilities.people.plugin", "incident": "features.incident"}
         assert _violations(tmp_path, monkeypatch, files, entry_points) == set()
 
     def test_a_settings_only_package_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -182,6 +184,45 @@ class TestPluginModule:
     def test_plugin_no_entry_point_names_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         files = _feature("rant", {"features/rant/plugin.py": ""})
         assert _violations(tmp_path, monkeypatch, files, {"rant": "features.rant"}) == {"features/rant/plugin.py:plugin-unnamed"}
+
+    def test_a_hookimpl_left_in_init_beside_plugin_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        files = {
+            "features/rant/__init__.py": PLUGIN_INIT,
+            "features/rant/plugin.py": PLUGIN_INIT,
+            "features/rant/settings.py": "",
+        }
+        assert _violations(tmp_path, monkeypatch, files, {"rant": "features.rant.plugin"}) == {
+            "features/rant/__init__.py:hookimpl-outside-plugin"
+        }
+
+    def test_a_feature_with_hookimpls_in_init_and_no_plugin_module_passes(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        assert _violations(tmp_path, monkeypatch, _feature("rant"), {"rant": "features.rant"}) == set()
+
+
+class TestCapabilityEntryPoint:
+    """A capability registers its plugin module, so features may import its api.py under contract (m)."""
+
+    def _capability(self) -> dict[str, str]:
+        return {
+            "capabilities/people/__init__.py": CAPABILITY_INIT,
+            "capabilities/people/plugin.py": PLUGIN_INIT,
+            "capabilities/people/README.md": VALID_README,
+            "capabilities/people/api.py": "",
+            "features/incident/__init__.py": PLUGIN_INIT,
+        }
+
+    def test_an_entry_point_naming_the_plugin_module_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        entry_points = {"people": "capabilities.people.plugin", "incident": "features.incident"}
+        assert _violations(tmp_path, monkeypatch, self._capability(), entry_points) == set()
+
+    def test_an_entry_point_naming_the_package_fails(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        files = self._capability()
+        files["capabilities/people/__init__.py"] = PLUGIN_INIT
+        del files["capabilities/people/plugin.py"]
+        entry_points = {"people": "capabilities.people", "incident": "features.incident"}
+        assert _violations(tmp_path, monkeypatch, files, entry_points) == {"capabilities/people:capability-entry-point"}
 
 
 class TestUmbrella:
@@ -267,7 +308,8 @@ class TestCapabilityReadme:
 
     def _capability(self, readme: str | None) -> dict[str, str]:
         files = {
-            "capabilities/people/__init__.py": PLUGIN_INIT,
+            "capabilities/people/__init__.py": CAPABILITY_INIT,
+            "capabilities/people/plugin.py": PLUGIN_INIT,
             "capabilities/people/api.py": "",
             "features/incident/__init__.py": PLUGIN_INIT,
         }
@@ -276,7 +318,7 @@ class TestCapabilityReadme:
         return files
 
     def _run(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, readme: str | None) -> set[str]:
-        entry_points = {"people": "capabilities.people", "incident": "features.incident"}
+        entry_points = {"people": "capabilities.people.plugin", "incident": "features.incident"}
         return _violations(tmp_path, monkeypatch, self._capability(readme), entry_points)
 
     def test_a_valid_readme_passes(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

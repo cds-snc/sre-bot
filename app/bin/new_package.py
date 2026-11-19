@@ -8,7 +8,10 @@ bin/package_templates/ and makes every edit the package needs elsewhere:
 
   - a plugin (feature, capability, subdomain): its entry point (dotted for a
     subdomain), its module in the protected-plugins contract and its
-    enablement key, switched on, in the [plugins.<area>] table chosen;
+    enablement key, switched on, in the [plugins.<area>] table chosen; both
+    name the package's plugin module (<package>.plugin) when its entries hold
+    the manifest's plugin_module, as a capability's always do, so features can
+    import its api.py; otherwise the package itself (plugins.md);
   - a feature or umbrella: the feature-independence contract; an umbrella also
     gets its own exhaustive layers contract, and a subdomain, core/ or common/
     joins it;
@@ -238,6 +241,14 @@ def _entries(request: Request) -> frozenset[str]:
     return layout().kinds[request.kind].required | {options[name].entry for name in request.options}
 
 
+def _plugin_target(request: Request, package: Package) -> str:
+    """The entry point's and contract (m)'s module: the plugin module when the package holds one (plugins.md)."""
+    plugin_module = layout().plugin_module
+    if plugin_module in _entries(request):
+        return f"{package.module}.{plugin_module.removesuffix('.py')}"
+    return package.module
+
+
 def _entry_point_name(package: Package) -> str:
     return f"{package.umbrella}.{package.name}" if package.umbrella else package.name
 
@@ -298,8 +309,9 @@ def _pyproject_edits(request: Request, package: Package, pyproject: dict[str, An
     if request.kind == "capability":
         edits += capabilities_root(pyproject)
     if request.kind in PLUGIN_KINDS:
-        edits += entry_point(pyproject, _entry_point_name(package), package.module)
-        edits += protected_plugin(pyproject, package.module)
+        target = _plugin_target(request, package)
+        edits += entry_point(pyproject, _entry_point_name(package), target)
+        edits += protected_plugin(pyproject, target)
     if request.kind in ("feature", "umbrella"):
         edits += independent_feature(pyproject, package.module)
     if request.kind == "umbrella":
@@ -412,7 +424,7 @@ def _report(request: Request, package: Package) -> list[str]:
     if request.kind in PLUGIN_KINDS:
         name = _entry_point_name(package)
         lines += [
-            f"Entry point '{name}' = '{package.module}'; enablement key [plugins.{request.area}] \"{name}\" = true.",
+            f"Entry point '{name}' = '{_plugin_target(request, package)}'; enablement key [plugins.{request.area}] \"{name}\" = true.",
             "Run 'uv sync' so the new entry point is installed before the app boots.",
             "When register_requirements declares a requirement, switch the plugin off in config/ci.toml "
             "(CI configures no vendor; a guard test fails otherwise, plugins.md).",

@@ -16,7 +16,11 @@ Rules, each reported as one key:
     from the layout table (``<path>``); service and domain may each be a module
     or a package; api.py and hookspecs.py only in a capability, api.py also in
     core/; plugin.py only where an entry point names it
-    (``<path>:plugin-unnamed``);
+    (``<path>:plugin-unnamed``), and then no hookimpl in __init__.py, which
+    the entry point never registers (``<__init__.py>:hookimpl-outside-plugin``);
+  - a capability's entry point names its plugin module, never the package, so
+    features can import its api.py under contract (m)
+    (``<path>:capability-entry-point``);
   - an umbrella's __init__.py holds nothing but whitespace
     (``<path>:umbrella-init``) and its root holds only __init__.py, README.md
     and its subdomain, core and common directories (``<path>``);
@@ -56,7 +60,7 @@ import tomllib
 from pathlib import Path
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, load_baseline, report
-from bin.package_layout import COMMON_KIND, CORE_KIND, Kind, layout
+from bin.package_layout import CAPABILITY_KIND, COMMON_KIND, CORE_KIND, Kind, layout
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -67,7 +71,7 @@ PYPROJECT_PATH = APP_ROOT / "pyproject.toml"
 
 CORE = CORE_KIND
 COMMON = COMMON_KIND
-PLUGIN_MODULE = "plugin"
+PLUGIN_MODULE = layout().plugin_module.removesuffix(".py")
 
 
 def _relative(path: Path) -> str:
@@ -141,10 +145,16 @@ def _check_plugin_package(package: Path, kind: Kind, targets: set[str]) -> set[s
     """A flat package or an umbrella subdomain: table names, plugin.py, and hookimpls imply an entry point."""
     violations = _check_names(package, kind)
     plugin = package / f"{PLUGIN_MODULE}.py"
-    if plugin.is_file() and f"{_module(package)}.{PLUGIN_MODULE}" not in targets:
-        violations.add(f"{_relative(plugin)}:plugin-unnamed")
-    if (_defines_hookimpl(package / "__init__.py") or _defines_hookimpl(plugin)) and not _is_named(package, targets):
+    init = package / "__init__.py"
+    if plugin.is_file():
+        if f"{_module(package)}.{PLUGIN_MODULE}" not in targets:
+            violations.add(f"{_relative(plugin)}:plugin-unnamed")
+        elif _defines_hookimpl(init):
+            violations.add(f"{_relative(init)}:hookimpl-outside-plugin")
+    if (_defines_hookimpl(init) or _defines_hookimpl(plugin)) and not _is_named(package, targets):
         violations.add(f"{_relative(package)}:no-entry-point")
+    if kind.name == CAPABILITY_KIND and _module(package) in targets:
+        violations.add(f"{_relative(package)}:capability-entry-point")
     return violations
 
 

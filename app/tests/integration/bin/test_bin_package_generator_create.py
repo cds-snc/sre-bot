@@ -7,12 +7,17 @@ judged by the same tools CI uses: the package-shape guard (its path constants
 aimed at the copy, empty baseline), the plugin-enablement check, the rule that
 the protected-plugins contract lists exactly the entry-point modules, ruff over
 the generated files, and a pluggy PluginManager that registers the generated
-``__init__.py`` (loaded from its file, so it cannot collide with the real
-``features`` package) and calls ``register_requirements``. The optional
+plugin module (``__init__.py``, or a capability's ``plugin.py``, loaded from
+its file so it cannot collide with the real ``features`` package) and calls
+``register_requirements``. A capability's entry point and protected module are
+asserted to name its plugin module, the one placement that lets features import
+its api.py under contract (m); features and subdomains, with or without
+settings, keep the package as the target. The optional
 entries a kind may gain come from bin/package_layout.toml, so the option
 matrix is checked against the shape guard for every capability combination.
 """
 
+import ast
 import importlib.util
 import itertools
 import shutil
@@ -99,10 +104,10 @@ def _capabilities(root: Path) -> list[str]:
     return [str(path)] if path.is_dir() else []
 
 
-def _registered_requirements(package: Path) -> list[Any]:
+def _registered_requirements(package: Path, module: str = "__init__.py") -> list[Any]:
     """Register the generated plugin module on a fresh manager and collect register_requirements."""
     spec = importlib.util.spec_from_file_location(
-        f"generated_{package.name}", package / "__init__.py", submodule_search_locations=[str(package)]
+        f"generated_{package.name}_{module.removesuffix('.py')}", package / module, submodule_search_locations=[str(package)]
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -126,9 +131,17 @@ def test_a_feature_is_a_registrable_plugin_with_its_key_and_contracts(root: Path
     _assert_consistent(root)
 
 
+def _is_docstring_only(path: Path) -> bool:
+    body = ast.parse(path.read_text(encoding="utf-8")).body
+    return len(body) == 1 and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant)
+
+
 def test_a_feature_with_settings_gets_a_slice_and_its_table(root: Path) -> None:
     _run(root, "feature", "shop", "--area", AREA, "--settings")
 
+    assert not (root / "features" / "shop" / "plugin.py").exists()
+    assert _entry_points(root)["shop"] == "features.shop"
+    assert "features.shop" in _contract(root, "protected-plugins")["protected_modules"]
     settings = (root / "features" / "shop" / "settings.py").read_text(encoding="utf-8")
     assert 'toml_table_header=("shop",)' in settings
     assert 'env_prefix="SHOP__"' in settings
@@ -153,14 +166,17 @@ def test_the_first_capability_creates_the_capabilities_root(root: Path) -> None:
 
     package = root / "capabilities" / "pricing"
     assert (root / "capabilities" / "__init__.py").is_file()
-    assert {"api.py", "hookspecs.py", "README.md"} <= {path.name for path in package.iterdir()}
+    assert {"api.py", "hookspecs.py", "README.md", "plugin.py"} <= {path.name for path in package.iterdir()}
+    assert _is_docstring_only(package / "__init__.py")
     readme = (package / "README.md").read_text(encoding="utf-8")
     assert "## Classification\n\nsupporting\n" in readme
     assert "## Feature consumers\n\n- features.shop\n" in readme
     assert "capabilities" in _pyproject(root)["tool"]["importlinter"]["root_packages"]
     assert "capabilities" in _pyproject(root)["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"]
-    assert _entry_points(root)["pricing"] == "capabilities.pricing"
-    assert _registered_requirements(package) == [[]]
+    assert _entry_points(root)["pricing"] == "capabilities.pricing.plugin"
+    assert "capabilities.pricing.plugin" in _contract(root, "protected-plugins")["protected_modules"]
+    assert "capabilities.pricing" not in _contract(root, "protected-plugins")["protected_modules"]
+    assert _registered_requirements(package, "plugin.py") == [[]]
     _assert_consistent(root)
 
 
@@ -264,6 +280,15 @@ def test_the_printed_next_steps_name_the_product_scope_row(root: Path, capsys: p
     assert "| Workplace utilities | `talent`, `rant`, `shop` |" in capsys.readouterr().out
 
 
+def test_the_printed_entry_point_names_the_target_written(root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    _run(root, "feature", "shop", "--area", AREA, "--settings")
+    _run(root, "capability", "pricing", "--classification", "generic", "--consumer", "features.shop")
+
+    out = capsys.readouterr().out
+    assert "Entry point 'shop' = 'features.shop';" in out
+    assert "Entry point 'pricing' = 'capabilities.pricing.plugin';" in out
+
+
 CAPABILITY_OPTIONS = ("hookspecs", "service", "entrypoints", "interfaces", "adapters", "settings")
 ENTRY = {
     "hookspecs": "hookspecs.py",
@@ -294,7 +319,7 @@ def test_a_capability_holds_its_required_entries_plus_exactly_the_options_given(
     )
 
     package = root / "capabilities" / "pricing"
-    assert _names(package) == {"__init__.py", "README.md", "api.py"} | {ENTRY[option] for option in options}
+    assert _names(package) == {"__init__.py", "README.md", "api.py", "plugin.py"} | {ENTRY[option] for option in options}
     for directory in ("entrypoints", "adapters"):
         if directory in _names(package):
             assert (package / directory / "__init__.py").is_file()
