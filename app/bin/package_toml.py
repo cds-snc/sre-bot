@@ -20,16 +20,19 @@ import tomlkit
 from tomlkit.container import Container
 from tomlkit.items import AoT, Table
 
+from bin.package_layout import COMMON_KIND, CORE_KIND, layout
+
 ENTRY_POINT_GROUP = "sre_bot"
 PROTECTED_PLUGINS = "protected-plugins"
 FEATURE_INDEPENDENCE = "feature-independence"
 # Every contract that lists features as a source lists capabilities too (plugin-architecture.md Checks).
 CAPABILITY_GUARDED_CONTRACTS = ("no-host-imports", "integrations-via-adapters", "no-legacy-imports", "no-provider-imports")
 SLACK_BOLT_CONTRACT = "slack-bolt-in-entrypoints"
-CAPABILITY_SLACK_ENTRYPOINT = "capabilities.**.entrypoints.slack"
-CAPABILITIES = "capabilities"
-CORE = "core"
-COMMON = "common"
+FEATURES = layout().roots.features
+CAPABILITIES = layout().roots.capabilities
+CAPABILITY_SLACK_ENTRYPOINT = f"{CAPABILITIES}.**.entrypoints.slack"
+CORE = CORE_KIND
+COMMON = COMMON_KIND
 SIBLING_SEPARATOR = " | "
 
 type UmbrellaMember = Literal["subdomain", "core", "common"]
@@ -185,7 +188,7 @@ def independent_feature(pyproject: dict[str, Any], module: str) -> list[Edit]:
 
 
 def _umbrella_contract_id(pyproject: dict[str, Any], umbrella: str) -> str | None:
-    container = f"features.{umbrella}"
+    container = f"{FEATURES}.{umbrella}"
     for contract in _contracts(pyproject):
         if contract.get("type") == "layers" and contract.get("containers") == [container]:
             contract_id = contract.get("id")
@@ -203,7 +206,7 @@ def umbrella_contract(pyproject: dict[str, Any], umbrella: str) -> list[Edit]:
         "id": f"{umbrella}-umbrella",
         "name": f"{umbrella} subdomains are independent siblings over core and common",
         "type": "layers",
-        "containers": [f"features.{umbrella}"],
+        "containers": [f"{FEATURES}.{umbrella}"],
         "layers": [],
         "exhaustive": True,
     }
@@ -214,7 +217,7 @@ def umbrella_member(pyproject: dict[str, Any], umbrella: str, member: str, kind:
     """``member`` in its umbrella's layers contract: subdomains as sorted siblings, over core, over common."""
     contract_id = _umbrella_contract_id(pyproject, umbrella)
     if contract_id is None:
-        raise TomlEditError(f"no import-linter layers contract has containers = ['features.{umbrella}']")
+        raise TomlEditError(f"no import-linter layers contract has containers = ['{FEATURES}.{umbrella}']")
     path: Location = (*CONTRACTS, Contract(contract_id), "layers")
     layers: list[str] = _contract(pyproject, contract_id)["layers"]
     sibling_lines = [index for index, layer in enumerate(layers) if layer not in (CORE, COMMON)]

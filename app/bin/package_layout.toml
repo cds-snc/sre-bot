@@ -18,6 +18,10 @@
 
 roots = { features = "features", capabilities = "capabilities" }
 
+# The only public surface of a capability and of an umbrella's core/ (feature-packages.md);
+# both kinds must require it. The fake-coverage check reads it.
+public_api = "api.py"
+
 # A subdomain named like a layout-table directory or an umbrella kernel would be read as one.
 reserved_subdomains = ["core", "common", "adapters", "entrypoints", "locales", "service", "domain"]
 

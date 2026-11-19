@@ -62,6 +62,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, iter_python_files
+from bin.package_layout import layout
 
 APP_ROOT = Path(__file__).resolve().parent.parent
 
@@ -73,7 +74,7 @@ ENVIRON_EXEMPT_ROOTS = frozenset({"bin"})
 
 # Where a plugin or the scheduler is decided to run: judged by plugin-switch and environment-gate.
 RUN_SWITCH_FILES = frozenset({"server/lifespan.py"})
-RUN_SWITCH_ROOTS = ("server/plugins/", "packages/", "features/", "jobs/")
+RUN_SWITCH_ROOTS = ("server/plugins/", "packages/", f"{layout().roots.features}/", "jobs/")
 ENVIRONMENT_NAME = "environment"
 
 # Names the platform sets for the app; they keep their bare names.

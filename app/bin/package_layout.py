@@ -6,7 +6,10 @@ entries, plus the capability README rules and the reserved subdomain names,
 and for the generator (bin/new_package.py) each kind's templates and the
 option flags that add an optional entry. This module reads it with tomllib into frozen dataclasses and refuses a
 malformed manifest, naming the key at fault, so a bad edit fails every tool
-that reads it instead of silently widening a check.
+that reads it instead of silently widening a check. The other app/bin guards
+take their package roots, the public api module, the adapters directory and the
+core and common kind names from here instead of keeping their own copies;
+``layout()`` refuses the repository's manifest when one of those is missing.
 
 Usage:
     from bin.package_layout import layout
@@ -18,17 +21,28 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 LAYOUT_PATH = Path(__file__).resolve().parent / "package_layout.toml"
 
-REQUIRED_TOP_LEVEL_KEYS = frozenset({"roots", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"})
+REQUIRED_TOP_LEVEL_KEYS = frozenset(
+    {"roots", "public_api", "reserved_subdomains", "grows_into_package", "capability_readme", "kinds"}
+)
 TOP_LEVEL_KEYS = REQUIRED_TOP_LEVEL_KEYS | {"options"}
 ROOT_KEYS = frozenset({"features", "capabilities"})
 README_KEYS = frozenset({"classification_heading", "consumers_heading", "classifications"})
 KIND_KEYS = frozenset({"extends", "required", "optional", "exclude", "forbidden", "open", "templates"})
 OPTION_KEYS = frozenset({"entry", "needs"})
 DIRECTORY_MARK = "/"
+
+# An umbrella's kernel kinds; each is also the directory name of its member (feature-packages.md layout table).
+CORE_KIND: Final = "core"
+COMMON_KIND: Final = "common"
+CAPABILITY_KIND: Final = "capability"
+# The kinds whose public surface is the public_api entry (feature-packages.md: a capability's api.py, core/api.py).
+PUBLIC_API_KINDS = (CAPABILITY_KIND, CORE_KIND)
+# The generator option whose entry is a package's adapters directory.
+ADAPTERS_OPTION = "adapters"
 
 
 class LayoutError(Exception):
@@ -92,6 +106,8 @@ class Layout:
     """The whole manifest."""
 
     roots: Roots
+    public_api: str
+    """The module that is a capability's and an umbrella core's only public surface."""
     kinds: Mapping[str, Kind]
     reserved_subdomains: frozenset[str]
     classification_heading: str
@@ -103,6 +119,11 @@ class Layout:
         """The options a kind takes, in manifest order: those whose entry the kind lists as optional."""
         optional = self.kinds[kind].optional
         return tuple(option for option in self.options.values() if option.entry in optional)
+
+    @property
+    def adapters_dir(self) -> str:
+        """The adapters directory's bare name, from the adapters option's entry."""
+        return self.options[ADAPTERS_OPTION].entry.removesuffix(DIRECTORY_MARK)
 
     @property
     def declared_names(self) -> frozenset[str]:
@@ -198,6 +219,15 @@ def _options(value: Any, declared: frozenset[str]) -> dict[str, Option]:
     return options
 
 
+def _public_api(value: Any, kinds: Mapping[str, Kind]) -> str:
+    if not isinstance(value, str) or not value or DIRECTORY_MARK in value:
+        raise LayoutError("public_api must name one module file, such as 'api.py'")
+    for name in PUBLIC_API_KINDS:
+        if name in kinds and value not in kinds[name].required:
+            raise LayoutError(f"kinds.{name}: must require public_api '{value}'")
+    return value
+
+
 def load_layout(path: Path) -> Layout:
     """Read and validate the manifest at ``path``; raise ``LayoutError`` naming the key at fault."""
     try:
@@ -229,9 +259,11 @@ def load_layout(path: Path) -> Layout:
     if not isinstance(kinds, dict) or not kinds:
         raise LayoutError("kinds must declare at least one kind")
     parsed = {name: _kind(name, kinds, grows) for name in kinds}
+    public_api = _public_api(data["public_api"], parsed)
     declared = frozenset().union(*(kind.declared for kind in parsed.values()))
     return Layout(
         roots=Roots(features=roots["features"], capabilities=roots["capabilities"]),
+        public_api=public_api,
         kinds=parsed,
         reserved_subdomains=_names(data["reserved_subdomains"], "reserved_subdomains"),
         classification_heading=str(headings["classification_heading"]),
@@ -241,7 +273,17 @@ def load_layout(path: Path) -> Layout:
     )
 
 
+def check_tool_needs(layout: Layout) -> Layout:
+    """Refuse a manifest that lacks a kind or option the app/bin guards read; return it unchanged."""
+    for name in (*PUBLIC_API_KINDS, COMMON_KIND):
+        if name not in layout.kinds:
+            raise LayoutError(f"kinds.{name}: missing; the app/bin guards read this kind")
+    if ADAPTERS_OPTION not in layout.options:
+        raise LayoutError(f"options.{ADAPTERS_OPTION}: missing; the app/bin guards read its entry")
+    return layout
+
+
 @cache
 def layout() -> Layout:
-    """The repository's manifest, loaded once."""
-    return load_layout(LAYOUT_PATH)
+    """The repository's manifest, loaded once, with every name the app/bin guards read."""
+    return check_tool_needs(load_layout(LAYOUT_PATH))

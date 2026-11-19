@@ -2,18 +2,23 @@
 
 ``classify`` is called with a small hand-built ``Context`` (read names, a retired map and workflow and
 setup references), so each action is pinned without reading the env files or GitHub. The real
-``RETIRED`` map and the real setup files are read only where the test is about them.
+``RETIRED`` map and the real setup files are read only where the test is about them. The runtime names
+are pinned against the settings-key ownership check's platform names and its SDK namespace side by side:
+the audit's runtime set is deliberately narrower than that namespace, so merging the two definitions shows
+up here as a changed action, not as a silent widening.
 """
 
 import pytest
 
 from bin.audit_env_names import (
     RETIRED,
+    RUNTIME,
     Context,
     classify,
     setup_references,
     unprovided_workflow_references,
 )
+from bin.check_settings_key_ownership import PLATFORM_NAMES, SDK_NAMESPACE
 
 pytestmark = pytest.mark.unit
 
@@ -123,3 +128,27 @@ def test_maxmind_key_is_never_deleted(source: str) -> None:
     assert "MAXMIND_KEY" not in RETIRED
     assert _action(source, "MAXMIND_KEY", "present", ctx) != "delete"
     assert _action(source, "MAXMIND_KEY", "commented", ctx) != "delete"
+
+
+def test_every_platform_provided_name_is_a_runtime_name() -> None:
+    assert PLATFORM_NAMES <= RUNTIME
+    assert {name for name in RUNTIME - PLATFORM_NAMES if not name.startswith("AWS_")} == set()
+
+
+@pytest.mark.parametrize(
+    ("name", "action", "in_sdk_namespace"),
+    [
+        ("ENVIRONMENT", "none", False),
+        ("GIT_SHA", "none", False),
+        ("FORWARDED_ALLOW_IPS", "none", False),
+        ("AWS_REGION", "none", True),
+        ("AWS_ENDPOINT_URL_S3", "none", True),
+        ("UVICORN_PORT", "none", True),
+        ("OTEL_SERVICE_NAME", "none", True),
+        ("AWS_BUCKET", "check", True),
+        ("UVICORN__X", "none", False),
+    ],
+)
+def test_the_audits_runtime_names_are_narrower_than_the_sdk_namespace(name: str, action: str, in_sdk_namespace: bool) -> None:
+    assert _action("file app/.env", name) == action
+    assert bool(SDK_NAMESPACE.match(name)) is in_sdk_namespace

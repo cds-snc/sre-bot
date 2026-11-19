@@ -56,7 +56,7 @@ import tomllib
 from pathlib import Path
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, load_baseline, report
-from bin.package_layout import Kind, layout
+from bin.package_layout import COMMON_KIND, CORE_KIND, Kind, layout
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 
 APP_ROOT = Path(__file__).resolve().parent.parent
@@ -65,8 +65,8 @@ CAPABILITIES_ROOT = APP_ROOT / layout().roots.capabilities
 BASELINE_PATH = Path(__file__).resolve().parent / "baselines" / "package_shape.txt"
 PYPROJECT_PATH = APP_ROOT / "pyproject.toml"
 
-CORE = "core"
-COMMON = "common"
+CORE = CORE_KIND
+COMMON = COMMON_KIND
 PLUGIN_MODULE = "plugin"
 
 
@@ -219,7 +219,7 @@ def _check_readme(capability: Path) -> set[str]:
     resolved = [
         consumer
         for consumer in consumers
-        if consumer.startswith("features.") and (APP_ROOT.joinpath(*consumer.split("."))).is_dir()
+        if consumer.startswith(f"{layout().roots.features}.") and (APP_ROOT.joinpath(*consumer.split("."))).is_dir()
     ]
     if not consumers or len(resolved) != len(consumers):
         violations.add(f"{key}:readme-consumers")

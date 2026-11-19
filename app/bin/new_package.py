@@ -55,7 +55,7 @@ from string import Template
 from typing import Any
 
 from bin.freeze_guard import EXCLUDED_DIR_NAMES, iter_python_files
-from bin.package_layout import DIRECTORY_MARK, Kind, layout
+from bin.package_layout import COMMON_KIND, CORE_KIND, DIRECTORY_MARK, Kind, layout
 from bin.package_toml import (
     Edit,
     TomlEditError,
@@ -81,10 +81,9 @@ PROMOTE = "promote"
 DECISION = "decisions/feature-packages.md"
 PLUGIN_KINDS = frozenset({"feature", "capability", "subdomain"})
 AREA_KINDS = PLUGIN_KINDS | {"umbrella"}
-UMBRELLA_MEMBER_KINDS: dict[str, UmbrellaMember] = {"subdomain": "subdomain", "core": "core", "common": "common"}
+UMBRELLA_MEMBER_KINDS: dict[str, UmbrellaMember] = {"subdomain": "subdomain", CORE_KIND: CORE_KIND, COMMON_KIND: COMMON_KIND}
 NAME = re.compile(r"^[a-z][a-z0-9_]*$")
-CONSUMER = re.compile(r"^features\.[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$")
-COMMON = "common"
+CONSUMER = re.compile(rf"^{re.escape(layout().roots.features)}\.[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)?$")
 SHARED_AREA = "shared"
 
 
@@ -245,7 +244,7 @@ def _entry_point_name(package: Package) -> str:
 
 def _table(package: Package) -> str:
     """The settings table: the module path joined by ``_`` (configuration.md); an umbrella's common/ reads [<umbrella>]."""
-    if package.name == COMMON and package.umbrella:
+    if package.name == COMMON_KIND and package.umbrella:
         return package.umbrella
     return "_".join(package.module.split(".")[1:])
 
@@ -497,7 +496,7 @@ def promote(request: Request) -> list[str]:
         edits += rename_in_contracts(pyproject, rename, keep=frozenset({"feature-independence"}))
         edits += umbrella_contract(pyproject, feature)
         new_pyproject = render(pyproject_text, edits)
-        for member, kind in [(subdomain, "subdomain"), *([("common", "common")] if settings_moved else [])]:
+        for member, kind in [(subdomain, "subdomain"), *([(COMMON_KIND, COMMON_KIND)] if settings_moved else [])]:
             member_kind = UMBRELLA_MEMBER_KINDS[kind]
             new_pyproject = render(new_pyproject, umbrella_member(tomllib.loads(new_pyproject), feature, member, member_kind))
         configs = _render_configs(root, lambda config: rename_enablement_key(config, feature, new_name))
@@ -505,7 +504,7 @@ def promote(request: Request) -> list[str]:
         raise GeneratorError(str(error)) from error
 
     moves = {
-        child: (directory / "common" / child.name) if child.name == "settings.py" else directory / subdomain / child.name
+        child: (directory / COMMON_KIND / child.name) if child.name == "settings.py" else directory / subdomain / child.name
         for child in sorted(directory.iterdir())
         if child.name not in EXCLUDED_DIR_NAMES
     }
@@ -525,8 +524,8 @@ def promote(request: Request) -> list[str]:
     (directory / "README.md").write_text(_template("umbrella_readme.md.tmpl", values), encoding="utf-8")
     if settings_moved:
         common_values = {**values, "title": _title(f"{feature}_common")}
-        (directory / "common" / "__init__.py").write_text(_template("common_init.py.tmpl", common_values), encoding="utf-8")
-        (directory / "common" / "README.md").write_text(_template("common_readme.md.tmpl", common_values), encoding="utf-8")
+        (directory / COMMON_KIND / "__init__.py").write_text(_template("common_init.py.tmpl", common_values), encoding="utf-8")
+        (directory / COMMON_KIND / "README.md").write_text(_template("common_readme.md.tmpl", common_values), encoding="utf-8")
     for path, text in rewrites.items():
         path.write_text(text, encoding="utf-8")
     pyproject_path.write_text(new_pyproject, encoding="utf-8")
@@ -557,7 +556,7 @@ def _ask(prompt: str) -> str:
 def prompt_arguments() -> list[str]:
     """Ask for each value on a terminal; return them as command-line arguments."""
     kind = _ask(f"Kind ({' / '.join(_kinds())})")
-    hints = {"subdomain": "<umbrella>.<subdomain>", "core": "umbrella", "common": "umbrella", "promote": "flat feature"}
+    hints = {"subdomain": "<umbrella>.<subdomain>", CORE_KIND: "umbrella", COMMON_KIND: "umbrella", PROMOTE: "flat feature"}
     argv = [kind, _ask(f"Name ({hints.get(kind, 'lower snake_case')})")]
     if kind in AREA_KINDS:
         base = tomllib.loads((APP_ROOT / "config" / "base.toml").read_text(encoding="utf-8"))

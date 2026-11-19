@@ -8,7 +8,10 @@ widening the shape check. A drift test compares the names in the record's
 layout table with the manifest's, so the two can only change together. The
 generator's options and templates are read from the same manifest, so the
 real one is also checked for the option each kind takes and for a template on
-every entry the generator can write.
+every entry the generator can write. The names the other bin guards read (the
+public api module, the adapters directory, the core and common kinds) are
+asserted on the real manifest, and a manifest that cannot supply them is
+refused by the repository check, so no guard keeps its own copy.
 """
 
 import re
@@ -17,13 +20,14 @@ from pathlib import Path
 
 import pytest
 
-from bin.package_layout import LAYOUT_PATH, Layout, LayoutError, load_layout
+from bin.package_layout import COMMON_KIND, CORE_KIND, LAYOUT_PATH, Layout, LayoutError, check_tool_needs, load_layout
 
 DECISION = Path(__file__).resolve().parents[4] / "decisions" / "feature-packages.md"
 TEMPLATES = LAYOUT_PATH.parent / "package_templates"
 
 MINIMAL = """
 roots = { features = "features", capabilities = "capabilities" }
+public_api = "api.py"
 reserved_subdomains = ["core"]
 grows_into_package = ["service.py"]
 
@@ -60,6 +64,23 @@ optional = ["service.py"]
 
 [kinds.capability.templates]
 "api.py" = "api.tmpl"
+"""
+
+TOOL_NEEDS = """
+[options.adapters]
+entry = "adapters/"
+
+[kinds.capability]
+extends = "feature"
+required = ["api.py"]
+
+[kinds.core]
+extends = "feature"
+required = ["api.py"]
+
+[kinds.common]
+required = ["__init__.py"]
+open = true
 """
 
 
@@ -163,6 +184,14 @@ class TestRealManifest:
             "amend the record and the manifest together"
         )
 
+    def test_the_guards_read_the_public_api_adapters_and_umbrella_kernel_names(self) -> None:
+        layout = check_tool_needs(load_layout(LAYOUT_PATH))
+
+        assert layout.public_api == "api.py"
+        assert layout.adapters_dir == "adapters"
+        assert {CORE_KIND, COMMON_KIND} <= set(layout.kinds)
+        assert layout.public_api in layout.kinds["capability"].required & layout.kinds[CORE_KIND].required
+
 
 class TestMalformedManifest:
     """A malformed manifest is refused, naming the key at fault."""
@@ -209,6 +238,10 @@ class TestMalformedManifest:
             (lambda text: text + '\n[options.adapters]\nentry = "adapters/"\nneeds = ["store.py"]\n', "options.adapters.needs"),
             (lambda text: text + '\n[options.adapters]\nentry = "adapters/"\nflag = "a"\n', "flag"),
             (lambda text: text + '\n[kinds.feature.templates]\n"api.py" = "api.tmpl"\n', "kinds.feature.templates"),
+            (lambda text: text.replace('public_api = "api.py"\n', ""), "public_api"),
+            (lambda text: text.replace('public_api = "api.py"', 'public_api = "api/"'), "public_api"),
+            (lambda text: text + CAPABILITY.replace('required = ["api.py"]', 'required = ["hookspecs.py"]'), "kinds.capability"),
+            (lambda text: text + '\n[kinds.core]\nextends = "feature"\n', "kinds.core"),
         ],
         ids=[
             "unknown-top-level-key",
@@ -223,8 +256,35 @@ class TestMalformedManifest:
             "option-needs-unknown",
             "unknown-option-key",
             "template-for-an-undeclared-entry",
+            "missing-public-api",
+            "public-api-a-directory",
+            "capability-without-the-public-api",
+            "core-without-the-public-api",
         ],
     )
     def test_a_malformed_manifest_is_refused(self, tmp_path: Path, edit: Callable[[str], str], message: str) -> None:
         with pytest.raises(LayoutError, match=re.escape(message)):
             _load(tmp_path, edit(MINIMAL))
+
+    def test_a_manifest_with_every_name_the_guards_read_passes_the_repository_check(self, tmp_path: Path) -> None:
+        layout = check_tool_needs(_load(tmp_path, MINIMAL + TOOL_NEEDS))
+
+        assert layout.adapters_dir == "adapters"
+
+    @pytest.mark.parametrize(
+        ("removed", "message"),
+        [
+            ('[options.adapters]\nentry = "adapters/"\n', "options.adapters"),
+            ('[kinds.capability]\nextends = "feature"\nrequired = ["api.py"]\n', "kinds.capability"),
+            ('[kinds.core]\nextends = "feature"\nrequired = ["api.py"]\n', "kinds.core"),
+            ('[kinds.common]\nrequired = ["__init__.py"]\nopen = true\n', "kinds.common"),
+        ],
+        ids=["no-adapters-option", "no-capability-kind", "no-core-kind", "no-common-kind"],
+    )
+    def test_a_manifest_missing_a_name_the_guards_read_fails_the_repository_check(
+        self, tmp_path: Path, removed: str, message: str
+    ) -> None:
+        layout = _load(tmp_path, MINIMAL + TOOL_NEEDS.replace(removed, ""))
+
+        with pytest.raises(LayoutError, match=re.escape(message)):
+            check_tool_needs(layout)
