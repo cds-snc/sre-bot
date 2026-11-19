@@ -23,13 +23,17 @@ class AIWriter(Protocol):
         """Whether a model endpoint backs this writer, so an optional action may be offered."""
         ...
 
-    async def write(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+    async def write(
+        self, source: str, *, instructions: str, max_output_tokens: int, temperature: float | None = None
+    ) -> OperationResult[str]:
         """Return the written text, or the classified error (``AI_WRITING_UNAVAILABLE`` when unbacked).
 
         Args:
             source: The content the text is written from (a transcript, a draft).
             instructions: The caller's system prompt; every caller states its own.
-            max_output_tokens: Optional per-call completion budget; ``None`` uses the configured one.
+            max_output_tokens: The completion budget; every caller states its own.
+            temperature: Optional sampling temperature, omitted from the request when ``None``
+                (some models reject the parameter outright).
         """
         ...
 

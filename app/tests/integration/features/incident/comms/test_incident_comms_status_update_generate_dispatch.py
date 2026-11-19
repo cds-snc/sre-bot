@@ -180,7 +180,8 @@ class _StubWriter:
         transcript: str,
         *,
         instructions: str | None = None,
-        max_output_tokens: int | None = None,
+        max_output_tokens: int,
+        temperature: float | None = None,
     ) -> OperationResult[str]:
         self.calls.append({"transcript": transcript, "instructions": instructions, "max_output_tokens": max_output_tokens})
         return OperationResult.success(data=json.dumps(_ANSWER))

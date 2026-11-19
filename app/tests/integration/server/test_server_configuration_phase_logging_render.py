@@ -44,8 +44,8 @@ SECRET = "xoxb-secret-value-0002"
 CANARY_CREDENTIAL = "xoxb-canary-credential-7788"
 CANARY_NON_PUBLIC = "canary-board-id-0123456789"
 REDACTED = "***REDACTED***"
-# Names a key-name redaction pattern matches: "auth" in unauthorized_*, "token" in max_output_tokens.
-EXPECTED_MASKED = {"aws.unauthorized_codes", "openai.max_output_tokens", "slack.unauthorized_errors"}
+# Names a key-name redaction pattern matches: "auth" in unauthorized_*.
+EXPECTED_MASKED = {"aws.unauthorized_codes", "slack.unauthorized_errors"}
 # The Fargate runtime splits a line over 16 KB, and Logs Insights extracts at most 200 fields of a JSON event.
 LINE_LIMIT_BYTES = 16 * 1024
 FIELD_LIMIT = 200

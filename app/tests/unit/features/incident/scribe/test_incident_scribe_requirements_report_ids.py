@@ -1,8 +1,9 @@
 """The scribe plugin cannot boot without the incident document ids it drafts from.
 
 scribe is registered on a fresh plugin manager under its entry-point name and the
-host resolves its declarations. Every tenant is configured (the OpenAI slice and
-the configured-systems read are stand-ins), and the built [incident_core] slice is
+host resolves its declarations. Every tenant and the [ai_writing] model are configured
+(the OpenAI slice and the configured-systems read are stand-ins, the [ai_writing] slice is
+built with a model), and the built [incident_core] slice is
 a real ``IncidentCoreSettings`` with one id left empty, as the configuration phase
 builds it from the environment. Boot must stop with one CRITICAL
 ``plugin_boot_failed`` event naming exactly that key, and no value is logged.
@@ -16,6 +17,7 @@ import pytest
 import structlog
 from structlog.testing import capture_logs
 
+from capabilities.ai_writing.settings import AIWritingSettings
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
@@ -32,9 +34,10 @@ class _AllSystems(ConfiguredSystems):
         return {WorkplaceSystem.SLACK: "T0SLACK", WorkplaceSystem.GOOGLE: "C0GOOGLE"}
 
 
-def _boot(monkeypatch: pytest.MonkeyPatch, settings: IncidentCoreSettings) -> None:
+def _boot(monkeypatch: pytest.MonkeyPatch, settings: IncidentCoreSettings, model: str = "gpt-test") -> None:
     monkeypatch.setattr(host, "SETTINGS_SLICES", {"openai": lambda: SimpleNamespace(tenant=SimpleNamespace(api_key="k"))})
-    monkeypatch.setattr(host, "built_slices", lambda: (settings,))
+    writing = AIWritingSettings.model_construct(model=model)
+    monkeypatch.setattr(host, "built_slices", lambda: (settings, writing))
     pm = pluggy.PluginManager(PLUGIN_NAMESPACE)
     pm.add_hookspecs(FeatureLifecycleSpecs)
     pm.register(scribe, name="incident.scribe")
@@ -67,3 +70,13 @@ def test_both_document_ids_set_boot_cleanly(monkeypatch: pytest.MonkeyPatch) -> 
         _boot(monkeypatch, IncidentCoreSettings(folder_id="F0INCIDENTS", report_template_id="T0TEMPLATE"))
 
     assert [event for event in events if event["event"] == "plugin_boot_failed"] == []
+
+
+def test_an_unset_ai_writing_model_stops_boot_naming_it(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With the OpenAI tenant set but no model, scribe cannot draft, so boot names the missing key."""
+    with capture_logs() as events, pytest.raises(PluginRequirementsUnmetError) as raised:
+        _boot(monkeypatch, IncidentCoreSettings(folder_id="F0INCIDENTS", report_template_id="T0TEMPLATE"), model="")
+
+    failures = [event for event in events if event["event"] == "plugin_boot_failed"]
+    assert [(event["plugin"], event["setting"]) for event in failures] == [("incident.scribe", "ai_writing.model")]
+    assert [failure.setting for failure in raised.value.failures] == ["ai_writing.model"]

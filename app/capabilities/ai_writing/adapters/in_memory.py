@@ -19,7 +19,8 @@ class WritingCall:
 
     source: str
     instructions: str
-    max_output_tokens: int | None
+    max_output_tokens: int
+    temperature: float | None
 
 
 class InMemoryAIWriter(AIWriter):
@@ -41,9 +42,11 @@ class InMemoryAIWriter(AIWriter):
         """Return the ``available`` the fake was built with."""
         return self._available
 
-    async def write(self, source: str, *, instructions: str, max_output_tokens: int | None = None) -> OperationResult[str]:
+    async def write(
+        self, source: str, *, instructions: str, max_output_tokens: int, temperature: float | None = None
+    ) -> OperationResult[str]:
         """Record the call, then answer unavailable, the scripted result, or the response text."""
-        self.calls.append(WritingCall(source, instructions, max_output_tokens))
+        self.calls.append(WritingCall(source, instructions, max_output_tokens, temperature))
         if not self._available:
             return OperationResult.permanent_error(
                 message="AI writing is not configured",

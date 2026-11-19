@@ -27,6 +27,7 @@ import structlog
 
 from bin.audit_env_coverage import terraform_parameters
 from bin.generate_env_example import EnvName, collect
+from capabilities.ai_writing.settings import get_ai_writing_settings
 from contracts.configuration import ConfigurationError, install_configuration_files
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
@@ -57,9 +58,10 @@ SETTINGS_GETTERS = (
     get_opsgenie_settings,
     get_incident_core_settings,
     get_incident_response_settings,
+    get_ai_writing_settings,
 )
 # The feature slices server/configuration/host_configuration.py builds before plugin boot.
-FEATURE_SLICE_GETTERS = (get_incident_core_settings, get_incident_response_settings)
+FEATURE_SLICE_GETTERS = (get_incident_core_settings, get_incident_response_settings, get_ai_writing_settings)
 PLUGIN_AREAS = ("INCIDENT_RESPONSE", "CLOUD_OPERATIONS", "PLATFORM_ACCESS", "WORKPLACE_UTILITIES")
 
 

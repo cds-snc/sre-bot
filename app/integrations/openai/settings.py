@@ -3,9 +3,9 @@
 Exposes ``OpenAISettings``, its tenant entry ``OpenAITenant``, and the cached
 ``get_openai_settings()`` provider.
 
-Only OpenAI-transport concerns belong here (API key, model endpoint, token/timeout
-limits). Feature-domain configuration (what gets summarized, how history is bounded)
-lives with the consuming feature. OpenAI has no tenant id, so the tenant entry is the
+Only the connection belongs here (API key, endpoint, timeout and connection retries).
+The model is the AI writing capability's [ai_writing] model, and the output budget and
+temperature are each caller's (decisions/configuration.md). OpenAI has no tenant id, so the tenant entry is the
 model endpoint it reaches (decisions/configuration.md). The slice is validated at boot;
 whether a consumer requires OpenAI is the consumer's, not this slice's.
 """
@@ -22,12 +22,11 @@ _LOOPBACK_HOSTS = ("localhost", "127.0.0.1", "::1")
 
 
 class OpenAITenant(BaseModel):
-    """The OpenAI-compatible model endpoint this instance works with."""
+    """The OpenAI-compatible endpoint this instance works with."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     base_url: str = Field(description="Base URL of the OpenAI-compatible API: https, or http on a loopback host.")
-    model: str = Field(min_length=1, description="Model the endpoint serves for chat completions.")
 
     @field_validator("base_url")
     @classmethod
@@ -41,11 +40,11 @@ class OpenAITenant(BaseModel):
 
 
 class OpenAISettings(ConfigurationSlice):
-    """Vendor credential, endpoint and tuning settings for the OpenAI API.
+    """Vendor credential, endpoint and connection settings for the OpenAI API.
 
     Keys of [openai]:
-        connect_retries, max_output_tokens, temperature, timeout_seconds.
-        [openai.tenant] base_url, model: the model endpoint. Default: none (OpenAI not configured).
+        connect_retries, timeout_seconds.
+        [openai.tenant] base_url: the endpoint. Default: none (OpenAI not configured).
 
     Environment only:
         OPENAI__API_KEY. An empty value counts as unset. A tenant entry needs the key and the
@@ -56,14 +55,7 @@ class OpenAISettings(ConfigurationSlice):
 
     tenant: OpenAITenant | None = Field(default=None, description="The model endpoint this instance works with.")
     api_key: SecretStr = env_only("API key for the tenant's endpoint.", "codespaces", default=SecretStr(""))
-    max_output_tokens: int = 3000
-    # Summarising wants reproducibility, not creativity, so a temperature of 0
-    # is worth having where the model supports it. It is omitted by default
-    # because reasoning-style models -- including the gateway's current default
-    # -- reject the parameter outright with a 400, which fails the whole
-    # request. Set 0.0 to opt in; any negative value omits it.
-    temperature: float = -1.0
-    # Must outlast generating max_output_tokens: at 60-100 tokens/sec a large
+    # Must outlast generating the largest output budget a caller passes: at 60-100 tokens/sec a large
     # completion takes well over a minute, so a 60s timeout aborted requests
     # the model was still legitimately writing.
     timeout_seconds: float = 180.0
@@ -85,11 +77,6 @@ class OpenAISettings(ConfigurationSlice):
     def base_url(self) -> str:
         """The tenant's base URL, or empty when OpenAI is not configured."""
         return self.tenant.base_url if self.tenant else ""
-
-    @property
-    def model(self) -> str:
-        """The tenant's model, or empty when OpenAI is not configured."""
-        return self.tenant.model if self.tenant else ""
 
 
 @lru_cache(maxsize=1)

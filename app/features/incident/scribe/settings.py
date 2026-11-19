@@ -64,6 +64,10 @@ class IncidentSummarySettings(BaseSettings):
     # day-one measure from one that was lifted a week later.
     TIMEZONE: str = Field(default="America/Toronto", alias="INCIDENT_SUMMARY__TIMEZONE")
 
+    # Completion budget of one catch-up summary: a few Slack paragraphs, far less
+    # than the draft's multi-section JSON.
+    MAX_OUTPUT_TOKENS: int = Field(default=3000, alias="INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS")
+
 
 @lru_cache(maxsize=1)
 def get_incident_summary_settings() -> IncidentSummarySettings:

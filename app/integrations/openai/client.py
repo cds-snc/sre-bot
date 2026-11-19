@@ -7,6 +7,8 @@ module holds no business logic; the adapter calling the API wraps the call in
 ``try/except`` and classifies.
 """
 
+import json
+
 import httpx
 
 from contracts.operations.codes import ErrorCode
@@ -37,7 +39,8 @@ def build_openai_client(settings: OpenAISettings | None = None) -> httpx.AsyncCl
 def classify_openai_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
     """Classify expected httpx failures from the OpenAI API; propagate unknown exceptions.
 
-    ``retry_after`` is the 429 response's Retry-After delay in seconds, or ``None`` when
+    An unparseable response body is ``PERMANENT_ERROR`` ``INVALID_RESPONSE``
+    (decisions/outbound-clients.md). ``retry_after`` is the 429 response's Retry-After delay in seconds, or ``None`` when
     the header is absent or not a number of seconds.
     """
     if isinstance(exc, httpx.HTTPStatusError):
@@ -57,6 +60,9 @@ def classify_openai_error(exc: Exception) -> tuple[OperationStatus, str | None, 
         return OperationStatus.TRANSIENT_ERROR, ErrorCode.TIMEOUT, None
     if isinstance(exc, httpx.HTTPError):
         return OperationStatus.TRANSIENT_ERROR, ErrorCode.CONNECTION_ERROR, None
+    if isinstance(exc, json.JSONDecodeError):
+        # A 2xx whose body is not JSON (a gateway error page): resending gets the same page.
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE, None
     raise exc
 
 

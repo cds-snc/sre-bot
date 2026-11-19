@@ -117,6 +117,7 @@ PLUGIN_DECLARATIONS = [
         scribe,
         (
             "openai.tenant",
+            "ai_writing.model",
             "slack.tenant",
             "google_workspace.tenant",
             "incident_core.folder_id",
@@ -139,6 +140,7 @@ def test_plugin_requirements_are_met_when_everything_is_configured(
     module: ModuleType, settings: tuple[str, ...], slices: dict[str, object], built: list[object]
 ) -> None:
     built.append(_built_on("incident_core", folder_id="F0", report_template_id="T0"))
+    built.append(_built_on("ai_writing", model="gpt-test"))
 
     assert unmet_requirements({"plugin": module.register_requirements()}, _Systems(ALL_SYSTEMS)) == []
 
@@ -148,6 +150,7 @@ def test_plugin_requirements_fail_naming_each_setting_that_is_not_configured(
     module: ModuleType, settings: tuple[str, ...], slices: dict[str, object], built: list[object]
 ) -> None:
     built.append(_built_on("incident_core", folder_id="", report_template_id=""))
+    built.append(_built_on("ai_writing", model=""))
     slices["openai"] = SimpleNamespace(tenant=None)
     slices["opsgenie"] = SimpleNamespace(tenant=None)
     slices["slack"] = SimpleNamespace(user_token=SecretStr(""))

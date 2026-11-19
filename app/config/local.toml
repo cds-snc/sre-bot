@@ -20,6 +20,9 @@ announce_channel_id = "C033L7RGCT0"
 [openai.tenant]
 # The model gateway every development environment shares; its key is the repository's Codespaces secret OPENAI__API_KEY.
 base_url = "https://ai.cdssandbox.xyz"
+
+[ai_writing]
+# The model every development environment writes with, served by the [openai.tenant] gateway.
 model = "gpt-5.6-luna"
 
 [opsgenie.tenant]

@@ -112,7 +112,8 @@ class _StubWriter:
         transcript: str,
         *,
         instructions: str | None = None,
-        max_output_tokens: int | None = None,
+        max_output_tokens: int,
+        temperature: float | None = None,
     ) -> OperationResult[str]:
         self.calls.append(transcript)
         answer = {

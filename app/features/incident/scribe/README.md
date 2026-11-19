@@ -393,13 +393,11 @@ rest.
 | `INCIDENT_DRAFT__DEFAULT_HISTORY_LIMIT` | 500 | Messages fetched when `--limit` is absent |
 | `INCIDENT_DRAFT__MAX_HISTORY_LIMIT` | 1000 | Hard cap on `--limit` |
 | `INCIDENT_DRAFT__DEFAULT_SINCE_HOURS` | 24 | Fallback window when the channel creation time can't be read |
-| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than the vendor default, which truncates the JSON mid-object. |
+| `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS` | 4000 | Completion budget for the draft. One response covers every section, so it needs far more than a catch-up summary; less truncates the JSON mid-object. |
 
-Vendor settings live in `integrations.openai`. Two matter here:
-`[openai] max_output_tokens` (the fallback budget, overridden per call by the
-row above) and `[openai] temperature`, which is **omitted by default** — the
-gateway's current model rejects the parameter with a 400. Set `0.0` to opt in
-where the model supports it, for more reproducible drafts.
+The draft sends no temperature: the gateway's current model rejects the
+parameter with a 400. `write` takes one per call if a model that supports it
+should draft more reproducibly.
 
 #### Truncated responses
 
@@ -424,7 +422,8 @@ ours will not help.
 #### Credentials
 
 `OPENAI__API_KEY` (`integrations.openai`, whose `[openai.tenant]` entry also
-supplies the endpoint and model, and whose `[openai]` table the timeout) and the Google Workspace service account, with the `documents` and
+supplies the endpoint, and whose `[openai]` table the timeout), the `[ai_writing]`
+`model` (the plugin declares it, so boot names it when empty) and the Google Workspace service account, with the `documents` and
 `drive` scopes. The `[incident_core]` `folder_id` and `report_template_id`
 (`INCIDENT_CORE__FOLDER_ID`, `INCIDENT_CORE__REPORT_TEMPLATE_ID`) must be set:
 the plugin declares them, so boot stops naming the one that is empty.
@@ -492,10 +491,12 @@ have safe defaults:
 | `INCIDENT_SUMMARY__MAX_HISTORY_LIMIT` | `1000` | Hard cap on `--limit` |
 | `INCIDENT_SUMMARY__DEFAULT_SINCE_HOURS` | `24` | Fallback look-back window when `--since` is omitted and the channel start cannot be determined |
 | `INCIDENT_SUMMARY__TIMEZONE` | `America/Toronto` | Zone for the transcript line times and the current-time line; an unknown zone falls back to UTC |
+| `INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS` | `3000` | Completion budget for one catch-up summary |
 
-OpenAI credentials/model are **not** configured here — they belong to the
-vendor client (`OPENAI__API_KEY`, `[openai.tenant] model`, …) in
-`app/integrations/openai/settings.py`.
+OpenAI credentials and the model are **not** configured here: the key and
+endpoint belong to the vendor client (`OPENAI__API_KEY`, `[openai.tenant]
+base_url`) in `app/integrations/openai/settings.py`, and the model to the AI
+writing capability (`[ai_writing] model`) in `app/capabilities/ai_writing/settings.py`.
 
 #### Required Slack scopes
 

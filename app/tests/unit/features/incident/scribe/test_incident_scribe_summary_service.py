@@ -31,17 +31,24 @@ class _StubSummarizer:
         self._result = result
         self.received_transcript: str | None = None
         self.received_instructions: str | None = None
+        self.received_max_output_tokens: int | None = None
         self.calls = 0
 
     def is_available(self) -> bool:
         return True
 
     async def write(
-        self, transcript: str, *, instructions: str | None = None, max_output_tokens: int | None = None
+        self,
+        transcript: str,
+        *,
+        instructions: str | None = None,
+        max_output_tokens: int,
+        temperature: float | None = None,
     ) -> OperationResult[str]:
         self.calls += 1
         self.received_transcript = transcript
         self.received_instructions = instructions
+        self.received_max_output_tokens = max_output_tokens
         return self._result
 
 
@@ -70,6 +77,24 @@ class TestSummarizeTranscript:
         assert result.data == "A tidy summary"
         assert stub.received_transcript is not None
         assert stub.received_transcript.endswith("Ada: prod is down\nBob: on it, rolling back")
+
+    @pytest.mark.asyncio
+    async def test_the_summary_passes_its_own_output_budget(self):
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+
+        await summarize_transcript([TranscriptMessage(author="Ada", text="prod is down")], summarizer=stub)
+
+        assert stub.received_max_output_tokens == 3000
+
+    @pytest.mark.asyncio
+    async def test_a_configured_summary_budget_is_passed(self, monkeypatch: pytest.MonkeyPatch):
+        settings = IncidentSummarySettings.model_validate({"INCIDENT_SUMMARY__MAX_OUTPUT_TOKENS": 1200})
+        monkeypatch.setattr(service, "get_incident_summary_settings", lambda: settings)
+        stub = _StubSummarizer(OperationResult.success(data="ok"))
+
+        await summarize_transcript([TranscriptMessage(author="Ada", text="prod is down")], summarizer=stub)
+
+        assert stub.received_max_output_tokens == 1200
 
     @pytest.mark.asyncio
     async def test_lines_carry_their_local_time_and_the_request_states_the_current_time(self):

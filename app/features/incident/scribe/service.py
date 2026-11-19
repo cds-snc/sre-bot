@@ -976,12 +976,13 @@ async def summarize_transcript(
             error_code=EMPTY_HISTORY_CODE,
         )
 
-    transcript = _build_summary_payload(messages, get_incident_summary_settings().TIMEZONE)
+    settings = get_incident_summary_settings()
+    transcript = _build_summary_payload(messages, settings.TIMEZONE)
     summarizer = summarizer or get_ai_writer()
     full_instructions = f"{_CONTENT_INSTRUCTIONS}\n\n{_SUMMARY_FORMAT_INSTRUCTIONS}"
     if instructions:
         full_instructions = f"{full_instructions}\n\n{instructions}"
-    result = await summarizer.write(transcript, instructions=full_instructions)
+    result = await summarizer.write(transcript, instructions=full_instructions, max_output_tokens=settings.MAX_OUTPUT_TOKENS)
 
     if result.is_success:
         log.info("incident_summary_generated")

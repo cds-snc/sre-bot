@@ -675,7 +675,12 @@ class _RecordingWriter:
         return True
 
     async def write(
-        self, transcript: str, *, instructions: str | None = None, max_output_tokens: int | None = None
+        self,
+        transcript: str,
+        *,
+        instructions: str | None = None,
+        max_output_tokens: int,
+        temperature: float | None = None,
     ) -> OperationResult[str]:
         self.calls.append({"transcript": transcript, "instructions": instructions})
         return OperationResult.success(data=_model_answer())

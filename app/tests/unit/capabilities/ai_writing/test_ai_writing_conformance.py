@@ -23,6 +23,7 @@ from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
+from tests.unit.capabilities.ai_writing.conftest import MODEL
 
 pytestmark = pytest.mark.unit
 
@@ -40,7 +41,7 @@ def available(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -
         return
     client = httpx.AsyncClient(base_url=openai_settings.base_url, transport=httpx.MockTransport(_echo))
     with patch("capabilities.ai_writing.adapters.openai.build_openai_client", return_value=client):
-        yield OpenAIWriter(settings=openai_settings)
+        yield OpenAIWriter(settings=openai_settings, model=MODEL)
 
 
 @pytest.fixture(params=["unconfigured", "in_memory"])
@@ -56,25 +57,39 @@ async def test_an_available_writer_answers_from_the_instructions_and_the_source(
 
 
 async def test_an_unavailable_writer_reports_it_on_every_call(unavailable: AIWriter) -> None:
-    result = await unavailable.write("the source", instructions="the instructions")
+    result = await unavailable.write("the source", instructions="the instructions", max_output_tokens=50)
 
     assert unavailable.is_available() is False
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.AI_WRITING_UNAVAILABLE)
+
+
+@pytest.mark.parametrize("writer", [UnconfiguredAIWriter(), InMemoryAIWriter()], ids=["unconfigured", "in_memory"])
+async def test_every_call_states_its_output_budget(writer: AIWriter) -> None:
+    with pytest.raises(TypeError, match="max_output_tokens"):
+        await writer.write("the source", instructions="the instructions")  # type: ignore[call-arg]
+
+
+async def test_the_openai_writer_requires_an_output_budget(available: AIWriter) -> None:
+    with pytest.raises(TypeError, match="max_output_tokens"):
+        await available.write("the source", instructions="the instructions")  # type: ignore[call-arg]
 
 
 async def test_the_fake_records_each_call() -> None:
     fake = InMemoryAIWriter()
 
     await fake.write("the source", instructions="the instructions", max_output_tokens=50)
+    await fake.write("the source", instructions="the instructions", max_output_tokens=60, temperature=0.0)
 
-    (call,) = fake.calls
-    assert (call.source, call.instructions, call.max_output_tokens) == ("the source", "the instructions", 50)
+    assert [(call.source, call.instructions, call.max_output_tokens, call.temperature) for call in fake.calls] == [
+        ("the source", "the instructions", 50, None),
+        ("the source", "the instructions", 60, 0.0),
+    ]
 
 
 async def test_the_fake_returns_a_scripted_result() -> None:
     scripted = OperationResult.transient_error(message="busy", error_code=ErrorCode.RATE_LIMITED, retry_after=7)
 
-    result = await InMemoryAIWriter(result=scripted).write("s", instructions="i")
+    result = await InMemoryAIWriter(result=scripted).write("s", instructions="i", max_output_tokens=50)
 
     assert result is scripted
 

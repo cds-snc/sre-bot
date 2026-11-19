@@ -17,11 +17,13 @@ from capabilities.ai_writing.adapters.openai import OpenAIWriter
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
+from tests.unit.capabilities.ai_writing.conftest import MODEL
 
 pytestmark = pytest.mark.unit
 
 _CLIENT = "capabilities.ai_writing.adapters.openai.build_openai_client"
 type Handler = Callable[[httpx.Request], httpx.Response]
+_BUDGET = 1234
 
 
 def _mock_client(handler: Handler, settings: OpenAISettings) -> httpx.AsyncClient:
@@ -33,12 +35,13 @@ def _completion(content: str, finish_reason: str = "stop") -> httpx.Response:
 
 
 async def _write(settings: OpenAISettings, handler: Handler, **kwargs: object):
+    kwargs.setdefault("max_output_tokens", _BUDGET)
     with patch(_CLIENT, return_value=_mock_client(handler, settings)):
-        return await OpenAIWriter(settings=settings).write("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
+        return await OpenAIWriter(settings=settings, model=MODEL).write("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
 
 
 def test_a_configured_adapter_is_available(openai_settings: OpenAISettings) -> None:
-    assert OpenAIWriter(settings=openai_settings).is_available() is True
+    assert OpenAIWriter(settings=openai_settings, model=MODEL).is_available() is True
 
 
 async def test_success_returns_the_stripped_text_from_the_completions_endpoint(openai_settings: OpenAISettings) -> None:
@@ -50,27 +53,30 @@ async def test_success_returns_the_stripped_text_from_the_completions_endpoint(o
         return _completion("  A concise summary.  ")
 
     with patch(_CLIENT, return_value=_mock_client(handler, openai_settings)):
-        result = await OpenAIWriter(settings=openai_settings).write("alice: prod is down", instructions="Be terse.")
+        result = await OpenAIWriter(settings=openai_settings, model=MODEL).write(
+            "alice: prod is down", instructions="Be terse.", max_output_tokens=_BUDGET
+        )
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, "A concise summary.")
     assert captured["url"].endswith("/chat/completions")
+    assert captured["body"]["model"] == MODEL
     assert captured["body"]["messages"] == [
         {"role": "system", "content": "Be terse."},
         {"role": "user", "content": "alice: prod is down"},
     ]
 
 
-async def test_the_configured_budget_applies_unless_the_call_sets_one(openai_settings: OpenAISettings) -> None:
+async def test_the_budget_the_call_sets_is_sent(openai_settings: OpenAISettings) -> None:
     bodies: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         bodies.append(json.loads(request.read().decode()))
         return _completion("ok")
 
-    await _write(openai_settings, handler)
     await _write(openai_settings, handler, max_output_tokens=3000)
+    await _write(openai_settings, handler, max_output_tokens=4000)
 
-    assert [body["max_completion_tokens"] for body in bodies] == [openai_settings.max_output_tokens, 3000]
+    assert [body["max_completion_tokens"] for body in bodies] == [3000, 4000]
 
 
 async def test_empty_choices_return_empty_text(openai_settings: OpenAISettings) -> None:
@@ -87,7 +93,7 @@ async def test_a_truncated_completion_is_logged_with_its_budget(openai_settings:
 
     assert result.data == "cut off"
     (truncated,) = [entry for entry in logs if entry["event"] == "openai_write_truncated"]
-    assert truncated["max_completion_tokens"] == openai_settings.max_output_tokens
+    assert truncated["max_completion_tokens"] == _BUDGET
 
 
 async def test_an_http_error_is_classified(openai_settings: OpenAISettings) -> None:
@@ -110,59 +116,45 @@ async def test_a_rate_limit_is_transient_with_its_retry_after(openai_settings: O
     )
 
 
+async def test_an_unparseable_body_is_a_permanent_invalid_response(openai_settings: OpenAISettings) -> None:
+    with capture_logs() as logs:
+        result = await _write(openai_settings, lambda request: httpx.Response(200, text="<html>gateway page</html>"))
+
+    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE)
+    assert "openai_write_failed" in [entry["event"] for entry in logs]
+
+
 class TestTemperature:
-    """Drafting wants reproducibility: the same channel should draft the same."""
+    """Temperature is the caller's: omitted unless the call sets one, since some models reject it."""
 
     @staticmethod
-    async def _payload_for(settings: OpenAISettings) -> dict:
+    async def _payload_for(settings: OpenAISettings, **kwargs: object) -> dict:
         captured: dict = {}
 
         def handler(request: httpx.Request) -> httpx.Response:
             captured["body"] = json.loads(request.read().decode())
             return _completion("a summary")
 
-        await _write(settings, handler)
+        await _write(settings, handler, **kwargs)
         return captured["body"]
 
-    async def test_temperature_is_omitted_by_default(self, openai_settings: OpenAISettings) -> None:
+    async def test_temperature_is_omitted_when_the_call_sets_none(self, openai_settings: OpenAISettings) -> None:
         """The gateway's model rejects the parameter with a 400."""
         assert "temperature" not in await self._payload_for(openai_settings)
 
-    async def test_zero_is_sent_when_opted_into(self, openai_settings: OpenAISettings, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr(openai_settings, "temperature", 0.0)
-
-        assert (await self._payload_for(openai_settings))["temperature"] == 0.0
-
-    async def test_a_configured_temperature_is_used(
-        self, openai_settings: OpenAISettings, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(openai_settings, "temperature", 0.7)
-
-        assert (await self._payload_for(openai_settings))["temperature"] == 0.7
-
-    async def test_a_negative_temperature_omits_the_parameter(
-        self, openai_settings: OpenAISettings, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Some models reject temperature outright, which would fail the call."""
-        monkeypatch.setattr(openai_settings, "temperature", -1.0)
-
-        payload = await self._payload_for(openai_settings)
-
-        assert "temperature" not in payload
-        assert payload["model"] == openai_settings.model
+    @pytest.mark.parametrize("temperature", [0.0, 0.7])
+    async def test_a_temperature_the_call_sets_is_sent(self, openai_settings: OpenAISettings, temperature: float) -> None:
+        assert (await self._payload_for(openai_settings, temperature=temperature))["temperature"] == temperature
 
 
 class TestErrorDiagnostics:
     """A 400 must say what the API objected to, not just that it objected."""
 
-    async def test_the_error_body_and_sent_parameters_are_logged(
-        self, openai_settings: OpenAISettings, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(openai_settings, "temperature", 0.0)
+    async def test_the_error_body_and_sent_parameters_are_logged(self, openai_settings: OpenAISettings) -> None:
         body = '{"error": {"message": "Unsupported parameter: temperature", "param": "temperature"}}'
 
         with capture_logs() as logs:
-            result = await _write(openai_settings, lambda request: httpx.Response(400, text=body))
+            result = await _write(openai_settings, lambda request: httpx.Response(400, text=body), temperature=0.0)
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR)
         (failed,) = [entry for entry in logs if entry["event"] == "openai_write_failed"]

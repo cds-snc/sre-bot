@@ -121,14 +121,17 @@ system_admin_permissions = ""
 view_only_permissions = ""
 
 [openai]
-# The completion budget, temperature (negative omits it), request timeout and connection retries
-# (a connection that never opened; a sent request is never retried). The model endpoint is the
-# [openai.tenant] entry (base_url, model), named in the deployment's environment file; with no
-# entry OpenAI is not configured. The key is a secret from OPENAI__API_KEY.
+# The request timeout and connection retries (a connection that never opened; a sent request is
+# never retried). The endpoint is the [openai.tenant] entry (base_url), named in the deployment's
+# environment file; with no entry OpenAI is not configured. The key is a secret from OPENAI__API_KEY.
 connect_retries = 2
-max_output_tokens = 3000
-temperature = -1.0
 timeout_seconds = 180.0
+
+[ai_writing]
+# The model the AI writing capability writes with: the deploying organisation's choice, so the
+# environment file sets it. Unset, the capability reports unavailable and a plugin that requires
+# it fails boot naming ai_writing.model. Each caller passes its own output budget.
+model = ""
 
 [directory]
 # Which directory answers a lookup is data (the IdP in a group reference, available when its tenant

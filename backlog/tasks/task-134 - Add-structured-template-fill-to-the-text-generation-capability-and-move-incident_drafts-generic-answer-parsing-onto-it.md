@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-01 14:05
-updated_date: '2026-11-19T17:29:00Z'
+updated_date: '2026-11-19T19:30:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -43,8 +43,8 @@ TASK-145.11 (the report draft moves into incident/postmortem and scribe is delet
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The text-generation capability's api.py exposes a structured-fill operation: source text plus ordered sections (heading and instructions) in, one answer per section and a truncation flag out, as frozen dataclasses inside OperationResult
-- [ ] #2 The generic request building, JSON answer parsing, salvage of a cut-off response and heading matching live in the capability with their tests; grep finds no incident, timeline, transcript or Slack vocabulary under app/capabilities/text_generation/
+- [ ] #1 The AI writing capability's api.py (app/capabilities/ai_writing/) exposes a structured-fill operation: source text plus ordered sections (heading and instructions) in, with a required max_output_tokens and an optional temperature like AIWriter.write, one answer per section and a truncation flag out, as frozen dataclasses inside OperationResult
+- [ ] #2 The generic request building, JSON answer parsing, salvage of a cut-off response and heading matching live in the capability with their tests; grep finds no incident, timeline, transcript or Slack vocabulary under app/capabilities/ai_writing/
 - [ ] #3 The incident scribe service (features/incident/scribe/service.py) calls the capability operation and keeps only incident-specific logic (prompt text, timeline, metadata fields, pull-request links, document writing); its existing tests pass with assertions unchanged
 - [ ] #4 The capability's in-memory fake covers the new operation and is what the scribe draft service tests use
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass; the TASK-36 legacy_surface suite is green before and after
@@ -57,4 +57,6 @@ TASK-145.11 (the report draft moves into incident/postmortem and scribe is delet
 2026-11-06 (human, TASK-186 review): both incident consumers of answer parsing move onto the capability (plugin-architecture.md, text generation is a capability), not only scribe.
 
 2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
+
+2026-11-19 (TASK-25.10.3): AIWriter.write is now write(source, *, instructions, max_output_tokens: int, temperature: float | None = None): every caller states its own budget, and a temperature is sent only when set. The model is [ai_writing] model (capabilities/ai_writing/settings.py), no longer the OpenAI vendor slice's. The structured-fill operation takes the same parameters (AC #1); scribe's draft keeps INCIDENT_DRAFT__MAX_OUTPUT_TOKENS (4000) as its budget. ACs #1 and #2 reworded to name app/capabilities/ai_writing/ (rename, human, #1877 review); read the description's app/capabilities/text_generation/ as app/capabilities/ai_writing/.
 <!-- SECTION:NOTES:END -->
