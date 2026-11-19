@@ -1,6 +1,6 @@
 """OpenAI integration package.
 
-Authenticated client construction and error classification. The text-generation
+Authenticated client construction and error classification. The AI writing
 capability's OpenAI adapter is its only consumer (import-linter contract (o)). No
 import-time side effects.
 """

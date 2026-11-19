@@ -19,7 +19,7 @@ The bot was named for site reliability engineering and the root README described
 
 | Area | Packages |
 | --- | --- |
-| Incident response | `incident`, `webhooks`, `oncall` capability (with the self-managed rotations, an on-call schedule source, and `/sre rotations`, [oncall.md](oncall.md)), `oncall_sync`, `text_generation` capability |
+| Incident response | `incident`, `webhooks`, `oncall` capability (with the self-managed rotations, an on-call schedule source, and `/sre rotations`, [oncall.md](oncall.md)), `oncall_sync`, `ai_writing` capability |
 | Cloud operations | AWS account health, spending, Lambda surfaces |
 | Platform access | `access` umbrella, AWS Identity Center, Google Workspace provisioning |
 | Workplace utilities | `talent`, ATIP, `secret`, `geolocate`, `rant` |
@@ -49,4 +49,4 @@ A capability belongs to the area of its consumers; one used by two or more areas
 - 2026-10-26: end state recorded: the app repository holds only app code; each organisation configures and deploys its instance from its own deployment repository (configuration files, organisation content, deployment code); not scheduled, the refactor comes first (human).
 - 2026-10-28: organisation content's pattern is [organisation-content.md](organisation-content.md) (TASK-167; Accepted 2026-10-28).
 - 2026-11-06: a capability used by two or more areas is shared, with its enablement key in `[plugins.shared]` (TASK-114 planning, human).
-- 2026-11-19: TASK-25.10.2 (human, 2026-11-19): an adopter extends the platform with feature plugins, and a capability's new vendor is an adapter inside it; the `text_generation` capability is in incident response.
+- 2026-11-19: TASK-25.10.2 (human, 2026-11-19): an adopter extends the platform with feature plugins, and a capability's new vendor is an adapter inside it; the `ai_writing` capability is in incident response.

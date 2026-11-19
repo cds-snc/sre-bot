@@ -49,7 +49,7 @@ _TEXT_FIELDS = ("affected_service", "impact", "current_action", "workaround")
 _GENERATE_FAILURE_KEYS = MappingProxyType(
     {
         ErrorCode.SECURITY_CONFIRMATION_REQUIRED: "generate_security",
-        ErrorCode.TEXT_GENERATION_UNAVAILABLE: "generate_unavailable",
+        ErrorCode.AI_WRITING_UNAVAILABLE: "generate_unavailable",
         ErrorCode.EMPTY_HISTORY: "generate_empty_history",
         DRAFT_UNPARSEABLE_CODE: "generate_unparseable",
     }
@@ -383,7 +383,7 @@ def build_review_view(
     and Save draft buttons are block actions, so Approve stays the only submit.
     ``instructions`` prefills the instructions input and ``security_confirm``
     adds the security confirmation checkbox. ``with_ai=False`` leaves the AI
-    section out, for when text generation is not configured.
+    section out, for when AI writing is not configured.
     """
     fr = locale.startswith("fr")
     stage_names = build_profile_labels(locale).stage_names

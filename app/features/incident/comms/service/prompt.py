@@ -4,7 +4,7 @@ The model fills structured fields only; the text people read is rendered from
 those fields by the comms profile, never by the prompt
 (decisions/incident-management.md, External status updates). The parser is
 deliberately strict: a public update is never assembled from a partial or
-malformed answer. Generic answer parsing moves to the text-generation
+malformed answer. Generic answer parsing moves to the AI writing
 capability with TASK-134.
 """
 

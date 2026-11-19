@@ -5,7 +5,7 @@ always make one model call with the redraft prompt; the helper returns the
 stored draft so assertions read the record directly. The service runs against
 the in-memory status-update store, an in-memory incident store that counts
 security flag reads, and stubs for the transcript reader and the text
-generator, with a fixed ``now``, so each test controls which records exist,
+ai_writer, with a fixed ``now``, so each test controls which records exist,
 which messages are read and what the model answers. Assertions compare the
 exact model call (instructions, input and token cap), the exact stored records
 and the exact result codes, because an instructed fill must make one model
@@ -161,7 +161,7 @@ class _StubReader:
         return OperationResult.success(self._messages)
 
 
-class _StubGenerator:
+class _StubWriter:
     def __init__(self, result: OperationResult[str] | None = None, events: list[str] | None = None) -> None:
         self._result = result or OperationResult.success(data=_model_answer())
         self._events = events
@@ -170,7 +170,7 @@ class _StubGenerator:
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self,
         transcript: str,
         *,
@@ -228,7 +228,7 @@ async def _redraft(
     instructions: str = _GUIDANCE,
     current: StatusUpdateEdit = _CURRENT,
     reader: _StubReader | None = None,
-    generator: _StubGenerator | None = None,
+    ai_writer: _StubWriter | None = None,
     incidents: _CountingIncidents | None = None,
     security_confirmed: bool = False,
     on_started: Any = None,
@@ -246,7 +246,7 @@ async def _redraft(
         on_started=on_started,
         reader=reader or _StubReader(),
         store=store,
-        generator=generator or _StubGenerator(),
+        ai_writer=ai_writer or _StubWriter(),
         now=_NOW,
     )
     if result.is_success and result.data is not None:
@@ -263,11 +263,11 @@ class TestRedraft:
         """The model gets the redraft instructions, the reviewer's current values and every message, bots included."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("rolled back", 50), _bot("RESOLVED: 5xx", 20), _human("vendor confirmed", 10)])
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        await _redraft(store=store, reader=reader, generator=generator)
+        await _redraft(store=store, reader=reader, ai_writer=ai_writer)
 
-        assert generator.calls == [
+        assert ai_writer.calls == [
             {
                 "transcript": build_redraft_input(
                     _CURRENT, "Ada: rolled back\nAlertmanager: RESOLVED: 5xx\nAda: vendor confirmed"
@@ -328,21 +328,21 @@ class TestRedraft:
     async def test_the_guidance_is_trimmed_before_it_reaches_the_model(self) -> None:
         """Surrounding whitespace in the reviewer's guidance is dropped from the instructions."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        await _redraft(store=store, instructions=f"  \n{_GUIDANCE} \n", reader=_StubReader([_human("x", 5)]), generator=generator)
+        await _redraft(store=store, instructions=f"  \n{_GUIDANCE} \n", reader=_StubReader([_human("x", 5)]), ai_writer=ai_writer)
 
-        assert [call["instructions"] for call in generator.calls] == [build_redraft_instructions(_GUIDANCE)]
+        assert [call["instructions"] for call in ai_writer.calls] == [build_redraft_instructions(_GUIDANCE)]
 
     @pytest.mark.asyncio
     async def test_overlong_guidance_is_capped_before_it_reaches_the_model(self) -> None:
         """Guidance longer than the cap is cut to the first 500 characters."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        await _redraft(store=store, instructions="v" * 650, reader=_StubReader([_human("x", 5)]), generator=generator)
+        await _redraft(store=store, instructions="v" * 650, reader=_StubReader([_human("x", 5)]), ai_writer=ai_writer)
 
-        assert [call["instructions"] for call in generator.calls] == [build_redraft_instructions("v" * 500)]
+        assert [call["instructions"] for call in ai_writer.calls] == [build_redraft_instructions("v" * 500)]
 
     @pytest.mark.asyncio
     async def test_on_started_is_called_once_just_before_the_model_call(self) -> None:
@@ -353,7 +353,7 @@ class TestRedraft:
         await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=_StubGenerator(events=events),
+            ai_writer=_StubWriter(events=events),
             on_started=lambda: events.append("started"),
         )
 
@@ -367,7 +367,7 @@ class TestRedraft:
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("all clear", 5)]),
-            generator=_StubGenerator(OperationResult.success(data=_model_answer("resolved"))),
+            ai_writer=_StubWriter(OperationResult.success(data=_model_answer("resolved"))),
         )
 
         assert result.data is not None
@@ -386,11 +386,11 @@ class TestNoNewPeople:
     ) -> None:
         """Instructions alone justify a redraft; with no person's message read, cutoff and fingerprint stay the previous draft's."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _redraft(store=store, reader=_StubReader(messages), generator=generator)
+        result = await _redraft(store=store, reader=_StubReader(messages), ai_writer=ai_writer)
 
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
         assert result.data is not None
         assert (result.data.sequence, result.data.state, result.data.author) == (3, StatusUpdateState.DRAFT, _REDRAFTER)
         assert (result.data.transcript_cutoff, result.data.transcript_fingerprint) == (
@@ -404,11 +404,11 @@ class TestNoNewPeople:
         """A draft carried forward with nothing new is still revised: the model gets the draft and an empty transcript."""
         carried = _record(2, StatusUpdateState.DRAFT, cutoff_minutes_ago=90)
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, carried)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _redraft(store=store, reader=_StubReader([]), generator=generator)
+        result = await _redraft(store=store, reader=_StubReader([]), ai_writer=ai_writer)
 
-        assert [call["transcript"] for call in generator.calls] == [build_redraft_input(_CURRENT, "")]
+        assert [call["transcript"] for call in ai_writer.calls] == [build_redraft_input(_CURRENT, "")]
         assert result.data is not None
         assert (result.data.transcript_cutoff, result.data.transcript_fingerprint) == (
             carried.transcript_cutoff,
@@ -440,7 +440,7 @@ class TestStageFloor:
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("update", 5)]),
-            generator=_StubGenerator(OperationResult.success(data=_model_answer(drafted))),
+            ai_writer=_StubWriter(OperationResult.success(data=_model_answer(drafted))),
         )
 
         assert result.data is not None
@@ -477,14 +477,14 @@ class TestRejectedBeforeAnyWork:
         """Outside an incident, or with two incidents on the channel, nothing is read, redrafted or stored."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         reader = _StubReader([_human("x", 5)])
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
         result = await _redraft(
-            store=store, reader=reader, generator=generator, incidents=_CountingIncidents(incident_ids=incident_ids)
+            store=store, reader=reader, ai_writer=ai_writer, incidents=_CountingIncidents(incident_ids=incident_ids)
         )
 
         assert (result.status, result.error_code) == refusal
-        assert (reader.reads, generator.calls) == ([], [])
+        assert (reader.reads, ai_writer.calls) == ([], [])
         assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.parametrize(
@@ -506,40 +506,40 @@ class TestRejectedBeforeAnyWork:
         store = await _store(InMemoryStatusUpdateStore(), *records)
         before = await _stored(store)
         reader = _StubReader([_human("x", 5)])
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _redraft(store=store, sequence=sequence, reader=reader, generator=generator)
+        result = await _redraft(store=store, sequence=sequence, reader=reader, ai_writer=ai_writer)
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.STATUS_UPDATE_CONFLICT)
-        assert (reader.reads, generator.calls) == ([], [])
+        assert (reader.reads, ai_writer.calls) == ([], [])
         assert await _stored(store) == before
 
     @pytest.mark.asyncio
     async def test_a_store_read_failure_passes_through_before_the_transcript_is_read(self) -> None:
         """Without the incident's records nothing can be checked, so the store's error is returned."""
         reader = _StubReader([_human("x", 5)])
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
 
-        result = await _redraft(store=_FailingListStore(), reader=reader, generator=generator)
+        result = await _redraft(store=_FailingListStore(), reader=reader, ai_writer=ai_writer)
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,
             ErrorCode.RATE_LIMITED,
             3,
         )
-        assert (reader.reads, generator.calls) == ([], [])
+        assert (reader.reads, ai_writer.calls) == ([], [])
 
 
 class TestFailuresKeepThePreviousDraft:
     @pytest.mark.asyncio
     async def test_a_model_failure_passes_through_and_stores_nothing(self) -> None:
-        """The generator's classified error, retry hint included, reaches the caller; the pending draft stays latest."""
+        """The ai_writer's classified error, retry hint included, reaches the caller; the pending draft stays latest."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
         failure: OperationResult[str] = OperationResult.transient_error(
             message="rate limited", error_code=ErrorCode.RATE_LIMITED, retry_after=7
         )
 
-        result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]), generator=_StubGenerator(failure))
+        result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]), ai_writer=_StubWriter(failure))
 
         assert (result.status, result.error_code, result.retry_after) == (
             OperationStatus.TRANSIENT_ERROR,
@@ -567,7 +567,7 @@ class TestFailuresKeepThePreviousDraft:
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=_StubGenerator(OperationResult.success(data=raw)),
+            ai_writer=_StubWriter(OperationResult.success(data=raw)),
         )
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, DRAFT_UNPARSEABLE_CODE)
@@ -615,14 +615,14 @@ class TestSecurityGate:
     async def test_a_security_incident_or_unreadable_flag_refuses_before_the_model(self, incident: dict[str, Any]) -> None:
         """Without confirmation, a redraft that may expose a security incident never reaches the model or the store."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
         incidents = _CountingIncidents(**incident)
         started: list[str] = []
 
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=generator,
+            ai_writer=ai_writer,
             incidents=incidents,
             on_started=lambda: started.append("started"),
         )
@@ -632,33 +632,33 @@ class TestSecurityGate:
             ErrorCode.SECURITY_CONFIRMATION_REQUIRED,
         )
         assert incidents.calls == [_INCIDENT]
-        assert (generator.calls, started) == ([], [])
+        assert (ai_writer.calls, started) == ([], [])
         assert await _stored(store) == (_PENDING, _APPROVED)
 
     @pytest.mark.asyncio
     async def test_a_non_security_incident_redrafts_after_reading_the_flag_once(self) -> None:
         """A flag that says no lets the redraft through without confirmation."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
         incidents = _CountingIncidents(security_incident=False)
 
-        result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]), generator=generator, incidents=incidents)
+        result = await _redraft(store=store, reader=_StubReader([_human("x", 5)]), ai_writer=ai_writer, incidents=incidents)
 
         assert result.is_success
         assert incidents.calls == [_INCIDENT]
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
 
     @pytest.mark.asyncio
     async def test_confirmation_skips_the_flag_and_redrafts(self) -> None:
         """The responder's confirmation is explicit consent, so the flag is not read and one model call is made."""
         store = await _store(InMemoryStatusUpdateStore(), _APPROVED, _PENDING)
-        generator = _StubGenerator()
+        ai_writer = _StubWriter()
         incidents = _CountingIncidents(security_incident=True)
 
         result = await _redraft(
             store=store,
             reader=_StubReader([_human("x", 5)]),
-            generator=generator,
+            ai_writer=ai_writer,
             incidents=incidents,
             security_confirmed=True,
         )
@@ -666,7 +666,7 @@ class TestSecurityGate:
         assert result.data is not None
         assert (result.data.sequence, result.data.state) == (3, StatusUpdateState.DRAFT)
         assert incidents.calls == []
-        assert len(generator.calls) == 1
+        assert len(ai_writer.calls) == 1
 
 
 class TestLogging:

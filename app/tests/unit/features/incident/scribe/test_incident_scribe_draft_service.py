@@ -38,7 +38,7 @@ _REPORT = ReportReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vend
 
 
 class _StubSummarizer:
-    """Minimal ``TextGenerator`` stub capturing what it receives."""
+    """Minimal ``AIWriter`` stub capturing what it receives."""
 
     def __init__(self, result: OperationResult[str]) -> None:
         self._result = result
@@ -50,7 +50,7 @@ class _StubSummarizer:
     def is_available(self) -> bool:
         return True
 
-    async def generate(
+    async def write(
         self,
         transcript: str,
         *,

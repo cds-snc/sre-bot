@@ -3,14 +3,14 @@ id: TASK-140.12
 title: Un-approve or correct an approved incident status update
 status: To Do
 assignee: []
-created_date: '2026-10-07 18:52'
-updated_date: '2026-10-15 17:50'
+created_date: 2026-10-07 18:52
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - incident
 dependencies:
   - TASK-140.6
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1684'
+  - https://github.com/cds-snc/sre-bot/issues/1684
 parent_task_id: TASK-140
 priority: low
 type: feature
@@ -48,6 +48,12 @@ Approval enforces a forward-only stage floor: a draft's stage may not be below t
 - [ ] #8 Nothing is posted in the incident channel
 - [ ] #9 The fixed update sets the next update time; fixing a wrongly approved Resolved update does not restart periodic drafting, a responder turns it on again
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

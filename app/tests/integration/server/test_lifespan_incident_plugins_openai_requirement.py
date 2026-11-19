@@ -6,7 +6,7 @@ registration are stubbed, since requirements are resolved before any of them. Th
 ci files configure no tenant. With incident.scribe enabled (the
 configuration's disabled set replaced by the access plugins and the other plugins that declare requirements) startup must stop
 before the lifespan yields, naming each tenant and incident document id scribe declares: it has no fallback. With the ci
-files as they are (scribe off, comms on) startup must reach the yield and the text-generation
+files as they are (scribe off, comms on) startup must reach the yield and the AI writing
 capability must report itself unavailable, comms' designed fallback.
 """
 
@@ -19,8 +19,8 @@ import pytest
 from fastapi import FastAPI
 from structlog.testing import capture_logs
 
-from capabilities.text_generation.api import get_text_generator
-from capabilities.text_generation.providers import get_text_generator_singleton
+from capabilities.ai_writing.api import get_ai_writer
+from capabilities.ai_writing.providers import get_ai_writer_singleton
 from integrations.openai import get_openai_settings
 from server.configuration import load_host_configuration
 from server.lifespan import build_lifespan
@@ -37,11 +37,11 @@ OTHER_REQUIRING_PLUGINS = frozenset({"incident.response", "oncall_sync", "rant"}
 def _fresh_plugin_manager() -> Iterator[None]:
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
-    get_text_generator_singleton.cache_clear()
+    get_ai_writer_singleton.cache_clear()
     yield
     get_plugin_manager.cache_clear()
     get_openai_settings.cache_clear()
-    get_text_generator_singleton.cache_clear()
+    get_ai_writer_singleton.cache_clear()
 
 
 def _stub_startup(stack: ExitStack) -> None:
@@ -76,14 +76,14 @@ async def test_lifespan_aborts_naming_every_tenant_scribe_lacks_when_it_is_enabl
     ]
 
 
-async def test_lifespan_boots_with_comms_reporting_text_generation_unavailable_when_scribe_is_off() -> None:
+async def test_lifespan_boots_with_comms_reporting_ai_writing_unavailable_when_scribe_is_off() -> None:
     configuration = load_host_configuration()
 
     with ExitStack() as stack:
         _stub_startup(stack)
         async with build_lifespan(configuration)(FastAPI()):
             registered = {get_plugin_manager().get_name(plugin) for plugin, _ in get_plugin_manager().list_plugin_distinfo()}
-            available = get_text_generator().is_available()
+            available = get_ai_writer().is_available()
 
     assert "incident.scribe" in configuration.disabled_plugins
     assert "incident.comms" in registered

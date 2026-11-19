@@ -1,8 +1,8 @@
 """Feature-local dependency wiring for the incident comms subdomain.
 
 Resolves the default implementations of the Protocols the services depend on,
-keeping the services and ``entrypoints/`` free of adapter imports. Text generation
-is the capability's: the services import ``capabilities.text_generation.api``.
+keeping the services and ``entrypoints/`` free of adapter imports. AI writing
+is the capability's: the services import ``capabilities.ai_writing.api``.
 """
 
 from functools import lru_cache

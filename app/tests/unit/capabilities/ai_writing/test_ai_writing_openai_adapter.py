@@ -1,4 +1,4 @@
-"""Tests for the OpenAI adapter of the text-generation capability.
+"""Tests for the OpenAI adapter of the AI writing capability.
 
 No live network calls: the adapter's vendor-client factory is replaced at the edge by an httpx
 client over a MockTransport serving canned responses, so the real request, response and
@@ -13,14 +13,14 @@ import httpx
 import pytest
 from structlog.testing import capture_logs
 
-from capabilities.text_generation.adapters.openai import OpenAITextGenerator
+from capabilities.ai_writing.adapters.openai import OpenAIWriter
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from integrations.openai.settings import OpenAISettings
 
 pytestmark = pytest.mark.unit
 
-_CLIENT = "capabilities.text_generation.adapters.openai.build_openai_client"
+_CLIENT = "capabilities.ai_writing.adapters.openai.build_openai_client"
 type Handler = Callable[[httpx.Request], httpx.Response]
 
 
@@ -32,13 +32,13 @@ def _completion(content: str, finish_reason: str = "stop") -> httpx.Response:
     return httpx.Response(200, json={"choices": [{"message": {"content": content}, "finish_reason": finish_reason}]})
 
 
-async def _generate(settings: OpenAISettings, handler: Handler, **kwargs: object):
+async def _write(settings: OpenAISettings, handler: Handler, **kwargs: object):
     with patch(_CLIENT, return_value=_mock_client(handler, settings)):
-        return await OpenAITextGenerator(settings=settings).generate("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
+        return await OpenAIWriter(settings=settings).write("transcript", instructions="Be terse.", **kwargs)  # type: ignore[arg-type]
 
 
 def test_a_configured_adapter_is_available(openai_settings: OpenAISettings) -> None:
-    assert OpenAITextGenerator(settings=openai_settings).is_available() is True
+    assert OpenAIWriter(settings=openai_settings).is_available() is True
 
 
 async def test_success_returns_the_stripped_text_from_the_completions_endpoint(openai_settings: OpenAISettings) -> None:
@@ -50,7 +50,7 @@ async def test_success_returns_the_stripped_text_from_the_completions_endpoint(o
         return _completion("  A concise summary.  ")
 
     with patch(_CLIENT, return_value=_mock_client(handler, openai_settings)):
-        result = await OpenAITextGenerator(settings=openai_settings).generate("alice: prod is down", instructions="Be terse.")
+        result = await OpenAIWriter(settings=openai_settings).write("alice: prod is down", instructions="Be terse.")
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, "A concise summary.")
     assert captured["url"].endswith("/chat/completions")
@@ -67,31 +67,31 @@ async def test_the_configured_budget_applies_unless_the_call_sets_one(openai_set
         bodies.append(json.loads(request.read().decode()))
         return _completion("ok")
 
-    await _generate(openai_settings, handler)
-    await _generate(openai_settings, handler, max_output_tokens=3000)
+    await _write(openai_settings, handler)
+    await _write(openai_settings, handler, max_output_tokens=3000)
 
     assert [body["max_completion_tokens"] for body in bodies] == [openai_settings.max_output_tokens, 3000]
 
 
 async def test_empty_choices_return_empty_text(openai_settings: OpenAISettings) -> None:
     with capture_logs() as logs:
-        result = await _generate(openai_settings, lambda request: httpx.Response(200, json={"choices": []}))
+        result = await _write(openai_settings, lambda request: httpx.Response(200, json={"choices": []}))
 
     assert (result.status, result.data) == (OperationStatus.SUCCESS, "")
-    assert "openai_generate_empty_content" in [entry["event"] for entry in logs]
+    assert "openai_write_empty_content" in [entry["event"] for entry in logs]
 
 
 async def test_a_truncated_completion_is_logged_with_its_budget(openai_settings: OpenAISettings) -> None:
     with capture_logs() as logs:
-        result = await _generate(openai_settings, lambda request: _completion("cut off", "length"))
+        result = await _write(openai_settings, lambda request: _completion("cut off", "length"))
 
     assert result.data == "cut off"
-    (truncated,) = [entry for entry in logs if entry["event"] == "openai_generate_truncated"]
+    (truncated,) = [entry for entry in logs if entry["event"] == "openai_write_truncated"]
     assert truncated["max_completion_tokens"] == openai_settings.max_output_tokens
 
 
 async def test_an_http_error_is_classified(openai_settings: OpenAISettings) -> None:
-    result = await _generate(openai_settings, lambda request: httpx.Response(401, json={"error": "bad key"}))
+    result = await _write(openai_settings, lambda request: httpx.Response(401, json={"error": "bad key"}))
 
     assert (result.status, result.error_code, result.retry_after) == (
         OperationStatus.UNAUTHORIZED,
@@ -101,7 +101,7 @@ async def test_an_http_error_is_classified(openai_settings: OpenAISettings) -> N
 
 
 async def test_a_rate_limit_is_transient_with_its_retry_after(openai_settings: OpenAISettings) -> None:
-    result = await _generate(openai_settings, lambda request: httpx.Response(429, headers={"Retry-After": "7"}))
+    result = await _write(openai_settings, lambda request: httpx.Response(429, headers={"Retry-After": "7"}))
 
     assert (result.status, result.error_code, result.retry_after) == (
         OperationStatus.TRANSIENT_ERROR,
@@ -121,7 +121,7 @@ class TestTemperature:
             captured["body"] = json.loads(request.read().decode())
             return _completion("a summary")
 
-        await _generate(settings, handler)
+        await _write(settings, handler)
         return captured["body"]
 
     async def test_temperature_is_omitted_by_default(self, openai_settings: OpenAISettings) -> None:
@@ -162,10 +162,10 @@ class TestErrorDiagnostics:
         body = '{"error": {"message": "Unsupported parameter: temperature", "param": "temperature"}}'
 
         with capture_logs() as logs:
-            result = await _generate(openai_settings, lambda request: httpx.Response(400, text=body))
+            result = await _write(openai_settings, lambda request: httpx.Response(400, text=body))
 
         assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR)
-        (failed,) = [entry for entry in logs if entry["event"] == "openai_generate_failed"]
+        (failed,) = [entry for entry in logs if entry["event"] == "openai_write_failed"]
         assert "Unsupported parameter: temperature" in failed["response_body"]
         assert "temperature" in failed["sent_parameters"]
 
@@ -174,8 +174,8 @@ class TestErrorDiagnostics:
             raise httpx.ConnectError("no route to host")
 
         with capture_logs() as logs:
-            result = await _generate(openai_settings, handler)
+            result = await _write(openai_settings, handler)
 
         assert result.status == OperationStatus.TRANSIENT_ERROR
-        (failed,) = [entry for entry in logs if entry["event"] == "openai_generate_failed"]
+        (failed,) = [entry for entry in logs if entry["event"] == "openai_write_failed"]
         assert failed["response_body"] == ""

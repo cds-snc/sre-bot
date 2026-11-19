@@ -148,7 +148,7 @@ async def test_a_fill_returns_the_new_draft_and_its_kind(monkeypatch: pytest.Mon
         (ErrorCode.EMPTY_HISTORY, True),
         (DRAFT_UNPARSEABLE_CODE, True),
         (ErrorCode.RATE_LIMITED, True),
-        (ErrorCode.TEXT_GENERATION_UNAVAILABLE, False),
+        (ErrorCode.AI_WRITING_UNAVAILABLE, False),
     ],
 )
 async def test_a_refusal_keeps_the_stored_draft_overlaid_with_the_typed_values(

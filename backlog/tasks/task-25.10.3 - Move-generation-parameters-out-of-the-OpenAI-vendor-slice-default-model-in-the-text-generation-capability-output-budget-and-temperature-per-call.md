@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-16T14:06:00Z'
+updated_date: '2026-11-19T17:29:00Z'
 labels:
   - clients
   - phase-3
@@ -62,4 +62,6 @@ Blast radius: production.toml changes the configuration production boots with. A
 2026-11-09 (25.10 review), Q6, where an unset model fails. The ADRs cover it, no gap. configuration.md:33 puts a capability's defaults in its own slice. configuration.md:87 says production.toml holds the deploying organisation's values, while base.toml stays the framework's. The gateway's model name is this organisation's choice, so it stays out of base.toml: base.toml has [text_generation] model = '' (unset), and production.toml and local.toml set it, as AC #7 reads. Spring AI does ship a library default (spring.ai.openai.chat.model = gpt-5-mini, docs.spring.io/spring-ai/reference/api/chat/openai-chat.html). That fits a framework that knows its vendor's catalogue, not a deployment-specific gateway. Unset model: the capability reports unavailable, through 25.10.2's no-op implementation, and logs text_generation_model_unset once at build. Required consumers add Requirement('text_generation.model') beside 'openai.tenant', resolved through the built slice (host_configuration.py, plugins.md 2026-11-05), so boot names the missing key (plugins.md: requirement is the consumer's). Production safety: production.toml and local.toml move the same model in the same PR. A model left under [openai.tenant] fails boot (extra=forbid), so the move cannot half-apply, and one revert restores it. Note: which plugins are 'required consumers' after scribe dissolves is open on TASK-145.9 and TASK-145.11 (2026-11-09).
 
 2026-11-09 (human): OQ6 ruled as recommended: [text_generation] model empty in base.toml, set in production.toml and local.toml; unset means unavailable, plus Requirement('text_generation.model') for required consumers (scribe while it exists). Description and ACs #2 and #4 updated; the 'or the alternative ruled at plan' clause is gone.
+
+2026-11-19 (human, #1877 review of TASK-25.10.2): the text-generation capability is named ai_writing: capabilities/ai_writing, Protocol AIWriter with is_available() and write(source, *, instructions, max_output_tokens=None), get_ai_writer(), error code AI_WRITING_UNAVAILABLE, log events openai_write_*. Its purpose is AI-written text only; any other AI use is a separate capability named for its purpose (plugin-architecture.md). Read 'text generation', TextGenerator and generate in this task as AI writing, AIWriter and write.
 <!-- SECTION:NOTES:END -->

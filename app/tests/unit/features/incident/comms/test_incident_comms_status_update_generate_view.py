@@ -3,7 +3,7 @@
 With ``with_ai=True`` the review form opens with an AI section, below any
 notice and above the stage select: an optional multiline instructions input
 capped at 500 characters, an optional security confirmation checkbox when asked
-for, and the Draft with AI button. With ``with_ai=False`` (text generation not
+for, and the Draft with AI button. With ``with_ai=False`` (AI writing not
 configured) the section is left out and the rest of the form is unchanged.
 ``parse_ai_form`` reads the instructions and the checkbox back from a block
 action's view state. ``build_generating_view`` is the button-less modal shown
@@ -305,7 +305,7 @@ class TestWithoutAi:
         [{}, {"notice": "Read me."}, {"instructions": "x", "security_confirm": True}],
         ids=["plain", "notice", "after-refusal"],
     )
-    def test_without_text_generation_the_form_has_no_ai_section(self, kwargs: dict[str, Any]) -> None:
+    def test_without_ai_writing_the_form_has_no_ai_section(self, kwargs: dict[str, Any]) -> None:
         """No instructions, checkbox or Draft with AI block; the stage, fields, Save draft and Approve remain unchanged."""
         with_ai = build_review_view(_DRAFT, "en-US", _METADATA, **kwargs)
         view = build_review_view(_DRAFT, "en-US", _METADATA, with_ai=False, **kwargs)
