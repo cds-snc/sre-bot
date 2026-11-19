@@ -137,7 +137,15 @@ def test_interface_signatures_carry_only_plain_and_domain_types() -> None:
     assert read.return_annotation == OperationResult[Sequence[api.TranscriptMessage]]
 
 
-_REPORT_METHODS = ("list_placements", "create_from_template", "replace_placeholders", "read_sections", "write_draft_copy")
+_REPORT_METHODS = (
+    "list_placements",
+    "create_from_template",
+    "replace_placeholders",
+    "read_sections",
+    "write_draft_copy",
+    "append_timeline_entry",
+    "remove_timeline_entry",
+)
 _READER_METHODS = ("conversation_started_at", "read_transcript")
 
 

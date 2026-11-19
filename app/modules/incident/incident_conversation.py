@@ -1,5 +1,4 @@
 from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import i18n  # type: ignore
 import pytz  # type: ignore
@@ -11,14 +10,14 @@ from structlog import get_logger
 from contracts.configuration import host_info
 from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters import google_docs as incident_documents
+from features.incident.core.adapters.google_docs import (  # TODO(TASK-145.9.2): the handlers move onto IncidentReport
+    timeline_with_entry,
+    timeline_without_entry,
+    update_timeline_section,
+)
 from integrations.sentinel import log_to_sentinel
 from integrations.slack import users as slack_users
 from modules.incident import schedule_retro
-from modules.incident.incident_document import (
-    TIMELINE_ENTRY_PATTERN,
-    timeline_message_key,
-    update_timeline_section,
-)
 
 logger = get_logger()
 
@@ -115,26 +114,6 @@ def is_incident_channel(client: WebClient, channel_id: str, notify: bool = True)
             text="This channel is not an incident channel. Please use this command in an incident channel.",
         )
     return is_incident, is_dev_incident
-
-
-def rearrange_by_datetime_ascending(text: str) -> str:
-    matches = list(TIMELINE_ENTRY_PATTERN.finditer(text))
-    if not matches:
-        return text
-    entries: dict[tuple[str, str], tuple[int, str]] = {}
-    for index, match in enumerate(matches):
-        key = timeline_message_key(match["url"])
-        posted_at = (
-            int(key[1])
-            if key[0]
-            else int(datetime.strptime(match["date"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=ZoneInfo("US/Eastern")).timestamp())
-            * 1_000_000
-        )
-        end = matches[index + 1].start() if index + 1 < len(matches) else len(text)
-        entries[key] = (posted_at, text[match.start() : end].rstrip("\n"))
-    return (
-        text[: matches[0].start()] + "\n".join(entry for _, entry in sorted(entries.values(), key=lambda entry: entry[0])) + "\n"
-    )
 
 
 def convert_epoch_to_datetime_est(epoch_time):
@@ -292,14 +271,8 @@ def handle_reaction_added(client, ack, body):
                 new_entry = f"\n ➡️ [{message_date_time}]({link}) {user_full_name}: {message}\n"
 
                 def add_entry(content, link=link, new_entry=new_entry):
-                    # if the message already exists in the timeline, then don't put it there again
-                    if any(
-                        timeline_message_key(match["url"]) == timeline_message_key(link)
-                        for match in TIMELINE_ENTRY_PATTERN.finditer(content)
-                    ):
-                        return None
-                    # append the new message and sort all the messages in ascending chronological order
-                    return rearrange_by_datetime_ascending(content + new_entry)
+                    # once per message, in ascending chronological order (TODO(TASK-145.9.2): IncidentReport.append_timeline_entry)
+                    return timeline_with_entry(content, link, new_entry)
 
                 # rewrite the timeline section from the current state of the document
                 result = update_timeline_section(document_id, add_entry)
@@ -354,19 +327,11 @@ def handle_reaction_removed(client, ack, body):
             message_found = False
 
             def remove_entry(content):
+                # every copy of the message (TODO(TASK-145.9.2): IncidentReport.remove_timeline_entry)
                 nonlocal message_found
-                matches = list(TIMELINE_ENTRY_PATTERN.finditer(content))
-                spans = [
-                    (match.start(), matches[index + 1].start() if index + 1 < len(matches) else len(content))
-                    for index, match in enumerate(matches)
-                    if timeline_message_key(match["url"]) == timeline_message_key(link)
-                ]
-                if not spans:
-                    return None
-                message_found = True
-                for start, end in reversed(spans):
-                    content = content[:start] + content[end:]
-                return content
+                rewritten = timeline_without_entry(content, link)
+                message_found = message_found or rewritten is not None
+                return rewritten
 
             # Remove the message and update the timeline content
             updated = update_timeline_section(document_id, remove_entry)
