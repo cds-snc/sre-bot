@@ -2,5 +2,19 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "local>cds-snc/renovate-config"
+  ],
+  "packageRules": [
+    {
+      "description": "The Python runtime (.python-version, Dockerfile base image, CI setup-python) moves in its own PR, never grouped with library updates",
+      "matchDepNames": ["python"],
+      "groupName": "python runtime",
+      "groupSlug": "python-runtime"
+    },
+    {
+      "description": "A new Python minor is a coordinated upgrade (Dockerfile, requires-python, mypy, CLAUDE.md baseline): require dashboard approval",
+      "matchDepNames": ["python"],
+      "matchUpdateTypes": ["minor", "major"],
+      "dependencyDashboardApproval": true
+    }
   ]
 }
