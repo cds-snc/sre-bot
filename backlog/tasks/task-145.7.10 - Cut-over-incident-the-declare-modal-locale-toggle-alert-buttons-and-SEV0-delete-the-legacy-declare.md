@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-18T16:41:00Z'
+updated_date: '2026-11-20T22:04:00Z'
 labels:
   - incident
   - features
@@ -65,6 +65,14 @@ created: 2026-11-17T19:10:00Z
 ---
 
 2026-11-17 (found at the Stack L sync, TASK-145.8.5.3 session): #1853 (fba4ff8b, merged to main, not a Stack L change) added a policy-help answer to the legacy declare: production-only invite of the policy group ([incident] policy_group_id in features/incident/response/settings.py; modules/incident/core.py and incident.py; pinned in tests/modules/incident/test_incident_core.py and test_incident.py, 15 policy tests). The declare rebuild carries it (pins rewired, not dropped) or rules it a named change at planning.
+
+---
+
+created: 2026-11-20T22:04:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): declare writes the incident commander as the declarer when on-call names none (not decided before; neither legacy nor TASK-145.7.9 sets it). Named change of kind (b) under the incident-role rule that lands with TASK-145.10.5; until then the core role check falls back to declared_by.
 
 ---
 <!-- COMMENTS:END -->

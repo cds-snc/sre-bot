@@ -3,10 +3,10 @@ id: TASK-114.4
 title: >-
   Package generator reads the layout manifest and emits only the parts a package
   uses
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T15:41:00Z'
-updated_date: '2026-11-10T17:46:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - tooling
 milestone: m-3
@@ -123,6 +123,8 @@ Gates (from app/):
 - uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 41 errors in 14 files (checked 425 source files); all pre-existing in legacy modules/ (same count as the L3 baseline), none in touched files.
 - uv run pytest tests --ignore=tests/smoke -> 6875 passed in 208.33s
 TASK-176 asked at start (2026-11-10): nothing changed (#1, #4 open; #2 waits on TASK-182).
+
+2026-11-20: closed by the agent: PR #1847 merged 2026-11-10 (b72a09a8); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -3,14 +3,14 @@ id: TASK-155
 title: Enable ruff DTZ (flake8-datetimez) and make every datetime timezone-aware
 status: To Do
 assignee: []
-created_date: '2026-10-15 19:39'
-updated_date: '2026-10-15 19:50'
+created_date: 2026-10-15 19:39
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - quality
   - lint
 dependencies: []
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1724'
+  - https://github.com/cds-snc/sre-bot/issues/1724
 priority: low
 ordinal: 397000
 ---
@@ -27,3 +27,15 @@ Stored and compared times must be instants independent of the host timezone, whi
 - [ ] #2 Every fixed call produces an aware datetime; no per-line DTZ ignore is added without a recorded reason
 - [ ] #3 ruff, lint-imports, mypy (no errors in touched files) and pytest tests --ignore=tests/smoke pass, with commands and output recorded in notes
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): the rebuilt availability search (TASK-145.10.3, NC7) is timezone-aware from the start (zoneinfo per-date windows, injected clock), so it adds nothing to this task's DTZ backlog; the legacy scheduling/availability.py is deleted by TASK-145.10.4.
+
+---
+<!-- COMMENTS:END -->

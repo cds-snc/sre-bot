@@ -4,15 +4,16 @@ title: Move the report draft into incident/postmortem and delete scribe
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-19T17:29:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - features
   - slack
 dependencies:
-  - TASK-145.10
-  - TASK-145.9
   - TASK-134
+  - TASK-145.9
+  - TASK-145.10
+  - TASK-145.10.6
 references:
   - https://github.com/cds-snc/sre-bot/issues/1689
 parent_task_id: TASK-145

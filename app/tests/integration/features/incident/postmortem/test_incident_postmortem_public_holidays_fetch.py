@@ -3,7 +3,7 @@
 from datetime import datetime
 from unittest.mock import patch
 
-from features.incident.scheduling import availability
+from features.incident.postmortem.adapters import public_holidays as availability
 
 
 def test_get_federal_holidays(requests_mock):
@@ -34,7 +34,7 @@ def test_get_federal_holidays_with_different_year(requests_mock):
         json={"holidays": []},
     )
 
-    with patch("features.incident.scheduling.availability.datetime") as mock_datetime:
+    with patch("features.incident.postmortem.adapters.public_holidays.datetime") as mock_datetime:
         mock_datetime.now.return_value = datetime(2025, 1, 1)
 
         holidays = availability.get_federal_holidays()
@@ -75,7 +75,7 @@ def test_get_federal_holidays_server_error(requests_mock):
 def test_leap_year_handling(requests_mock):
     requests_mock.DEFAULT_TIMEOUT = 10
 
-    with patch("features.incident.scheduling.availability.datetime") as mock_datetime:
+    with patch("features.incident.postmortem.adapters.public_holidays.datetime") as mock_datetime:
         mock_datetime.now.return_value = datetime(2024, 6, 15)
         mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
 

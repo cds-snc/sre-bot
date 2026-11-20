@@ -3,10 +3,10 @@ id: TASK-145.7.9
 title: >-
   Declare service in incident.response, unregistered, with the on-call invite
   through the capability
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-18T16:57:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - features
@@ -136,6 +136,8 @@ Tests (new): test_incident_response_declare_run.py (20), test_incident_response_
 Gates: ruff check . All checks passed, format 1254 files unchanged; make check-import-contracts 14 kept 0 broken; check-settings-key-ownership OK; check-package-shape OK (3 baselined); check-test-seams OK (47/12 baselined); check-fake-coverage OK (4 baselined); mypy Found 40 errors in 13 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 7735 passed.
 
 Left for the human: parent TASK-145.7 ACs #2 and #14 (the declare's resource rules) are verified by these tests but checked by the human with the parent; nothing runs in production until TASK-145.7.10 (Slack cutover, its new Notify SSM AC) and TASK-165.2 (HTTP route).
+
+2026-11-20: closed by the agent: PR #1870 merged 2026-11-18 (7aa3d4ce); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

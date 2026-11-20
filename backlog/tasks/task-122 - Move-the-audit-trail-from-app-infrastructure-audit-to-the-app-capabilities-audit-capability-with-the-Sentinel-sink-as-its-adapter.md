@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -48,3 +48,23 @@ The Sentinel sink moves out of integrations/sentinel into this capability's adap
 - [ ] #5 The adapter and the in_memory.py fake explicitly subclass the api.py Protocol; the AuditTrailService line is removed from app/bin/baselines/fake_coverage.txt and make check-fake-coverage passes
 - [ ] #6 If no earlier cross-area capability built it, this task adds the [plugins.shared] enablement table (plugins.md, product-scope.md, 2026-11-06) and puts the audit capability's key there
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T22:04:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): the AuditEvent shape this capability exposes follows the new audit event catalogue task (which events, actor/action/target/outcome/time/request_id). Consumers to repoint include features/incident/response/adapters/sentinel.py and features/incident/postmortem/adapters/sentinel.py.
+
+---
+
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20: the audit event catalogue task is TASK-191 (depends on TASK-171); this task's AuditEvent adopts its shape.
+
+---
+<!-- COMMENTS:END -->

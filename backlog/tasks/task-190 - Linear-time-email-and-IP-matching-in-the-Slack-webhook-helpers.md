@@ -1,10 +1,10 @@
 ---
 id: TASK-190
 title: Linear-time email and IP matching in the Slack webhook helpers
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-20T15:23:00Z'
-updated_date: '2026-11-20T20:23:00Z'
+updated_date: '2026-11-20T22:07:00Z'
 labels:
   - security
   - webhooks
@@ -93,4 +93,8 @@ Handed off (applied in the row 21, TASK-168, session; #1882 also edits TASK-37.4
 - TASK-168 comments: the rebuilt matcher is linear and token-bounded and bounds Slack lookups (OQ2, F-I: one users_lookupByEmail call per match, unbounded); the rewritten webhooks.md carries the linear-processing rule into the interpret and render stages (OQ3); keep the 37.4 padding AC in the re-cut.
 
 For the human: review the PR. No deploy checks: no terraform, IAM, SSM or env-name change.
+
+2026-11-20: closed by the agent: PR #1883 merged 2026-11-20 (ac8f8186); all ACs checked.
+
+2026-11-20 correction: TASK-190 merged as #1883 (ac8f8186); #1882 is TASK-36.2.
 <!-- SECTION:NOTES:END -->

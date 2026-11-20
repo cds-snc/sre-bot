@@ -1,11 +1,11 @@
 ---
 id: TASK-36.2
 title: Pin the legacy webhook route through the ASGI boundary
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-09-28 14:36
-updated_date: '2026-11-20T15:23:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - migration
   - testing
@@ -148,6 +148,8 @@ Correction to the BUILT note: collected test counts are lookup 34, payload 19, a
 2026-11-20 (human): AC #6 reworded to match the code (finding F-B: the bucket is per sender address and path; per-id buckets pinned as durable, per-sender-address keying legacy_only for TASK-49) and checked (80 webhook pins pass). F-A follow-up approved as a new task queued at doc-11 row 20a. Review: no production file touched (only tests, INVENTORY.md and the two ADR amendments); ruff clean and the 80 webhook pins re-run green by the reviewer. Full mypy reported 40 errors in 13 untouched production files (modules/webhooks, modules/incident, modules/role, infrastructure/i18n, features/incident/scheduling/adapters/google_calendar.py), pre-existing and unrelated, not fixed here.
 
 2026-11-20: F-A follow-up created as TASK-190 (doc-11 row 20a; id 190 because TASK-189 exists on the unmerged TASK-188 branch).
+
+2026-11-20: closed by the agent: PR #1882 merged 2026-11-20 (0836652d); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

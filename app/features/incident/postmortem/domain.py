@@ -1,12 +1,15 @@
-"""Pure availability computations over an already-fetched freebusy response."""
+"""Postmortem domain: pure availability computations over an already-fetched freebusy response.
+
+Moved verbatim from features/incident/scheduling/availability.py (TASK-145.10.1).
+The holiday lookup is still fetched through ``adapters.public_holidays`` until
+the postmortem availability model (TASK-145.10.3) takes an injected holiday set.
+"""
 
 from datetime import UTC, datetime, timedelta
 
 import pytz
-import requests
-import structlog
 
-logger = structlog.get_logger()
+from features.incident.postmortem.adapters.public_holidays import get_federal_holidays
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
@@ -54,31 +57,6 @@ def find_first_available_slot(freebusy_response, days_in_future, duration_minute
                 return current_time.astimezone(est), slot_end.astimezone(est)
 
     return None, None  # No available slot found after searching the limit
-
-
-def get_federal_holidays():
-    # Get the public holidays for the current year
-    # Uses Paul Craig's Public holidays api to retrieve the federal holidays (https://canada-holidays.ca/api)
-    holidays = []
-
-    # get today's year
-    year = datetime.now().year
-
-    # call the api to get the public holidays
-    url = f"https://canada-holidays.ca/api/v1/holidays?federal=true&year={year}"
-
-    try:
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        for holiday in response.json().get("holidays", []):
-            holidays.append(holiday["observedDate"])
-    except requests.exceptions.RequestException as e:
-        logger.error(
-            "federal_holidays_request_failed",
-            error=str(e),
-            year=year,
-        )
-    return holidays
 
 
 def get_utc_hour(hour, minute, tz_name, date=None):

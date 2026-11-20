@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T13:43:00Z'
-updated_date: '2026-11-20T13:46:00Z'
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - incident
   - ux
@@ -43,3 +43,15 @@ Questions for the session: who may close and what confirms it (a guard against c
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20 (human): closing a standard incident already has implications; closing a parent or a child of a coordinated incident (TASK-165) is in this session's scope (AC #5); TASK-165.5 plans against its outcome.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): Closed comes after Reviewed or after a postmortem opt-out with a reason (TASK-147.1); archiving the conversation waits for it. The postmortem meeting lifecycle is TASK-145.10.6.
+
+---
+<!-- COMMENTS:END -->

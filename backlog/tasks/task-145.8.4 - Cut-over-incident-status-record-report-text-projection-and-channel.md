@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.4
 title: 'Cut over incident status: record, report text, projection and channel'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-16T23:09:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - features
@@ -147,6 +147,8 @@ Production log count: 3 uses of the bare `status <status>` form in 90 days. Huma
 - Before merge (human): dry run of the upgrade job counts items the store cannot read (they can no longer change status by command).
 
 2026-11-16: rebased onto main d2f5b2f0 (after #1861 TASK-145.8.8 and #1860 merged); head b40706ae, force-pushed, #1859 approval dismissed. Conflicts: IncidentReport.set_status_text beside the now-async read_sections in core/api.py, in_memory.py, google_docs.py (docstring no longer says the rest of the port is sync), the core README line, outbound-clients.md (Migration line taken from main; Changes line reworded). Two test files awaited the now-async report helpers (parity _created, status-change _Ports.seeded). Gates on the rebased stack top: ruff clean; contracts 14 kept; key ownership, shape (3), seams (12) OK; mypy 40/13 baseline; pytest 7541 passed.
+
+2026-11-20: closed by the agent: PR #1859 merged 2026-11-17 (d02ed399); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

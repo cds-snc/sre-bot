@@ -3,10 +3,10 @@ id: TASK-114.3
 title: >-
   Package layout manifest: one declarative source for the layout table, read by
   the package-shape check
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T14:04:00Z'
-updated_date: '2026-11-09T15:53:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - tooling
 milestone: m-3
@@ -99,6 +99,8 @@ Tooling and CI only; nothing under app/features, app/capabilities, config or ter
 2026-11-09 (human): re-plan approved: Q1 split into 114.3 (manifest + shape check), 114.4 (generator) and 114.5 (other bin guards); Q2 manifest at app/bin/package_layout.toml; Q3 no import-linter contract generation now; Q4 no JSON Schema now; Q5a ruff INP001 rides here; Q5b env-name dedup rides with 114.5. The original behaviour change and OQ1/OQ2 moved to TASK-114.4. Plan rewritten; awaiting approval.
 
 2026-11-09 implemented on task-114.3-package-layout-manifest from main d3778e0a (re-plan approved by the human with the queue prompt). app/bin/package_layout.toml (kinds feature, subdomain, capability, core, common, umbrella; extends/exclude between kinds; grows_into_package declares service.py/domain.py may become packages, so the manifest's names equal the ADR table's exactly) and bin/package_layout.py (tomllib into frozen dataclasses Kind/Roots/Layout; LayoutError naming the key: unknown keys, missing keys, required-and-optional, nested paths, unknown base kind, extends cycles, exclude of an absent name, empty classifications, bad headings; layout() cached). check_package_shape.py: layout constants deleted (PACKAGE_FILES, CAPABILITY_FILES, PACKAGE_DIRS, UMBRELLA_ROOT_FILES, COMMON_IO_NAMES, CLASSIFICATIONS, headings); roots, names and README rules from the manifest; path constants kept (tests patch them). Behaviour unchanged: shape tests untouched and passing; find_violations() on the repo identical before and after (3 entries); make check-package-shape output identical. Mutations: a manifest-only name fails the drift test (and 2 shape tests); dropping core's api.py fails 15 tests. Ruff INP enabled, tests/** exempt (INP001): 0 hits in app code. ADR: feature-packages.md (manifest sentence, Checks: manifest and INP001, Changes line); bin/package_templates/README.md. Gates: ruff check . all passed; ruff format clean; targeted bin tests 83 passed; check-package-shape OK (3 baselined); check-import-contracts 13 kept, 0 broken; check-settings-key-ownership OK; check-test-seams OK (47 + 12); mypy 41 errors in 14 files, all pre-existing legacy modules/ (none in bin/ or tests/unit/bin; run twice by mistake, the second only to filter); pytest tests --ignore=tests/smoke 6586 passed. Merge deploys nothing (bin tooling, ruff config, ADR). Done is the human's.
+
+2026-11-20: closed by the agent: PR #1840 merged 2026-11-09 (3075170b); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

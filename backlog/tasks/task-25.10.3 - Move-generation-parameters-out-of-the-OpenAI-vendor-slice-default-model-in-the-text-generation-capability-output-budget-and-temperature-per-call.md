@@ -3,11 +3,11 @@ id: TASK-25.10.3
 title: >-
   Move generation parameters out of the OpenAI vendor slice: default model in
   the AI writing capability, output budget and temperature per call
-status: In Progress
+status: Done
 assignee:
   - '@me'
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-19T19:33:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - clients
   - phase-3
@@ -142,4 +142,6 @@ Gates (from app/, at the end, sequential):
 - uv run pytest tests --ignore=tests/smoke -> 7916 passed
 Downstream updated through the CLI: TASK-145.9.3 (note: write signature, ai_writer=, the summary budget moves with summarize); TASK-134 (ACs #1 and #2 name app/capabilities/ai_writing/, AC #1 takes the required budget and optional temperature; note).
 For the reviewer: app/.env.example was not inspected here (access denied in this session); no CI drift check covers it. Optional: make env-checks once (retired OpenAI names in Codespaces secrets). deploy-checks pre/post not required.
+
+2026-11-20: closed by the agent: PR #1879 merged 2026-11-19 (3d7264fc); all ACs checked.
 <!-- SECTION:NOTES:END -->

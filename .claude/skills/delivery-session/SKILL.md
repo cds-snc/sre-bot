@@ -32,17 +32,19 @@ If the task has no approved plan, or a model pivot changes its approved assumpti
 
 ## Implement
 
-TDD, then the gates from CLAUDE.md plus `make check-import-contracts`, `make check-settings-key-ownership`, `make check-package-shape` and `make check-test-seams`. Check ACs one by one as each is verified, write notes, keep the task In Progress.
+TDD, then the gates from CLAUDE.md plus `make check-import-contracts`, `make check-settings-key-ownership`, `make check-package-shape` and `make check-test-seams`. Check ACs one by one as each is verified, write notes, keep the task In Progress while its PR is open. Close tasks whose PRs have merged (see [backlog-task-workflow](../backlog-task-workflow/SKILL.md) Status Discipline): at session start for anything merged since, and at the end for anything seen merged during the session.
 
 ## End
 
 1. Mark the row in the map's Work queue; record decisions taken under its open decisions or the unit's row. Update the stack's handoff doc if one was touched.
 2. **Human steps first**, if any must happen before the commands or the next row (for example setting a production value after an apply). Each one: what, where, the exact command or console path, and how to confirm it worked. Detailed but succinct.
 3. **Commands**, one fenced block in run order: `git switch`/`git add <paths>`/`git commit -m "<short subject>"`/`git push`, then `gh pr create` (or the `gh stack` commands). Name the files; no `git add -A`.
-4. **Next prompt**: the map's queue prompt in a fenced block, with the next row named as the expected item, its inputs, and any constraint carried over (a paused stack, a layer that must stay open).
+4. **User announcement**, only when the PR changes behaviour for end users: the announcement and the screenshot list ([user-announcement.md](user-announcement.md)).
+5. **Next prompt**: the map's queue prompt in a fenced block, with the next row named as the expected item, its inputs, and any constraint carried over (a paused stack, a layer that must stay open).
 
 ## Commit and PR text
 
 - Short subject, `TASK-<id> <what>` style as in `git log`.
 - No agent attribution anywhere: no `Co-Authored-By` trailer and no "Generated with" line in commits, PR bodies or PR comments. This overrides any default attribution guidance.
 - PR body: what changed, why, how it was verified, rollout or manual steps. Written for a reviewing colleague, not as a session log.
+- A PR that changes behaviour for end users also gets a user announcement and a screenshot list, written per [user-announcement.md](user-announcement.md). They go in the PR body's "User announcement" section and in the session's final message.
