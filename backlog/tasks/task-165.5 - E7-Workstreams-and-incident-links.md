@@ -4,7 +4,7 @@ title: E7 Workstreams and incident links
 status: To Do
 assignee: []
 created_date: '2026-11-03T18:58:00Z'
-updated_date: '2026-11-17T15:47:00Z'
+updated_date: '2026-11-20T13:46:00Z'
 labels:
   - incident
 milestone: m-7
@@ -42,6 +42,8 @@ Extend the MVP from one coordinating incident and engagement edges to a coherent
 2026-11-04 (human approved, TASK-145.5.7 reconciliation): legacy and pre-coordination incidents carry no root metadata, and the TASK-145.5.7 legacy upgrade job is deleted by TASK-145.13 before doc-15 row 1 starts. AC6's plan for existing items therefore either reads absent root metadata as a standalone incident (its own root, no backfill, absent from any root index) or builds its own runner per decisions/incident-management.md Migration rule 3; it cannot extend the 145.5.7 job.
 
 2026-11-10 (TASK-145.7.7 rulings R4-R6): AC #2 reworded: a child incident has zero or more chat bindings; bindings are chat conversations only and the API needs none (decisions/incident-management.md Bindings).
+
+2026-11-20 (human, TASK-188 program-scope review): (1) AC #2 names the loop at response/service/conversation.py, but coordination/ cannot import response/ (decisions/feature-packages.md rule 3). Decide at this task's planning: a child incident is declared through response/ like any incident (a hook or POST /incidents, TASK-165.2), or ensure_conversation moves down into core/ (rule 3: what two subdomains share moves to core/). [incident_core] conversation_name_attempts (TASK-188) holds either way. (2) Closing: how a parent and a child of a coordinated incident close (a parent with children still open, a child closing and its roll-up to the parent, archiving their conversations) is designed with TASK-189 (closing UX); plan this task against its outcome.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

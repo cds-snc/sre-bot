@@ -50,7 +50,6 @@ from features.incident.core.adapters.legacy_roles import GoogleDriveLegacyRolesR
 from features.incident.core.adapters.legacy_schedule import GoogleDrivePlacementScheduleLookup
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
-    CONVERSATION_NAME_ATTEMPTS,
     BindingKind,
     ConversationName,
     ConversationReference,
@@ -96,7 +95,6 @@ from features.incident.core.store import (
 logger = structlog.get_logger()
 
 __all__ = [
-    "CONVERSATION_NAME_ATTEMPTS",
     "BindingKind",
     "ConversationName",
     "ConversationReference",

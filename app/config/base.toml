@@ -214,6 +214,9 @@ full_read_max_items = 10000
 # Most revision-guarded writes one report timeline update (the 💾 capture) makes, each from
 # a fresh read; a lost guard or an unconfirmed write is recomputed without sleeping.
 timeline_update_attempts = 3
+# Most names an incident's conversation is tried under (the first, then -2 onward); the next
+# is tried only when the current one is proven another incident's or not the bot's.
+conversation_name_attempts = 5
 folder_id = ""
 report_template_id = ""
 list_sheet_id = ""

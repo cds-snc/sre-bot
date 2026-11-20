@@ -51,6 +51,7 @@ from features.incident.core.api import (
     VideoCallReference,
 )
 from features.incident.response.adapters.claims import ThreadedClaims
+from features.incident.response.service.conversation import name_claim_key
 from features.incident.response.service.declare import (
     ChatSurface,
     Declared,
@@ -92,6 +93,7 @@ POLICY = DeclarePolicy(
     policy_group_id="S0POLICY",
     notify_management_group_id="S0NOTIFY",
     notify_management_placement_id="F0NOTIFY",
+    conversation_name_attempts=5,
 )
 
 
@@ -363,6 +365,30 @@ class NoCreate(InMemoryIncidentConversation):
 
     async def create(self, name: ConversationName, *, private: bool) -> OperationResult[ConversationReference]:
         return OperationResult.transient_error("Slack create timed out")
+
+
+async def test_the_policys_name_bound_limits_the_candidates_declare_tries() -> None:
+    """With a bound of two and both names held by another incident, declare stops at two.
+
+    Real claims hold attempts 1 and 2 for another incident, so each is skipped
+    without a create; a third name would be free, so reaching it would create a
+    conversation. The stage failing with CONVERSATION_NAME_TAKEN and no conversation
+    created proves the policy's bound, not a default, reached the loop.
+    """
+    world = _world()
+    for attempt in (1, 2):
+        key = name_claim_key(SLACK_TENANT, ConversationName("Payments down", AT.date(), production=True, attempt=attempt))
+        held = await world.claims.claim(key)
+        assert held.claim_token is not None
+        await world.claims.complete(key, {"incident_id": "inc-other"}, held.claim_token)
+
+    declared = await _declare(world, policy=replace(POLICY, conversation_name_attempts=2))
+
+    assert declared.conversation.outcome is StageOutcome.FAILED
+    assert declared.conversation.error_code == ErrorCode.CONVERSATION_NAME_TAKEN
+    assert declared.incident.conversation is None
+    third = ConversationName("Payments down", AT.date(), production=True, attempt=3)
+    assert (await world.conversations.find_own(third)).data is None
 
 
 async def test_a_failing_conversation_leaves_an_open_incident_with_no_surface_and_writes_the_list_row() -> None:

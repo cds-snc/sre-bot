@@ -12,16 +12,20 @@ from datetime import date
 import pytest
 
 from features.incident.core.adapters.slack import slack_channel_name
-from features.incident.core.api import CONVERSATION_NAME_ATTEMPTS, ConversationName, incident_conversation_names
+from features.incident.core.api import ConversationName, incident_conversation_names
 
 pytestmark = pytest.mark.unit
 
 OPENED_ON = date(2026, 11, 10)
 _SLACK_NAME = re.compile(r"^[a-z0-9_-]{1,80}$")
+ATTEMPTS = 5
 
 
 def _rendered(title: str, *, production: bool = True) -> list[str]:
-    return [slack_channel_name(name) for name in incident_conversation_names(title, OPENED_ON, production=production)]
+    return [
+        slack_channel_name(name)
+        for name in incident_conversation_names(title, OPENED_ON, production=production, attempts=ATTEMPTS)
+    ]
 
 
 @pytest.mark.parametrize(("production", "prefix"), [(True, "incident-"), (False, "incident-dev-")])
@@ -62,7 +66,7 @@ def test_a_title_of_punctuation_only_still_names_a_channel() -> None:
 def test_every_attempt_is_a_valid_distinct_slack_name(title: str) -> None:
     names = _rendered(title)
 
-    assert len(names) == CONVERSATION_NAME_ATTEMPTS
+    assert len(names) == ATTEMPTS
     assert len(set(names)) == len(names)
     assert all(_SLACK_NAME.match(name) for name in names)
 
