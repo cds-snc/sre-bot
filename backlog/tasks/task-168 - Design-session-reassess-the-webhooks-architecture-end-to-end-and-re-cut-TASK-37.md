@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-20T15:23:00Z'
 labels:
   - architecture
   - webhooks
@@ -50,3 +50,31 @@ Invariants carried over (not reopened): nothing registers at import time and not
 
 2026-11-03 (from TASK-28.4's approved plan): TASK-28.4 lowers the import-time webhook pattern lines (registered_pattern, registered_notification_pattern, no_handlers_found_in_module) to DEBUG and deletes the dead modules/webhooks/patterns/examples.py (pattern_registration_success had no caller); they still print plain at import because structlog is unconfigured then, so AC #5's exclusion removal stays this task's.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T14:47:00Z
+
+---
+
+2026-11-20 inputs from TASK-36.2 planning (human-approved): (1) modules/webhooks/aws_sns.py:41,47 interpolate the builtin id ('<built-in function id>' in the ops text) and :36 logs the topic ARN as webhook_id: recorded legacy bug, kind (a) candidate, no pin asserts it. (2) SNS SignatureVersion 2 (SHA256, AWS-recommended: https://docs.aws.amazon.com/sns/latest/dg/sns-verify-signature-of-message.html) is rejected today (installed sns_message_validator accepts only '1'); pinned legacy_only; rule whether the rebuilt verifier accepts 1 and 2 (TASK-37.2 AC) and record it in security.md Webhooks. (3) duplicate _get_bot_client in modules/webhooks/base.py:21 and api/v1/routes/webhooks.py:27. (4) /api/v1/hook retention and the CRS scope-down covering only /hook/ (TASK-37.4 AC #6; decide on a production access-log check since 2026-11-03; record the bare /hook/{webhook_id} durable-URL statement in webhooks.md). (5) per-IP rate-limit bucket shared across webhook ids (legacy_only, ended by TASK-49). (6) bot-built SNS layouts are pinned by identifying facts only, so provisioned templates (organisation-content.md) may change layout without rewriting the pin.
+
+---
+
+created: 2026-11-20T15:18:00Z
+
+---
+
+2026-11-20 (TASK-36.2 implementation findings): F-A the email regex in integrations/slack/users.py:207 (replace_users_emails_with_mention) backtracks quadratically (32 KB of 'a' 1.2 s; ~80 s CPU for a body under the 256 KiB cap) on an unauthenticated synchronous route: follow-up fix proposed ahead of the rebuild. F-B rate-limit bucket is per sender address and path (TASK-49 comment). F-E/F-F on TASK-37.2.
+
+---
+
+created: 2026-11-20T15:23:00Z
+
+---
+
+2026-11-20: F-A is fixed ahead of the rebuild by TASK-190 (doc-11 row 20a).
+
+---
+<!-- COMMENTS:END -->

@@ -4,7 +4,7 @@ title: 'Webhooks slice 4: cutover and delete modules/webhooks'
 status: To Do
 assignee: []
 created_date: 2026-07-28 18:40
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-20T15:18:00Z'
 labels:
   - migration
   - webhooks
@@ -53,6 +53,7 @@ Verify: grep every importer of modules/webhooks and models/webhooks before delet
 - [ ] #4 TASK-36 smoke tests pass before and after cutover; deprecated-import and import-linter baselines shrank or held
 - [ ] #5 TASK-46 fingerprint emission and TASK-7 hardening are preserved on the new route (test)
 - [ ] #6 The WAF Common Rule Set scope-down and the body cap cover both webhook mount points (/hook/ and /api/v1/hook/), or the duplicate mount is dropped by decision; the TASK-163 edge test's public-by-decision set matches the outcome
+- [ ] #7 The TASK-36.2 pin harness is rewired at its named steps (mount_webhook_routes mounts through the plugin manager's register_routes as the edge route probe does; set_webhook_bot_state and the webhook_records fake move to the capability's fakes) with every assertion unchanged (test)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -60,3 +61,23 @@ Verify: grep every importer of modules/webhooks and models/webhooks before delet
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T14:47:00Z
+
+---
+
+2026-11-20 (TASK-36.2 OQ3/OQ6, human): AC #6's drop-the-duplicate-mount decision is taken on a production access-log check of /api/v1/hook since 2026-11-03 (TASK-163 opened it at the edge; before that the WAF allowed only /hook), run by the human; until then test_webhook_route_api_v1_mount_serves_route pins the mount. Dropping it is a migration.md step 4 named change.
+
+---
+
+created: 2026-11-20T15:18:00Z
+
+---
+
+2026-11-20 (TASK-36.2 finding F-G): tests/conftest.py replaces slack_bolt App.__init__ suite-wide with a MagicMock-client stub; the webhook pin harness restores the real constructor with unpatched_app_init (as build_bolt_app does). Keep that when rewiring the harness, or ops messages never reach the faked WebClient edge.
+
+---
+<!-- COMMENTS:END -->

@@ -25,10 +25,13 @@ test-seam guard (``make check-test-seams``) lists each seam in
 capabilities/ or modules/ target anywhere else (decisions/testing.md).
 """
 
+import base64
 import json
 import re
 from collections.abc import Callable, Coroutine, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from functools import lru_cache
 from types import ModuleType, SimpleNamespace
 from typing import Any, cast
 from urllib.parse import urlencode
@@ -37,9 +40,16 @@ import httplib2
 import i18n  # type: ignore
 import pluggy
 import pytest
+import requests_mock as requests_mock_module
 import structlog
 from boto3.dynamodb.types import TypeDeserializer, TypeSerializer
 from botocore.exceptions import ClientError
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.x509.oid import NameOID
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from googleapiclient.errors import HttpError
 from pydantic import SecretStr
 from slack_bolt import App, BoltRequest, BoltResponse
@@ -61,9 +71,13 @@ from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
 from features.incident.scribe import service as incident_scribe_service
+from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
 from infrastructure.records.in_memory import InMemoryRecordStore
+from infrastructure.security import get_limiter
 from infrastructure.spreadsheets import get_spreadsheet_provider
+from integrations.aws.settings import get_aws_settings
 from integrations.google_workspace import client as google_workspace_client
+from integrations.notify.settings import get_notify_settings
 from integrations.sentinel import client as sentinel_client
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
@@ -71,10 +85,12 @@ from integrations.slack.settings import SlackSettings
 from models.incidents import Incident
 from modules.slack import webhooks as legacy_webhooks
 from modules.sre.platforms import slack as sre_slack
+from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from packages.aws_platform.adapters import dynamodb as dynamodb_adapter
 from packages.rant.adapters.slack import SlackUserIdentityLookup
 from packages.rant.platforms import slack as rant_slack
 from server.lifespan import _register_legacy_handlers, _register_legacy_slack_commands
+from server.server import create_app
 from server.slack.settings import get_slack_transport_settings
 from tests.factories.incident import GOOGLE_TENANT, SLACK_TENANT, incident_scopes, seed_legacy_incident
 from tests.factories.slack_bolt import FakeSlackClient, InlineExecutor, authorize_single_workspace, unpatched_app_init
@@ -990,3 +1006,308 @@ def submission_payload(view: dict[str, Any], answers: dict[str, str | None]) -> 
             "state": {"values": values},
         },
     }
+
+
+# The webhook route: POST /hook/{webhook_id} through the production app, over faked external edges.
+
+WEBHOOK_ID = "5e6f7a8b-9c0d-4e1f-a2b3-c4d5e6f7a8b9"
+WEBHOOK_CHANNEL = "C0WEBHOOK"
+WEBHOOK_SENDER_IP = "203.0.113.7"
+OPS_CHANNEL_ID = "C0OPSROOM"
+NOTIFY_LEAK_CHANNEL_ID = "C0NOTIFYLEAK"
+NOTIFY_ONCALL_GROUP_ID = "S0NOTIFYONCALL"
+SNS_CERT_URL = "https://sns.ca-central-1.amazonaws.com/SimpleNotificationService-test.pem"
+SNS_SUBSCRIBE_URL = "https://sns.ca-central-1.amazonaws.com/?Action=ConfirmSubscription&Token=token-1"
+SNS_TOPIC_ARN = "arn:aws:sns:ca-central-1:123456789012:sre-alerts"
+SNS_TIMESTAMP = "2026-11-20T12:00:00.000Z"
+_SNS_CONFIRMATION_TYPES = ("SubscriptionConfirmation", "UnsubscribeConfirmation")
+
+
+class FakeWebhooksDynamoDbClient:
+    """In-memory stand-in for the boto3 DynamoDB client the webhooks table adapter wraps.
+
+    Serves ``get_item`` by id and the ``SET <counter> = if_not_exists(...) + :inc`` counter
+    update. ``read_error`` and ``counter_error`` are raised by the matching request, the
+    way a throttled or rejected table answers.
+    """
+
+    def __init__(self) -> None:
+        self.items: dict[str, dict[str, Any]] = {}
+        self.reads = 0
+        self.read_error: ClientError | None = None
+        self.counter_error: ClientError | None = None
+
+    def get_item(self, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["TableName"] == "webhooks"
+        self.reads += 1
+        if self.read_error is not None:
+            raise self.read_error
+        item = self.items.get(kwargs["Key"]["id"]["S"])
+        return {"Item": dict(item)} if item is not None else {}
+
+    def update_item(self, **kwargs: Any) -> dict[str, Any]:
+        assert kwargs["TableName"] == "webhooks"
+        if self.counter_error is not None:
+            raise self.counter_error
+        counter = re.match(r"SET (\w+) = if_not_exists", kwargs["UpdateExpression"])
+        assert counter is not None, kwargs["UpdateExpression"]
+        item = self.items[kwargs["Key"]["id"]["S"]]
+        current = int(item.get(counter.group(1), {"N": "0"})["N"])
+        item[counter.group(1)] = {"N": str(current + 1)}
+        return {}
+
+
+class WebhookRecords:
+    """The webhook records the route looks up and counts, seeded and read back through domain values."""
+
+    def __init__(self, client: FakeWebhooksDynamoDbClient) -> None:
+        self._client = client
+
+    def seed(
+        self,
+        webhook_id: str = WEBHOOK_ID,
+        *,
+        channel: str = WEBHOOK_CHANNEL,
+        active: bool = True,
+        hook_type: str | None = "alert",
+    ) -> None:
+        """Add one webhook; ``hook_type=None`` stores a record without the attribute, as older webhooks are."""
+        item: dict[str, Any] = {
+            "id": {"S": webhook_id},
+            "channel": {"S": channel},
+            "name": {"S": "pinned webhook"},
+            "active": {"BOOL": active},
+            "invocation_count": {"N": "0"},
+        }
+        if hook_type is not None:
+            item["hook_type"] = {"S": hook_type}
+        self._client.items[webhook_id] = item
+
+    def invocation_count(self, webhook_id: str = WEBHOOK_ID) -> int:
+        """How many times the route counted an invocation of ``webhook_id``."""
+        return int(self._client.items[webhook_id]["invocation_count"]["N"])
+
+    @property
+    def reads(self) -> int:
+        """How many lookups reached the store."""
+        return self._client.reads
+
+    def fail_reads(self, code: str) -> None:
+        """Make every later lookup fail with the AWS error ``code``."""
+        self._client.read_error = ClientError({"Error": {"Code": code, "Message": f"{code} from the table"}}, "GetItem")
+
+    def fail_counter_writes(self, code: str) -> None:
+        """Make every later invocation-counter write fail with the AWS error ``code``."""
+        self._client.counter_error = ClientError({"Error": {"Code": code, "Message": f"{code} from the table"}}, "UpdateItem")
+
+
+@lru_cache(maxsize=1)
+def _sns_signing_material() -> tuple[rsa.RSAPrivateKey, bytes]:
+    """A test RSA key and the PEM of a self-signed certificate for it, built once per process.
+
+    The SNS validator caches the certificate it fetches by URL for the life of the
+    process, so every test must sign with the same key.
+    """
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "sns.test")])
+    issued = datetime(2026, 1, 1, tzinfo=UTC)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(issued)
+        .not_valid_after(issued + timedelta(days=3650))
+        .sign(key, hashes.SHA256())
+    )
+    return key, certificate.public_bytes(serialization.Encoding.PEM)
+
+
+class SnsSigner:
+    """Builds AWS SNS HTTP messages signed over the canonical string the way SNS signs them."""
+
+    def message(
+        self,
+        message_type: str = "Notification",
+        *,
+        message: str,
+        subject: str | None = None,
+        topic_arn: str = SNS_TOPIC_ARN,
+        signature_version: str = "1",
+        signing_cert_url: str = SNS_CERT_URL,
+        digest: hashes.HashAlgorithm | None = None,
+    ) -> dict[str, str]:
+        """A signed SNS message of ``message_type``; ``digest`` defaults to SHA1, the SignatureVersion 1 hash."""
+        fields = {
+            "Type": message_type,
+            "MessageId": "6f1b2c3d-0000-4000-8000-000000000001",
+            "TopicArn": topic_arn,
+            "Message": message,
+            "Timestamp": SNS_TIMESTAMP,
+            "SignatureVersion": signature_version,
+            "SigningCertURL": signing_cert_url,
+        }
+        if subject is not None:
+            fields["Subject"] = subject
+        if message_type in _SNS_CONFIRMATION_TYPES:
+            fields["Token"] = "token-1"
+            fields["SubscribeURL"] = SNS_SUBSCRIBE_URL
+        key, _ = _sns_signing_material()
+        # SignatureVersion 1 is SHA1 by definition; the route's validator verifies exactly this.
+        algorithm = digest or hashes.SHA1()  # noqa: S303
+        signature = key.sign(self._canonical(fields).encode(), padding.PKCS1v15(), algorithm)
+        return {**fields, "Signature": base64.b64encode(signature).decode()}
+
+    @staticmethod
+    def _canonical(fields: dict[str, str]) -> str:
+        if fields["Type"] in _SNS_CONFIRMATION_TYPES:
+            names = ("Message", "MessageId", "SubscribeURL", "Timestamp", "Token", "TopicArn", "Type")
+        elif "Subject" in fields:
+            names = ("Message", "MessageId", "Subject", "Timestamp", "TopicArn", "Type")
+        else:
+            names = ("Message", "MessageId", "Timestamp", "TopicArn", "Type")
+        return "".join(f"{name}\n{fields.get(name)}\n" for name in names)
+
+
+@dataclass
+class SnsEdges:
+    """The signer and the HTTP edge SNS validation and subscription confirmation reach."""
+
+    signer: SnsSigner
+    http: requests_mock_module.Mocker
+
+    @property
+    def subscribe_requests(self) -> list[Any]:
+        """The GETs made to the SNS ``SubscribeURL``."""
+        return [request for request in self.http.request_history if request.url == SNS_SUBSCRIBE_URL]
+
+
+@pytest.fixture
+def sns(requests_mock: requests_mock_module.Mocker) -> SnsEdges:
+    """Real SNS signing over a faked HTTP edge: the signing certificate URL and the ``SubscribeURL``.
+
+    The route's signature validation runs unmodified against a test key; only the two
+    SNS hosts it fetches are answered. Any other outbound ``requests`` call is an error.
+    """
+    _, certificate = _sns_signing_material()
+    requests_mock.get(SNS_CERT_URL, content=certificate)
+    requests_mock.get(SNS_SUBSCRIBE_URL, text="confirmed")
+    return SnsEdges(signer=SnsSigner(), http=requests_mock)
+
+
+def mount_webhook_routes(app: FastAPI) -> None:
+    """Harness step: serve the webhook route on the production app.
+
+    A no-op today: ``create_app()`` includes the legacy routers, which serve the route at
+    ``/hook/{webhook_id}`` and ``/api/v1/hook/{webhook_id}``. Owning rebuild task:
+    TASK-37.4, which removes the legacy router and rewires this step to the plugin
+    manager's ``register_routes``, as the edge route probe does; assertions stay unchanged.
+    """
+
+
+def set_webhook_bot_state(app: FastAPI) -> None:
+    """Harness step: give the app the Slack bot state the route reads, as the lifespan does (``app.state.bot``).
+
+    Owning rebuild task: TASK-37.4, which rewires this step to the state the rebuilt
+    route reads. The client is a real ``WebClient``; its requests are routed to the
+    Slack fake by ``routed_slack_client``.
+    """
+    app.state.bot = SimpleNamespace(client=WebClient(token="xoxb-test"))
+
+
+@pytest.fixture(autouse=True)
+def reset_webhook_process_state() -> Iterator[None]:
+    """Clear the process-wide state the webhook route leaves behind: the rate-limit counters and cached settings."""
+    getters = (get_sre_ops_settings, get_notify_api_key_leak_settings, get_notify_settings, get_aws_settings)
+    for getter in getters:
+        getter.cache_clear()
+    get_limiter().reset()
+    yield
+    get_limiter().reset()
+    for getter in getters:
+        getter.cache_clear()
+
+
+class WebhookSurface:
+    """The production app serving ``POST /hook/{webhook_id}``, with its external edges faked.
+
+    ``records`` is the webhook store, ``slack`` the Slack Web API (every ``chat.postMessage``
+    of the route, the ops channel and the notify channel lands on it) and
+    ``sentinel_events`` what reached Sentinel.
+    """
+
+    def __init__(self, client: TestClient, records: WebhookRecords, edges: RoutedSlackEdges) -> None:
+        self.client = client
+        self.records = records
+        self.slack = edges.client
+        self.sentinel_events = edges.sentinel_events
+
+    def post(
+        self,
+        body: Any,
+        webhook_id: str = WEBHOOK_ID,
+        *,
+        prefix: str = "/hook",
+        headers: dict[str, str] | None = None,
+    ) -> Any:
+        """POST ``body`` as JSON to the route."""
+        return self.client.post(f"{prefix}/{webhook_id}", json=body, headers=headers)
+
+    def post_content(self, content: bytes | str, webhook_id: str = WEBHOOK_ID, *, headers: dict[str, str] | None = None) -> Any:
+        """POST a raw request body, so a test controls exactly what is on the wire."""
+        return self.client.post(f"/hook/{webhook_id}", content=content, headers=headers)
+
+    def remove_bot(self) -> None:
+        """Start the app without the Slack bot, as when the lifespan found no Slack provider."""
+        self.client.app.state.bot = None  # type: ignore[attr-defined]
+
+    def channel_posts(self, channel: str) -> list[dict[str, Any]]:
+        """Every message posted to ``channel``, in order."""
+        return [kwargs for name, kwargs in self.slack.calls if name == "chat_postMessage" and kwargs.get("channel") == channel]
+
+    @property
+    def webhook_posts(self) -> list[dict[str, Any]]:
+        """The messages posted to the webhook's channel."""
+        return self.channel_posts(WEBHOOK_CHANNEL)
+
+    @property
+    def ops_messages(self) -> list[str]:
+        """The texts posted to the ops channel."""
+        return [post["text"] for post in self.channel_posts(OPS_CHANNEL_ID)]
+
+    @property
+    def all_posts(self) -> list[dict[str, Any]]:
+        """Every ``chat.postMessage`` the request made, whatever the channel."""
+        return [kwargs for name, kwargs in self.slack.calls if name == "chat_postMessage"]
+
+    def sentinel_event_names(self) -> list[str]:
+        """The names of the events that reached Sentinel."""
+        return [event["event"] for event in self.sentinel_events]
+
+
+@pytest.fixture
+def webhook_surface(routed_slack_client: RoutedSlackEdges, monkeypatch: pytest.MonkeyPatch) -> WebhookSurface:
+    """The production app, built without its lifespan, serving the webhook route over faked edges.
+
+    The edges are the boto3 DynamoDB client under the webhooks table adapter, the
+    Slack Web API and Sentinel (``routed_slack_client``), and the typed settings the
+    ops channel and the API-key-leak response read, set the way the suite sets any
+    slice. The lifespan is not run (it would post startup messages and boot plugins
+    the route never reaches), so the routes and the ``app.state`` the route reads are
+    named harness steps, ``mount_webhook_routes`` and ``set_webhook_bot_state``,
+    rewired at TASK-37.4. ``slack_bolt``'s own ``App`` constructor is restored because
+    the ops message helper builds a Bolt app to reach its client.
+    """
+    table = FakeWebhooksDynamoDbClient()
+    monkeypatch.setattr(dynamodb_adapter, "get_aws_client", lambda *args, **kwargs: table)
+    monkeypatch.setattr(App, "__init__", unpatched_app_init())
+    monkeypatch.setenv("SRE_OPS__SRE_OPS_CHANNEL_ID", OPS_CHANNEL_ID)
+    monkeypatch.setenv("NOTIFY_API_KEY_LEAK__CHANNEL_ID", NOTIFY_LEAK_CHANNEL_ID)
+    monkeypatch.setenv("NOTIFY_API_KEY_LEAK__ONCALL_GROUP_ID", NOTIFY_ONCALL_GROUP_ID)
+    for getter in (get_sre_ops_settings, get_notify_api_key_leak_settings):
+        getter.cache_clear()
+    app = create_app()
+    mount_webhook_routes(app)
+    set_webhook_bot_state(app)
+    return WebhookSurface(TestClient(app, client=(WEBHOOK_SENDER_IP, 50000)), WebhookRecords(table), routed_slack_client)

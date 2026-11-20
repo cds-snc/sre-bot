@@ -88,7 +88,7 @@ Totals: 18 actions, 11 views and 4 events, 33 interactions in all.
 
 | Surface | Defined at | Registration | Target | Rebuild ticket | Pinned by |
 | --- | --- | --- | --- | --- | --- |
-| `POST /hook/{webhook_id}`, served at both `/hook/...` and `/api/v1/hook/...` | `api/v1/routes/webhooks.py:41` (mounted in `api/v1/router.py`) | FastAPI route | `app/capabilities/webhooks/` | TASK-37 (cutover TASK-37.4); app/api/ removal TASK-53 | not yet — TASK-36.2 (partial: `tests/api/v1/test_webhooks.py`) |
+| `POST /hook/{webhook_id}`, served at both `/hook/...` and `/api/v1/hook/...` | `api/v1/routes/webhooks.py:41` (mounted in `api/v1/router.py`) | FastAPI route | `app/capabilities/webhooks/` | TASK-37 (cutover TASK-37.4); app/api/ removal TASK-53 | `test_webhook_route_lookup_surface.py`, `test_webhook_route_payload_surface.py` and `test_webhook_route_aws_sns_surface.py`; behaviour the rebuild ends: `-k legacy_only_webhook` |
 
 ## Scheduled job entry points
 

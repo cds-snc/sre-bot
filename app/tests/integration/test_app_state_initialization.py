@@ -107,6 +107,11 @@ def test_app_state_bot_may_be_none_but_exists(app_with_lifespan):
         "app.state.bot attribute missing. Routes cannot safely check getattr(app.state, 'bot', None) if attribute doesn't exist."
     )
 
+    # when a bot exists, the routes that post to Slack read bot.client
+    bot = app_with_lifespan.app.state.bot
+    if bot is not None:
+        assert hasattr(bot, "client"), "app.state.bot exists but has no 'client' attribute; routes reading bot.client would fail."
+
 
 @pytest.mark.integration
 def test_app_routes_respond_without_crashes(app_with_lifespan):
