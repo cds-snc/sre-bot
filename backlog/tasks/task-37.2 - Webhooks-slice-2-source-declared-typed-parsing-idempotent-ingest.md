@@ -3,8 +3,8 @@ id: TASK-37.2
 title: 'Webhooks slice 2: source-declared typed parsing + idempotent ingest'
 status: To Do
 assignee: []
-created_date: '2026-07-28 18:39'
-updated_date: '2026-10-14 17:46'
+created_date: 2026-07-28 18:39
+updated_date: '2026-11-20T15:18:00Z'
 labels:
   - migration
   - webhooks
@@ -20,7 +20,7 @@ references:
   - decisions/webhooks.md
   - decisions/plugins.md
   - decisions/reliability.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1377'
+  - https://github.com/cds-snc/sre-bot/issues/1377
   - decisions/plugin-architecture.md
 parent_task_id: TASK-37
 priority: high
@@ -57,13 +57,16 @@ Verify: that every live webhook_id can be assigned a source from TASK-46 data; w
 - [ ] #4 An unclassified sender still succeeds via the generic/simple-text fallback source and is flagged for migration (test)
 - [ ] #5 SNS signature verification in all environments and generic non-leaking 5xx bodies from TASK-7 are preserved (test)
 - [ ] #6 Webhook URLs and behaviour are unchanged for known senders: TASK-36 smoke tests pass before and after
+- [ ] #7 The SNS verifier accepts SignatureVersion 1 (SHA1) and 2 (SHA256) per TASK-168's ruling, ending the TASK-36.2 test_legacy_only_ SignatureVersion 2 row (test)
 <!-- AC:END -->
 
 ## Comments
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-17 20:48
+
 ---
+
 2026-09-17, from planning TASK-25.2.5.4 - a guard this task needs and cannot see from its own description.
 
 This is the FIRST production consumer of the idempotency store for DEDUP rather than for a lease. Verified 2026-09-17: get_idempotency_store() has no production caller today; every live claim() goes through the lease helpers.
@@ -73,10 +76,22 @@ That matters because the store's read-failure policy is about to become use-depe
 TASK-100 flips that policy to fail-OPEN for the lease use, which is correct there for the opposite reason (the job body is idempotent, so failing closed just skips a scheduled period). Its AC#3 requires the dedup use to keep fail-closed and the two policies to be an explicit choice rather than one shared default - but if this task lands first and simply calls claim(), whichever default exists at the time is inherited silently.
 
 ACTION FOR THIS TASK'S PLANNER: state explicitly which read-failure policy the webhook ingest claim uses, and assert it rather than inheriting it. TASK-58 is where the per-use choice naturally lives (it builds the idempotency and lease facades over the one primitive); a comment there records the split. No dependency wired in either direction - just do not assume the default.
+
 ---
 
 created: 2026-09-18 15:27
+
 ---
+
 2026-09-18 (human decision): TASK-58 is now a real dependency, replacing the advisory comment of 2026-09-17. TASK-58 builds the dedup facade with an explicit fail-closed read-failure policy, and this task's ingest claim consumes that facade. The claim therefore cannot inherit whatever default exists at the time. Order agreed for the primitive: TASK-102, then TASK-58, then TASK-100.
+
+---
+
+created: 2026-11-20T15:18:00Z
+
+---
+
+2026-11-20 (TASK-36.2 findings): F-E equal-priority SNS patterns tie-break by os.listdir order at import (machine-dependent); the pin accepts either winner. F-F budget_auto_adjustment matches but returns no blocks, so the route answers 400 and SNS retries; pinned test_legacy_only_. Retry-After rounding is unreachable at the edge (int setting).
+
 ---
 <!-- COMMENTS:END -->

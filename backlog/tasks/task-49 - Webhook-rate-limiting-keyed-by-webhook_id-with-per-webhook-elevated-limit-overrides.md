@@ -5,8 +5,8 @@ title: >-
   overrides
 status: To Do
 assignee: []
-created_date: '2026-07-24 15:02'
-updated_date: '2026-10-13 13:42'
+created_date: 2026-07-24 15:02
+updated_date: '2026-11-20T15:18:00Z'
 labels:
   - security
   - phase-4
@@ -19,7 +19,7 @@ references:
   - decisions/webhooks.md
   - decisions/security.md
   - decisions/configuration.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1344'
+  - https://github.com/cds-snc/sre-bot/issues/1344
   - decisions/plugin-architecture.md
 priority: medium
 ordinal: 73000
@@ -58,7 +58,18 @@ Steps:
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-07-28 18:41
+
 ---
+
 Settings home is the package-partitioned WebhookSettings / Webhook record (decisions/webhooks.md, decisions/configuration.md), not a central SecuritySettings aggregator. The rate-limited route lives in app/packages/webhooks/interactions/http.py after the TASK-37.4 cutover. Deps unchanged: TASK-47 + TASK-3.
+
+---
+
+created: 2026-11-20T15:18:00Z
+
+---
+
+2026-11-20 (TASK-36.2 finding F-B): the legacy limiter (slowapi default key style) buckets per sender address AND URL path, not per address across webhook ids: each webhook id already has its own bucket, and /hook/x and /api/v1/hook/x are separate buckets. Pinned: durable per-id bucket; test_legacy_only_ per-sender-address bucket. Design the webhook_id key against this.
+
 ---
 <!-- COMMENTS:END -->

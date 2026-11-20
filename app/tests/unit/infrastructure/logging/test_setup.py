@@ -546,3 +546,17 @@ class TestBootstrapThenConfigure:
         logging_setup.configure_bootstrap_logging()
 
         assert logging.getLogger().handlers == before
+
+
+@pytest.mark.unit
+def test_signing_indicator_field_not_redacted_in_pipeline():
+    """The boolean ``signing_indicator_present`` field passes the redaction processor unchanged."""
+    processors = _build_base_processors(logging_settings=LoggingSettings())
+
+    with capture_logs(processors=processors) as entries:
+        logger = structlog.get_logger()
+        logger.info("webhook_invocation", signing_indicator_present=True)
+
+    assert len(entries) == 1
+    assert entries[0]["signing_indicator_present"] is True
+    assert entries[0]["signing_indicator_present"] != "***REDACTED***"

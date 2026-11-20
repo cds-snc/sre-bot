@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-10-27T20:32:00Z'
+updated_date: '2026-11-20T14:47:00Z'
 labels:
   - clients
   - phase-3
@@ -71,6 +71,14 @@ created: 2026-10-27T20:32:00Z
 ---
 
 2026-10-27 (TASK-111.12 planning): depends on TASK-171. If 171 rules the Sentinel integration deleted, this task closes as superseded; if rebuilt, the contract applies to the Logs Ingestion client.
+
+---
+
+created: 2026-11-20T14:47:00Z
+
+---
+
+2026-11-20 (TASK-36.2, human): add the TASK-36.2 webhook pin (tests/integration/legacy_surface/test_webhook_route_*_surface.py, Sentinel webhook_sent asserted at send_event) to the consumer re-grep; rewire its fixture, assertions unchanged.
 
 ---
 <!-- COMMENTS:END -->
