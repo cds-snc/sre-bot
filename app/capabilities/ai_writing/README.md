@@ -2,11 +2,28 @@
 
 A language model writes text (a summary, a draft, a template filled section by section) from a
 source and the caller's instructions, in feature-free vocabulary: the caller supplies the source
-(a transcript, a draft), the instructions and any post-processing. `api.py` exposes the `AIWriter`
-Protocol (`is_available()`, and async `write(source, *, instructions, max_output_tokens,
-temperature=None)` returning an `OperationResult[str]`) and the provider `get_ai_writer()`.
+(a document, a draft, a message log), the instructions and any post-processing. `api.py` exposes
+the `AIWriter` Protocol and the provider `get_ai_writer()`:
+
+- `is_available()`;
+- async `write(source, *, instructions, max_output_tokens, temperature=None)` returning an
+  `OperationResult[str]`;
+- async `fill_template(source, *, sections, instructions, max_output_tokens, temperature=None,
+  fields=())` returning an `OperationResult[FilledTemplate]`: one `TemplateAnswer` per requested
+  `TemplateSection` and `TemplateField` in order (`""` when unanswered), and `truncated` when the
+  model's answer was cut off and only its complete pairs were kept. The caller's instructions ask
+  for one JSON object keyed by heading; the capability renders the request (sections, fields, then
+  the source last and verbatim) and reads the answer forgivingly (code fences, prose around it,
+  list values, heading drift). Nothing usable is a permanent `AI_WRITING_UNPARSEABLE`.
+
 Every caller states its own completion budget; a temperature is sent only when the call sets one,
-since some models reject the parameter outright.
+since some models reject the parameter outright. `extract_json_object(raw)` is the strict first
+stage alone (the first complete JSON object, never coerced or salvaged) for a caller that refuses
+any partial answer. `service.py` holds the template fill; every adapter delegates to it, so writers
+differ only in how `write` reaches a model.
+
+Logs carry the answer's shape only (lengths, counts, whether an object was found): source text and
+model output are content and are never logged (decisions/observability.md).
 
 That is its only purpose. Any other AI use (classifying, extracting, searching) is a separate
 capability named for its purpose, sharing the vendor integration; adding it to import-linter

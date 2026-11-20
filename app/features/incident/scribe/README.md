@@ -78,7 +78,8 @@ service.py                platform-agnostic; no Slack, HTTP or Google SDK import
 - `core/adapters/google_docs.py` — the umbrella's Google Docs and Drive
   adapter behind `IncidentReport` (Docs read + Drive copy + Docs populate); the scribe package itself
   imports no Google code. `service.py` imports the AI writing capability's
-  `api.py` and `entrypoints/slack.py` the transport models, both by design.
+  `api.py` (the draft is one `fill_template` call: the capability renders the
+  sections and metadata fields, reads the JSON answer and matches headings) and `entrypoints/slack.py` the transport models, both by design.
 - `settings.py` — partitioned feature settings, one class and one cached getter
   per use case.
 - `locales/` — EN/FR message catalogues, one pair per use case. One
@@ -315,10 +316,11 @@ abbreviation follows DST because the setting names a zone rather than an offset.
 
 The timeline answer is normalised before it is written, because "one event per
 line" is an instruction models reshape: a JSON array (or an array of
-`{"time": …, "text": …}` objects) is joined back into lines, and a timeline run
-together into one paragraph is re-split at each timestamp. Without this a
-whole incident arrived as a single entry, or — for array answers — was dropped
-by the string-only parse and left the section looking unanswered.
+`{"time": …, "text": …}` objects) is joined back into lines by the AI writing
+capability's template fill, and a timeline run together into one paragraph is
+re-split here at each timestamp. Without this a whole incident arrived as a
+single entry, or — for array answers — was dropped by a string-only parse and
+left the section looking unanswered.
 
 These label lines are normalised to **ordinary body text** — the six fields
 above plus the Impact section's `End-users`, `CDS Staff`,
@@ -410,9 +412,10 @@ Two exceptions:
 
 - **Nothing usable, nothing written.** When no key/value pair can be recovered
   at all, the run fails with `DRAFT_UNPARSEABLE` rather than producing an empty
-  document. The failure logs the response length and a preview, because an
-  empty completion, prose instead of JSON, and a cutoff otherwise look
-  identical.
+  document. The capability's `ai_writing_fill_unparseable` event logs the
+  response's shape (length, whether an object or a code fence was found),
+  never its text, because an empty completion, prose instead of JSON, and a
+  cutoff otherwise look identical (decisions/observability.md).
 
 `openai_write_truncated` records the budget and how much came back — the
 number to look at before raising `INCIDENT_DRAFT__MAX_OUTPUT_TOKENS`, since a

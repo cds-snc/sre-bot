@@ -6,7 +6,9 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import pytest
+from structlog.testing import capture_logs
 
+from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
 from contracts.operations import OperationResult, OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.api import DocumentSection, DraftWriteResult, ReportReference, SectionDraft, TranscriptMessage
@@ -20,7 +22,6 @@ from features.incident.scribe.service import (
     NO_ANSWERS_CODE,
     _collapse_pr_references,
     _format_time,
-    _parse_answers,
     _resolve_pr_links,
     draft_incident_document,
 )
@@ -37,32 +38,9 @@ _MESSAGES = [
 _REPORT = ReportReference(system=WorkplaceSystem.GOOGLE, tenant="C0GOOGLE", vendor_id="D1")
 
 
-class _StubSummarizer:
-    """Minimal ``AIWriter`` stub capturing what it receives."""
-
-    def __init__(self, result: OperationResult[str]) -> None:
-        self._result = result
-        self.received_payload: str | None = None
-        self.received_instructions: str | None = None
-        self.received_max_output_tokens: int | None = None
-        self.calls = 0
-
-    def is_available(self) -> bool:
-        return True
-
-    async def write(
-        self,
-        transcript: str,
-        *,
-        instructions: str | None = None,
-        max_output_tokens: int,
-        temperature: float | None = None,
-    ) -> OperationResult[str]:
-        self.calls += 1
-        self.received_payload = transcript
-        self.received_instructions = instructions
-        self.received_max_output_tokens = max_output_tokens
-        return self._result
+def _StubSummarizer(result: OperationResult[str]) -> InMemoryAIWriter:
+    """The capability's in-memory writer answering ``result`` to every write, recording each call."""
+    return InMemoryAIWriter(result=result)
 
 
 class _StubIncidentReport:
@@ -113,7 +91,7 @@ class TestDraftIncidentDocument:
 
         assert result.status == OperationStatus.PERMANENT_ERROR
         assert result.error_code == DOCUMENT_UNREADABLE_CODE
-        assert summarizer.calls == 0
+        assert summarizer.calls == []
 
     @pytest.mark.asyncio
     async def test_empty_history_returns_permanent_error_without_calling_summarizer(self):
@@ -124,7 +102,7 @@ class TestDraftIncidentDocument:
 
         assert result.status == OperationStatus.PERMANENT_ERROR
         assert result.error_code == EMPTY_HISTORY_CODE
-        assert summarizer.calls == 0
+        assert summarizer.calls == []
 
     @pytest.mark.asyncio
     async def test_summarizer_error_keeps_its_status_code_and_retry_hint(self):
@@ -147,7 +125,7 @@ class TestDraftIncidentDocument:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        payload = summarizer.received_payload or ""
+        payload = summarizer.calls[-1].source
         assert "### Trigger" in payload
         assert "Instructions: Describe what caused the incident to begin." in payload
         assert "Ada: prod is down, 500s on checkout" in payload
@@ -196,7 +174,7 @@ class TestDraftIncidentDocument:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        assert summarizer.received_max_output_tokens == 4000
+        assert summarizer.calls[-1].max_output_tokens == 4000
 
     @pytest.mark.asyncio
     async def test_json_wrapped_in_prose_is_parsed(self):
@@ -233,15 +211,6 @@ class TestDraftIncidentDocument:
         assert result.error_code == DRAFT_UNPARSEABLE_CODE
         assert documents.created_drafts is None
 
-    def test_salvage_still_recovers_escaped_characters(self):
-        """Salvage feeds the truncation diagnostics, so it must stay correct."""
-        truncated = '{"Trigger": "A \\"bad\\" deploy.\\nRolled back.", "Impact": "Checkout'
-
-        answers, was_truncated = _parse_answers(truncated)
-
-        assert was_truncated is True
-        assert answers == {"Trigger": 'A "bad" deploy.\nRolled back.'}
-
     @pytest.mark.asyncio
     async def test_code_fenced_json_is_parsed(self):
         fenced = '```json\n{"Trigger": "A bad deploy."}\n```'
@@ -263,6 +232,32 @@ class TestDraftIncidentDocument:
         assert result.status == OperationStatus.PERMANENT_ERROR
         assert result.error_code == DRAFT_UNPARSEABLE_CODE
         assert documents.created_drafts is None
+
+    @pytest.mark.asyncio
+    async def test_unparseable_output_logs_no_transcript_or_model_text(self):
+        """The model's words and the channel's never reach the logs, only the answer's shape."""
+        documents = _StubIncidentReport(sections=_sections())
+        summarizer = _StubSummarizer(OperationResult.success(data="Sorry, the checkout outage is beyond me"))
+
+        with capture_logs() as events:
+            result = await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
+
+        assert result.error_code == DRAFT_UNPARSEABLE_CODE
+        assert events
+        assert not [e for e in events if "checkout" in repr(e)]
+
+    @pytest.mark.asyncio
+    async def test_metadata_answers_are_not_reported_as_unmatched_keys(self):
+        """A fully answered draft with its metadata fields logs no coverage warning."""
+        answer = {"Trigger": "A deploy.", "Impact": "Checkout.", "Detection": "Alarm.", "On-call": "Ada"}
+        documents = _StubIncidentReport(sections=_sections())
+        summarizer = _StubSummarizer(OperationResult.success(data=json.dumps(answer)))
+
+        with capture_logs() as events:
+            result = await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
+
+        assert result.is_success
+        assert [e for e in events if e["event"] == "ai_writing_fill_coverage"] == []
 
     @pytest.mark.asyncio
     async def test_all_blank_answers_return_no_answers_without_creating(self):
@@ -378,19 +373,6 @@ class TestTruncationNeverDestroysContent:
         assert result.is_success
         assert documents.created_drafts is not None
 
-    @pytest.mark.asyncio
-    def test_clean_json_is_not_flagged_as_truncated(self):
-        answers, was_truncated = _parse_answers('{"Trigger": "A bad deploy."}')
-
-        assert was_truncated is False
-        assert answers == {"Trigger": "A bad deploy."}
-
-    def test_prose_wrapped_json_is_not_flagged_as_truncated(self):
-        answers, was_truncated = _parse_answers('Here you go:\n{"Trigger": "A bad deploy."}\nHope that helps.')
-
-        assert was_truncated is False
-        assert answers == {"Trigger": "A bad deploy."}
-
 
 class TestMetadataFieldInference:
     """Times come from the model; authors are derived; the rest is left alone."""
@@ -466,7 +448,7 @@ class TestMetadataFieldInference:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        payload = summarizer.received_payload or ""
+        payload = summarizer.calls[-1].source
         assert "Metadata fields:" in payload
         assert "- Detection time" in payload
 
@@ -562,7 +544,7 @@ class TestHumanOnlySections:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        assert heading not in (summarizer.received_payload or "")
+        assert heading not in summarizer.calls[-1].source
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("heading", _SKIPPED)
@@ -605,7 +587,7 @@ class TestHumanOnlySections:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         for gone in ("five whys", "What went wrong", "Where we got lucky", "root-cause section"):
             assert gone not in instructions
 
@@ -689,7 +671,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         assert "Never return an array." in instructions
         assert "separate them with newline characters" in instructions
 
@@ -706,7 +688,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         timeline_clause = instructions[instructions.index("## TIMELINE") : instructions.index("## ACTION ITEMS")]
         assert timeline_clause.index("MUST hold") < timeline_clause.index("exactly as written")
         assert "10-15 entries" in timeline_clause
@@ -723,7 +705,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         timeline_clause = instructions[instructions.index("## TIMELINE") : instructions.index("## ACTION ITEMS")]
         assert "- YYYY-MM-DD HH:MM ZZZ Name: what happened" in timeline_clause
         assert "MUST open with the full YYYY-MM-DD HH:MM timestamp" in timeline_clause
@@ -737,7 +719,7 @@ class TestTimelineNeverCollapsesToOneEntry:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         assert "That limit does NOT apply to list sections" in instructions
         # The old selectivity language fought the entry count; it must stay gone.
         for gone in ("Be highly selective", "NOT a log", "merge closely related messages"):
@@ -874,7 +856,7 @@ class TestAPullRequestIsNamedOnce:
 
         await draft_incident_document(_REPORT, _MESSAGES, reports=documents, summarizer=summarizer)
 
-        instructions = summarizer.received_instructions or ""
+        instructions = summarizer.calls[-1].instructions
         assert "never paste its URL beside it" in instructions
         assert "include its\nfull URL" not in instructions
 
@@ -918,6 +900,6 @@ class TestTimestampFormatting:
 
         await draft_incident_document(_REPORT, messages, reports=documents, summarizer=summarizer)
 
-        assert (summarizer.received_payload or "").endswith(
+        assert summarizer.calls[-1].source.endswith(
             "Incident channel transcript:\n[2025-08-17 13:02 EDT] Ada: prod is down\nBob: on it"
         )

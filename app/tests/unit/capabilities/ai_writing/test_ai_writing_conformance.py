@@ -18,7 +18,7 @@ from bin.check_fake_coverage import find_covered_protocols, find_fakes
 from capabilities.ai_writing.adapters.in_memory import InMemoryAIWriter
 from capabilities.ai_writing.adapters.openai import OpenAIWriter
 from capabilities.ai_writing.adapters.unconfigured import UnconfiguredAIWriter
-from capabilities.ai_writing.api import AIWriter
+from capabilities.ai_writing.api import AIWriter, TemplateAnswer, TemplateSection
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
@@ -26,6 +26,13 @@ from integrations.openai.settings import OpenAISettings
 from tests.unit.capabilities.ai_writing.conftest import MODEL
 
 pytestmark = pytest.mark.unit
+
+
+def _json_answer(request: httpx.Request) -> httpx.Response:
+    return httpx.Response(200, json={"choices": [{"message": {"content": _ANSWER}, "finish_reason": "stop"}]})
+
+
+_ANSWER = '{"Trigger": "A deploy."}'
 
 
 def _echo(request: httpx.Request) -> httpx.Response:
@@ -40,6 +47,16 @@ def available(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -
         yield InMemoryAIWriter(respond=lambda source, instructions: f"{instructions}|{source}")
         return
     client = httpx.AsyncClient(base_url=openai_settings.base_url, transport=httpx.MockTransport(_echo))
+    with patch("capabilities.ai_writing.adapters.openai.build_openai_client", return_value=client):
+        yield OpenAIWriter(settings=openai_settings, model=MODEL)
+
+
+@pytest.fixture(params=["openai", "in_memory"])
+def answering(request: pytest.FixtureRequest, openai_settings: OpenAISettings) -> Iterator[AIWriter]:
+    if request.param == "in_memory":
+        yield InMemoryAIWriter(respond=lambda source, instructions: _ANSWER)
+        return
+    client = httpx.AsyncClient(base_url=openai_settings.base_url, transport=httpx.MockTransport(_json_answer))
     with patch("capabilities.ai_writing.adapters.openai.build_openai_client", return_value=client):
         yield OpenAIWriter(settings=openai_settings, model=MODEL)
 
@@ -61,6 +78,30 @@ async def test_an_unavailable_writer_reports_it_on_every_call(unavailable: AIWri
 
     assert unavailable.is_available() is False
     assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.AI_WRITING_UNAVAILABLE)
+
+
+async def test_an_available_writer_fills_a_template_from_its_answer(answering: AIWriter) -> None:
+    result = await answering.fill_template(
+        "the source", sections=(TemplateSection("Trigger"),), instructions="the instructions", max_output_tokens=50
+    )
+
+    assert result.status is OperationStatus.SUCCESS
+    assert result.data is not None
+    assert (result.data.sections, result.data.truncated) == ((TemplateAnswer("Trigger", "A deploy."),), False)
+
+
+async def test_an_unavailable_writer_reports_it_on_every_fill(unavailable: AIWriter) -> None:
+    result = await unavailable.fill_template(
+        "the source", sections=(TemplateSection("Trigger"),), instructions="the instructions", max_output_tokens=50
+    )
+
+    assert (result.status, result.error_code) == (OperationStatus.PERMANENT_ERROR, ErrorCode.AI_WRITING_UNAVAILABLE)
+
+
+@pytest.mark.parametrize("writer", [UnconfiguredAIWriter(), InMemoryAIWriter()], ids=["unconfigured", "in_memory"])
+async def test_every_fill_states_its_output_budget(writer: AIWriter) -> None:
+    with pytest.raises(TypeError, match="max_output_tokens"):
+        await writer.fill_template("s", sections=(), instructions="i")  # type: ignore[call-arg]
 
 
 @pytest.mark.parametrize("writer", [UnconfiguredAIWriter(), InMemoryAIWriter()], ids=["unconfigured", "in_memory"])
