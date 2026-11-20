@@ -5,8 +5,8 @@ title: >-
   create and copy once those writes reach their capability-package adapters
 status: To Do
 assignee: []
-created_date: '2026-09-18 15:43'
-updated_date: '2026-10-15 17:47'
+created_date: 2026-09-18 15:43
+updated_date: '2026-11-20T22:04:00Z'
 labels:
   - clients
   - reliability
@@ -17,7 +17,7 @@ references:
   - decisions/workplace-systems.md
   - app/infrastructure/drive/google.py
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1640'
+  - https://github.com/cds-snc/sre-bot/issues/1640
 parent_task_id: TASK-87
 priority: low
 ordinal: 237000
@@ -48,7 +48,18 @@ When this lands, decisions/outbound-clients.md's Migration section drops its las
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-24 20:11
+
 ---
+
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). The Calendar and Drive writes reach their final adapters in app/capabilities/drive/ (TASK-120) and the rebuilt incident surfaces (TASK-38), not a capability-packages.md package.
+
+---
+
+created: 2026-11-20T22:04:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): the Calendar adapter moves to features/incident/core/adapters/ in TASK-145.10.1. The wait on 'capability-package adapters' is obsolete: TASK-138 is superseded (TASK-169 ruling); the adapter stays incident-owned until a non-incident consumer appears. Repoint at pickup.
+
 ---
 <!-- COMMENTS:END -->

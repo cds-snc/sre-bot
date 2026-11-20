@@ -4,15 +4,15 @@ from datetime import datetime, timedelta
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from features.incident.postmortem.settings import get_incident_postmortem_settings
-from features.incident.scheduling.adapters.google_calendar import (
+from features.incident.core.adapters.google_calendar import (
     get_freebusy,
     insert_event,
 )
-from features.incident.scheduling.availability import (
+from features.incident.postmortem.domain import (
     find_first_available_slot,
     identify_unavailable_users,
 )
+from features.incident.postmortem.settings import get_incident_postmortem_settings
 from integrations.slack import channels as slack_channels
 from modules.incident import incident_conversation
 

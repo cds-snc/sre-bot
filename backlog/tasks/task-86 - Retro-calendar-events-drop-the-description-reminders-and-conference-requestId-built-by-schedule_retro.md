@@ -5,8 +5,8 @@ title: >-
   built by schedule_retro
 status: To Do
 assignee: []
-created_date: '2026-09-10 17:48'
-updated_date: '2026-10-15 17:47'
+created_date: 2026-09-10 17:48
+updated_date: '2026-11-20T22:04:00Z'
 labels:
   - incident
   - bug
@@ -16,7 +16,7 @@ references:
   - app/packages/incident/scheduling/adapters/google_calendar.py
   - >-
     https://developers.google.com/workspace/calendar/api/v3/reference/events/insert
-  - 'https://github.com/cds-snc/sre-bot/issues/1636'
+  - https://github.com/cds-snc/sre-bot/issues/1636
 priority: high
 type: bug
 ordinal: 185000
@@ -57,12 +57,26 @@ COORDINATION (updated 2026-09-11):
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-02 16:46
+
 ---
+
 2026-10-02 (TASK-97 decided): the calendar adapter moves to features/incident/retrospective/adapters/ in TASK-38.6, whose description and AC #2 carry this fix (typed parameters; description, reminders and the conference request id are sent). If TASK-38.6 lands first, close this task against it; if this task is fixed first in packages/incident/scheduling, TASK-38.6 moves the fix.
+
 ---
 
 created: 2026-10-02 16:59
+
 ---
+
 2026-10-02 correction: the calendar adapter's home is app/capabilities/calendar/adapters/google.py (TASK-138), not features/incident/retrospective/adapters/. TASK-138 carries this fix (typed parameters; description, reminders and the conference request are sent). TASK-38.6 then consumes the capability and has no calendar adapter.
+
+---
+
+created: 2026-11-20T22:04:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): absorbed into TASK-145.10.2 (Stack M M2a) as named change NC8, kind (a): the rebuilt Calendar adapter takes explicit parameters and sends the description and the 10-minute popup reminder, with one requestId source. Human check first (this task's precondition): a past retro event in Google Calendar has no description. Closed when 145.10.2 merges.
+
 ---
 <!-- COMMENTS:END -->

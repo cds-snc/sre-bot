@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-05T00:09:00Z'
-updated_date: '2026-11-05T00:13:00Z'
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - security
 milestone: m-7
@@ -41,3 +41,15 @@ Precondition: the entry's client id ("CDS-SNC Apps") may be shared by other appl
 - [ ] #6 The google task check is deleted from bin/deploy-checks.zsh once this task is Done (checks belong to their task)
 - [ ] #7 The runbook's transition section is deleted and its steps match the final delegation entry
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): add to the Admin-console checklist: confirm the delegated Workspace user (tenant.delegated_user_email, expected sre-bot@) owns the shared 'SRE - IFS Group Calendar' used for postmortem meetings, and reduce people's sharing on it to 'See all event details' (changes go through the bot; TASK-145.10.2 turns guest modification off).
+
+---
+<!-- COMMENTS:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-146.1.1
 title: On-call capability with its rotations and Opsgenie sources, no consumer
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T17:06:00Z'
-updated_date: '2026-11-16T17:37:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - oncall
   - capabilities
@@ -96,4 +96,6 @@ Merging deploys. The only running change is a new enabled plugin with no require
 2026-11-16: implementation started on branch task-146.1.1-oncall-capability from origin/main ac3b8f8d (#1852 merged). TASK-176 unchanged per the answer at TASK-146.1 planning start this session (#1 and #4 open, #2 waits on TASK-182).
 
 2026-11-16 implemented (gates green). Evidence (from app/): ruff check . -> All checks passed; lint-imports -> 14 kept, 0 broken (new protected contract on integrations.opsgenie KEPT, 3 ignored imports); make check-import-contracts, check-settings-key-ownership, check-package-shape (3 baselined), check-test-seams (47/12 baselined) -> OK, no new baseline entries; bin.check_fake_coverage OK; mypy . -> 40 errors in 13 files (= baseline, none in touched files); pytest tests --ignore=tests/smoke -> 7434 passed (first run: 2 failures in test_server_plugins_entrypoint_declaration.py, whose plugin scan did not include capabilities/; fixed by adding the root, rerun green); uv build --wheel lists capabilities/oncall. Tests were written alongside the code rather than red first; a mutation check (unknown system code, the no-tenant guard) failed 5 tests and was reverted. Deviations from the plan: domain types live in domain.py and api.py re-exports them; api's two functions import providers lazily (providers -> service -> api cycle); Rotation(name, members, weeks_per_shift, start), Schedule(reference, name, rotations, shifts); the rotation argument is a rotation name, ignored by the rotations source; ScheduleSource.list_schedules takes no system. Existing test edits: test_lifespan_plugin_loading.py (oncall in the enabled set), test_server_plugins_entrypoint_declaration.py (capabilities root). Opsgenie parsing is byte-for-byte the legacy readers' (modules/incident/on_call.py, oncall_sync adapter). Stays In Progress for human review.
+
+2026-11-20: closed by the agent: PR #1860 merged 2026-11-16 (9a3cd7ae); all ACs checked.
 <!-- SECTION:NOTES:END -->

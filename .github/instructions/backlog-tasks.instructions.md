@@ -10,8 +10,9 @@ applyTo: backlog/**
   corruption is not obvious until a later CLI call fails.
 - Mutate tasks only via `backlog task edit` / `backlog task create`; read them with
   `backlog task view <id> --plain`. See the `backlog-task-workflow` skill.
-- **Never set a task's status to `Done`.** Agents stop at `In Progress` with notes;
-  humans close tasks after verifying the Definition of Done.
+- **Close a task only once its PR is merged.** It stays `In Progress` while the PR
+  is open; set `Done` (with a closing note) once the PR is merged, every AC is
+  checked and no human post-deploy step is still open.
 - Check off acceptance criteria one at a time as each is verified
   (`--check-ac <index>`), never as a batch at the end.
 - Every task headed for implementation needs a human-approved implementation plan

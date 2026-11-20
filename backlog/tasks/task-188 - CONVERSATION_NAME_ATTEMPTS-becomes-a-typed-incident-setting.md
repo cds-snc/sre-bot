@@ -1,10 +1,10 @@
 ---
 id: TASK-188
 title: CONVERSATION_NAME_ATTEMPTS becomes a typed incident setting
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-18T21:26:00Z'
-updated_date: '2026-11-20T13:57:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
 dependencies:
@@ -74,4 +74,6 @@ Domain-model evolution gate: not applicable (no entity shape change; Conversatio
 2026-11-20: plan approved (human): OQ1 [incident_core] conversation_name_attempts default 5, ge=1; OQ2 domain stays settings-free, the count passed as an argument and read by providers.declare_policy at call time. Out of scope, recorded elsewhere: closing an incident (TASK-189), the conversation loop's placement for coordination/ (TASK-165.5 note).
 
 2026-11-20: Implemented (TDD) on task-188-conversation-name-attempts from main 3d7264fc, as approved. [incident_core] conversation_name_attempts (int, default 5, ge=1) in common/settings.py and config/base.toml; CONVERSATION_NAME_ATTEMPTS deleted from core/domain.py and core/api.py; incident_conversation_names takes attempts (ValueError below 1); ConversationName refuses attempt < 1 only; DeclarePolicy carries conversation_name_attempts, from_settings takes it, providers.declare_policy reads it from the core slice at each call; incident-management.md:36 and configuration.md (Decision paragraph) name the key, a Changes line in each. Tests: settings default, override, below-one rejected, base.toml table; names for a given count, a single attempt, count below one refused, attempt 6 valid; declare stops at a policy bound of 2 with CONVERSATION_NAME_TAKEN and no third name created; provider reads the bound at call time (new test_incident_response_declare_policy_build.py). Gates: ruff OK; ruff format on the touched files; contracts 15 kept; key ownership OK; package shape OK (3 baselined); test seams OK (47/12 baselined); mypy 40 errors in 13 files, the baseline, none in touched files; pytest 7926 passed. Dark: declare_policy has no production caller until TASK-165.2; no terraform/IAM/SSM/env-name change, no deploy-checks.
+
+2026-11-20: closed by the agent: PR #1881 merged 2026-11-20 (a8eed02f); all ACs checked.
 <!-- SECTION:NOTES:END -->

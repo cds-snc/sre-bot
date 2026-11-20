@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from googleapiclient.errors import HttpError
 
-from features.incident.scheduling.adapters import google_calendar
+from features.incident.core.adapters import google_calendar
 from integrations.google_workspace import client as google_client
 
 CALENDAR_SCOPES = ["https://www.googleapis.com/auth/calendar"]
@@ -101,7 +101,7 @@ def test_calendar_adapter_functions_take_no_body_overrides(function_name):
     assert "body_kwargs" not in parameters
 
 
-@patch("features.incident.scheduling.adapters.google_calendar.generate_unique_id")
+@patch("features.incident.core.adapters.google_calendar.generate_unique_id")
 def test_insert_event_builds_event_and_returns_link(mock_unique_id, calendar_client):
     insert = calendar_client.service.events.return_value.insert
     insert.return_value.execute.return_value = {

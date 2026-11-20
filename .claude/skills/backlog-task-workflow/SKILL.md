@@ -34,7 +34,7 @@ Multi-line values: pass real newlines inside the quoted string (heredoc via `"$(
 
 1. `To Do` → `In Progress` only when implementation actually starts, not during planning.
 2. Check each AC (`--check-ac <index>`) only when it is verified (its test passes), one by one, never batch-checked at the end.
-3. Agents stop at `In Progress` with notes written. Only a human moves a task to `Done` after verifying the Definition of Done.
+3. A task stays `In Progress` while its PR is open. The agent sets `Done` (`backlog task edit <id> --status Done`, with a closing note) once the PR is merged (`gh pr view <n> --json state`), every AC is checked, the Definition of Done holds and no human post-deploy step is still open. A task waiting on a human check stays `In Progress` with that check named in its notes. The task-file edit rides with the next commit. At session start, close any task whose PR merged since the last session on the same terms.
 4. Never delete or reword an existing AC to make it pass. Propose changes via `--comment` and let the human decide (or use `--remove-ac` only with explicit approval).
 
 ## Human Checkpoints

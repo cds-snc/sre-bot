@@ -5,6 +5,7 @@
 # safe. Do NOT add entries: net-new patches fail CI. A move PR re-keys its own entries, same count, and
 # says so in its PR body (decisions/testing.md). A trailing "# ..." comment is ignored.
 # Re-keyed from main 7b0b3810 for TASK-186's comms move (TASK-187): same patches. AI writing is faked through capabilities.ai_writing.providers (TASK-25.10.2).
+# Re-keyed for TASK-145.10.1's scheduling dissolve: same three patches at the moved paths.
 tests/integration/features/incident/comms/test_incident_comms_status_update_generate_dispatch.py::features.incident.comms.service.form.generate_status_update_draft
 tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.entrypoints.slack.get_status_update_overview
 tests/integration/features/incident/comms/test_incident_comms_status_update_history_dispatch.py::features.incident.comms.service.publication.get_approved_update
@@ -33,12 +34,12 @@ tests/unit/features/incident/comms/test_incident_comms_status_update_review_view
 tests/unit/features/incident/comms/test_incident_comms_status_update_save_entrypoint.py::features.incident.comms.service.form.get_draft_for_review
 tests/unit/features/incident/comms/test_incident_comms_status_update_save_entrypoint.py::features.incident.comms.service.form.save_status_update_draft
 tests/unit/features/incident/comms/test_incident_comms_status_update_slack.py::features.incident.comms.entrypoints.slack.get_status_update_overview
+tests/unit/features/incident/core/test_incident_core_calendar_adapter.py::features.incident.core.adapters.google_calendar.generate_unique_id
+tests/unit/features/incident/core/test_incident_core_calendar_adapter.py::features.incident.core.adapters.google_calendar.logger.warning
 tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs._drive_service
 tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs.get_metadata
 tests/unit/features/incident/core/test_incident_core_google_docs_drive.py::features.incident.core.adapters.google_docs.logger.warning
-tests/unit/features/incident/scheduling/test_incident_scheduling_availability.py::features.incident.scheduling.availability.get_federal_holidays
-tests/unit/features/incident/scheduling/test_incident_scheduling_calendar_adapter.py::features.incident.scheduling.adapters.google_calendar.generate_unique_id
-tests/unit/features/incident/scheduling/test_incident_scheduling_calendar_adapter.py::features.incident.scheduling.adapters.google_calendar.logger.warning
+tests/unit/features/incident/postmortem/test_incident_postmortem_slot_search.py::features.incident.postmortem.domain.get_federal_holidays
 tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service._now
 tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service.draft_incident_document
 tests/unit/features/incident/scribe/test_incident_scribe_conversation_draft.py::features.incident.scribe.service.get_incident_report

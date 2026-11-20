@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 16:51
-updated_date: '2026-11-20T14:47:00Z'
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - clients
   - phase-3
@@ -79,6 +79,22 @@ created: 2026-11-20T14:47:00Z
 ---
 
 2026-11-20 (TASK-36.2, human): add the TASK-36.2 webhook pin (tests/integration/legacy_surface/test_webhook_route_*_surface.py, Sentinel webhook_sent asserted at send_event) to the consumer re-grep; rewire its fixture, assertions unchanged.
+
+---
+
+created: 2026-11-20T22:04:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): the consumer re-grep must include the rebuilt Sentinel sinks features/incident/response/adapters/sentinel.py (TASK-145.8.5.3) and features/incident/postmortem/adapters/sentinel.py (TASK-145.10.3); both are interim and repoint onto the audit capability. Event content follows the new audit event catalogue task.
+
+---
+
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20: the audit event catalogue task is TASK-191.
 
 ---
 <!-- COMMENTS:END -->

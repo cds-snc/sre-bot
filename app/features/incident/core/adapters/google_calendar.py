@@ -1,3 +1,10 @@
+"""Google Calendar adapter of the incident core: free/busy reads and the retro event insert.
+
+Moved verbatim from features/incident/scheduling/adapters/google_calendar.py
+(TASK-145.10.1), beside google_meet.py. The legacy retro scheduling calls it
+until the MeetingScheduler port (TASK-145.10.2) replaces it.
+"""
+
 import random
 import string
 from datetime import datetime

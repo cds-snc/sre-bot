@@ -3,10 +3,10 @@ id: TASK-25.10.2
 title: >-
   Create the AI writing capability with make new-package and repoint scribe and
   comms onto its api.py
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T13:41:00Z'
-updated_date: '2026-11-19T17:34:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - clients
   - phase-3
@@ -165,6 +165,8 @@ Production safety: behaviour unchanged. The unconfigured implementation is today
 2026-11-19 (human, #1877 review): renamed to ai_writing before merge. Package regenerated with make new-package ARGS='capability ai_writing --classification generic --consumer features.incident.scribe --consumer features.incident.comms --adapters' (the text_generation generator edits removed first; only placeholders filled, 'Ai writing' title corrected to 'AI writing'). AIWriter.write(), get_ai_writer(), get_ai_writer_singleton, OpenAIWriter, UnconfiguredAIWriter, InMemoryAIWriter, build_openai_writer; ErrorCode.AI_WRITING_UNAVAILABLE replaces TEXT_GENERATION_UNAVAILABLE; log events openai_write_* and ai_writing_unconfigured; contract (o) names capabilities.ai_writing.adapters.openai; comms' parameter is ai_writer (comms prose already uses 'another writer' for a concurrent person). Slack action ids and locale keys (status_update.generate, generate_unavailable) unchanged: they name the Draft with AI button and live in open modals. ADR Decision text and today's Changes lines renamed; older dated lines kept; plugin-architecture.md states the purpose boundary. Open downstream tasks (25.10, 25.10.3, 134, 145, 145.9, 145.9.3, 145.11, 140.11, 140.12, 114) carry a rename note.
 
 Rename gates (from app/): ruff check . All checks passed; check-import-contracts Contracts: 15 kept, 0 broken; check-settings-key-ownership OK; check-package-shape OK (3 baselined); check-test-seams OK (47 + 12 baselined); check-fake-coverage OK (4 baselined); check-vendor-package-contract OK (13 baselined); mypy Found 40 errors in 13 files (pre-existing, none in touched files); pytest tests --ignore=tests/smoke 7891 passed.
+
+2026-11-20: closed by the agent: PR #1877 merged 2026-11-19 (98da95f7); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

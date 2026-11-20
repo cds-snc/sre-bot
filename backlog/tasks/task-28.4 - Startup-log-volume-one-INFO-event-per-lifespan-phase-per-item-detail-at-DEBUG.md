@@ -3,10 +3,10 @@ id: TASK-28.4
 title: >-
   Startup log volume: one INFO event per lifespan phase, per-item detail at
   DEBUG
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-29T16:25:00Z'
-updated_date: '2026-11-03T18:14:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - observability
   - lifecycle
@@ -195,4 +195,6 @@ make check-import-contracts -> Contracts: 13 kept, 0 broken.
 make check-settings-key-ownership -> OK: every settings key and configuration table has one owner, ...
 cd app && uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 41 errors in 14 files (checked 422 source files): the same 41 pre-existing errors in the same 14 files, none new, none fixed.
 cd app && uv run pytest tests --ignore=tests/smoke -> 6034 passed, 44 warnings in 184.48s
+
+2026-11-20: closed by the agent: PR #1815 merged 2026-11-03 (b24f320b); all ACs checked.
 <!-- SECTION:NOTES:END -->

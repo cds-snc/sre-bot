@@ -3,10 +3,10 @@ id: TASK-28.2
 title: >-
   Route uvicorn and pre-configuration lines through the structlog pipeline;
   logger name and explicit UTC on every line
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-09-15 14:08
-updated_date: '2026-11-03T17:20:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -179,4 +179,6 @@ Open for the human: A1 (aws logs test-metric-filter of terraform/local.tf on a c
 2026-11-03 test fix: test_malformed_access_arguments_pass_through_unchanged failed when pytest's capture handlers run below WARNING (e.g. -o log_level=INFO). pytest 9 catching_logs attaches its LogCaptureHandler to every non-propagating logger at test entry (_pytest/logging.py:357-366); the fixture set propagate False without restoring it, and the malformed records ('msg' with tuple args) raised TypeError when that handler formatted them. Fixed in the test only: each malformed case carries a message matching its args, and the fixture restores propagate. Logging tests pass at INFO, DEBUG and WARNING; full pytest tests --ignore=tests/smoke: 6010 passed, 44 warnings in 175.21s.
 
 2026-11-03: merged (#1814, 90ed5968, 16:24:40Z); build_and_deploy run 41673920664 success (verify waited out the alarm window), no alarm. Closed: every AC checked, no manual check required; the human sets Done. Rollback target now 90ed5968's image tag. A1 (test-metric-filter) optional, not run.
+
+2026-11-20: closed by the agent: PR #1814 merged 2026-11-03 (90ed5968); all ACs checked.
 <!-- SECTION:NOTES:END -->

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 import pytz
 
-from features.incident.scheduling import availability
+from features.incident.postmortem import domain as availability
 
 
 @pytest.fixture
@@ -34,8 +34,8 @@ def time_range():
     }
 
 
-@patch("features.incident.scheduling.availability.get_federal_holidays")
-@patch("features.incident.scheduling.availability.datetime")
+@patch("features.incident.postmortem.domain.get_federal_holidays")
+@patch("features.incident.postmortem.domain.datetime")
 def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays, fixed_utc_now, mock_year, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = mock_year
@@ -69,8 +69,8 @@ def test_available_slot_on_first_weekday(mock_datetime, mock_federal_holidays, f
     assert actual_end == expected_end_time
 
 
-@patch("features.incident.scheduling.availability.get_federal_holidays")
-@patch("features.incident.scheduling.availability.datetime")
+@patch("features.incident.postmortem.domain.get_federal_holidays")
+@patch("features.incident.postmortem.domain.datetime")
 def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.return_value.year = 2024
@@ -102,8 +102,8 @@ def test_opening_exists_after_busy_days(mock_datetime, mock_federal_holidays, fi
     assert start == expected_start and end == expected_end, "Expected to find an available slot correctly."
 
 
-@patch("features.incident.scheduling.availability.get_federal_holidays")
-@patch("features.incident.scheduling.availability.datetime")
+@patch("features.incident.postmortem.domain.get_federal_holidays")
+@patch("features.incident.postmortem.domain.datetime")
 def test_skipping_weekends(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])
@@ -124,8 +124,8 @@ def test_skipping_weekends(mock_datetime, mock_federal_holidays, fixed_utc_now, 
     assert start == expected_start and end == expected_end, "Expected to find an available slot after skipping the weekend"
 
 
-@patch("features.incident.scheduling.availability.get_federal_holidays")
-@patch("features.incident.scheduling.availability.datetime")
+@patch("features.incident.postmortem.domain.get_federal_holidays")
+@patch("features.incident.postmortem.domain.datetime")
 def test_no_available_slots_within_search_limit(mock_datetime, mock_federal_holidays, fixed_utc_now, est_timezone):
     mock_datetime.utcnow.return_value = fixed_utc_now
     mock_datetime.fromisoformat.side_effect = lambda d: datetime.fromisoformat(d[:-1])

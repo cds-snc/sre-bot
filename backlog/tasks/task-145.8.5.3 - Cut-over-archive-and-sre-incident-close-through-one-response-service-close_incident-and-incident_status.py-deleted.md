@@ -3,10 +3,10 @@ id: TASK-145.8.5.3
 title: >-
   Cut over archive and /sre incident close through one response service;
   close_incident and incident_status.py deleted
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T19:34:00Z'
-updated_date: '2026-11-17T20:09:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - features
@@ -139,6 +139,8 @@ OQ6 No change here; scope note on TASK-145.9.2: repoint or delete /sre dev stale
 - Human before merge: confirm no Sentinel query or workbook reads message fields of incident_channel_archived other than incident_id, conversation_id, user_id, at.
 
 2026-11-17 (human): Sentinel check done: nothing in the Sentinel code reads incident_channel_archived, so the minimal message breaks no query or workbook (TASK-145.8.5 OQ8 condition met).
+
+2026-11-20: closed by the agent: PR #1866 merged 2026-11-17 (94553f9b); all ACs checked.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

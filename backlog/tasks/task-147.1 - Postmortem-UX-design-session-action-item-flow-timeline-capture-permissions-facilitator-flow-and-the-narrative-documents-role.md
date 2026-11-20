@@ -5,14 +5,14 @@ title: >-
   facilitator flow and the narrative document's role
 status: To Do
 assignee: []
-created_date: '2026-10-13 14:00'
-updated_date: '2026-10-15 17:52'
+created_date: 2026-10-13 14:00
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - incident
   - features
 dependencies: []
 references:
-  - 'https://github.com/cds-snc/sre-bot/issues/1706'
+  - https://github.com/cds-snc/sre-bot/issues/1706
 parent_task_id: TASK-147
 priority: high
 type: feature
@@ -36,3 +36,15 @@ Questions to settle:
 - [ ] #1 A backlog doc records the decided action-item, timeline-capture and narrative-document flows, with the capture and removal permission rule
 - [ ] #2 The doc lists the user-facing surfaces each later slice builds, with EN/FR wording owners
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): decided in TASK-145.10 (Stack M): one upcoming meeting per incident, reschedule/cancel/follow-up restricted to the incident commander, operations lead or postmortem owner, meeting state derived from the calendar event. Still for this session: the prompt posted after the meeting ends ('mark review complete / schedule a follow-up'), who marks the review complete (postmortem owner; SRE leadership approval for SEV0-2 per the handbook?), and opting out of a postmortem with a reason.
+
+---
+<!-- COMMENTS:END -->
