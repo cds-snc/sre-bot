@@ -100,6 +100,27 @@ def test_a_timeline_recompute_bound_below_one_is_rejected_naming_the_key(monkeyp
         IncidentCoreSettings()
 
 
+def test_the_conversation_name_bound_defaults_to_five_candidates() -> None:
+    """Five names per incident conversation, the first and then -2 to -5, as the legacy bot tried."""
+    assert IncidentCoreSettings().conversation_name_attempts == 5
+
+
+def test_the_conversation_name_bound_is_changed_in_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An organisation tunes the bound without a code change."""
+    monkeypatch.setenv("INCIDENT_CORE__CONVERSATION_NAME_ATTEMPTS", "8")
+
+    assert IncidentCoreSettings().conversation_name_attempts == 8
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_a_conversation_name_bound_below_one_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    """A bound below one would leave declare no name to try, so the slice fails at boot naming the key."""
+    monkeypatch.setenv("INCIDENT_CORE__CONVERSATION_NAME_ATTEMPTS", value)
+
+    with pytest.raises(ConfigurationError, match="conversation_name_attempts"):
+        IncidentCoreSettings()
+
+
 def test_the_new_incident_policy_is_unset_by_default() -> None:
     """Unset resolves later to the only configured system, so most instances never set it."""
     assert IncidentCoreSettings().new_incident_system is None
@@ -132,6 +153,7 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
         "bindings_table": "sre_bot_incident_bindings",
         "full_read_max_items": 10000,
         "timeline_update_attempts": 3,
+        "conversation_name_attempts": 5,
         "folder_id": "",
         "report_template_id": "",
         "list_sheet_id": "",

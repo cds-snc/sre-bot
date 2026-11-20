@@ -7,6 +7,7 @@ substitution) and never import adapters.
 
 from capabilities.oncall.api import OnCallLookup, get_oncall_lookup
 from contracts.coordination import ConditionalWriteStore
+from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.api import (
     IncidentConversation,
     IncidentListProjection,
@@ -74,5 +75,9 @@ def claims(store: ConditionalWriteStore) -> Claims:
 
 
 def declare_policy(*, production: bool) -> DeclarePolicy:
-    """Return the declare policy from the ``[incident_response]`` slice."""
-    return DeclarePolicy.from_settings(get_incident_response_settings(), production=production)
+    """Return the declare policy from the ``[incident_response]`` slice and ``[incident_core]``'s name bound, read now."""
+    return DeclarePolicy.from_settings(
+        get_incident_response_settings(),
+        production=production,
+        conversation_name_attempts=get_incident_core_settings().conversation_name_attempts,
+    )

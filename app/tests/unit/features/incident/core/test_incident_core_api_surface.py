@@ -44,7 +44,6 @@ def test_api_exports_exactly_the_public_names() -> None:
     """Subdomains reach core through these names only; a new export is a deliberate change."""
     assert sorted(api.__all__) == [
         "BindingKind",
-        "CONVERSATION_NAME_ATTEMPTS",
         "ConversationName",
         "ConversationReference",
         "DocumentField",

@@ -546,10 +546,6 @@ class DraftWriteResult:
     created: bool
 
 
-CONVERSATION_NAME_ATTEMPTS = 5
-"""How many names declare tries for one incident's conversation: the first, then attempts 2 to 5."""
-
-
 @dataclass(frozen=True)
 class ConversationName:
     """The name an incident's conversation is created under, before a chat platform renders it.
@@ -563,7 +559,7 @@ class ConversationName:
         title: The incident title, as declared.
         opened_on: The day the incident opened.
         production: Whether this instance is production.
-        attempt: Which candidate this is, 1 to ``CONVERSATION_NAME_ATTEMPTS``.
+        attempt: Which candidate this is, from 1; how many are tried is the caller's count.
     """
 
     title: str
@@ -572,8 +568,8 @@ class ConversationName:
     attempt: int = 1
 
     def __post_init__(self) -> None:
-        if not 1 <= self.attempt <= CONVERSATION_NAME_ATTEMPTS:
-            raise ValueError(f"attempt must be 1 to {CONVERSATION_NAME_ATTEMPTS}, got {self.attempt}")
+        if self.attempt < 1:
+            raise ValueError(f"attempt must be 1 or more, got {self.attempt}")
 
     @property
     def prefix(self) -> str:
@@ -586,14 +582,20 @@ class ConversationName:
         return "" if self.attempt == 1 else f"-{self.attempt}"
 
 
-def incident_conversation_names(title: str, opened_on: date, *, production: bool) -> tuple[ConversationName, ...]:
-    """Return the names to try, in order, for an incident's conversation.
+def incident_conversation_names(title: str, opened_on: date, *, production: bool, attempts: int) -> tuple[ConversationName, ...]:
+    """Return the ``attempts`` names to try, in order, for an incident's conversation.
 
-    Which one an incident ends up with, and when an existing conversation is its
-    own, is the caller's decision (decisions/incident-management.md, one
+    ``attempts`` is ``[incident_core] conversation_name_attempts``, read by the
+    caller. Which name an incident ends up with, and when an existing conversation
+    is its own, is the caller's decision (decisions/incident-management.md, one
     conversation per incident).
+
+    Raises:
+        ValueError: ``attempts`` is below 1, which would leave no name to try.
     """
+    if attempts < 1:
+        raise ValueError(f"attempts must be 1 or more, got {attempts}")
     return tuple(
         ConversationName(title=title, opened_on=opened_on, production=production, attempt=attempt)
-        for attempt in range(1, CONVERSATION_NAME_ATTEMPTS + 1)
+        for attempt in range(1, attempts + 1)
     )

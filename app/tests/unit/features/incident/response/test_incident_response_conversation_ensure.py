@@ -39,7 +39,7 @@ from tests.factories.incident import SLACK_TENANT, binding_on, declared_incident
 pytestmark = pytest.mark.unit
 
 OPENED_ON = date(2026, 11, 18)
-NAMES = incident_conversation_names("Payments down", OPENED_ON, production=True)
+NAMES = incident_conversation_names("Payments down", OPENED_ON, production=True, attempts=5)
 FIRST = slack_channel_name(NAMES[0])
 
 Script = Literal["transient", "raise", "created_then_transient"]

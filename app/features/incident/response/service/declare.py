@@ -114,7 +114,10 @@ class DeclarePorts:
 
 @dataclass(frozen=True)
 class DeclarePolicy:
-    """The organisation's declare choices, read from ``[incident_response]``; an empty id means none."""
+    """The organisation's declare choices, read from ``[incident_response]``; an empty id means none.
+
+    ``conversation_name_attempts`` is ``[incident_core]``'s bound on the conversation's candidate names.
+    """
 
     initial_status: IncidentStatus
     production: bool
@@ -123,10 +126,13 @@ class DeclarePolicy:
     policy_group_id: str
     notify_management_group_id: str
     notify_management_placement_id: str
+    conversation_name_attempts: int
 
     @classmethod
-    def from_settings(cls, settings: IncidentResponseSettings, *, production: bool) -> DeclarePolicy:
-        """Build the policy from the response slice; ``production`` names conversations without ``-dev``."""
+    def from_settings(
+        cls, settings: IncidentResponseSettings, *, production: bool, conversation_name_attempts: int
+    ) -> DeclarePolicy:
+        """Build the policy from the response slice and core's name bound; ``production`` names conversations without ``-dev``."""
         return cls(
             initial_status=settings.initial_status,
             production=production,
@@ -135,6 +141,7 @@ class DeclarePolicy:
             policy_group_id=settings.policy_group_id,
             notify_management_group_id=settings.notify_management_group_id,
             notify_management_placement_id=settings.notify_management_placement_id,
+            conversation_name_attempts=conversation_name_attempts,
         )
 
 
@@ -278,7 +285,10 @@ class _Steps:
         if self.incident.conversation is not None:
             return _DONE
         names = incident_conversation_names(
-            self.incident.title, self.incident.declared_at.date(), production=self._policy.production
+            self.incident.title,
+            self.incident.declared_at.date(),
+            production=self._policy.production,
+            attempts=self._policy.conversation_name_attempts,
         )
         ensured = await ensure_conversation(
             self.incident,

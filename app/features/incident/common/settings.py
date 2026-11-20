@@ -23,7 +23,7 @@ class IncidentCoreSettings(ConfigurationSlice):
 
     Keys of [incident_core]:
         incidents_table, timeline_table, status_updates_table, bindings_table, full_read_max_items,
-        timeline_update_attempts, new_incident_system (absent: unset).
+        timeline_update_attempts, conversation_name_attempts, new_incident_system (absent: unset).
 
     Environment only (non-public values):
         INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, INCIDENT_CORE__LIST_SHEET_ID.
@@ -56,6 +56,14 @@ class IncidentCoreSettings(ConfigurationSlice):
         description=(
             "Most revision-guarded writes one report timeline update makes, each from a fresh read; "
             "a lost guard or an unconfirmed write is recomputed, never slept on."
+        ),
+    )
+    conversation_name_attempts: int = Field(
+        default=5,
+        ge=1,
+        description=(
+            "Most names an incident's conversation is tried under: the first, then a -<attempt> suffix "
+            "from the second; the next name is tried only when the current one is proven another's."
         ),
     )
     new_incident_system: WorkplaceSystem | None = Field(
