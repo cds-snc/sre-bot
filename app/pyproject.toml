@@ -117,6 +117,7 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 pythonpath = ["."]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 log_cli = false
 log_cli_level = "WARNING"
 log_level = "WARNING"
