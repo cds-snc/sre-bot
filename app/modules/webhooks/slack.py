@@ -19,7 +19,11 @@ IP_ADDRESS_PATTERN = re.compile(
     r"("
     r"(?:\d{1,3}\.){3}\d{1,3}"
     r"|"
-    r"(?:[0-9A-Fa-f]{1,4}:){2,}[0-9A-Fa-f:.]*"
+    # The groups never give back, and the tail is either the whole run or the run up to
+    # its last dot, the only places the closing lookahead can pass: the same matches as
+    # the overlapping form, in linear time (decisions/security.md, request limits).
+    r"(?:[0-9A-Fa-f]{1,4}:){2,}+"
+    r"(?:[0-9A-Fa-f:.]*+(?![\w/:-])|[0-9A-Fa-f:.]*(?=\.))"
     r")"
     r"(?![\w/:-])"
 )

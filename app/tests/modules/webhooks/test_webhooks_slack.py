@@ -1,4 +1,7 @@
+import time
 from unittest.mock import patch
+
+import pytest
 
 from models.webhooks import WebhookPayload
 from modules.webhooks.slack import (
@@ -127,3 +130,62 @@ def test_hydrate_ip_addresses_links_text_and_block_strings():
             },
         }
     ]
+
+
+_BODY_CAP_BYTES = 262_144
+_LINEAR_TIME_BUDGET_SECONDS = 0.5
+
+
+@pytest.mark.parametrize(
+    "adversarial_text",
+    [
+        "1:" * (_BODY_CAP_BYTES // 2) + "g",
+        "ab:" * (_BODY_CAP_BYTES // 3) + "z",
+        "1:1:" + "1." * (_BODY_CAP_BYTES // 2) + "g",
+        "1:1.:" * (_BODY_CAP_BYTES // 5) + "g",
+    ],
+    ids=["hex-groups-then-letter", "two-digit-groups-then-letter", "groups-then-dotted-tail", "mixed-colons-and-dots"],
+)
+def test_link_ip_addresses_to_geolocate_scans_a_body_cap_sized_text_in_linear_time(adversarial_text):
+    """IPv6-like text as large as the webhook body cap, ending where the pattern must give back, is scanned well under the budget.
+
+    No stub is needed: the base URL is passed in. None of these shapes is a valid address,
+    so the text comes back unchanged. A matcher whose groups and tail overlap retries every
+    split here and takes minutes, so the budget separates the two.
+    """
+    started = time.perf_counter()
+    result = link_ip_addresses_to_geolocate(adversarial_text, base_url="https://sre-bot.example.com")
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < _LINEAR_TIME_BUDGET_SECONDS
+    assert result == adversarial_text
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "host 2001:db8::1./x",
+            "host <https://sre-bot.example.com/geolocate/2001%3Adb8%3A%3A1|2001:db8::1>./x",
+        ),
+        (
+            "end 2001:db8::1. Next",
+            "end 2001:db8::1. Next",
+        ),
+        (
+            "joined 2001:db8::1.example",
+            "joined <https://sre-bot.example.com/geolocate/2001%3Adb8%3A%3A1|2001:db8::1>.example",
+        ),
+    ],
+    ids=["ipv6-then-dot-and-path", "ipv6-then-sentence-dot", "ipv6-then-dot-and-word"],
+)
+def test_link_ip_addresses_to_geolocate_handles_dots_after_an_ipv6_address(text, expected):
+    """An IPv6 address followed by a dot is linked or left exactly as the legacy matcher did.
+
+    Before a dot and a path or a word the address is linked without the dot; at a sentence
+    end the candidate keeps its dot, fails address validation and stays plain text. No stub
+    is needed: the base URL is passed in.
+    """
+    result = link_ip_addresses_to_geolocate(text, base_url="https://sre-bot.example.com")
+
+    assert result == expected

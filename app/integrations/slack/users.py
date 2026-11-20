@@ -12,6 +12,11 @@ from integrations.slack.client import get_slack_web_client
 
 SLACK_USER_ID_REGEX = r"^[A-Z0-9]+$"
 
+# An address starts where a run of local-part characters starts, and the local part never
+# gives characters back, so each run is scanned once and matching stays linear in the text
+# length on untrusted webhook bodies (decisions/security.md, request limits).
+EMAIL_ADDRESS_PATTERN = re.compile(r"(?<![a-zA-Z0-9._%+-])[a-zA-Z0-9._%+-]++@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+
 logger = structlog.get_logger()
 
 
@@ -204,8 +209,7 @@ def replace_users_emails_with_mention(text: str) -> str:
     client = get_slack_web_client()
     if not client:
         return text
-    email_pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-    matches = re.findall(email_pattern, text)
+    matches = EMAIL_ADDRESS_PATTERN.findall(text)
     for email in matches:
         try:
             response = client.users_lookupByEmail(email=email)
