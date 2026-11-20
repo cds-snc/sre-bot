@@ -1,5 +1,7 @@
+import time
 from unittest.mock import MagicMock, patch
 
+import pytest
 from slack_sdk import WebClient
 
 from integrations.slack import users
@@ -474,3 +476,93 @@ def test_replace_users_emails_in_dict_non_string_non_dict_non_list(
 
     assert result == 42
     mock_replace_function.assert_not_called()
+
+
+_BODY_CAP_BYTES = 262_144
+_LINEAR_TIME_BUDGET_SECONDS = 0.5
+
+
+@pytest.mark.parametrize(
+    "adversarial_text",
+    [
+        "a" * _BODY_CAP_BYTES,
+        "a" * (_BODY_CAP_BYTES // 2) + "@" + "a" * (_BODY_CAP_BYTES // 2),
+        "x@" + "a." * (_BODY_CAP_BYTES // 2),
+        "a@" * (_BODY_CAP_BYTES // 2),
+        "." * _BODY_CAP_BYTES,
+    ],
+    ids=["no-at", "at-without-dot", "dotted-domain-without-tld", "repeated-at", "dot-run"],
+)
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_scans_a_body_cap_sized_text_in_linear_time(
+    mock_get_slack_web_client, adversarial_text
+):
+    """Text as large as the webhook body cap, shaped to make a backtracking pattern retry, is scanned well under the budget.
+
+    The Slack client is a MagicMock, so the time measured is the matching alone; none of
+    these shapes holds an address, so no lookup is made and the text comes back unchanged.
+    A quadratic matcher takes minutes on these inputs, so the budget separates the two.
+    """
+    mock_client = MagicMock()
+    mock_get_slack_web_client.return_value = mock_client
+
+    started = time.perf_counter()
+    result = users.replace_users_emails_with_mention(adversarial_text)
+    elapsed = time.perf_counter() - started
+
+    assert elapsed < _LINEAR_TIME_BUDGET_SECONDS
+    assert result == adversarial_text
+    mock_client.users_lookupByEmail.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("text", "addresses"),
+    [
+        ("Reach john.doe@example.com today", ["john.doe@example.com"]),
+        ("plus first+tag@example.com", ["first+tag@example.com"]),
+        ("percent ops%team@example.com", ["ops%team@example.com"]),
+        ("hyphen a_b-c@sub-domain.example.co.uk!", ["a_b-c@sub-domain.example.co.uk"]),
+        ("two a@x.org,b@y.ca", ["a@x.org", "b@y.ca"]),
+        ("link <mailto:a@x.org|a@x.org>", ["a@x.org", "a@x.org"]),
+        ("trailing dot a@x.org.", ["a@x.org"]),
+    ],
+    ids=["dotted-local", "plus", "percent", "hyphenated-multi-label", "two-addresses", "mailto-link", "trailing-dot"],
+)
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_looks_up_each_address_and_replaces_it(mock_get_slack_web_client, text, addresses):
+    """Each address in the text is looked up in order and every occurrence becomes the user's mention.
+
+    The Slack client is a MagicMock answering every lookup with one user id, so the
+    lookups made and the rewritten text show exactly which substrings were taken as addresses.
+    """
+    mock_client = MagicMock()
+    mock_get_slack_web_client.return_value = mock_client
+    mock_client.users_lookupByEmail.return_value = {"user": {"id": "U1"}}
+
+    result = users.replace_users_emails_with_mention(text)
+
+    assert [call.kwargs["email"] for call in mock_client.users_lookupByEmail.call_args_list] == addresses
+    expected = text
+    for address in addresses:
+        expected = expected.replace(address, "<@U1>")
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["short tld x@y.c", "no local part @x.com", "no domain dot a@b", "empty label user@.com"],
+)
+@patch("integrations.slack.users.get_slack_web_client")
+def test_replace_users_emails_with_mention_leaves_non_addresses_untouched(mock_get_slack_web_client, text):
+    """Strings that only resemble an address are not looked up and the text comes back unchanged.
+
+    The Slack client is a MagicMock; asserting it was never called proves nothing was
+    taken as an address.
+    """
+    mock_client = MagicMock()
+    mock_get_slack_web_client.return_value = mock_client
+
+    result = users.replace_users_emails_with_mention(text)
+
+    assert result == text
+    mock_client.users_lookupByEmail.assert_not_called()
