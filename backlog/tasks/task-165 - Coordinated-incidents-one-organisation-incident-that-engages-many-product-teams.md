@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-11-25T19:10:00Z'
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - incident
 milestone: m-7
@@ -70,6 +70,14 @@ created: 2026-11-25T19:10:00Z
 ---
 
 2026-11-25 (human, TASK-193 approved): every coordinated-incident post to a shared conversation (engagement, workstreams, audiences) asks LanguagePolicy.shared_languages for that conversation and posts MultilingualText; direct interactions use the user's language of choice (decisions/languages.md).
+
+---
+
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved; packet Q9 and section 7.2): an authenticated alert-intake endpoint for class 1 callers (GitHub Actions, Sentinel and Logic Apps with their own identity) is this incident re-cut's to slice, after TASK-194 (machine principals). It converges with the webhook alert consumer that the incident feature registers in TASK-37.3 on one application service (one behaviour, two front doors). No dependency change.
 
 ---
 <!-- COMMENTS:END -->

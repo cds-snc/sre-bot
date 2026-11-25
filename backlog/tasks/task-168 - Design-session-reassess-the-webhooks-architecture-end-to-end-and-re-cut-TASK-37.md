@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-11-25T19:10:00Z'
+updated_date: '2026-11-25T21:01:00Z'
 labels:
   - architecture
   - webhooks
@@ -36,11 +36,10 @@ Invariants carried over (not reopened): nothing registers at import time and not
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 decisions/webhooks.md is rewritten (or superseded) from the session, with cited sources, and is consistent with the TASK-167 organisation-content decision
-- [ ] #2 TASK-37 and its subtasks, and TASK-47, 48 and 49, are rewritten, superseded or archived to match, each remaining slice a single PR under the size gate
-- [ ] #3 The re-cut slices are placed in the doc-11 work queue ahead of the rows that wait on TASK-37 (TASK-88, TASK-40)
-- [ ] #4 Webhook sender kinds (match, extract, template) are provisioned content and webhook instances managed content (decisions/organisation-content.md, provisioned-content.md, managed-content.md); the session chooses the matching and template engine for every content kind: declarative matching, logic-light templates over a fixed data model with an undefined name an error, size and count limits; the re-cut slices delete the per-sender Python in modules/webhooks/patterns/ and its import-time walk
-- [ ] #5 bin/deploy-checks.zsh post: the Non-JSON section's webhook pattern exclusion (added by TASK-28.2) is removed and any non-JSON line FAILs once import-time pattern discovery is gone
+- [x] #1 decisions/webhooks.md is rewritten (or superseded) from the session, with cited sources, and is consistent with the TASK-167 organisation-content decision
+- [x] #2 TASK-37 and its subtasks, and TASK-47, 48 and 49, are rewritten, superseded or archived to match, each remaining slice a single PR under the size gate
+- [x] #3 The re-cut slices are placed in the doc-11 work queue ahead of the rows that wait on TASK-37 (TASK-88, TASK-40)
+- [x] #4 Webhook sender kinds (match, extract, template) are provisioned content and webhook instances managed content (decisions/organisation-content.md, provisioned-content.md, managed-content.md); the session chooses the matching and template engine for every content kind: declarative matching, logic-light templates over a fixed data model with an undefined name an error, size and count limits; the re-cut slices delete the per-sender Python in modules/webhooks/patterns/ and its import-time walk
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -83,6 +82,38 @@ created: 2026-11-25T19:10:00Z
 ---
 
 2026-11-25 (human, TASK-193 approved): for the webhooks re-cut (37.x): bot-authored wording in intents (headers, buttons, NotificationRequested titles the bot writes) is MultilingualText from LanguagePolicy; sender-supplied alert content (AWS, other senders) keeps its source language, placed once (decisions/languages.md).
+
+---
+
+created: 2026-11-25T20:54:00Z
+
+---
+
+TASK-190 hand-off (delivery map row 21): the rebuilt address matcher is linear and token-bounded and bounds Slack lookups (F-I: one users_lookupByEmail per match, unbounded). Placed in TASK-37.2.1 (AC #8).
+
+---
+
+created: 2026-11-25T20:54:00Z
+
+---
+
+TASK-190 hand-off (delivery map row 21): the rewritten webhooks.md carries security.md's linear-processing rule into the interpret and render stages; the re-cut keeps the 37.4 padding AC. The padding AC is on TASK-37.4.3 (AC #3), the cutover child of the TASK-37.4 coordinator.
+
+---
+
+created: 2026-11-25T20:54:00Z
+
+---
+
+2026-11-25: AC #5 ("bin/deploy-checks.zsh post: the Non-JSON section's webhook pattern exclusion (added by TASK-28.2) is removed and any non-JSON line FAILs once import-time pattern discovery is gone") moved verbatim to TASK-37.5 (AC #5), where import-time pattern discovery is deleted, and removed from this task (human-approved, TASK-37.1 plan correction C8).
+
+---
+
+created: 2026-11-25T21:01:00Z
+
+---
+
+2026-11-25: ACs 1-4 verified on the TASK-37.1 branch (stack-w/task-37.1-content-loader): decisions/webhooks.md rewritten with cited sources and consistent with organisation-content.md/provisioned-content.md/managed-content.md; TASK-37.x, 47, 48, 49 re-cut (new 37.2.1, 37.2.2, 37.4.1-37.4.3, 37.6, 37.6.1, 37.6.2, 37.7, 37.8, TASK-194); doc-11 rows 22.1-22.14 ahead of C7/C9; engines named (conditions, RFC 9535 singular paths, python-liquid StrictUndefined with limits). AC 5 moved to TASK-37.5. Closes when TASK-37.1 merges.
 
 ---
 <!-- COMMENTS:END -->

@@ -5,8 +5,8 @@ title: >-
   factory and classify_notify_error; revoke_api_key moves to its webhook caller
 status: To Do
 assignee: []
-created_date: '2026-09-18 16:51'
-updated_date: '2026-10-15 17:45'
+created_date: 2026-09-18 16:51
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - clients
   - phase-3
@@ -18,7 +18,7 @@ references:
   - app/integrations/notify/client.py
   - app/modules/webhooks/patterns/aws_sns_notification/api_key_detected.py
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1604'
+  - https://github.com/cds-snc/sre-bot/issues/1604
 parent_task_id: TASK-25
 priority: medium
 ordinal: 241000
@@ -52,7 +52,18 @@ TARGET. The vendor package exports a factory for an authenticated HTTP client (J
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-09-24 20:11
+
 ---
+
 2026-09-24 citation fix: decisions/layers.md, capability-packages.md and events.md were deleted and replaced by decisions/plugin-architecture.md (six layers: server, features, capabilities, infrastructure, integrations, contracts). Read those references in this task as plugin-architecture.md. Path A infrastructure capabilities are now split: hosting contracts (storage, coordination, queue, secrets) live in app/contracts/ with implementations in app/infrastructure/; workplace systems and shared business engines live in app/capabilities/. Path B adapters are unchanged (outbound-clients.md). revoke_api_key moves to its caller. Today that is the modules/webhooks SNS pattern. When TASK-37 rebuilds webhooks as a capability, the key-revocation reaction belongs to the feature that registers a handler through the webhooks extension point (TASK-37.5), not the capability core.
+
+---
+
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved): TASK-37.3 now depends on this task. 37.3 ports the api_key_detected Notify key revocation into a registered webhooks handler in its own package (async httpx, run from the inbox item and keyed on the delivery id), and that handler calls this task's Notify contract client, not the legacy one, so this lands first (queued ahead in Lane B). No dependency change here.
+
 ---
 <!-- COMMENTS:END -->

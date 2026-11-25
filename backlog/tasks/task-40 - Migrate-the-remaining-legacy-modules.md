@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - migration
   - phase-5
 milestone: m-5
 dependencies:
-  - TASK-37
+  - TASK-37.5
+  - TASK-37.6.2
   - TASK-145
   - TASK-39
   - TASK-35
@@ -32,7 +33,7 @@ ordinal: 40000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 decisions/plugin-architecture.md and migration.md: rebuild by surface, not by module. modules/sre and modules/dev are grab-bags of unrelated commands, so each surface goes to the feature, capability or host home that owns what it does, as assigned in the TASK-36 inventory (app/tests/integration/legacy_surface/INVENTORY.md), never to a module-shaped package.
 
-Scope: every surface still under app/modules/ after TASK-37 (webhooks, including the webhook CRUD and admin views in modules/slack/ and modules/sre/webhook_helper.py), TASK-145 (incident, including /sre incident) and TASK-39 (role, secret, atip), except aws and provisioning, which TASK-88 owns (TASK-88 also deletes modules/permissions with its only callers, modules/aws/users.py and groups.py, per decisions/authorization.md). Expected remainder:
+Scope: every surface still under app/modules/ after TASK-37 (webhooks; its CRUD and admin views in modules/slack/ and modules/sre/webhook_helper.py are rebuilt as the webhooks control plane and deleted by TASK-37.6.2, not here), TASK-145 (incident, including /sre incident) and TASK-39 (role, secret, atip), except aws and provisioning, which TASK-88 owns (TASK-88 also deletes modules/permissions with its only callers, modules/aws/users.py and groups.py, per decisions/authorization.md). Expected remainder:
 - modules/ops: log_ops_message, called by models/utils.py, utils/models.py and the legacy webhook handlers;
 - modules/sre: the /sre root and /sre version (target app/server/, system info like GET /version);
 - modules/dev: the /sre dev commands, dev-environment only, recorded as dropped in the inventory;
@@ -64,3 +65,15 @@ Steps:
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved; packet OQ9 and section 7.2): the webhook CRUD and admin views leave this task's scope; the webhooks capability's control plane owns them (TASK-37.6.1 API, TASK-37.6.2 Slack binding and deletion). Dependency TASK-37 replaced by TASK-37.5 (legacy processing deleted) and TASK-37.6.2 (legacy admin deleted); the other dependencies are unchanged.
+
+---
+<!-- COMMENTS:END -->

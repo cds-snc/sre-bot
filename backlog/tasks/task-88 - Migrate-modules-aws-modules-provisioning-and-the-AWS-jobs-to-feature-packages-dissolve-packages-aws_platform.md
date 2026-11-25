@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-11 15:36
-updated_date: '2026-11-06T19:12:00Z'
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - phase-5
 dependencies:
   - TASK-25.2
   - TASK-36.1.3
   - TASK-36.3
-  - TASK-37.4
+  - TASK-37.6.2
   - TASK-109
   - TASK-114.2
   - TASK-145.9
@@ -72,3 +72,15 @@ This task decides the feature boundaries per decisions/feature-packages.md and d
 
 2026-11-06 (TASK-36.1.2 OQ1/OQ6, human-approved): legacy pin and cutover rules apply: decisions/migration.md recipe steps 2 and 4, decisions/transport-slack.md (legacy ids), decisions/testing.md (seams during the legacy migration); checklist in the implementation-planning skill (Legacy Surfaces). Rebuild/cutover task: pins pass with assertions unchanged; fixtures rewired to the target Protocol fakes and their seam-baseline entries removed; legacy_only_* tests for behaviour it ends deleted; modal-internal ids take the plugin prefix, ids on posted messages stay as legacy aliases; new tests in the strict zone (make check-test-seams, TASK-187).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved; TASK-37.1 plan correction C7): dependency TASK-37.4 replaced by TASK-37.6.2. modules/slack/webhooks.py is on the aws_platform seam baseline TASK-88 retires and is deleted by 37.6.2 (its incident caller incident_alert.py:67 goes with Lane A's TASK-145.7.10, transitively before 37.6.2). No content need on the old 37.4 edge was found: modules/webhooks imports no modules/aws. Other dependencies unchanged.
+
+---
+<!-- COMMENTS:END -->

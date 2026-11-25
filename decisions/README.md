@@ -44,7 +44,7 @@ The app is the organisation's internal operations platform, with incident respon
 | [security.md](security.md) | AuthN/Z, CORS, rate limiting, webhooks | target |
 | [dependency-scanning.md](dependency-scanning.md) | Dependency-vulnerability CI gate ownership and enforcement | target |
 | [hookspec-deprecation.md](hookspec-deprecation.md) | How a hookspec is deprecated and removed | target |
-| [webhooks.md](webhooks.md) | Incoming-webhook capability: pipeline, source-declared parsing, handler extension point | target |
+| [webhooks.md](webhooks.md) | Inbound-webhook capability: protocol, sender-kind and instance layers, async ingest through an inbox, the event model, data and control planes, caller migration | target |
 | [observability.md](observability.md) | Logging, redaction, correlation | target |
 | [health-checks.md](health-checks.md) | Static liveness and readiness; container, ECS, ALB and Route53 health-check layering | target |
 | [reliability.md](reliability.md) | Idempotency, queuing, background jobs | target |

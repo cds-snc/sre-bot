@@ -313,3 +313,10 @@ ai_writing = true
 [plugins.workplace_utilities]
 geolocate = true
 rant = true
+
+[content]
+# Provisioned content (decisions/provisioned-content.md): relative to the app directory.
+# The ceilings apply to every kind; a kind may only lower them.
+root = "content"
+max_file_bytes = 16384
+max_items_per_kind = 200
