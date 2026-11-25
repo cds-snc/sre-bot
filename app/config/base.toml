@@ -260,6 +260,25 @@ upgrade_lease_ttl_seconds = 900
 [incident_postmortem]
 # Non-public: set from the environment as INCIDENT_POSTMORTEM__CALENDAR_ID.
 calendar_id = ""
+# The retro meeting search. The window is local time in time_zone on each date, so it
+# follows daylight saving time; weekdays are ISO (1 Monday to 7 Sunday); holidays are the
+# observed federal holidays of every year the search spans.
+time_zone = "America/Toronto"
+window_start = "13:00"
+window_end = "15:00"
+weekdays = [1, 2, 3, 4, 5]
+duration_minutes = 30
+slot_step_minutes = 30
+# Days the search covers (1-120), and the "start after N days" input's default and maximum.
+search_days = 60
+default_start_offset_days = 1
+max_start_offset_days = 60
+# Share of optional attendees that must be free at the chosen time (0-100): 0 never lets
+# them block, 100 needs every optional attendee counted. Required attendees are never busy.
+optional_quorum_percent = 50
+# When the holiday list cannot be read: "proceed" searches without holidays and says so in the
+# view and the channel notice; "refuse" books nothing and says why.
+holiday_lookup_failure = "proceed"
 
 [talent]
 # Non-public: each id is set from the environment as TALENT__<KEY>.

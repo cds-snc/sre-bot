@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from features.incident.core.adapters.google_calendar import GoogleCalendarAvailability, GoogleCalendarMeetingScheduler
@@ -174,3 +175,24 @@ async def test_busy_free_and_unknown_are_three_answers_clipped_to_the_window(ava
 async def test_a_bad_window_is_refused(availability: CalendarAvailability) -> None:
     with pytest.raises(ValueError):
         await availability.busy_periods(["a@example.test"], END, START)
+
+
+async def test_a_labelled_meeting_is_titled_with_its_label_in_every_language_then_the_subject(
+    scheduler: MeetingScheduler,
+) -> None:
+    request = MeetingRequest(
+        title="Payments down",
+        label=MultilingualText((("en-US", "Retro"), ("fr-FR", "Rétro"))),
+        description="Review",
+        start=START,
+        end=END,
+        time_zone="America/Toronto",
+        attendees=("a@example.test",),
+        idempotency_key="incident-1:postmortem:label",
+    )
+
+    booked = await scheduler.create(request)
+
+    assert booked.is_success
+    assert booked.data is not None
+    assert booked.data.title == "Retro / Rétro — Payments down"

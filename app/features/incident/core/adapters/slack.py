@@ -288,6 +288,10 @@ _ARCHIVE_DONE = frozenset({"already_archived"})
 # Slack refuses a bot's join of a private channel; for the incident the channel is not writable.
 _JOIN_REFUSED = frozenset({"method_not_supported_for_channel_type"})
 _CANVAS_DONE = frozenset({"channel_canvas_already_exists"})
+# Slack's built-in assistant: a member of every channel with no bot flag, named only by its fixed id.
+_SLACKBOT = "USLACKBOT"
+_MEMBERS_PAGE = 200
+_NO_USER = frozenset({"user_not_found"})
 _NAME_TAKEN = "name_taken"
 _OWN_CONVERSATION_TYPES = "public_channel,private_channel"
 _OWN_CONVERSATIONS_PAGE = 200
@@ -339,7 +343,7 @@ class SlackIncidentConversation:
     """Write to an incident's Slack channel and say whether the bot can.
 
     ``reads`` is the async bot client (``conversations.info``, ``users.conversations``,
-    ``usergroups.users.list``); ``writes`` is the write handle, which retries only
+    ``usergroups.users.list``, ``conversations.members``, ``users.info``); ``writes`` is the write handle, which retries only
     rate-limited requests, so a create or a post is never replayed after Slack may
     already have applied it. ``tenant`` is the configured Slack tenant id, which
     names the channels this adapter creates or finds; ``None`` when Slack has no
@@ -493,6 +497,67 @@ class SlackIncidentConversation:
         if skipped:
             logger.info("incident_conversation_accounts_not_found", conversation_id=conversation.vendor_id, count=skipped)
         return OperationResult.success(tuple(account_ids))
+
+    async def members(self, conversation: ConversationReference) -> OperationResult[tuple[str, ...]]:
+        """Page through ``conversations.members``, then keep the human, active accounts by ``users.info``.
+
+        Bots (``is_bot``), app users (``is_app_user``), deactivated accounts (``deleted``)
+        and Slackbot are left out; a member Slack no longer knows is left out too.
+        """
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        member_ids: list[str] = []
+        cursor: str | None = None
+        while True:
+            try:
+                response = await self._reads.conversations_members(
+                    channel=conversation.vendor_id, limit=_MEMBERS_PAGE, cursor=cursor
+                )
+            except SlackApiError as exc:
+                return _conversation_failure("members", conversation, exc)
+            member_ids.extend(str(member) for member in response.get("members") or [])
+            cursor = _next_cursor(response) or None
+            if cursor is None:
+                break
+        people: list[str] = []
+        for account_id in dict.fromkeys(member_ids):
+            if account_id == _SLACKBOT:
+                continue
+            user = await self._user(conversation, account_id)
+            if isinstance(user, OperationResult):
+                return user
+            if user and not (user.get("is_bot") or user.get("is_app_user") or user.get("deleted")):
+                people.append(account_id)
+        return OperationResult.success(tuple(people))
+
+    async def account_emails(
+        self, conversation: ConversationReference, account_ids: Sequence[str]
+    ) -> OperationResult[Mapping[str, str | None]]:
+        """Read each account's profile email by ``users.info``; no email or no such user is ``None``."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        emails: dict[str, str | None] = {}
+        for account_id in account_ids:
+            user = await self._user(conversation, account_id)
+            if isinstance(user, OperationResult):
+                return user
+            profile: Mapping[str, Any] = (user or {}).get("profile") or {}
+            email = profile.get("email")
+            emails[account_id] = email if isinstance(email, str) and email.strip() else None
+        return OperationResult.success(emails)
+
+    async def _user(
+        self, conversation: ConversationReference, account_id: str
+    ) -> Mapping[str, Any] | None | OperationResult[Any]:
+        """The ``users.info`` user object; ``None`` for a user Slack does not know, a result for a failure."""
+        try:
+            response = await self._reads.users_info(user=account_id)
+        except SlackApiError as exc:
+            if exc.response.get("error") in _NO_USER:
+                return None
+            return _conversation_failure("users_info", conversation, exc)
+        user: Mapping[str, Any] = response.get("user") or {}
+        return user
 
     async def add_bookmark(self, conversation: ConversationReference, title: str, link: str) -> OperationResult[None]:
         """Add a link bookmark titled ``title`` to the channel."""

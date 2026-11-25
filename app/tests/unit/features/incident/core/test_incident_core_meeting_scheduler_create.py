@@ -18,6 +18,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from googleapiclient.errors import HttpError
 
+from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from features.incident.core.adapters.google_calendar import GoogleCalendarMeetingScheduler, meeting_event_id
@@ -184,3 +185,23 @@ async def test_a_response_without_a_timed_start_is_an_invalid_response(stub_cale
 
     assert result.status is OperationStatus.PERMANENT_ERROR
     assert result.error_code == ErrorCode.INVALID_RESPONSE
+
+
+async def test_a_label_leads_the_summary_in_every_language_and_a_multilingual_description_has_a_paragraph_each(
+    stub_calendar: StubCalendar,
+) -> None:
+    """An uncapped label carries every language joined by " / " ahead of the subject (decisions/languages.md)."""
+    request = _request(
+        title="Payments down",
+        label=MultilingualText((("fr-FR", "Rétro"), ("en-US", "Retro"))),
+        description=MultilingualText((("fr-FR", "Revue de l'incident."), ("en-US", "Review of the incident."))),
+    )
+
+    result = await _scheduler().create(request)
+
+    assert result.status is OperationStatus.SUCCESS
+    body = stub_calendar.calls_to("insert")[0].params["body"]
+    assert body["summary"] == "Rétro / Retro — Payments down"
+    assert body["description"] == "Revue de l'incident.\n\nReview of the incident."
+    assert result.data is not None
+    assert result.data.title == "Rétro / Retro — Payments down"

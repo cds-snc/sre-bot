@@ -3,10 +3,10 @@ id: TASK-193
 title: >-
   Instance language policy and the multilingual message: shared notices in the
   configured languages, direct interactions in the user's language
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-25T18:51:00Z'
-updated_date: '2026-11-25T19:25:00Z'
+updated_date: '2026-11-25T19:46:00Z'
 labels:
   - i18n
   - platform
@@ -134,4 +134,12 @@ Verification
 - grep ("en-US", "fr-FR") in features/ and server/: only the slice default in server/languages/settings.py (the configured default, mirrors base.toml).
 
 Human after merge: decide the production order (TBS 6.1.1: French first while the issuing office is in Quebec; department move pending); the agent prepares the app/config/production.toml PR.
+
+Closed 2026-11-25: #1887 merged 2026-11-25T19:46Z (merge commit 87471ee9); ACs #1-#7 checked; no human post-deploy check (no visible change with the default setting). Open follow-on outside this task: production's [languages] shared order (human decision, then the agent prepares the app/config/production.toml PR); fr-CA raw-locale gap recorded on TASK-118.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Instance language policy as configuration behind contracts/languages.py (LanguagePolicy, MultilingualText); [languages] shared host slice (default en-US then fr-FR, validated at boot); IncidentConversation.post takes MultilingualText; tenant guard, show field notice and archive notices/replies moved onto the policy; ADR decisions/languages.md, with i18n.md, platform-transports.md and configuration.md updated. Merged in #1887 (87471ee9).
+<!-- SECTION:FINAL_SUMMARY:END -->

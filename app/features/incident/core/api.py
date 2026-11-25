@@ -306,6 +306,27 @@ class IncidentConversation(Protocol):
         """
         ...
 
+    async def members(self, conversation: ConversationReference) -> OperationResult[tuple[str, ...]]:
+        """Return the account ids of the conversation's people, in the platform's order.
+
+        Only human, active accounts: bots, app users and deactivated accounts are left
+        out by the platform's own flags, never by a name. An unknown conversation is
+        NOT_FOUND.
+        """
+        ...
+
+    async def account_emails(
+        self, conversation: ConversationReference, account_ids: Sequence[str]
+    ) -> OperationResult[Mapping[str, str | None]]:
+        """Return each asked account's email in the conversation's system and tenant.
+
+        An account with no email, or unknown to the platform, maps to ``None``: the caller
+        skips and names it. No accounts is an empty mapping without a call. An email is a
+        lookup attribute, never a key (decisions/people-and-accounts.md); reading it from
+        the platform is tolerated until the people capability links accounts.
+        """
+        ...
+
     async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
         """Set the conversation's purpose (its description) to ``text``."""
         ...

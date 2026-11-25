@@ -13,6 +13,10 @@ seeded with the same channel names, user groups and accounts: a new name creates
 channel the bot can write to, a taken name is ``CONVERSATION_NAME_TAKEN``,
 ``find_own`` finds only the bot's open channels by exact name, and
 ``account_ids_for`` answers the account ids of the emails it knows, skipping the others.
+``members`` lists the conversation's human, active accounts in order (bots, app users,
+Slackbot and deactivated accounts left out) and ``account_emails`` answers each asked
+account's email, ``None`` for an account with no email or none at all; the Slack stub
+answers ``conversations.members`` one id per page, so the adapter's paging is exercised.
 """
 
 from collections.abc import Callable
@@ -25,7 +29,7 @@ from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
-from features.incident.core.adapters.in_memory import InMemoryIncidentConversation
+from features.incident.core.adapters.in_memory import InMemoryIncidentConversation, SeededAccount
 from features.incident.core.adapters.slack import SlackIncidentConversation, slack_channel_name
 from features.incident.core.api import ConversationName, ConversationReference, IncidentConversation, MessageReference
 
@@ -52,6 +56,27 @@ _NAMES = {
 _FOREIGN = [slack_channel_name(FOREIGN_NAME)]
 _GROUPS = {"S0SEC": ["U1", "U2"]}
 _ACCOUNTS = {"ada@example.org": "U0ADA", "bo@example.org": "U0BO"}
+_MEMBERS = {"C0OPEN": ["U0ADA", "U0BOT", "U0BO", "U0GONE", "U0APP", "USLACKBOT", "U0NOMAIL"]}
+_PEOPLE = {
+    "U0ADA": SeededAccount(email="ada@example.org"),
+    "U0BO": SeededAccount(email="bo@example.org"),
+    "U0NOMAIL": SeededAccount(email=None),
+    "U0BOT": SeededAccount(email=None, human=False),
+    "U0APP": SeededAccount(email="app@example.org", human=False),
+    "USLACKBOT": SeededAccount(email=None, human=False),
+    "U0GONE": SeededAccount(email="gone@example.org", active=False),
+}
+# The same people as Slack's users.info answers them: a bot and an app user are flagged
+# differently, and Slackbot carries no bot flag at all (only its id names it).
+_SLACK_USERS: dict[str, dict[str, Any]] = {
+    "U0ADA": {"profile": {"email": "ada@example.org"}},
+    "U0BO": {"profile": {"email": "bo@example.org"}},
+    "U0NOMAIL": {"profile": {}},
+    "U0BOT": {"is_bot": True, "profile": {}},
+    "U0APP": {"is_app_user": True, "profile": {"email": "app@example.org"}},
+    "USLACKBOT": {"profile": {}},
+    "U0GONE": {"deleted": True, "profile": {"email": "gone@example.org"}},
+}
 _CHANNELS = {
     "C0OPEN": {"is_archived": False, "is_member": True},
     "C0ARCHIVED": {"is_archived": True, "is_member": True},
@@ -68,6 +93,8 @@ def conversations(request: pytest.FixtureRequest, stub_slack: Callable[..., Any]
             foreign_names=_FOREIGN,
             groups=_GROUPS,
             accounts=_ACCOUNTS,
+            members={key: list(value) for key, value in _MEMBERS.items()},
+            users=_SLACK_USERS,
         )
         return SlackIncidentConversation(stub.reads, stub.writes, tenant=TENANT)
     return InMemoryIncidentConversation(
@@ -79,6 +106,8 @@ def conversations(request: pytest.FixtureRequest, stub_slack: Callable[..., Any]
         foreign_names=_FOREIGN,
         groups=_GROUPS,
         accounts=_ACCOUNTS,
+        members=_MEMBERS,
+        people=_PEOPLE,
     )
 
 
@@ -170,6 +199,8 @@ async def test_inviting_nobody_succeeds(conversations: IncidentConversation) -> 
         lambda c: c.group_members(GOOGLE, "S0SEC"),
         lambda c: c.join(GOOGLE),
         lambda c: c.account_ids_for(GOOGLE, ["ada@example.org"]),
+        lambda c: c.members(GOOGLE),
+        lambda c: c.account_emails(GOOGLE, ["U0ADA"]),
     ],
 )
 async def test_another_systems_reference_is_unsupported(
@@ -338,3 +369,32 @@ async def test_account_ids_for_no_emails_is_empty(conversations: IncidentConvers
 
     assert found.is_success
     assert found.data == ()
+
+
+async def test_members_are_the_human_active_accounts_in_order(conversations: IncidentConversation) -> None:
+    found = await conversations.members(OPEN)
+
+    assert found.is_success
+    assert found.data == ("U0ADA", "U0BO", "U0NOMAIL")
+
+
+async def test_members_of_an_unknown_conversation_is_not_found(conversations: IncidentConversation) -> None:
+    found = await conversations.members(UNKNOWN)
+
+    assert found.status is OperationStatus.NOT_FOUND
+
+
+async def test_account_emails_answers_each_asked_account_none_without_an_email(
+    conversations: IncidentConversation,
+) -> None:
+    found = await conversations.account_emails(OPEN, ["U0BO", "U0NOMAIL", "U0NOBODY", "U0ADA"])
+
+    assert found.is_success
+    assert dict(found.data or {}) == {"U0BO": "bo@example.org", "U0NOMAIL": None, "U0NOBODY": None, "U0ADA": "ada@example.org"}
+
+
+async def test_account_emails_of_no_accounts_is_empty(conversations: IncidentConversation) -> None:
+    found = await conversations.account_emails(OPEN, [])
+
+    assert found.is_success
+    assert dict(found.data or {}) == {}

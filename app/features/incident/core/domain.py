@@ -6,6 +6,7 @@ from enum import Enum, StrEnum
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from contracts.languages import MultilingualText
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity, StatusUpdateStage
 
@@ -656,8 +657,10 @@ class MeetingRequest:
     """A meeting to book: purpose-neutral, so any incident meeting can use it.
 
     Attributes:
-        title: The invitation title.
-        description: The invitation body; may be empty.
+        title: The meeting's subject, as given (user content, such as the incident title):
+            never repeated per language.
+        description: The invitation body; may be empty. The bot's own wording is a
+            ``MultilingualText``, laid out by the adapter in its order.
         start: Aware start time.
         end: Aware end time, after ``start``.
         time_zone: IANA zone the meeting is shown in (the caller's setting).
@@ -666,19 +669,25 @@ class MeetingRequest:
             attempt (never a claim token): a replay with the same key returns the
             meeting it booked instead of booking a second one.
         attachments: Links attached to the invitation.
+        label: The bot's word for the kind of meeting (Retro / Rétro), shown before the
+            subject in every language: a calendar title has no cap, so it carries them all
+            (decisions/languages.md); ``None`` for the subject alone.
     """
 
     title: str
-    description: str
+    description: str | MultilingualText
     start: datetime
     end: datetime
     time_zone: str
     attendees: tuple[str, ...]
     idempotency_key: str
     attachments: tuple[MeetingAttachment, ...] = ()
+    label: MultilingualText | None = None
 
     def __post_init__(self) -> None:
         _require_text(self, "title", "time_zone", "idempotency_key")
+        if self.label is not None and not isinstance(self.label, MultilingualText):
+            raise ValueError(f"label must be a MultilingualText or None, got {self.label!r}")
         _require_window(self, self.start, self.end)
         _require_time_zone(self.time_zone)
         object.__setattr__(self, "attendees", normalized_attendees(self.attendees))

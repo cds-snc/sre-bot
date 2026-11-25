@@ -76,6 +76,10 @@ jobs:
         working-directory: ./app
         run: make check-test-seams
 
+      - name: Task reference freeze check
+        working-directory: ./app
+        run: make check-task-references
+
       - name: Test
         working-directory: ./app
         run: make test

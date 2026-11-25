@@ -4,7 +4,7 @@ title: Compare person-based retro attendees with Slack profile emails in shadow 
 status: To Do
 assignee: []
 created_date: 2026-09-10 16:18
-updated_date: '2026-11-06T02:59:00Z'
+updated_date: '2026-11-25T20:12:00Z'
 labels:
   - identity
 dependencies:
@@ -34,3 +34,15 @@ modules/incident/schedule_retro.py resolves retro attendees from Slack profile e
 - [ ] #4 Existing retro scheduling tests stay green, and new tests cover linked, unlinked and mixed attendees
 - [ ] #5 If app/bin/baselines/package_shape.txt still holds the people capability's readme-consumers entry, it is deleted and the capability README names this consumer
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): the rebuilt retro surface resolves attendee emails through postmortem's AttendeeDirectory Protocol (incident/postmortem/interfaces.py, emails_for(conversation, account_ids)), implemented now by ConversationAttendeeDirectory over IncidentConversation.account_emails (Slack profile email, tolerated by people-and-accounts.md until TASK-83.6). The shadow comparison wraps that one adapter: person-based emails beside the conversation emails, mismatches logged.
+
+---
+<!-- COMMENTS:END -->

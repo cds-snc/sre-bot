@@ -17,6 +17,10 @@ Once every other change is finished, run each full gate once, one after the othe
 
 Rerun a full gate only when it raised a real error.
 
+The freeze guards run in CI beside these gates; run the ones a change can trip, from `app/`, before the full mypy: `make check-import-contracts`, `check-settings-key-ownership`, `check-package-shape`, `check-test-seams`, `check-fake-coverage` and `check-task-references`. A guard's baseline only ratchets down (decisions/migration.md rule 3).
+
+**Task ids in code:** a backlog task id appears in a `.py` file only as `TODO(TASK-<id>)`, naming the task that deletes or changes those lines. Describe what the code does; never write where it came from, which task added it, or which future task will own a behaviour (decisions/migration.md rule 7; `check-task-references` enforces it).
+
 By default, do not run `app/tests/smoke/*`. Run smoke tests only when explicitly requested and env vars are confirmed.
 Always run from `app/` and keep checks scoped to project code only (exclude virtualenv and non-project paths).
 
