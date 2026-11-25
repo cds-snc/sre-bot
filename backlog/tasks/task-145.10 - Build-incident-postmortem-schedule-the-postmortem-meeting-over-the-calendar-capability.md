@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-16T20:19:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - features
@@ -26,58 +26,62 @@ ordinal: 360000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Layer D1 of TASK-145: plugin incident.postmortem, independent of the response slices after TASK-145.6. Rebuilds schedule_retro (the modal flow, the schedule button from the nudge, availability search and meeting creation). A postmortem meeting is a meeting about the incident: calendar operations come from the calendar capability (TASK-138), so this subdomain has no calendar adapter.
+Layer D1 of TASK-145 and Stack M coordinator: plugin incident.postmortem, independent of the response slices after TASK-145.6. Rebuilds schedule_retro (the modal flow, the schedule button from the nudge, availability search and meeting creation) and adds the meeting lifecycle. A postmortem meeting is a meeting about the incident. Calendar operations are incident-owned: TASK-138 (calendar capability) is superseded by the TASK-169 ruling of 2026-11-05 (human), and a calendar capability waits for a non-incident consumer.
 
-THIS SLICE
-- postmortem/entrypoints/slack.py and slack_views.py: the modal and the schedule action id declared in common/vocabulary.
-- postmortem/service.py: resolve the incident through find_incident_for_conversation; attendees from channel members as today; availability and meeting creation through capabilities.calendar.api; store the PostmortemMeetingReference (system, tenant, event id, link) on the record; post the confirmation when the conversation is writable.
-- Behaviour-preserving: pick a day offset and attendees, first free slot, one meeting. Rescheduling, cancelling, action items and feedback are expansions.
-- User-facing labels keep today's "retro" wording in the catalogues; the code and the record say postmortem.
-- Legacy registration removed in the same PR; modal fields and replies unchanged, pinned by TASK-36.1.
+Split into six layers by the single-PR size gate (see the program plan): TASK-145.10.1 (M1, verbatim move dissolving features/incident/scheduling), 145.10.2 (M2a, MeetingScheduler port, Google Calendar adapter, canada_holidays client), 145.10.3 (M2b, availability model, service, views, catalogues), 145.10.4 (M3, cutover and legacy deletion), 145.10.5 (M4a, role check), 145.10.6 (M4b, meeting lifecycle). This task writes no code; it is Done when every layer is merged and the ADR edits have landed.
+
+User-facing labels keep today's "retro" wording in the catalogues; the code and the record say postmortem. TASK-147 shares postmortem/ and nothing here is gated by its flag; TASK-145.11 moves the report draft in afterwards.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 features/incident/postmortem/ is registered as incident.postmortem and handles the schedule modal and the nudge's schedule button
-- [ ] #2 Meeting availability and creation go through capabilities.calendar.api; postmortem/ has no adapters/ directory
-- [ ] #3 The meeting reference is stored on the record with system, tenant and event id
-- [ ] #4 The pinned schedule flow passes unchanged
-- [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
-- [ ] #6 incident.postmortem reads the retrospective calendar id from [incident_postmortem] calendar_id (features/incident/postmortem/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
-- [ ] #7 Meeting scheduling comes from the incident-owned features/incident/scheduling and features/incident/meet over integrations/google_workspace, not a calendar capability (TASK-138 superseded by TASK-169 ruling, 2026-11-05 (human))
-- [ ] #8 features/incident/scheduling/availability.py takes a layout-table name (scheduling/service.py or domain.py, or core/ under feature-packages.md rule 4), and its app/bin/baselines/package_shape.txt entry is deleted
-- [ ] #9 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams
+- [ ] #1 TASK-145.10.1 (M1) is merged: scheduling/ dissolved, no behaviour change
+- [ ] #2 TASK-145.10.2 (M2a) is merged: MeetingScheduler port, Google Calendar adapter and canada_holidays client in place, dark
+- [ ] #3 TASK-145.10.3 (M2b) is merged: availability model, service, views, catalogues and Sentinel adapter in place, dark
+- [ ] #4 TASK-145.10.4 (M3) is merged: incident.postmortem registered with calendar_id required, legacy retro scheduling deleted, named changes NC1-NC10 listed in its PR body, pins pass
+- [ ] #5 TASK-145.10.5 (M4a) and TASK-145.10.6 (M4b) are merged: role check and meeting lifecycle in place
+- [ ] #6 Every ADR edit named in the program plan has landed with its layer (incident-management.md, configuration.md, service-accounts.md, workplace-systems.md wording, features/incident/README.md)
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Outline plan grounded at main d2d973ae (2026-10-09); re-ground at pickup (after TASK-145.6, TASK-138 and TASK-36.1).
+Program plan, approved 2026-11-20 (human) after re-plan against main ac8f8186. TASK-145.10 is the Stack M coordinator: it owns no code; its six subtasks do. Supersedes the single-PR plan (it tripped the size gate: about 520 new LOC, about 285 moved, about 430 deleted, about 30 files, a mechanical move mixed with behaviour).
 
-## Discovered state
-- modules/incident/schedule_retro.py (389): open_incident_retro_modal (67), view_save_event submission -> handle_schedule_retro_submit, confirm_click and user_select_action (incident_helper.py 158-160); calendar through packages.incident.scheduling (schedule_event 26, 241; availability 14), which TASK-138 turns into capabilities/calendar. Attendees come from channel members. The retrospective_url is written to the legacy item.
-- Not yet pinned (TASK-36.1).
+## Rules
+- One layer, one PR, branch stack-m/<task-id>-<slug>; each layer shippable and revertible by one git revert; main stays green after each merge. Order M1 -> M2a -> M2b -> M3 -> M4a -> M4b; TASK-145.11 depends on M4b (the last).
+- No calendar capability (TASK-138 superseded by TASK-169, 2026-11-05 human): calendar code is incident-owned; a non-incident consumer is the trigger for a capability. The MeetingScheduler port uses purpose-neutral names.
+- Every behaviour change is a named change of a migration.md step-4 kind (a)-(d), pinned before the cutover and listed in M3's PR body. Dead code in touched files is deleted. Policy and tuning values are typed settings with defaults (configuration.md). No Google scope list is written to any task or note.
+- ADR and README edits ride with the layer that makes them true. TASK-147 shares postmortem/: nothing here is gated by its flag. TASK-145.11 moves the report draft in afterwards (postmortem/service/report.py, prompt.py), taking none of this scope.
 
-## Steps
-1. features/incident/postmortem/: __init__.py (hookimpls), settings.py (day offset default, meeting length), service.py schedule_meeting(incident, attendees, day_offset): availability and creation through capabilities.calendar.api, PostmortemMeetingReference written through IncidentStore.update_field, confirmation posted through IncidentConversation when writable; domain.py (attendee selection types).
-2. postmortem/entrypoints: /sre incident schedule under sre.incident, the modal (view_save_event -> incident.postmortem.schedule.save), confirm_click and user_select_action under incident.postmortem.* ids; the nudge's schedule button id comes from common/vocabulary (rendered by response, handled here). Views and locales (keys moved from app/locales/incident.*.yml; labels keep "retro" wording pending decision).
-3. Legacy schedule_retro.py registrations removed in the same PR; pinned by TASK-36.1.
+## Layers
+| Layer | Task | Kind | Waits on | Blast radius / revert |
+| M1 | 145.10.1 verbatim move dissolving features/incident/scheduling | mechanical, no behaviour change | 145.6, 36.1.5 | none at runtime; revert restores both trees |
+| M2a | 145.10.2 core MeetingScheduler port + Google Calendar adapter; integrations/canada_holidays client + HolidayCalendar port | dark | M1 | dark; revert trivial |
+| M2b | 145.10.3 availability model, service, views, EN/FR catalogues, Sentinel adapter | dark (rule-1 exception if over about 600 LOC) | M2a | dark; revert trivial |
+| M3 | 145.10.4 cutover, legacy deleted, value-scoped alias claimed | production-changing | M2b, PR #1867 merged | retro modal, nudge button and /sre incident schedule move; one git revert restores legacy |
+| M4a | 145.10.5 core role check for meeting changes | dark | M3 | none; revert trivial |
+| M4b | 145.10.6 meeting lifecycle (one upcoming meeting, reschedule, cancel, follow-up) | production-changing | M4a (merge soon after M3) | writes to a shared calendar; revert restores M3 behaviour, events already created stay |
 
-## AC traceability
-AC1: steps 1-2 -> registration test (modal and nudge button id). AC2: step 1 -> service tests with the calendar capability fake; `ls features/incident/postmortem` shows no adapters/. AC3: step 1 -> store update test (reference with system, tenant, event id). AC4: pinned flow green. AC5: gates.
+## Design decisions
+D1 Scheduling dissolves into core and postmortem because contract (i) makes postmortem and scheduling independent siblings and incident-management.md :98 and :179 retire adapter-only siblings. Calendar adapter in core/adapters beside google_meet.py; pure rules in postmortem/domain.py (feature-packages.md: domain.py = pure rules); the holiday client is a vendor integration (integrations/canada_holidays, outbound-clients.md) behind a HolidayCalendar port in postmortem/interfaces.py. postmortem/ has no calendar adapter; its adapters/ holds the holidays and Sentinel adapters.
+D2 Plugin: entry point incident.postmortem = features.incident.postmortem.plugin (host reads settings.py before plugins load), contract (m) updated, requirement incident_postmortem.calendar_id (boot fails naming the key when empty, plugins.md), enablement keys (ci off).
+D3 Ids: modal-internal ids under incident.postmortem.*; the nudge button via register_attachment_action('incident.postmortem.schedule', ..., legacy_callback_values={'archive_channel': ('schedule_retro',)}); TASK-145.13 removes the alias. The archive_channel_action schedule_retro branch is deleted in M3.
+D4 Availability model (replaces the legacy single-busy-block heuristic): free/busy/unknown per attendee, freebusy errors are unknown never free; required attendees default to the incident's role holders, optional are other channel members ('Must attend' and 'Invite' pickers); a slot qualifies when no required attendee is busy (required unknown allowed but named) and the optional quorum (optional_quorum_percent) holds; earliest qualifying slot; explanations name who is busy or unknown and why no slot.
+D5 One upcoming meeting per incident; the calendar owns the time and the record holds only the reference; state (none, upcoming, ended, missing) is derived, never stored. First booking open to any channel member; later changes limited to the commander, operations lead or postmortem owner (declared_by fallback).
+D6 i18n per the rule of PR #1867: view carries the opener's locale in private_metadata; nudge-opened modal and channel confirmation bilingual (English first line); French title 'Planifier la rétro 🗓️' within Slack's 24-character limit; zone name in hints from the zone setting.
 
-## Test matrix
-Schedule: first free slot found -> meeting created, reference stored, confirmation posted; no slot -> notice, nothing stored; archived channel -> stored without post; calendar failure classified. Attendee picker: channel members listed, selection kept across confirm.
+## Named changes (listed with kind in M3's PR body)
+NC1 (a) refused calendar insert shows a failure view (pin first renamed test_legacy_only_*); NC2 (b) not-an-incident decided by the record, private localized reply; NC3 (b) meeting reference stored on the record; NC4 (b) EN/FR text; NC5 (b) minimal Sentinel payload (observability.md:20); NC6 (a) member without email skipped; NC7 (a) per-date DST windows and holidays for every year crossed (overlap with TASK-155 to check); NC8 (a) description, 10-minute reminder and one requestId source sent (TASK-86 folded in; event_config is sent, not deleted); NC9 (b) availability model, pins test_incident_retro_schedule_surface.py:159 and :175 edited citing the ruling; NC10 (b) guestsCanModify and guestsCanInviteOthers false.
 
-## Assumptions and doubts
-- capabilities.calendar.api shape per TASK-138 (MeetingScheduler, MeetingReference); confirm before coding.
-- Whether labels switch from "retro" to "postmortem" is open question 2 in the delivery plan.
+## ADR edits per layer
+M1 incident-management.md :75 (stale TASK-138 calendar sentence), :137, :179; M2a configuration.md vendor-enablement line for a credential-less public vendor plus a Changes line, service-accounts.md rule 5 meetings line; M3 incident-management.md Postmortem availability paragraph; M4a incident-management.md role rule (authorization.md object-level checks stay in the feature; feature-packages.md rule 4); M4b incident-management.md Postmortem paragraph and :44 line.
 
-## Size
-About 300 production lines. Under the gate.
+## Open checks (human or pickup)
+INCIDENT_POSTMORTEM__CALENDAR_ID non-empty in production before M3 merges; no Sentinel query reads the schedule-button event (M3); PR #1867 merged before M3; TASK-181 may change the Calendar factory (whichever merges second adapts); TASK-189 or TASK-145.9.2 may replace the stale notice's buttons (alias still serves posted notices); host_configuration.py :247 line removable only if key ownership still validates the table; TASK-155 overlap on holidays; verify a bot can create events on the calendar the bot user owns (service-accounts rule 5).
 
-## Blast radius and rollback
-One modal flow; revert restores the legacy registration.
+## Verification (every layer)
+ruff and targeted tests during TDD; at the end, from app/: make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams, then once each, sequentially, full mypy and full pytest (tests --ignore=tests/smoke).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -110,6 +114,14 @@ created: 2026-11-16T19:34:00Z
 ---
 
 2026-11-16 (human, TASK-145.8.5 OQ3): the nudge's schedule button registers through a value-scoped alias (archive_channel scoped to schedule_retro, TASK-145.8.5.2), not a plain alias of the whole callback; until then that value falls through to the legacy listener. TASK-145.13 removes the alias.
+
+---
+
+created: 2026-11-20T22:06:00Z
+
+---
+
+2026-11-20 (human): program-scope rulings APPROVED as recommended: three-way-plus slicing into 145.10.1-145.10.6 (M1 move; M2a core port, Calendar adapter, canada_holidays; M2b industry availability model, service, views, EN/FR; M3 cutover NC1-NC10; M4a core incident-role check; M4b meeting lifecycle); OQ1 scheduling dissolved (TASK-138 archived; scheduling is domain-agnostic); OQ2 accepted, audit content -> TASK-191; OQ3 TASK-86 folded in (NC8); OQ4 i18n per #1867; OQ5 NC7 in M2b; OQ6 one upcoming meeting, reschedule/cancel/follow-up, calendar owns the time; OQ7 industry availability model with required/optional attendees; OQ8 integrations/canada_holidays; NC10 guests cannot modify; postmortem owner may also change the meeting; first booking stays open to any channel member; post-meeting state derived from the event; TASK-192 overdue reminders. Assessment and sources: doc-17 Open decisions.
 
 ---
 <!-- COMMENTS:END -->

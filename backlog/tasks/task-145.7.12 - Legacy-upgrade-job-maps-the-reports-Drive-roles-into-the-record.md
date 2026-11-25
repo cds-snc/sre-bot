@@ -1,10 +1,10 @@
 ---
 id: TASK-145.7.12
 title: Legacy upgrade job maps the report's Drive roles into the record
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-16T19:34:00Z'
-updated_date: '2026-11-18T14:47:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - incident
   - migration
@@ -148,4 +148,6 @@ OQ4 Calling the async reader from the sync runner.
 - Tests: test_incident_core_item_upgrade_legacy_roles.py, test_incident_core_legacy_upgrade_roles.py (new); report, builder and job-run tests extended; tests/factories/legacy_upgrade.py takes roles or read_roles.
 Gates (from app/): ruff check . All checks passed; make check-import-contracts 14 kept 0 broken; check-settings-key-ownership OK; check-package-shape OK (3 baselined); check-test-seams OK (47/12 baselined); mypy Found 40 errors in 13 files (baseline, none in touched files; one arg-type error in legacy_upgrade.py found and fixed before the counted run); pytest tests --ignore=tests/smoke 7680 passed.
 AC #1, #2, #3 checked. Merges after the TASK-145.7.8 apply; the rerun (dry_run then apply) maps the roles before TASK-145.13. Stays In Progress; commit, PR and merge are the human's.
+
+2026-11-20: closed by the agent: PR #1869 merged 2026-11-18 (98918309); all ACs checked.
 <!-- SECTION:NOTES:END -->

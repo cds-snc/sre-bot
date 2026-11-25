@@ -4,10 +4,10 @@ title: >-
   Abort boot when an enabled plugin's settings fail validation or a dependency
   it requires is not configured; CI switches off the plugins that require a
   vendor
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-10-27T18:10:00Z'
-updated_date: '2026-10-29T17:08:00Z'
+updated_date: '2026-11-20T22:06:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -129,4 +129,6 @@ Q6 TASK-126 title/file name still says "on_boot_failure abort|continue" while it
 Gates 2026-10-29: ruff check . All checks passed (format clean); mypy 41 errors in 14 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 5878 passed; make check-import-contracts 13 kept, 0 broken; make check-settings-key-ownership OK. ACs 1-5 checked: #1 test_lifespan_plugin_boot_failure (settings slice case), #2 same file (requirement case, event fields exactly plugin/phase/error_type/setting), #3 test_incident_scribe_requirements_resolve and test_lifespan_incident_plugins_openai_requirement, #4 ci.toml + guard test + full suite.
 
 2026-10-29 (human): no manual deploy or env check is required for this task. Since the SSM blob migration closed, those checks run only for a task that changes terraform, the task definition, IAM or SSM parameters, or adds, renames or removes an environment name or secret, and for the contract step that deletes what a running revision used. Every AC is checked; the human sets Done.
+
+2026-11-20: closed by the agent: PR #1809 merged 2026-10-29 (7cbdec44); all ACs checked.
 <!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: Cut over floppy-disk timeline capture and the stale-channel nudge
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-18T20:52:00Z'
+updated_date: '2026-11-20T22:05:00Z'
 labels:
   - incident
   - features
@@ -86,6 +86,14 @@ created: 2026-11-18T00:01:00Z
 ---
 
 2026-11-18 (human): depends on TASK-64's minimum-hold lease (reliability.md, 2026-11-18) before the stale-channel nudge registers as a leased job; a short run would otherwise nudge twice, once from each replica.
+
+---
+
+created: 2026-11-20T22:05:00Z
+
+---
+
+2026-11-20 (human, TASK-145.10 program-scope rulings): once an incident has a postmortem meeting (TASK-145.10.6 meeting lifecycle), the stale nudge shows 'Postmortem scheduled for <time>' (read live from the event) instead of the schedule button. Cut over only what TASK-189 keeps.
 
 ---
 <!-- COMMENTS:END -->

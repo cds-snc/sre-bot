@@ -45,7 +45,7 @@ evidence — never assert success without it.
 - Type boundary rules, partitioned package-owned settings, structured logging,
   non-blocking async, explicit error mapping.
 - Backlog tasks: CLI-only mutations, ACs checked off one by one as verified, never
-  set a task to Done, one task per session/branch/PR.
+  set a task to Done before its PR is merged, one task per session/branch/PR.
 - IMPORTANT: never run git commands unless the user explicitly asks.
 - If the diff outgrows the single-PR size gate, stop and hand off to
   `task-planner` rather than finishing an unreviewable PR.
