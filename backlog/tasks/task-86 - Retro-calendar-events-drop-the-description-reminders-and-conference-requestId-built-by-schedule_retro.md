@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-10 17:48
-updated_date: '2026-11-20T22:04:00Z'
+updated_date: '2026-11-25T15:18:00Z'
 labels:
   - incident
   - bug
@@ -77,6 +77,14 @@ created: 2026-11-20T22:04:00Z
 ---
 
 2026-11-20 (human, TASK-145.10 program-scope rulings): absorbed into TASK-145.10.2 (Stack M M2a) as named change NC8, kind (a): the rebuilt Calendar adapter takes explicit parameters and sends the description and the 10-minute popup reminder, with one requestId source. Human check first (this task's precondition): a past retro event in Google Calendar has no description. Closed when 145.10.2 merges.
+
+---
+
+created: 2026-11-25T15:18:00Z
+
+---
+
+2026-11-25 (TASK-145.10.2 rulings, human): the reminder override is not restored. Calendar applies events.reminders to the authenticated user only (the bot user), and attendees keep their own calendar defaults. NC8 sends the description and one requestId source (derived from the caller key) through the new adapter in TASK-145.10.2, wired in by TASK-145.10.4.
 
 ---
 <!-- COMMENTS:END -->

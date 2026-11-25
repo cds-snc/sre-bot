@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 15:43
-updated_date: '2026-11-20T22:04:00Z'
+updated_date: '2026-11-25T15:18:00Z'
 labels:
   - clients
   - reliability
@@ -60,6 +60,14 @@ created: 2026-11-20T22:04:00Z
 ---
 
 2026-11-20 (human, TASK-145.10 program-scope rulings): the Calendar adapter moves to features/incident/core/adapters/ in TASK-145.10.1. The wait on 'capability-package adapters' is obsolete: TASK-138 is superseded (TASK-169 ruling); the adapter stays incident-owned until a non-incident consumer appears. Repoint at pickup.
+
+---
+
+created: 2026-11-25T15:18:00Z
+
+---
+
+2026-11-25: Calendar events.insert is settled for the new adapter by TASK-145.10.2: event id = lower-case base32hex SHA-256 of the caller idempotency key, the same value as conferenceData requestId (one key, TASK-86), 409 reads back the existing event, SDK retries kept. The legacy insert_event (num_retries=0) is deleted by TASK-145.10.4.
 
 ---
 <!-- COMMENTS:END -->

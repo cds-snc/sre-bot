@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-18 15:43
-updated_date: '2026-11-20T22:04:00Z'
+updated_date: '2026-11-25T15:18:00Z'
 labels:
   - clients
   - reliability
@@ -78,6 +78,14 @@ created: 2026-11-20T22:04:00Z
 ---
 
 2026-11-20 (human, TASK-145.10 program-scope rulings): the Calendar adapter moves from features/incident/scheduling/adapters/google_calendar.py to features/incident/core/adapters/ (beside google_meet.py) in TASK-145.10.1; scheduling/ is dissolved. Repoint this task's paths at pickup.
+
+---
+
+created: 2026-11-25T15:18:00Z
+
+---
+
+2026-11-25 (TASK-145.10.2): the new Calendar adapter (core/adapters/google_calendar.py) keeps SDK retries on create (client-supplied id derived from the caller key, 409 read-back) and delete (410 = success); only events.patch is a per-call num_retries=0 entry. Patch's end state: send If-Match with the etag from get so it keeps retries (outbound-clients.md optimistic-concurrency rule), a 412 settled by a re-read. The legacy insert_event entry leaves with TASK-145.10.4.
 
 ---
 <!-- COMMENTS:END -->
