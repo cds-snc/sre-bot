@@ -122,6 +122,9 @@ check-package-shape:
 check-test-seams:
 	uv run python -m bin.check_test_seams
 
+check-task-references:
+	uv run python -m bin.check_task_references
+
 new-package: # Create a feature, capability, umbrella, subdomain, core or common package; asks for each value, or pass ARGS="feature <name> --area <area>"
 	uv run python -m bin.new_package $(ARGS)
 

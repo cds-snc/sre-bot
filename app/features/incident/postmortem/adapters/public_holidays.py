@@ -1,8 +1,9 @@
 """Public-holiday lookup of the incident postmortem: Canadian federal holidays from canada-holidays.ca.
 
-Moved verbatim from features/incident/scheduling/availability.py (TASK-145.10.1);
-the HolidayCalendar adapter over integrations/canada_holidays (TASK-145.10.2)
-replaces it.
+The legacy retro flow's lookup; ``CanadaHolidaysCalendar`` (adapters/canada_holidays.py)
+is the ``HolidayCalendar`` the schedule service uses.
+
+TODO(TASK-145.10.4): delete with the legacy retro flow.
 """
 
 from datetime import datetime

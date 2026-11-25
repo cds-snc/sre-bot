@@ -2,8 +2,8 @@
 
 ``schedule`` serves the schedule view's submission. It finds the conversation's
 incident (a refusal books nothing). An incident whose meeting is on the calendar is
-shown that meeting and nothing is booked (changing it is the meeting lifecycle's,
-TASK-145.10.6); a meeting deleted outside the bot is recreated under a key naming
+shown that meeting and nothing is booked: this service never changes a meeting. A
+meeting deleted outside the bot is recreated under a key naming
 the deleted one. Otherwise the attendees' emails are resolved, the holidays of every
 year the search spans are read (a failure proceeds without them or refuses, as the
 setting says), the calendars are read once for the whole search, and the domain

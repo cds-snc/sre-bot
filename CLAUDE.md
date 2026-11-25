@@ -80,6 +80,9 @@ See `plugin-registration-lifespan` skill.
 ## Mandatory Patterns (Every Change)
 
 - **Imports** explicit and minimal, none unused.
+- **Comments** describe what the code does. A task id appears in code only as
+  `TODO(TASK-<id>)` naming the task that removes or changes those lines
+  (`decisions/migration.md` rule 7, `make check-task-references`).
 - **Config** centralized and typed — no ad-hoc constants.
 - **Logging** structured and contextual, no secrets. Prefer
   `structlog.contextvars` middleware binding over threading `request_id` through

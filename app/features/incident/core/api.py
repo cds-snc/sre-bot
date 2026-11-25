@@ -323,7 +323,7 @@ class IncidentConversation(Protocol):
         An account with no email, or unknown to the platform, maps to ``None``: the caller
         skips and names it. No accounts is an empty mapping without a call. An email is a
         lookup attribute, never a key (decisions/people-and-accounts.md); reading it from
-        the platform is tolerated until the people capability links accounts (TASK-83.6).
+        the platform is tolerated until the people capability links accounts.
         """
         ...
 

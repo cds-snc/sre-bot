@@ -5,7 +5,7 @@ role holders; Invite, defaulting to the channel's other people; anyone in the
 workspace may be added), the number of days before the search starts, the rules
 the search applies (from the [incident_postmortem] settings) and, once a preview
 ran, who cannot be counted on. The working, outcome and error views replace it
-after submission. No handler opens them until the cutover (TASK-145.10.4).
+after submission. No handler opens them yet.
 
 Every string comes from the ``incident_postmortem`` catalogue in ``languages``: the
 opener's language from a command, the instance languages from a button whose payload
@@ -102,8 +102,8 @@ def build_outcome_view(
 ) -> dict[str, Any]:
     """The view after a schedule: the meeting booked, recreated or already scheduled, or why there is none.
 
-    An existing meeting is shown with its time, link and invitees; changing it is the
-    meeting lifecycle's (TASK-145.10.6), so this view offers no action on it.
+    An existing meeting is shown with its time, link and invitees; this view offers no
+    action on it.
     """
     meeting = outcome.meeting
     if outcome.state is ScheduleState.NO_SLOT or meeting is None:

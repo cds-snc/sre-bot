@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: '2026-11-20T22:04:00Z'
-updated_date: '2026-11-25T20:33:00Z'
+updated_date: '2026-11-25T20:54:00Z'
 labels:
   - incident
   - features
@@ -133,6 +133,8 @@ Size: rule-1 exception (dark-slice rule, precedent M2a #1885): about 1,570 produ
 Gates (from app/): uv run ruff check . -> All checks passed!; make check-import-contracts -> Contracts: 15 kept, 0 broken; check-settings-key-ownership -> OK; check-package-shape -> OK: no net-new package-shape violations (2 baselined); check-test-seams -> OK (47 + 12 baselined); check-fake-coverage -> OK (4 baselined gaps). uv run mypy . --exclude '(?:^|/)\.venv(?:/|$)' -> Found 33 errors in 11 files, all pre-existing and outside this layer (infrastructure/i18n, modules/*, integrations/slack/channels.py, google_calendar.py:157-158 in the legacy insert_event). uv run pytest tests --ignore=tests/smoke -> 8325 passed, 235 warnings in 268.96s.
 
 Named changes for M3's PR body: NC11-NC13 and the NC4/NC5 notes are on TASK-145.10.4 (comment 2026-11-25).
+
+2026-11-25 (human, after review of the first commit f7a4716d, PR #1888): task ids in code are removal markers only. Second commit: M2b's docstrings rewritten (history deleted, scope pointers stated as behaviour, removal points as TODO(TASK-145.10.4), TODO(TASK-83.10), TODO(TASK-118), TODO(TASK-122)); decisions/migration.md coexistence rule 7 + Checks + Changes; CLAUDE.md Mandatory Patterns 'Comments' bullet; python-quality-gates skill (freeze-guard list, task-id rule); guard app/bin/check_task_references.py (entries <path>:<task id> for .py files under app/, tests included; TOML owner comments stay under rule 3) with tests/unit/bin/test_bin_task_references_check.py, baseline bin/baselines/task_references.txt seeded at 97 mentions in 69 files, make check-task-references, CI step in ci_code.yml; freeze_guard.py consumer list. Gates: ruff clean; contracts 15 kept; ownership, shape, seams, fake coverage, task references OK; mypy 33/11 pre-existing, none in changed files; pytest 8332 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

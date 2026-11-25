@@ -1,6 +1,6 @@
 """Postmortem domain: the meeting search rules as pure functions, and the legacy availability helpers.
 
-The availability model (TASK-145.10.3): each attendee is free, busy or unknown at a
+The availability model: each attendee is free, busy or unknown at a
 candidate slot (a calendar that could not be read, or an account without an email,
 is unknown and never free). A slot qualifies when no required attendee is busy (a
 required unknown is allowed and named) and the optional quorum holds; the earliest
@@ -9,10 +9,8 @@ zone, so the UTC hour follows daylight saving time, over the weekdays of the pol
 and skipping the holidays of every year the search spans. Nothing here reads a
 clock or does I/O: ``now``, the holidays and the calendars' answers are passed in.
 
-The legacy helpers below (``find_first_available_slot``, ``get_utc_hour``,
-``identify_unavailable_users``) were moved verbatim from
-features/incident/scheduling/availability.py (TASK-145.10.1) and serve the legacy
-flow until the cutover (TASK-145.10.4) deletes them.
+The legacy helpers at the end (``find_first_available_slot``, ``get_utc_hour``,
+``identify_unavailable_users``) serve the legacy retro flow in modules/incident.
 """
 
 from collections.abc import Mapping, Sequence
@@ -279,6 +277,9 @@ def local_time(moment: datetime, policy: SlotPolicy) -> LocalTime:
         clock=local.strftime("%H:%M"),
         zone=local.tzname() or policy.time_zone,
     )
+
+
+# TODO(TASK-145.10.4): delete the legacy helpers below with the legacy retro flow.
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3

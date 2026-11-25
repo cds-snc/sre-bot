@@ -1,9 +1,10 @@
 """The attendee directory over the incident conversation's platform accounts.
 
 Reads each account's profile email through ``IncidentConversation.account_emails``,
-tolerated until the people capability links accounts (decisions/people-and-accounts.md,
-TASK-83.6). TASK-83.9 compares person-based emails beside this adapter and TASK-83.10
-replaces it, keeping it as the explicit fallback.
+tolerated until the people capability links accounts (decisions/people-and-accounts.md).
+
+TODO(TASK-83.10): resolve attendees through the people capability, keeping this adapter
+as the explicit fallback.
 """
 
 from collections.abc import Mapping, Sequence

@@ -1,7 +1,7 @@
 """The postmortem meeting scheduled event sent to Sentinel through the legacy client.
 
-TODO(TASK-122): moves onto the audit capability's sink, with TASK-171's Logs
-Ingestion API rebuild. The event keeps the legacy name ``incident_retro_scheduled``
+TODO(TASK-122): move onto the audit capability's sink, with the Logs Ingestion API
+rebuild. The event keeps the legacy name ``incident_retro_scheduled``
 so Sentinel queries keyed on ``event`` keep working; it is sent once per booked or
 recreated meeting (the legacy sent it when the button was pressed, with the whole
 request body), and the message holds only the incident, conversation, user,

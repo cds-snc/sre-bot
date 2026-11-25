@@ -4,10 +4,9 @@
 languages it is built with: the conversation's shared languages, since the meeting
 and the channel notice are shared (decisions/languages.md). ``when_text`` renders a
 meeting time in one language from the catalogue's weekday and month names and the
-date's own zone abbreviation, in-house until TASK-118 chooses a formatting library
+date's own zone abbreviation, in-house while no formatting library is chosen
 (decisions/i18n.md). ``register_catalogue`` registers the catalogue; it is a plain
-function, not a hookimpl, until the cutover (TASK-145.10.4) adds ``plugin.py`` with an
-entry point whose ``register_i18n_resources`` calls it.
+function, not a hookimpl, because no entry point names the package yet.
 """
 
 from collections.abc import Sequence
@@ -25,7 +24,10 @@ LOCALES_DIR = Path(__file__).parent.parent / "locales"
 
 
 def register_catalogue(registry: I18nResourceRegistrar) -> None:
-    """Register the ``incident_postmortem`` catalogue in ``locales``."""
+    """Register the ``incident_postmortem`` catalogue in ``locales``.
+
+    TODO(TASK-145.10.4): call it from plugin.py's ``register_i18n_resources``.
+    """
     registry.register(
         I18nResourceSpec(
             owner="features.incident.postmortem", path=str(LOCALES_DIR), required=False, format="yaml", domain=DOMAIN
@@ -40,7 +42,10 @@ def text(key: str, language: str, **variables: str) -> str:
 
 
 def when_text(moment: datetime, policy: SlotPolicy, language: str) -> str:
-    """``moment`` in the policy's zone as a sentence fragment in ``language``."""
+    """``moment`` in the policy's zone as a sentence fragment in ``language``.
+
+    TODO(TASK-118): use the chosen library's date formatting.
+    """
     parts = local_time(moment, policy)
     return text(
         "time.format",

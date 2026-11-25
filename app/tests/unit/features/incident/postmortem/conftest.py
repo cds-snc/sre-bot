@@ -1,4 +1,4 @@
-"""Load the postmortem catalogue for every test in this directory, as the lifespan will once TASK-145.10.4 adds the plugin."""
+"""Load the postmortem catalogue for every test in this directory, as the lifespan loads plugin catalogues at startup."""
 
 from collections.abc import Iterator
 

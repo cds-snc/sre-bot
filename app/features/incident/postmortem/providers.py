@@ -1,7 +1,7 @@
 """Feature-local dependency wiring for the incident postmortem subdomain.
 
 Resolves the ports the schedule service reads and writes through, so the entry
-points (TASK-145.10.4) name one place to substitute them (decisions/testing.md,
+points name one place to substitute them (decisions/testing.md,
 provider substitution) and never import adapters.
 """
 
@@ -46,7 +46,7 @@ def holiday_calendar() -> HolidayCalendar:
 
 
 def attendee_directory() -> AttendeeDirectory:
-    """Return the attendee directory over the conversation's accounts (TASK-83.10 swaps it for the people capability)."""
+    """Return the attendee directory over the conversation's accounts."""
     return ConversationAttendeeDirectory(get_incident_conversation())
 
 

@@ -3,7 +3,7 @@
 ``HolidayCalendar`` reads the observed federal holidays the postmortem meeting
 search skips; ``adapters/canada_holidays.py`` is the Canada Holidays API one and
 ``adapters/in_memory.py`` the fake. ``AttendeeDirectory`` resolves attendee
-emails (the seam the people capability replaces, TASK-83.9 and TASK-83.10),
+emails (where the people capability's resolution plugs in),
 ``PostmortemEventSink`` receives the scheduled event, and ``ScheduleTexts`` gives
 the schedule service its wording, rendered by the entry-point layer from the
 catalogues.
