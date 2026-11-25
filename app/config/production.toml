@@ -68,6 +68,10 @@ log_type = "SREBot"
 # The database the image ships (Dockerfile).
 database_path = "./geodb/GeoLite2-City.mmdb"
 
+[canada_holidays.tenant]
+# The public Canada Holidays API (canada-holidays.ca) production reads federal holidays from.
+base_url = "https://canada-holidays.ca/api/v1"
+
 [[security.issuers]]
 issuer = "https://backstage.cdssandbox.xyz/api/auth"
 jwks_uri = "https://backstage.cdssandbox.xyz/api/auth/.well-known/jwks.json"

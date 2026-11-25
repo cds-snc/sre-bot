@@ -35,6 +35,7 @@ from infrastructure.logging.setup import (
 )
 from infrastructure.security.settings import SecuritySettings, get_security_settings
 from integrations.aws.settings import get_aws_settings
+from integrations.canada_holidays.settings import get_canada_holidays_settings
 from integrations.google_workspace.settings import GoogleWorkspaceSettings, get_google_workspace_settings
 from integrations.maxmind.settings import get_maxmind_settings
 from integrations.notify.settings import get_notify_settings
@@ -239,6 +240,7 @@ def _validate_slices(identity: IdentitySettings) -> HostConfiguration:
     get_trello_settings()
     get_opsgenie_settings()
     get_maxmind_settings()
+    get_canada_holidays_settings()
     get_sentinel_settings()
     get_notify_api_key_leak_settings()
     get_atip_settings()

@@ -187,6 +187,14 @@ log_type = "DevSREBot"
 # No key: the GeoIP2 database file is the [maxmind.tenant] entry (database_path), named in the
 # deployment's environment file; with no entry MaxMind is not configured.
 
+[canada_holidays]
+# The Canada Holidays API's per-attempt timeout and the retries of a connection that never opened
+# (every call is a GET; a sent request is never repeated). No key. The API is open source and
+# self-hostable, so its host is the [canada_holidays.tenant] entry (base_url), named in the
+# deployment's environment file; with no entry the API is not configured.
+timeout_seconds = 10.0
+connect_retries = 2
+
 [scheduler]
 # Each deployment that runs the scheduled jobs switches them on in its own file;
 # a developer opts in with SCHEDULER__ENABLED=true in app/.env.
