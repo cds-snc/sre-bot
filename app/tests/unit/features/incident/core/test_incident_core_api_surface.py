@@ -191,6 +191,8 @@ def test_conversation_interface_is_async_on_the_reference_with_operation_results
             "set_topic",
             "create_canvas",
             "group_members",
+            "members",
+            "account_emails",
         )
     }
 
@@ -204,6 +206,8 @@ def test_conversation_interface_is_async_on_the_reference_with_operation_results
     assert find_own.parameters["name"].annotation is api.ConversationName
     assert find_own.return_annotation == OperationResult[api.ConversationReference | None]
     assert inspect.signature(methods["group_members"]).return_annotation == OperationResult[tuple[str, ...]]
+    assert inspect.signature(methods["members"]).return_annotation == OperationResult[tuple[str, ...]]
+    assert inspect.signature(methods["account_emails"]).return_annotation == OperationResult[Mapping[str, str | None]]
     assert inspect.signature(methods["post"]).parameters["blocks"].kind is inspect.Parameter.KEYWORD_ONLY
     for method in methods.values():
         signature = inspect.signature(method)

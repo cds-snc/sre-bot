@@ -3,8 +3,8 @@ id: TASK-83.10
 title: Cut retro attendee resolution over to people with an explicit fallback
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 17:46'
+created_date: 2026-09-10 16:18
+updated_date: '2026-11-25T20:12:00Z'
 labels:
   - identity
 dependencies:
@@ -12,7 +12,7 @@ dependencies:
   - TASK-145
 references:
   - app/modules/incident/schedule_retro.py
-  - 'https://github.com/cds-snc/sre-bot/issues/1620'
+  - https://github.com/cds-snc/sre-bot/issues/1620
 parent_task_id: TASK-83
 priority: medium
 ordinal: 177000
@@ -34,3 +34,15 @@ After SRE reviews the shadow comparison, retro invitations use each attendee's c
 - [ ] #4 Tests cover linked, unlinked and mixed attendee sets
 - [ ] #5 Full test suite, ruff and mypy pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): the cutover swaps postmortem's AttendeeDirectory adapter (incident/postmortem/adapters/attendees.py, ConversationAttendeeDirectory) for a people-based one with the Slack-email adapter as the explicit fallback; the service and domain do not change. An account without an email is skipped and named (NC6).
+
+---
+<!-- COMMENTS:END -->

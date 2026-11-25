@@ -4,10 +4,10 @@ title: >-
   M1 Dissolve features/incident/scheduling by a verbatim move (Calendar adapter
   to core/adapters, availability to postmortem/domain.py, holidays to
   postmortem/adapters)
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-20T22:04:00Z'
-updated_date: '2026-11-20T22:28:00Z'
+updated_date: '2026-11-25T19:54:00Z'
 labels:
   - incident
   - features
@@ -80,6 +80,8 @@ During TDD: ruff and the moved test files. At the end, from app/: make check-imp
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20: implemented in the working tree on main ac8f8186 (the human creates stack-m/task-145.10.1-dissolve-scheduling with gh stack init; uncommitted work carries). Verbatim move (diff against HEAD: only module docstrings and imports changed): scheduling/adapters/google_calendar.py -> core/adapters/google_calendar.py; availability.py split into postmortem/domain.py (find_first_available_slot, get_utc_hour, identify_unavailable_users; imports get_federal_holidays from its own adapter) and postmortem/adapters/public_holidays.py (get_federal_holidays); scheduling/ deleted; modules/incident/schedule_retro.py imports repointed (legacy test patches the schedule_retro names, unchanged). Tests moved: unit/postmortem/test_incident_postmortem_slot_search.py, unit/core/test_incident_core_calendar_adapter.py, integration/postmortem/test_incident_postmortem_public_holidays_fetch.py (new __init__.py); test_incident_scheduling_boundaries.py deleted (its subject package is gone). Contract (i) is comms | postmortem | response | scribe; package_shape.txt scheduling entry deleted; test_seams_strict.txt three lines re-keyed (same patches, count 47 unchanged, header comment notes the re-key). ADR: incident-management.md :75 (calendar incident-owned in core/adapters, TASK-138 superseded), :137, :179 and a 2026-11-20 log entry; workplace-systems.md :70; features/incident/README.md core/postmortem rows, contract line, adapter-only rule, the calendar and retro routing rows (stale retrospective/ target row removed). Gates: ruff clean; make check-import-contracts 15 kept 0 broken; key ownership OK; package shape OK (2 baselined); test seams OK (47 strict, 12 legacy); mypy 40 errors in 13 files, none new (the two google_calendar.py errors are the moved verbatim lines); pytest tests --ignore=tests/smoke 8027 passed. One commit for the layer (squash-merged), not the two the plan sketched; the move stays reviewable as renames.
+
+Closed 2026-11-25: #1884 merged (8696f5c7); ACs #1-#5 checked; no behaviour change, so no human post-deploy check. Task-file edit rides with the next Stack M commit (M2b).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -93,3 +95,9 @@ created: 2026-11-20T22:06:00Z
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+features/incident/scheduling dissolved by a verbatim move: the Calendar adapter to core/adapters/google_calendar.py, the availability functions to postmortem/domain.py, the holiday lookup to postmortem/adapters/public_holidays.py; contract (i), package-shape and seam baselines updated; incident-management.md and the incident README amended. Merged in #1884.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -201,12 +201,32 @@ def _attendees(addresses: Sequence[str]) -> list[dict[str, str]]:
     return [{"email": address} for address in addresses]
 
 
+# Between a meeting's label and its subject, and between a label's languages (decisions/languages.md).
+_LABEL_SEPARATOR = " — "
+_LANGUAGE_SEPARATOR = " / "
+
+
+def meeting_summary(request: MeetingRequest) -> str:
+    """The event title: the label in every language joined by " / ", then the subject; the subject alone without a label."""
+    if request.label is None:
+        return request.title
+    label = _LANGUAGE_SEPARATOR.join(text for _, text in request.label.parts)
+    return f"{label}{_LABEL_SEPARATOR}{request.title}"
+
+
+def meeting_description(request: MeetingRequest) -> str:
+    """The event body: a multilingual description is one paragraph per language, in order."""
+    if isinstance(request.description, str):
+        return request.description
+    return "\n\n".join(text for _, text in request.description.parts)
+
+
 def _event_body(request: MeetingRequest, event_id: str) -> dict[str, Any]:
     """The inserted event: invitees cannot modify it or invite others; reminders stay each calendar's default."""
     body: dict[str, Any] = {
         "id": event_id,
-        "summary": request.title,
-        "description": request.description,
+        "summary": meeting_summary(request),
+        "description": meeting_description(request),
         "start": _event_time(request.start, request.time_zone),
         "end": _event_time(request.end, request.time_zone),
         "attendees": _attendees(request.attendees),

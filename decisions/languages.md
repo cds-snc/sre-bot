@@ -27,6 +27,8 @@ Current state: `[languages] shared` (`server/languages/settings.py`), `LanguageP
 
 **A message in several languages is one value, laid out by the platform.** Features hand `MultilingualText` (ordered language and text pairs) to the platform; `plain_text()` (a line per language, in order) is the layout every platform can show. Slack posts one message, top to bottom; a Teams adapter lays it out as one card with a text block per language; email marks each part's language ([WCAG 3.1.2](https://www.w3.org/WAI/WCAG22/Understanding/language-of-parts)).
 
+**A label a platform caps shows the first language; an uncapped label carries every language.** Where a platform caps a single label below what every language needs (a Slack modal title, a button), the view shows the first language of its set and the body carries every language. A label without such a cap (a calendar event title, an email subject) carries every language in order, joined by " / " (`MeetingRequest.label`, laid out by the calendar adapter). This keeps both official languages visible with equal prominence where the platform allows it ([Federal Identity Program design standard](https://www.canada.ca/en/treasury-board-secretariat/services/government-communications/federal-identity-program/manual.html)).
+
 **Only the bot's own wording is multilingual.** Text the bot forwards (a webhook sender's alert, a captured message) or that a model writes keeps its source language and appears once, beside the bot's lines ([W3C language tags](https://www.w3.org/International/articles/language-tags/)); AI-written text follows its own feature's rule.
 
 ## Consequences
@@ -52,3 +54,4 @@ Tolerated until then:
 
 **Changes:**
 - 2026-11-25: Accepted. Instance languages configured; shared messages in the instance order, direct interactions in the user's language of choice; `LanguagePolicy` and `MultilingualText` (TASK-193; TASK-145.8.9 OQ2, human D1-D6).
+- 2026-11-25: a label a platform caps shows the first language, an uncapped label carries every language joined by " / " (TASK-145.10.3 plan D8, human approval).

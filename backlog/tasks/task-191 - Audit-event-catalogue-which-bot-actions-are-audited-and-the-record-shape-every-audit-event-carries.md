@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T22:05:00Z'
+updated_date: '2026-11-25T20:12:00Z'
 labels:
   - audit
   - observability
@@ -37,3 +38,15 @@ Sources: https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
 - [ ] #2 TASK-122's AuditEvent and TASK-25.7's sink are re-scoped against the catalogue (comments on both)
 - [ ] #3 Every existing emitter (legacy log_to_sentinel callers, response/ and postmortem/ Sentinel adapters) is mapped to a catalogue entry or marked for removal
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): incident_retro_scheduled (incident/postmortem/adapters/sentinel.py) is now sent once per booked or recreated meeting, not when the schedule button is pressed, with incident_id, conversation_id, user_id, meeting_id and at. It matches this catalogue's 'postmortem meeting scheduled' action; rescheduled and cancelled arrive with TASK-145.10.6.
+
+---
+<!-- COMMENTS:END -->

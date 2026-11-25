@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-11-25T19:25:00Z'
+updated_date: '2026-11-25T20:12:00Z'
 labels:
   - plugin-architecture
   - i18n
@@ -82,6 +82,14 @@ created: 2026-11-25T19:25:00Z
 ---
 
 2026-11-25 (TASK-193 finding, D3 gap): integrations/slack/provider.py get_user_locale (:915-971, enrichment at :1138) maps any Slack locale outside en-US/fr-FR to en-US before an entry point sees it, so a fr-CA user is answered in English and the LanguagePolicy's primary-subtag match (decisions/languages.md) never runs for slash commands. When the provider's supported-locale list moves here, pass the raw Slack locale through and let reply_languages decide; that change is user-visible (named change, announcement).
+
+---
+
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): postmortem renders a meeting's local date and time in-house (a domain helper over catalogue weekday and month names, incident_postmortem.time.*, and the per-date zone abbreviation, the comms/domain.py precedent), because i18n.md leaves formatting in-house until this task's library decision. Replace the helper with the chosen library's date formatting here.
 
 ---
 <!-- COMMENTS:END -->

@@ -40,7 +40,9 @@ class StubSlack:
     any other id is ``no_such_subteam``. ``accounts`` maps an email to its user id for
     ``users.lookupByEmail``; any other email is ``users_not_found``. A second channel canvas is
     ``channel_canvas_already_exists``. A channel's purpose is absent from ``conversations.info``
-    until ``purposes`` holds one (a set purpose is stored there).
+    until ``purposes`` holds one (a set purpose is stored there). ``members`` maps a channel id to
+    the user ids ``conversations.members`` lists, ``page_size`` per page; ``users`` maps a user id to
+    the ``user`` object ``users.info`` answers (any other id is ``user_not_found``).
     """
 
     def __init__(
@@ -52,6 +54,8 @@ class StubSlack:
         foreign_names: Sequence[str] = (),
         groups: dict[str, list[str]] | None = None,
         accounts: dict[str, str] | None = None,
+        members: dict[str, list[str]] | None = None,
+        users: dict[str, dict[str, Any]] | None = None,
         page_size: int = 1,
     ) -> None:
         self.channels = channels if channels is not None else {"C0OPEN": {"is_archived": False, "is_member": True}}
@@ -60,6 +64,8 @@ class StubSlack:
         self.foreign_names = set(foreign_names)
         self.groups = dict(groups or {})
         self.accounts = dict(accounts or {})
+        self.members = dict(members or {})
+        self.users = dict(users or {})
         self.page_size = page_size
         self.canvases: dict[str, str] = {}
         self.purposes: dict[str, str] = {}
@@ -79,6 +85,8 @@ class StubSlack:
         self.reads.users_conversations.side_effect = self._own_conversations
         self.reads.usergroups_users_list.side_effect = self._group_members
         self.reads.users_lookupByEmail.side_effect = self._lookup_by_email
+        self.reads.conversations_members.side_effect = self._conversation_members
+        self.reads.users_info.side_effect = self._user_info
         self._posted = 0
 
     error = staticmethod(slack_error)
@@ -188,6 +196,21 @@ class StubSlack:
         if email not in self.accounts:
             raise slack_error("users_not_found")
         return {"ok": True, "user": {"id": self.accounts[email]}}
+
+    async def _conversation_members(self, *, channel: str, cursor: str | None = None, **_: Any) -> dict[str, Any]:
+        self._check(channel)
+        members = self.members.get(channel, [])
+        start = int(cursor) if cursor else 0
+        end = start + self.page_size
+        next_cursor = str(end) if end < len(members) else ""
+        return {"ok": True, "members": members[start:end], "response_metadata": {"next_cursor": next_cursor}}
+
+    async def _user_info(self, *, user: str, **_: Any) -> dict[str, Any]:
+        if self.fail_with:
+            raise slack_error(self.fail_with)
+        if user not in self.users:
+            raise slack_error("user_not_found")
+        return {"ok": True, "user": {"id": user, **self.users[user]}}
 
 
 @pytest.fixture

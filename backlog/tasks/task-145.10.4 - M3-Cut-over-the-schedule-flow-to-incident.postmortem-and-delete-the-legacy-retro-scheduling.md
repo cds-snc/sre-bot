@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T22:04:00Z'
-updated_date: '2026-11-25T15:18:00Z'
+updated_date: '2026-11-25T20:33:00Z'
 labels:
   - incident
   - features
@@ -50,6 +50,22 @@ created: 2026-11-25T15:18:00Z
 ---
 
 2026-11-25 (TASK-145.10.2 rulings, human): legacy deletions moved here (AC #6, OQ1); NC8 amended: no reminder override (events.reminders is the bot user's only), NC8 = description and one requestId source.
+
+---
+
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): named changes for this PR's body beside NC1-NC10. NC11 (b): a second schedule shows the existing meeting (time, link, attendees) instead of booking another; legacy booked any number. NC12 (b): pickers list human, active members (bots, app users and deactivated accounts excluded by their flags), replacing the legacy 'SRE'/'SRE Dev' real-name filter; the pickers are two multi_users_select (Must attend = role holders, Invite = other members) and any workspace user may be added. NC13 (b): a meeting deleted outside the bot is recreated by the next schedule (new search, key <incident_id>:postmortem:after:<deleted id>, notice says it was recreated). Also: NC4 the event summary is 'Retro / Rétro — <record title>' in the instance languages (was 'Retro <channel name>'); NC5 extended: incident_retro_scheduled is sent once per booked or recreated meeting, not per button press. Pins: edit :136 (picker is two user selects with defaults, not a static member list) and :187 (summary from the record title with the multilingual label) under NC9/NC4, beside :159/:175.
+
+---
+
+created: 2026-11-25T20:33:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b implemented): this layer creates features/incident/postmortem/plugin.py with the entry point incident.postmortem (check-package-shape refuses a hookimpl without one, so M2b has none); its register_i18n_resources calls entrypoints/texts.register_catalogue, and the entry point joins contract (m)'s protected modules. Wire the schedule view's preview: dispatch_action on the two pickers and the start-offset input, the handler calling service.schedule.preview and views.update with the overview. holiday_lookup_failure=refuse comes back as NO_SLOT with reason HOLIDAYS_UNAVAILABLE (a success outcome with catalogue wording), not an error.
 
 ---
 <!-- COMMENTS:END -->

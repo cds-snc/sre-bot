@@ -35,7 +35,7 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
-from features.incident.core.adapters.google_calendar import meeting_event_id
+from features.incident.core.adapters.google_calendar import meeting_event_id, meeting_summary
 from features.incident.core.adapters.google_docs import timeline_entry_url, timeline_message_key
 from features.incident.core.adapters.list_rows import list_row
 from features.incident.core.adapters.slack import slack_channel_name, slack_conversation_label, slack_conversation_link
@@ -555,6 +555,18 @@ def _report_not_configured[T](key: str) -> OperationResult[T]:
     return OperationResult.permanent_error(f"{key} is not configured", ErrorCode.CONFIG_NOT_CONFIGURED)
 
 
+@dataclass(frozen=True)
+class SeededAccount:
+    """A person ``InMemoryIncidentConversation`` knows: an email (or none), and whether a human and active.
+
+    A bot or app user is ``human=False``; a deactivated account is ``active=False``.
+    """
+
+    email: str | None
+    human: bool = True
+    active: bool = True
+
+
 @dataclass
 class _StoredConversation:
     archived: bool
@@ -585,7 +597,9 @@ class InMemoryIncidentConversation:
     adapter's ``slack_channel_name``, the platform this fake stands in for. A created conversation is open, the bot a member,
     with id ``C0NEW<n>``. ``find_own`` finds named conversations that are open and
     where the bot is a member. ``groups`` maps a user group id to its members and
-    ``accounts`` an email to its account id.
+    ``accounts`` an email to its account id. ``members`` maps a conversation id to its
+    account ids and ``people`` an account id to its ``SeededAccount``: ``members`` answers the
+    human, active ones, ``account_emails`` their emails (``None`` for no email or no account).
     """
 
     def __init__(
@@ -600,9 +614,13 @@ class InMemoryIncidentConversation:
         foreign_names: Sequence[str] = (),
         groups: Mapping[str, Sequence[str]] | None = None,
         accounts: Mapping[str, str] | None = None,
+        members: Mapping[str, Sequence[str]] | None = None,
+        people: Mapping[str, SeededAccount] | None = None,
     ) -> None:
         self._tenant = tenant
         self._accounts = dict(accounts or {})
+        self._members = {vendor_id: tuple(ids) for vendor_id, ids in (members or {}).items()}
+        self._people = dict(people or {})
         self._conversations: dict[str, _StoredConversation] = {}
         for vendor_id in open_ids:
             self._conversations[vendor_id] = _StoredConversation(archived=False, member=True)
@@ -705,6 +723,29 @@ class InMemoryIncidentConversation:
         if conversation.system is not WorkplaceSystem.SLACK:
             return _conversation_unsupported(conversation)
         return OperationResult.success(tuple(self._accounts[email] for email in emails if email in self._accounts))
+
+    async def members(self, conversation: ConversationReference) -> OperationResult[tuple[str, ...]]:
+        """Return the seeded members that are known, human and active, in order; an unknown conversation is not found."""
+        stored = self._known(conversation)
+        if isinstance(stored, OperationResult):
+            return stored
+        return OperationResult.success(
+            tuple(
+                account_id
+                for account_id in self._members.get(conversation.vendor_id, ())
+                if (person := self._people.get(account_id)) is not None and person.human and person.active
+            )
+        )
+
+    async def account_emails(
+        self, conversation: ConversationReference, account_ids: Sequence[str]
+    ) -> OperationResult[Mapping[str, str | None]]:
+        """Return each asked account's seeded email; an account without one, or unknown, is ``None``."""
+        if conversation.system is not WorkplaceSystem.SLACK:
+            return _conversation_unsupported(conversation)
+        return OperationResult.success(
+            {account_id: person.email if (person := self._people.get(account_id)) else None for account_id in account_ids}
+        )
 
     async def set_purpose(self, conversation: ConversationReference, text: str) -> OperationResult[None]:
         """Record the purpose; refused where the bot cannot write."""
@@ -916,7 +957,7 @@ class InMemoryMeetingScheduler(MeetingScheduler):
             return OperationResult.success(self.meetings[meeting_id])
         meeting = ScheduledMeeting(
             id=meeting_id,
-            title=request.title,
+            title=meeting_summary(request),
             start=request.start,
             end=request.end,
             status=MeetingStatus.CONFIRMED,

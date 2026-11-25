@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-25T19:10:00Z'
+updated_date: '2026-11-25T20:12:00Z'
 labels:
   - incident
   - features
@@ -139,6 +139,14 @@ created: 2026-11-25T19:10:00Z
 ---
 
 2026-11-25 (human, TASK-193 approved): D6's 'English first line' is superseded by the instance order (decisions/languages.md, [languages] shared); M3/M4 channel posts go through LanguagePolicy and MultilingualText; views and private replies in the user's language of choice. Note in doc-17 at the next Stack M session.
+
+---
+
+created: 2026-11-25T20:12:00Z
+
+---
+
+2026-11-25 (TASK-145.10.3 M2b plan, approved): D6 'English first line' (bilingual confirmation) is superseded by decisions/languages.md (TASK-193): channel posts and the calendar event text use LanguagePolicy.shared_languages in the instance order; views and private replies use reply_languages. Label rule added to languages.md with M2b: where a platform caps a single label below what every language needs (Slack modal title, button) the view shows the first language and the body carries every language; an uncapped label (calendar event title, email subject) carries every language in order joined by ' / '. MeetingRequest gains label (MultilingualText | None) and a str | MultilingualText description in M2b. Existing meeting: shown, booking refused (modify = M4b); deleted outside the bot: recreated by the next schedule.
 
 ---
 <!-- COMMENTS:END -->

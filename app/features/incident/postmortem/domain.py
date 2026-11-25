@@ -1,15 +1,284 @@
-"""Postmortem domain: pure availability computations over an already-fetched freebusy response.
+"""Postmortem domain: the meeting search rules as pure functions, and the legacy availability helpers.
 
-Moved verbatim from features/incident/scheduling/availability.py (TASK-145.10.1).
-The holiday lookup is still fetched through ``adapters.public_holidays`` until
-the postmortem availability model (TASK-145.10.3) takes an injected holiday set.
+The availability model (TASK-145.10.3): each attendee is free, busy or unknown at a
+candidate slot (a calendar that could not be read, or an account without an email,
+is unknown and never free). A slot qualifies when no required attendee is busy (a
+required unknown is allowed and named) and the optional quorum holds; the earliest
+qualifying slot wins. Candidate slots are built per local date in the meeting's
+zone, so the UTC hour follows daylight saving time, over the weekdays of the policy
+and skipping the holidays of every year the search spans. Nothing here reads a
+clock or does I/O: ``now``, the holidays and the calendars' answers are passed in.
+
+The legacy helpers below (``find_first_available_slot``, ``get_utc_hour``,
+``identify_unavailable_users``) were moved verbatim from
+features/incident/scheduling/availability.py (TASK-145.10.1) and serve the legacy
+flow until the cutover (TASK-145.10.4) deletes them.
 """
 
-from datetime import UTC, datetime, timedelta
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, time, timedelta
+from enum import StrEnum
+from zoneinfo import ZoneInfo
 
 import pytz
 
+from features.incident.core.api import AttendeeBusy
 from features.incident.postmortem.adapters.public_holidays import get_federal_holidays
+
+
+class Availability(StrEnum):
+    """An attendee at a candidate slot."""
+
+    FREE = "free"
+    BUSY = "busy"
+    UNKNOWN = "unknown"
+
+
+class HolidayLookupFailure(StrEnum):
+    """What a schedule does when the holiday list cannot be read: the [incident_postmortem] setting."""
+
+    PROCEED = "proceed"
+    REFUSE = "refuse"
+
+
+class NoSlotReason(StrEnum):
+    """Why a search found no slot."""
+
+    NO_ATTENDEES = "no_attendees"
+    NO_CANDIDATE = "no_candidate"
+    REQUIRED_ALWAYS_BUSY = "required_always_busy"
+    REQUIRED_NEVER_FREE_TOGETHER = "required_never_free_together"
+    QUORUM_NEVER_MET = "quorum_never_met"
+    HOLIDAYS_UNAVAILABLE = "holidays_unavailable"
+
+
+@dataclass(frozen=True)
+class SlotPolicy:
+    """The meeting search policy, built from the [incident_postmortem] settings.
+
+    Attributes:
+        time_zone: IANA zone the window and the meeting are in.
+        window_start: Local time the first slot of a day may start.
+        window_end: Local time the last slot of a day must end by.
+        weekdays: ISO weekdays (1 Monday to 7 Sunday) a meeting may be on.
+        duration: The meeting's length.
+        step: Time between two candidate starts on a day.
+        search_days: How many days, from the first date, the search covers.
+        optional_quorum_percent: The share of counted optional attendees that must be free.
+    """
+
+    time_zone: str
+    window_start: time
+    window_end: time
+    weekdays: frozenset[int]
+    duration: timedelta
+    step: timedelta
+    search_days: int
+    optional_quorum_percent: int
+
+    @property
+    def zone(self) -> ZoneInfo:
+        """The policy's zone."""
+        return ZoneInfo(self.time_zone)
+
+
+@dataclass(frozen=True)
+class Slot:
+    """A candidate meeting time: aware, ending after it starts."""
+
+    start: datetime
+    end: datetime
+
+    def __post_init__(self) -> None:
+        if self.start.utcoffset() is None or self.end.utcoffset() is None:
+            raise ValueError("a slot's start and end must be timezone-aware")
+        if self.end <= self.start:
+            raise ValueError("a slot must end after it starts")
+
+
+@dataclass(frozen=True)
+class Attendee:
+    """A person asked to the meeting: an account, its email (``None`` when it has none), required or optional."""
+
+    account_id: str
+    email: str | None
+    required: bool
+
+
+@dataclass(frozen=True)
+class SlotSearch:
+    """A search's outcome: the slot (or ``None`` with a reason) and the people to name.
+
+    Attributes:
+        slot: The earliest qualifying slot, ``None`` when none qualifies.
+        reason: Why no slot qualifies; ``None`` with a slot.
+        required_unknown: Required attendees whose calendar is unknown at the slot.
+        optional_busy: Counted optional attendees busy at the slot.
+        optional_unknown: Counted optional attendees whose calendar is unknown at the slot.
+        excluded_optional: Optional attendees busy at every candidate, left out of the quorum.
+        blocking_required: Required attendees busy at every candidate (the search stops).
+    """
+
+    slot: Slot | None
+    reason: NoSlotReason | None = None
+    required_unknown: tuple[Attendee, ...] = ()
+    optional_busy: tuple[Attendee, ...] = ()
+    optional_unknown: tuple[Attendee, ...] = ()
+    excluded_optional: tuple[Attendee, ...] = ()
+    blocking_required: tuple[Attendee, ...] = ()
+
+
+@dataclass(frozen=True)
+class AttendeeOverview:
+    """Who cannot be counted on over the whole search: busy at every candidate, or unknown."""
+
+    always_busy: tuple[Attendee, ...]
+    unknown: tuple[Attendee, ...]
+
+
+@dataclass(frozen=True)
+class LocalTime:
+    """A moment's parts in the policy's zone, for catalogue wording: ISO weekday, date, 24-hour clock and zone abbreviation."""
+
+    weekday: int
+    day: int
+    month: int
+    year: int
+    clock: str
+    zone: str
+
+
+def attendee_list(*, required: Sequence[str], optional: Sequence[str], emails: Mapping[str, str | None]) -> tuple[Attendee, ...]:
+    """The attendees, required first, each account once; an account in both sets is required."""
+    required_ids = tuple(dict.fromkeys(required))
+    optional_ids = tuple(account for account in dict.fromkeys(optional) if account not in required_ids)
+    return tuple(Attendee(account, emails.get(account), True) for account in required_ids) + tuple(
+        Attendee(account, emails.get(account), False) for account in optional_ids
+    )
+
+
+def search_start_date(policy: SlotPolicy, now: datetime, start_after_days: int) -> date:
+    """The first date of the search: today in the policy's zone plus ``start_after_days``."""
+    return now.astimezone(policy.zone).date() + timedelta(days=start_after_days)
+
+
+def search_dates(policy: SlotPolicy, first: date) -> tuple[date, ...]:
+    """Every date the search covers, from ``first``."""
+    return tuple(first + timedelta(days=offset) for offset in range(policy.search_days))
+
+
+def search_years(policy: SlotPolicy, first: date) -> frozenset[int]:
+    """Every year the search spans: the holiday lookup asks for each one."""
+    return frozenset(day.year for day in search_dates(policy, first))
+
+
+def candidate_slots(policy: SlotPolicy, first: date, holidays: frozenset[date], *, now: datetime) -> tuple[Slot, ...]:
+    """The candidate slots in time order: the policy's weekdays, not holidays, inside the local window, after ``now``.
+
+    Each date's window is its local start and end time in the policy's zone, so the UTC
+    hour follows daylight saving time per date.
+    """
+    zone = policy.zone
+    slots: list[Slot] = []
+    for day in search_dates(policy, first):
+        if day.isoweekday() not in policy.weekdays or day in holidays:
+            continue
+        start = datetime.combine(day, policy.window_start, tzinfo=zone)
+        window_end = datetime.combine(day, policy.window_end, tzinfo=zone)
+        while start + policy.duration <= window_end:
+            if start > now:
+                slots.append(Slot(start=start, end=start + policy.duration))
+            start += policy.step
+    return tuple(slots)
+
+
+def availability_at(answer: AttendeeBusy | None, slot: Slot) -> Availability:
+    """Free, busy or unknown at ``slot``: no answer, or a calendar that could not be read, is unknown."""
+    if answer is None or answer.busy is None:
+        return Availability.UNKNOWN
+    if any(interval.start < slot.end and interval.end > slot.start for interval in answer.busy):
+        return Availability.BUSY
+    return Availability.FREE
+
+
+def _answer(attendee: Attendee, busy: Mapping[str, AttendeeBusy]) -> AttendeeBusy | None:
+    return busy.get(attendee.email.strip().casefold()) if attendee.email else None
+
+
+def _always_busy(attendee: Attendee, busy: Mapping[str, AttendeeBusy], candidates: Sequence[Slot]) -> bool:
+    answer = _answer(attendee, busy)
+    return all(availability_at(answer, slot) is Availability.BUSY for slot in candidates)
+
+
+def _quorum_holds(free: int, counted: int, percent: int) -> bool:
+    return counted == 0 or free * 100 >= percent * counted
+
+
+def find_slot(
+    policy: SlotPolicy, attendees: Sequence[Attendee], busy: Mapping[str, AttendeeBusy], candidates: Sequence[Slot]
+) -> SlotSearch:
+    """The earliest candidate where no required attendee is busy and the optional quorum holds.
+
+    ``busy`` is keyed by stripped, case-folded email, as ``CalendarAvailability`` answers.
+    An optional attendee busy at every candidate is left out of the count and named; a
+    required one stops the search.
+    """
+    if not attendees:
+        return SlotSearch(slot=None, reason=NoSlotReason.NO_ATTENDEES)
+    if not candidates:
+        return SlotSearch(slot=None, reason=NoSlotReason.NO_CANDIDATE)
+    required = tuple(attendee for attendee in attendees if attendee.required)
+    blocking = tuple(attendee for attendee in required if _always_busy(attendee, busy, candidates))
+    if blocking:
+        return SlotSearch(slot=None, reason=NoSlotReason.REQUIRED_ALWAYS_BUSY, blocking_required=blocking)
+    optional = tuple(attendee for attendee in attendees if not attendee.required)
+    excluded = tuple(attendee for attendee in optional if _always_busy(attendee, busy, candidates))
+    counted = tuple(attendee for attendee in optional if attendee not in excluded)
+    required_free_somewhere = False
+    for slot in candidates:
+        if any(availability_at(_answer(attendee, busy), slot) is Availability.BUSY for attendee in required):
+            continue
+        required_free_somewhere = True
+        at_slot = {attendee: availability_at(_answer(attendee, busy), slot) for attendee in counted}
+        free = sum(1 for state in at_slot.values() if state is Availability.FREE)
+        if not _quorum_holds(free, len(counted), policy.optional_quorum_percent):
+            continue
+        return SlotSearch(
+            slot=slot,
+            required_unknown=tuple(
+                attendee for attendee in required if availability_at(_answer(attendee, busy), slot) is Availability.UNKNOWN
+            ),
+            optional_busy=tuple(attendee for attendee, state in at_slot.items() if state is Availability.BUSY),
+            optional_unknown=tuple(attendee for attendee, state in at_slot.items() if state is Availability.UNKNOWN),
+            excluded_optional=excluded,
+        )
+    reason = NoSlotReason.QUORUM_NEVER_MET if required_free_somewhere else NoSlotReason.REQUIRED_NEVER_FREE_TOGETHER
+    return SlotSearch(slot=None, reason=reason, excluded_optional=excluded)
+
+
+def attendee_overview(
+    attendees: Sequence[Attendee], busy: Mapping[str, AttendeeBusy], candidates: Sequence[Slot]
+) -> AttendeeOverview:
+    """Who is busy at every candidate, and whose calendar is unknown: the schedule view's warning."""
+    unknown = tuple(attendee for attendee in attendees if (answer := _answer(attendee, busy)) is None or answer.busy is None)
+    always_busy = tuple(
+        attendee for attendee in attendees if attendee not in unknown and candidates and _always_busy(attendee, busy, candidates)
+    )
+    return AttendeeOverview(always_busy=always_busy, unknown=unknown)
+
+
+def local_time(moment: datetime, policy: SlotPolicy) -> LocalTime:
+    """``moment`` in the policy's zone, as parts a catalogue sentence fills in; the abbreviation is that date's own."""
+    local = moment.astimezone(policy.zone)
+    return LocalTime(
+        weekday=local.isoweekday(),
+        day=local.day,
+        month=local.month,
+        year=local.year,
+        clock=local.strftime("%H:%M"),
+        zone=local.tzname() or policy.time_zone,
+    )
 
 
 # Function to use the freebusy response to find the first available spot in the next 60 days. We look for a 30 minute windows, 3
