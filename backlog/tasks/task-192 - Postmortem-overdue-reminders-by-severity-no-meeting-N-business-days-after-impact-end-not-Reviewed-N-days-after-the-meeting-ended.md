@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T22:05:00Z'
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - incident
   - postmortem
@@ -33,3 +34,15 @@ Sources: https://docs.pagerduty.com/ops-guides/incident-response-guide/postmorte
 - [ ] #2 Opted-out and Closed incidents are skipped; reminders are bilingual in the incident conversation
 - [ ] #3 incident-management.md Postmortem records the overdue rule
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): the bilingual reminder is MultilingualText from LanguagePolicy.shared_languages (instance languages and order), not a hard-coded pair.
+
+---
+<!-- COMMENTS:END -->

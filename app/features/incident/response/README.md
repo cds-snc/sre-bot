@@ -10,8 +10,8 @@ rebuilds the legacy `modules/incident` surfaces one cutover at a time (TASK-145.
 | `/sre incident status update <status>` | Changes the status of the channel's incident: the record, then the report's status line, the incident list's status cell and a notice in the incident channel. One private reply names the outcome and any write that was skipped or failed. | `entrypoints/slack.py`, `service/status.py` |
 | `/sre incident roles manage` | Opens the roles modal (callback `incident.response.roles`): five user pickers, the incident commander and operations lead required, the communications lead, policy lead and postmortem owner optional, preselected from the record. The submission writes the five roles to the record, announces each role whose holder changed and rewrites the channel purpose's `IC: ... / OL: ...` line. | `entrypoints/slack_roles.py`, `service/roles.py` |
 | `/sre incident roles`, `roles show` | The command's generated help (the `roles show` stub is retired). | `entrypoints/slack_roles.py` |
-| `/sre incident close` and the stale notice's archive button | Closes the channel's incident and archives its channel: joins the channel, sets the status to Closed (the record, the report line, the list and a notice), posts the archived notice, archives the channel and sends one `incident_channel_archived` event. The button is the legacy attachment `archive_channel`, registered as `incident.response.archive` with the alias scoped to its `archive` value; its texts are English then French, since a button press names no locale. | `entrypoints/slack_archive.py`, `service/archive.py`, `adapters/sentinel.py` |
-| `/sre incident show` and its update modal | Opens the information modal on the channel's incident (callback `incident.response.show`): the report and Meet links, the five roles, severity, status, security flag and times, each changeable field with an Update button (`incident.response.update_field.open`). The button pushes a field modal (callback `incident.response.update_field`): a select, or one date-and-time picker for a time. The submission writes the record, posts a notice in English and French to the incident channel and refreshes the information modal; the status field goes through `change_status`. | `entrypoints/slack_show.py`, `entrypoints/slack_show_views.py`, `service/fields.py` |
+| `/sre incident close` and the stale notice's archive button | Closes the channel's incident and archives its channel: joins the channel, sets the status to Closed (the record, the report line, the list and a notice), posts the archived notice, archives the channel and sends one `incident_channel_archived` event. The button is the legacy attachment `archive_channel`, registered as `incident.response.archive` with the alias scoped to its `archive` value; its texts are in the instance languages and order, since a button press names no locale (decisions/languages.md). | `entrypoints/slack_archive.py`, `service/archive.py`, `adapters/sentinel.py` |
+| `/sre incident show` and its update modal | Opens the information modal on the channel's incident (callback `incident.response.show`): the report and Meet links, the five roles, severity, status, security flag and times, each changeable field with an Update button (`incident.response.update_field.open`). The button pushes a field modal (callback `incident.response.update_field`): a select, or one date-and-time picker for a time. The submission writes the record, posts a notice in the instance languages to the incident channel and refreshes the information modal; the status field goes through `change_status`. | `entrypoints/slack_show.py`, `entrypoints/slack_show_views.py`, `service/fields.py` |
 | `/sre incident status`, `status show` | The command's help. A bare valid status (`status Closed`, retired after 2025-11-01) answers a pointer to `status update` and changes nothing; TASK-145.13 deletes the pointer. | `entrypoints/slack.py` |
 
 ## Status changes
@@ -49,13 +49,13 @@ the archive and the update modal's status field call it.
 submission; `entrypoints/slack_show_views.py` builds the views; `service/fields.py` holds
 `update_fields`.
 
-- `show` answers in the invoker's locale; the modal carries that locale in its private
+- `show` answers in the invoker's language (matched by the language policy); the modal carries that locale in its private
   metadata (with the channel, never the incident, which each press and submission read
   fresh), and the private lines of the flow use it.
 - A field change writes the record first: the status through `change_status`, the severity,
   the three times and the security flag through `IncidentStore.update_fields` (a severity
-  change appends its `severity_changed` timeline entry). Then the notice, in English and French
-  since the channel is shared (decisions/i18n.md), only when the channel is writable. A refused
+  change appends its `severity_changed` timeline entry). Then the notice, in the instance languages and order
+  since the channel is shared (decisions/languages.md), only when the channel is writable. A refused
   or failed record write, a lost guard and a skipped or failed follower are told to the
   submitter privately; nothing retries.
 - A time is picked with one `datetimepicker`, which returns the instant itself, so no user
@@ -113,8 +113,9 @@ platform), the `DeclarePolicy` from `[incident_response]` and the texts (`Declar
 - `entrypoints/slack.py`: the status commands and the registration; `entrypoints/slack_roles.py`:
   the roles command and modal; `entrypoints/slack_archive.py`: close and the archive button;
   `entrypoints/slack_show.py` and `slack_show_views.py`: show and the update modal;
-  `entrypoints/scope.py`: the service scope they open. Replies come from `locales/` in the
-  invoker's locale, or English then French when the payload names none.
+  `entrypoints/scope.py`: the service scope they open and the language policy. Replies come
+  from `locales/` in the invoker's language, or the instance languages when the payload names
+  none (decisions/languages.md).
 - `service/status.py`: `change_status`; `service/fields.py`: `update_fields`; `service/roles.py`:
   `assign_roles`; `service/archive.py`: `archive_incident`; `service/declare.py`: `declare`;
   `service/conversation.py`: `ensure_conversation`.

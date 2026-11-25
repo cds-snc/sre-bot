@@ -23,6 +23,7 @@ from datetime import datetime
 from typing import Any
 
 from capabilities.oncall.api import ScheduleReference
+from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
@@ -661,14 +662,18 @@ class InMemoryIncidentConversation:
         return tuple(self._conversations[conversation.vendor_id].invited)
 
     async def post(
-        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+        self,
+        conversation: ConversationReference,
+        text: str | MultilingualText,
+        *,
+        blocks: Sequence[Mapping[str, object]] = (),
     ) -> OperationResult[MessageReference]:
-        """Record ``text`` and its blocks and return its reference; refused where the bot cannot write."""
+        """Record ``text`` as the Slack adapter lays it out, and its blocks; refused where the bot cannot write."""
         stored = self._writable(conversation)
         if isinstance(stored, OperationResult):
             return stored
         self._posted += 1
-        stored.posts.append(text)
+        stored.posts.append(text.plain_text() if isinstance(text, MultilingualText) else text)
         stored.blocks.append(tuple(blocks))
         return OperationResult.success(
             MessageReference(

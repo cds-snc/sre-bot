@@ -50,6 +50,7 @@ from server.configuration.identity import IdentitySettings, build_service_identi
 from server.configuration.loader import TomlConfigurationFiles, load_configuration_files
 from server.configuration.server_settings import ServerSettings, get_server_settings
 from server.configuration.summary import summarize
+from server.languages.settings import get_language_settings
 from server.plugins.manager import installed_plugin_names
 from server.plugins.settings import check_plugin_enablement, get_plugins_settings
 from server.slack.settings import SlackTransportSettings, get_slack_transport_settings
@@ -225,6 +226,7 @@ def _validate_slices(identity: IdentitySettings) -> HostConfiguration:
     get_audit_settings()
     get_conditional_write_settings()
     sre_ops = get_sre_ops_settings()
+    get_language_settings()
     # Vendor and feature slices validate with the host slices: an invalid entry fails boot here.
     slack_transport = get_slack_transport_settings()
     validate_slack_transport(slack_transport, get_slack_settings())

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-20T22:06:00Z'
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - incident
   - features
@@ -123,6 +123,14 @@ created: 2026-11-20T22:06:00Z
 ---
 
 2026-11-20 (human): program-scope rulings APPROVED as recommended: three-way-plus slicing into 145.10.1-145.10.6 (M1 move; M2a core port, Calendar adapter, canada_holidays; M2b industry availability model, service, views, EN/FR; M3 cutover NC1-NC10; M4a core incident-role check; M4b meeting lifecycle); OQ1 scheduling dissolved (TASK-138 archived; scheduling is domain-agnostic); OQ2 accepted, audit content -> TASK-191; OQ3 TASK-86 folded in (NC8); OQ4 i18n per #1867; OQ5 NC7 in M2b; OQ6 one upcoming meeting, reschedule/cancel/follow-up, calendar owns the time; OQ7 industry availability model with required/optional attendees; OQ8 integrations/canada_holidays; NC10 guests cannot modify; postmortem owner may also change the meeting; first booking stays open to any channel member; post-meeting state derived from the event; TASK-192 overdue reminders. Assessment and sources: doc-17 Open decisions.
+
+---
+
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): D6's 'English first line' is superseded by the instance order (decisions/languages.md, [languages] shared); M3/M4 channel posts go through LanguagePolicy and MultilingualText; views and private replies in the user's language of choice. Note in doc-17 at the next Stack M session.
 
 ---
 <!-- COMMENTS:END -->

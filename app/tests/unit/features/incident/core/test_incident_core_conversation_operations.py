@@ -12,6 +12,7 @@ from typing import Any
 
 import pytest
 
+from contracts.languages import MultilingualText
 from contracts.workplace import WorkplaceSystem
 from features.incident.core.adapters.slack import SlackIncidentConversation
 from features.incident.core.api import ConversationReference
@@ -36,6 +37,15 @@ async def test_post_sends_plain_text_on_the_write_handle(stub: Any, adapter: Sla
 
     stub.writes.chat_postMessage.assert_awaited_once_with(channel="C0OPEN", text="Status: investigating")
     stub.reads.chat_postMessage.assert_not_called()
+
+
+async def test_a_multilingual_post_is_one_message_with_a_line_per_language(stub: Any, adapter: SlackIncidentConversation) -> None:
+    """Slack lays a message in several languages out as one message, top to bottom, as the plain-text fallback."""
+    text = MultilingualText((("fr-FR", "Statut : enquête"), ("en-US", "Status: investigating")))
+
+    await adapter.post(OPEN, text)
+
+    stub.writes.chat_postMessage.assert_awaited_once_with(channel="C0OPEN", text="Statut : enquête\nStatus: investigating")
 
 
 async def test_set_purpose_bookmark_and_archive_name_the_channel(stub: Any, adapter: SlackIncidentConversation) -> None:

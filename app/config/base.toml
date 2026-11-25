@@ -22,6 +22,12 @@ cors_allowed_headers = ["Authorization", "Content-Type", "X-Request-ID", "tracep
 # SECURITY__DEV_BYPASS_ENABLED and SECURITY__DEV_BYPASS_TOKEN in app/.env.
 dev_bypass_enabled = false
 
+[languages]
+# Languages of shared and generic messages (a post to an incident channel, a notice to many readers),
+# in display order; one or more, each a language the app has catalogues for (decisions/languages.md).
+# Direct replies use each user's own language. A deployment sets its order in its own file.
+shared = ["en-US", "fr-FR"]
+
 [slack]
 # The Slack client's per-call timeout, retry budget and error-code catalogues.
 # Each deployment that works with Slack names its tenant in [slack.tenant] in its own

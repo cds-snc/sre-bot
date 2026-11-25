@@ -10,11 +10,13 @@ from collections.abc import Mapping
 import svcs
 
 from contracts.coordination import ConditionalWriteStore
+from contracts.languages import LanguagePolicy
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from infrastructure.coordination import InMemoryConditionalWriteStore
 from infrastructure.records.in_memory import InMemoryRecordStore
 from server.configured_systems import StaticConfiguredSystems
+from server.languages.policy import ConfiguredLanguagePolicy
 
 FAKE_SLACK_TENANT = "T-FAKE-SLACK"
 
@@ -34,4 +36,5 @@ def build_fake_service_registry(*, configured_tenants: Mapping[WorkplaceSystem, 
         ConfiguredSystems,
         StaticConfiguredSystems({WorkplaceSystem.SLACK: FAKE_SLACK_TENANT} if configured_tenants is None else configured_tenants),
     )
+    registry.register_value(LanguagePolicy, ConfiguredLanguagePolicy(shared=("en-US", "fr-FR"), supported=("en-US", "fr-FR")))
     return registry

@@ -73,7 +73,9 @@ ROOT_VIEW_ID = "V0ROOT"
 class _Surface:
     """The records, the fakes behind the response providers and the reply sender."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch, reply: FakeSlackReply | None = None) -> None:
+    def __init__(
+        self, monkeypatch: pytest.MonkeyPatch, reply: FakeSlackReply | None = None, *, languages: tuple[str, ...] | None = None
+    ) -> None:
         self.records = SwitchableRecordStore()
         seed_legacy_incident(
             self.records,
@@ -93,7 +95,7 @@ class _Surface:
         self.legacy = InMemoryLegacyRolesReader()
         self.legacy.seed(REPORT, {IncidentRole.INCIDENT_COMMANDER: "U0OLDIC"})
         self.reply = reply or FakeSlackReply()
-        self.scopes = incident_scopes(self.records, tenants=TENANTS)
+        self.scopes = incident_scopes(self.records, tenants=TENANTS, languages=languages)
         monkeypatch.setattr(providers, "incident_report", lambda: self.reports)
         monkeypatch.setattr(providers, "incident_list_projection", lambda: self.projection)
         monkeypatch.setattr(providers, "incident_conversation", lambda: self.conversations)
@@ -329,6 +331,44 @@ def test_submitting_a_severity_writes_the_record_tells_the_channel_in_both_langu
     [refreshed] = surface.reply.calls_to("update_view")
     assert refreshed["view_id"] == ROOT_VIEW_ID
     assert "*Severity*:\nsev-1" in _text(refreshed["view"])
+
+
+def test_the_field_notice_follows_the_instance_languages_and_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A French-first instance posts French first; the submitter's English modal is not what decides it (decisions/languages.md)."""
+    surface = _Surface(monkeypatch, languages=("fr-FR", "en-US"))
+
+    surface.update("severity", option="sev-1")
+
+    assert surface.posts() == (
+        f"<@{USER_ID}> a mis à jour le champ severity à sev-1\n<@{USER_ID}> has updated the field severity to sev-1",
+    )
+
+
+def test_a_one_language_instance_posts_the_field_notice_in_that_language_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    surface = _Surface(monkeypatch, languages=("en-US",))
+
+    surface.update("severity", option="sev-1")
+
+    assert surface.posts() == (f"<@{USER_ID}> has updated the field severity to sev-1",)
+
+
+def test_a_regional_locale_is_answered_in_its_language_not_a_raw_key(surface: _Surface) -> None:
+    """A Canadian French client is matched to fr-FR on its language (RFC 4647 lookup)."""
+    surface.records.go_down()
+
+    response = surface.show(locale="fr-CA")
+
+    assert response.message == "La base de données des incidents est temporairement indisponible. Veuillez réessayer plus tard."
+
+
+def test_an_unsupported_locale_is_answered_in_the_first_instance_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Spanish has no catalogue: a French-first instance answers in French rather than showing the key."""
+    surface = _Surface(monkeypatch, languages=("fr-FR", "en-US"))
+    surface.records.go_down()
+
+    response = surface.show(locale="es-ES")
+
+    assert response.message == "La base de données des incidents est temporairement indisponible. Veuillez réessayer plus tard."
 
 
 def test_submitting_none_clears_the_severity(surface: _Surface) -> None:

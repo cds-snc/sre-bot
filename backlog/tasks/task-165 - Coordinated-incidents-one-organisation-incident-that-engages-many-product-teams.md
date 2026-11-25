@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T18:47:00Z'
-updated_date: '2026-11-05T15:54:00Z'
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - incident
 milestone: m-7
@@ -62,6 +62,14 @@ created: 2026-11-05T15:54:00Z
 ---
 
 2026-11-05 (human): TASK-145.11 turns the report section writer's template facts into a template profile that postmortem passes as data: groups dropped when empty, labels styled as body text, metadata labels, and guidance restored under named headings. Until then it is a postmortem constant. The per-type document templates this epic manages supply the profile per template; the configured Google template's profile stays the default.
+
+---
+
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): every coordinated-incident post to a shared conversation (engagement, workstreams, audiences) asks LanguagePolicy.shared_languages for that conversation and posts MultilingualText; direct interactions use the user's language of choice (decisions/languages.md).
 
 ---
 <!-- COMMENTS:END -->

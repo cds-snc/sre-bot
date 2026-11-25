@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-11-20T15:23:00Z'
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - architecture
   - webhooks
@@ -75,6 +75,14 @@ created: 2026-11-20T15:23:00Z
 ---
 
 2026-11-20: F-A is fixed ahead of the rebuild by TASK-190 (doc-11 row 20a).
+
+---
+
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): for the webhooks re-cut (37.x): bot-authored wording in intents (headers, buttons, NotificationRequested titles the bot writes) is MultilingualText from LanguagePolicy; sender-supplied alert content (AWS, other senders) keeps its source language, placed once (decisions/languages.md).
 
 ---
 <!-- COMMENTS:END -->

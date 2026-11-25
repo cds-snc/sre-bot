@@ -18,6 +18,7 @@ from datetime import datetime
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from features.incident.core.api import (
     ConversationReference,
@@ -49,7 +50,7 @@ async def update_fields(
     *,
     by: str,
     at: datetime,
-    notice: str,
+    notice: str | MultilingualText,
 ) -> OperationResult[FieldsChange]:
     """Write ``changes`` to the conversation's incident, then post ``notice`` to its conversation.
 

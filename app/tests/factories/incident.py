@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from contracts.languages import LanguagePolicy
 from contracts.operations import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.records import ExpectedValue, RecordChange, RecordQuery, RecordStore, RecordTable
@@ -20,9 +21,11 @@ from features.incident.core.api import StatusUpdateStore, build_status_update_st
 from features.incident.core.domain import BindingKind, ConversationReference, Incident, IncidentBinding
 from features.incident.core.store import RecordIncidentStore, RecordTimelineStore, bindings_table, incidents_table, timeline_table
 from infrastructure.records.in_memory import InMemoryRecordStore
+from server.languages.policy import ConfiguredLanguagePolicy
 from tests.factories.services import FakeServiceScopeOpener
 
 SLACK_TENANT = "T0SLACK"
+DEFAULT_LANGUAGES = ("en-US", "fr-FR")
 GOOGLE_TENANT = "C0GOOGLE"
 DECLARED_AT = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
@@ -132,16 +135,22 @@ def incident_scopes(
     records: RecordStore | None = None,
     *,
     tenants: Mapping[WorkplaceSystem, str] | None = None,
+    languages: Sequence[str] | None = None,
 ) -> FakeServiceScopeOpener:
-    """A scope opener resolving the RecordStore and ConfiguredSystems an incident entry point needs.
+    """A scope opener resolving the RecordStore, ConfiguredSystems and LanguagePolicy an incident entry point needs.
 
     ``records`` defaults to an empty ``InMemoryRecordStore``; ``tenants``
-    defaults to Slack configured under ``SLACK_TENANT``.
+    defaults to Slack configured under ``SLACK_TENANT``; ``languages`` is the
+    instance's shared list, English then French by default (the base file's).
+    The policy is the host's own, a pure value with no I/O.
     """
     return FakeServiceScopeOpener(
         {
             RecordStore: records if records is not None else InMemoryRecordStore(),
             ConfiguredSystems: FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT} if tenants is None else tenants),
+            LanguagePolicy: ConfiguredLanguagePolicy(
+                shared=tuple(languages) if languages is not None else DEFAULT_LANGUAGES, supported=DEFAULT_LANGUAGES
+            ),
         }
     )
 

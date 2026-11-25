@@ -16,6 +16,7 @@ import pytest
 import svcs
 
 from contracts.coordination import ConditionalWriteStore
+from contracts.languages import LanguagePolicy
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier
 from infrastructure.coordination import DynamoDBConditionalWriteStore
@@ -41,8 +42,22 @@ def _registry() -> svcs.Registry:
     return registry
 
 
-def test_core_services_cover_records_coordination_configured_systems_and_tenant_verification() -> None:
-    assert {entry.contract for entry in CORE_SERVICES} == {RecordStore, ConditionalWriteStore, ConfiguredSystems, TenantVerifier}
+def test_core_services_cover_records_coordination_configured_systems_tenant_verification_and_languages() -> None:
+    assert {entry.contract for entry in CORE_SERVICES} == {
+        RecordStore,
+        ConditionalWriteStore,
+        ConfiguredSystems,
+        TenantVerifier,
+        LanguagePolicy,
+    }
+
+
+def test_the_language_policy_resolves_from_the_validated_slice() -> None:
+    """The base file's languages, English then French, reach every caller of the contract."""
+    with svcs.Container(_registry()) as container:
+        policy = container.get(LanguagePolicy)
+
+    assert policy.reply_languages(None) == ("en-US", "fr-FR")
 
 
 def test_registered_contracts_resolve_to_the_dynamodb_stores() -> None:

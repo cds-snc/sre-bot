@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 
+from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
@@ -92,6 +93,16 @@ async def test_post_to_an_open_conversation_returns_the_message_reference(conver
     assert posted.data == MessageReference(
         system=WorkplaceSystem.SLACK, tenant=TENANT, conversation_id="C0OPEN", message_id="1700000000.000001"
     )
+
+
+async def test_a_multilingual_post_to_an_open_conversation_returns_the_message_reference(
+    conversations: IncidentConversation,
+) -> None:
+    posted = await conversations.post(OPEN, MultilingualText((("en-US", "Status"), ("fr-FR", "Statut"))))
+
+    assert posted.is_success
+    assert posted.data is not None
+    assert posted.data.conversation_id == "C0OPEN"
 
 
 async def test_each_write_to_an_open_conversation_succeeds(conversations: IncidentConversation) -> None:
