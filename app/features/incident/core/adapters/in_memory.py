@@ -15,9 +15,15 @@ references only, unknown conversations not found, archived or non-member
 conversations not writable and refusing writes, repeated archives and empty
 invites succeeding). ``InMemoryVideoCall``: the ``GoogleMeetVideoCall`` rules
 (Google references under the tenant, a link only for Google references).
+``InMemoryMeetingScheduler``: the ``GoogleCalendarMeetingScheduler`` rules (the id
+derived from the key, a replayed key returning the booked meeting and a deleted
+one's key a permanent 409, deleted or unknown meetings not found, a repeated
+delete succeeding, patches applying only the fields set). ``InMemoryCalendarAvailability``:
+the ``GoogleCalendarAvailability`` rules (one answer per case-folded address,
+unknown is ``None`` and never free, intervals clipped to the window).
 """
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from typing import Any
@@ -29,12 +35,16 @@ from contracts.operations.result import OperationResult
 from contracts.operations.status import OperationStatus
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus
+from features.incident.core.adapters.google_calendar import meeting_event_id
 from features.incident.core.adapters.google_docs import timeline_entry_url, timeline_message_key
 from features.incident.core.adapters.list_rows import list_row
 from features.incident.core.adapters.slack import slack_channel_name, slack_conversation_label, slack_conversation_link
 from features.incident.core.adapters.timeline_items import entry_key
+from features.incident.core.api import CalendarAvailability, MeetingScheduler
 from features.incident.core.domain import (
+    AttendeeBusy,
     BindingKind,
+    BusyInterval,
     ConversationName,
     ConversationReference,
     DocumentField,
@@ -43,11 +53,15 @@ from features.incident.core.domain import (
     Incident,
     IncidentBinding,
     IncidentChanges,
+    MeetingChange,
+    MeetingRequest,
+    MeetingStatus,
     MessageReference,
     ReferenceKind,
     ReportPlacement,
     ReportReference,
     ResourceReference,
+    ScheduledMeeting,
     SectionDraft,
     StatusUpdate,
     StatusUpdateState,
@@ -857,6 +871,147 @@ class InMemoryVideoCall:
     def link(self, call: VideoCallReference) -> str | None:
         """Return the stored link of a Google call; a call of another system has none here."""
         return call.url if call.system is WorkplaceSystem.GOOGLE else None
+
+
+def _meeting_not_found[T](meeting_id: str) -> OperationResult[T]:
+    return OperationResult.error(
+        status=OperationStatus.NOT_FOUND, message=f"meeting {meeting_id} is not on the calendar", error_code=ErrorCode.NOT_FOUND
+    )
+
+
+class InMemoryMeetingScheduler(MeetingScheduler):
+    """Hold one calendar's meetings in memory with the Google Calendar scheduler's observable rules.
+
+    ``requests`` records each booked request, ``changes`` each applied patch and ``deletions``
+    each deleted id. ``fail_with`` makes every call return that error result; ``fail_on``
+    maps an operation name (``create``, ``get``, ``patch``, ``delete``) to the error result it
+    returns. ``edit_by_hand`` changes a stored meeting as a person editing the shared calendar
+    would, so a test can show the calendar owning the time.
+    """
+
+    def __init__(self, *, fail_with: OperationResult[Any] | None = None) -> None:
+        self.meetings: dict[str, ScheduledMeeting] = {}
+        self.deleted: set[str] = set()
+        self.requests: list[MeetingRequest] = []
+        self.changes: list[tuple[str, MeetingChange]] = []
+        self.deletions: list[str] = []
+        self.fail_with = fail_with
+        self.fail_on: dict[str, OperationResult[Any]] = {}
+
+    def _failure(self, operation: str) -> OperationResult[Any] | None:
+        return self.fail_with if self.fail_with is not None else self.fail_on.get(operation)
+
+    def edit_by_hand(self, meeting_id: str, **fields: Any) -> None:
+        """Replace fields of a stored meeting, as a hand edit on the calendar does."""
+        self.meetings[meeting_id] = replace(self.meetings[meeting_id], **fields)
+
+    async def create(self, request: MeetingRequest) -> OperationResult[ScheduledMeeting]:
+        """Book the meeting under the id its key derives; a replay returns it, a deleted one's key is a 409."""
+        if (failure := self._failure("create")) is not None:
+            return failure
+        meeting_id = meeting_event_id(request.idempotency_key)
+        if meeting_id in self.deleted:
+            return OperationResult.permanent_error(f"meeting {meeting_id} was deleted; a new booking needs a new key", "409")
+        if meeting_id in self.meetings:
+            return OperationResult.success(self.meetings[meeting_id])
+        meeting = ScheduledMeeting(
+            id=meeting_id,
+            title=request.title,
+            start=request.start,
+            end=request.end,
+            status=MeetingStatus.CONFIRMED,
+            url=f"https://calendar.google.com/calendar/event?eid={meeting_id}",
+            video_url=f"https://meet.google.com/{meeting_id[:3]}-{meeting_id[3:7]}-{meeting_id[7:10]}",
+            attendees=request.attendees,
+        )
+        self.meetings[meeting_id] = meeting
+        self.requests.append(request)
+        return OperationResult.success(meeting)
+
+    async def get(self, meeting_id: str) -> OperationResult[ScheduledMeeting]:
+        """Return the stored meeting; a deleted or unknown one is not found."""
+        if (failure := self._failure("get")) is not None:
+            return failure
+        if meeting_id in self.deleted or meeting_id not in self.meetings:
+            return _meeting_not_found(meeting_id)
+        return OperationResult.success(self.meetings[meeting_id])
+
+    async def patch(self, meeting_id: str, change: MeetingChange) -> OperationResult[ScheduledMeeting]:
+        """Apply only the fields the change sets; a deleted or unknown meeting is not found."""
+        if (failure := self._failure("patch")) is not None:
+            return failure
+        if meeting_id in self.deleted or meeting_id not in self.meetings:
+            return _meeting_not_found(meeting_id)
+        meeting = self.meetings[meeting_id]
+        updated = replace(
+            meeting,
+            title=change.title if change.title is not None else meeting.title,
+            start=change.start if change.start is not None else meeting.start,
+            end=change.end if change.end is not None else meeting.end,
+            attendees=change.attendees if change.attendees is not None else meeting.attendees,
+        )
+        self.meetings[meeting_id] = updated
+        self.changes.append((meeting_id, change))
+        return OperationResult.success(updated)
+
+    async def delete(self, meeting_id: str) -> OperationResult[None]:
+        """Delete the meeting; a repeated delete succeeds and an unknown meeting is not found."""
+        if (failure := self._failure("delete")) is not None:
+            return failure
+        if meeting_id in self.deleted:
+            return OperationResult.success()
+        if meeting_id not in self.meetings:
+            return _meeting_not_found(meeting_id)
+        del self.meetings[meeting_id]
+        self.deleted.add(meeting_id)
+        self.deletions.append(meeting_id)
+        return OperationResult.success()
+
+
+class InMemoryCalendarAvailability(CalendarAvailability):
+    """Answer free/busy from configured intervals with the Google Calendar availability's observable rules.
+
+    ``busy`` maps an address to its busy intervals; an address in ``unknown`` answers
+    ``busy=None``; any other address is free. ``fail_with`` makes every read return that
+    error result. ``queries`` records each requested window and its addresses.
+    """
+
+    def __init__(
+        self,
+        *,
+        busy: Mapping[str, Sequence[BusyInterval]] | None = None,
+        unknown: Collection[str] = (),
+        fail_with: OperationResult[Any] | None = None,
+    ) -> None:
+        self._busy = {email.casefold(): tuple(intervals) for email, intervals in (busy or {}).items()}
+        self._unknown = {email.casefold() for email in unknown}
+        self.fail_with = fail_with
+        self.queries: list[tuple[tuple[str, ...], datetime, datetime]] = []
+
+    async def busy_periods(
+        self, emails: Sequence[str], start: datetime, end: datetime
+    ) -> OperationResult[Mapping[str, AttendeeBusy]]:
+        """Return one answer per case-folded address, the intervals clipped to the window."""
+        if start.utcoffset() is None or end.utcoffset() is None:
+            raise ValueError("start and end must be timezone-aware")
+        if end <= start:
+            raise ValueError("end must be after start")
+        keys = tuple(dict.fromkeys(email.strip().casefold() for email in emails if email.strip()))
+        self.queries.append((keys, start, end))
+        if self.fail_with is not None:
+            return self.fail_with
+        answers: dict[str, AttendeeBusy] = {}
+        for key in keys:
+            if key in self._unknown:
+                answers[key] = AttendeeBusy(email=key, busy=None)
+                continue
+            clipped = tuple(
+                BusyInterval(start=max(interval.start, start), end=min(interval.end, end))
+                for interval in self._busy.get(key, ())
+                if interval.start < end and interval.end > start
+            )
+            answers[key] = AttendeeBusy(email=key, busy=clipped)
+        return OperationResult.success(answers)
 
 
 class InMemoryIncidentListProjection:

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T22:04:00Z'
-updated_date: '2026-11-20T22:05:00Z'
+updated_date: '2026-11-25T15:18:00Z'
 labels:
   - incident
   - features
@@ -39,3 +39,15 @@ Grounded outline (plan in full at pickup). Depends on M2a; i18n rule of PR #1867
 Grounding: moved pure rules in postmortem/domain.py (find_first_available_slot, identify_unavailable_users heuristic, get_utc_hour; legacy flags only a single busy block within one hour of both edges and treats calendar errors as free); legacy modal text in modules/incident/schedule_retro.py:97-232 (English only, title 'SRE - Schedule Retro'); response precedent for service/, providers.py, interfaces.py, adapters/sentinel.py, catalogues and register_i18n_resources; core Incident roles (incident_commander, operations_lead, postmortem_owner) and IncidentConversation.members (new, add here if not in M2a) for the pickers.
 Steps: (1) domain: Availability (free/busy/unknown), SlotPolicy (frozen, built from settings), required/optional attendee model, qualifying-slot search (no required busy; required unknown named; optional quorum percent; earliest; whole-window-busy optional excluded and named, required stops the search), explanations; NC7 per-date zoneinfo windows, holidays for every year crossed (check overlap with TASK-155); (2) settings: meeting hours, timezone, duration, search days, earliest offset, optional_quorum_percent, unavailable rules, excluded attendee names, all typed with defaults in [incident_postmortem]; (3) service/schedule.py over MeetingScheduler, HolidayCalendar, IncidentStore.set_reference, IncidentConversation (post when writable); (4) slack_views.py and EN/FR catalogues (opener locale in private_metadata; nudge modal bilingual; confirmation bilingual English first; French title Planifier la rétro 🗓️ within 24 chars; zone name from setting); (5) adapters/sentinel.py + interfaces + providers (minimal named fields, observability.md:20). Tests under tests/unit/features/incident/postmortem/ (slot search, availability model, service with fakes, views, catalogue parity). Size: about 600 LOC; if over, record the rule-1 exception (dark, no consumer). Blast radius: dark; revert trivial.
 <!-- SECTION:PLAN:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T15:18:00Z
+
+---
+
+2026-11-25 (TASK-145.10.2 rulings): no [incident_postmortem] reminder_minutes (NC8 amended, reminder dropped). Consume HolidayCalendar.observed_federal_holidays(years) and decide fail-open vs fail-closed on a classified failure. The caller passes MeetingRequest.idempotency_key stable across re-claims of one booking attempt (see 145.10.6).
+
+---
+<!-- COMMENTS:END -->

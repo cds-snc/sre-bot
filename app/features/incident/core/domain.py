@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, fields
 from datetime import date, datetime
 from enum import Enum, StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus, Severity, StatusUpdateStage
@@ -599,3 +600,172 @@ def incident_conversation_names(title: str, opened_on: date, *, production: bool
         ConversationName(title=title, opened_on=opened_on, production=production, attempt=attempt)
         for attempt in range(1, attempts + 1)
     )
+
+
+def _require_window(record: object, start: datetime, end: datetime) -> None:
+    _require_aware(record, "start", "end")
+    if end <= start:
+        raise ValueError("end must be after start")
+
+
+def _require_time_zone(name: str) -> None:
+    try:
+        ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(f"time_zone {name!r} is not an IANA time zone") from exc
+
+
+def normalized_attendees(addresses: tuple[str, ...]) -> tuple[str, ...]:
+    """Return the addresses stripped, de-duplicated case-insensitively in order (first spelling kept).
+
+    Raises:
+        ValueError: an address is blank.
+    """
+    seen: set[str] = set()
+    kept: list[str] = []
+    for address in addresses:
+        email = address.strip()
+        if not email:
+            raise ValueError("an attendee address must not be blank")
+        if email.casefold() not in seen:
+            seen.add(email.casefold())
+            kept.append(email)
+    return tuple(kept)
+
+
+class MeetingStatus(StrEnum):
+    """Whether a scheduled meeting is confirmed or tentative; a cancelled meeting is not found."""
+
+    CONFIRMED = "confirmed"
+    TENTATIVE = "tentative"
+
+
+@dataclass(frozen=True)
+class MeetingAttachment:
+    """A link attached to a meeting invitation, such as the incident report."""
+
+    title: str
+    url: str
+
+    def __post_init__(self) -> None:
+        _require_text(self, "title", "url")
+
+
+@dataclass(frozen=True)
+class MeetingRequest:
+    """A meeting to book: purpose-neutral, so any incident meeting can use it.
+
+    Attributes:
+        title: The invitation title.
+        description: The invitation body; may be empty.
+        start: Aware start time.
+        end: Aware end time, after ``start``.
+        time_zone: IANA zone the meeting is shown in (the caller's setting).
+        attendees: Invitee addresses, stripped and de-duplicated case-insensitively.
+        idempotency_key: Caller key, stable across retries and re-claims of one booking
+            attempt (never a claim token): a replay with the same key returns the
+            meeting it booked instead of booking a second one.
+        attachments: Links attached to the invitation.
+    """
+
+    title: str
+    description: str
+    start: datetime
+    end: datetime
+    time_zone: str
+    attendees: tuple[str, ...]
+    idempotency_key: str
+    attachments: tuple[MeetingAttachment, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_text(self, "title", "time_zone", "idempotency_key")
+        _require_window(self, self.start, self.end)
+        _require_time_zone(self.time_zone)
+        object.__setattr__(self, "attendees", normalized_attendees(self.attendees))
+
+
+@dataclass(frozen=True)
+class MeetingChange:
+    """The fields of a scheduled meeting to change; ``None`` leaves a field as it is.
+
+    ``start``, ``end`` and ``time_zone`` move the meeting together. ``attendees`` is
+    the full replacement list (an empty tuple removes every invitee).
+    """
+
+    title: str | None = None
+    description: str | None = None
+    start: datetime | None = None
+    end: datetime | None = None
+    time_zone: str | None = None
+    attendees: tuple[str, ...] | None = None
+
+    def __post_init__(self) -> None:
+        if all(getattr(self, name) is None for name in ("title", "description", "start", "end", "time_zone", "attendees")):
+            raise ValueError("a meeting change that sets nothing is not a change")
+        if self.title is not None:
+            _require_text(self, "title")
+        times = (self.start, self.end, self.time_zone)
+        if any(value is not None for value in times):
+            if self.start is None or self.end is None or self.time_zone is None:
+                raise ValueError("start, end and time_zone change together")
+            _require_window(self, self.start, self.end)
+            _require_time_zone(self.time_zone)
+        if self.attendees is not None:
+            object.__setattr__(self, "attendees", normalized_attendees(self.attendees))
+
+
+@dataclass(frozen=True)
+class ScheduledMeeting:
+    """A meeting as the calendar holds it now: the calendar owns its time.
+
+    Attributes:
+        id: The vendor's id of the meeting.
+        title: The invitation title as it stands.
+        start: Aware start time.
+        end: Aware end time.
+        status: Confirmed or tentative.
+        url: Link to the meeting in the calendar.
+        video_url: The meeting's video link, ``None`` while the vendor has not attached one.
+        attendees: Invitee addresses.
+    """
+
+    id: str
+    title: str
+    start: datetime
+    end: datetime
+    status: MeetingStatus
+    url: str
+    video_url: str | None
+    attendees: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        _require_text(self, "id", "url")
+        _require_aware(self, "start", "end")
+
+
+@dataclass(frozen=True)
+class BusyInterval:
+    """A period a person's calendar is busy."""
+
+    start: datetime
+    end: datetime
+
+    def __post_init__(self) -> None:
+        _require_aware(self, "start", "end")
+
+
+@dataclass(frozen=True)
+class AttendeeBusy:
+    """What a person's calendar says for a window: ``busy`` is ``None`` when unknown, never an empty tuple.
+
+    An empty tuple means free for the whole window; ``None`` means the calendar could
+    not be read (not shared, not found, or not answered), which a caller must not read as free.
+    """
+
+    email: str
+    busy: tuple[BusyInterval, ...] | None
+
+    @property
+    def known(self) -> bool:
+        """Whether the calendar answered for this person."""
+        return self.busy is not None

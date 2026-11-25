@@ -1,12 +1,20 @@
 """Shared fixtures for the incident core unit tests."""
 
+import copy
+import threading
 from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
+from googleapiclient.errors import HttpError
 from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
+
+from features.incident.core.adapters import google_calendar
 
 
 def slack_error(code: str) -> SlackApiError:
@@ -186,3 +194,160 @@ class StubSlack:
 def stub_slack() -> Callable[..., StubSlack]:
     """Return the ``StubSlack`` constructor."""
     return StubSlack
+
+
+def google_http_error(status: int, retry_after: str | None = None) -> HttpError:
+    """Return a googleapiclient ``HttpError`` with ``status`` (and a Retry-After header when given)."""
+
+    class FakeResp(dict[str, str]):
+        def __init__(self) -> None:
+            super().__init__()
+            if retry_after is not None:
+                self["retry-after"] = retry_after
+            self.status = status
+            self.reason = "boom"
+
+    return HttpError(resp=FakeResp(), content=b"{}")  # type: ignore[arg-type]
+
+
+class _CalendarRequest:
+    def __init__(self, stub: StubCalendar, method: str, params: dict[str, Any], run: Callable[[], Any]) -> None:
+        self._stub, self._method, self._params, self._run = stub, method, params, run
+
+    def execute(self, num_retries: int | None = None) -> Any:
+        self._stub.calls.append(CalendarCall(self._method, self._params, num_retries, threading.get_ident()))
+        failure = self._stub.fail.get(self._method)
+        if failure is not None:
+            raise failure
+        result = self._run()
+        transform = self._stub.transform.get(self._method)
+        return transform(result) if transform is not None else result
+
+
+@dataclass(frozen=True)
+class CalendarCall:
+    """One executed Calendar request: the method, its parameters, the retries asked for (None = factory default), the thread."""
+
+    method: str
+    params: dict[str, Any]
+    num_retries: int | None
+    thread: int
+
+
+class StubCalendar:
+    """A Calendar API v3 service stand-in over one in-memory calendar, answering as Google documents.
+
+    ``events().insert`` stores the body under its client-supplied ``id`` (a second insert of the
+    same id, deleted or not, is a 409), adds ``htmlLink``, ``hangoutLink`` and a confirmed status;
+    ``get`` of an unknown id is a 404 and of a deleted event a minimal cancelled resource;
+    ``patch`` merges the body (arrays replace); ``delete`` cancels the event, and a second delete
+    is a 410. ``freebusy().query`` answers each requested calendar from ``busy`` (intervals as
+    ``(start, end)`` aware datetimes, clipped to the window), ``calendar_errors`` (a reason per
+    address) or omits addresses in ``omitted``. ``fail`` maps a method name (``insert``, ``get``,
+    ``patch``, ``delete``, ``query``) to the exception its ``execute`` raises, and ``transform``
+    to a function applied to its answer (a hand-edited or incomplete event). Every executed
+    request is recorded in ``calls``.
+    """
+
+    def __init__(self) -> None:
+        self.stored: dict[str, dict[str, Any]] = {}
+        self.calls: list[CalendarCall] = []
+        self.fail: dict[str, Exception] = {}
+        self.busy: dict[str, list[tuple[datetime, datetime]]] = {}
+        self.calendar_errors: dict[str, str] = {}
+        self.omitted: set[str] = set()
+        self.transform: dict[str, Callable[[Any], Any]] = {}
+
+    def calls_to(self, method: str) -> list[CalendarCall]:
+        return [call for call in self.calls if call.method == method]
+
+    def events(self) -> SimpleNamespace:
+        return SimpleNamespace(insert=self._insert, get=self._get, patch=self._patch, delete=self._delete)
+
+    def freebusy(self) -> SimpleNamespace:
+        return SimpleNamespace(query=self._query)
+
+    def _insert(self, **params: Any) -> _CalendarRequest:
+        def run() -> dict[str, Any]:
+            body = copy.deepcopy(params["body"])
+            event_id = body["id"]
+            if event_id in self.stored:
+                raise google_http_error(409)
+            body.update(
+                status="confirmed",
+                htmlLink=f"https://calendar.google.com/calendar/event?eid={event_id}",
+                hangoutLink=f"https://meet.google.com/{event_id[:3]}-{event_id[3:7]}-{event_id[7:10]}",
+            )
+            self.stored[event_id] = body
+            return copy.deepcopy(body)
+
+        return _CalendarRequest(self, "insert", params, run)
+
+    def _get(self, **params: Any) -> _CalendarRequest:
+        def run() -> dict[str, Any]:
+            event = self.stored.get(params["eventId"])
+            if event is None:
+                raise google_http_error(404)
+            if event["status"] == "cancelled":
+                return {"id": event["id"], "status": "cancelled"}
+            return copy.deepcopy(event)
+
+        return _CalendarRequest(self, "get", params, run)
+
+    def _patch(self, **params: Any) -> _CalendarRequest:
+        def run() -> dict[str, Any]:
+            event = self.stored.get(params["eventId"])
+            if event is None:
+                raise google_http_error(404)
+            if event["status"] == "cancelled":
+                raise google_http_error(410)
+            event.update(copy.deepcopy(params["body"]))
+            return copy.deepcopy(event)
+
+        return _CalendarRequest(self, "patch", params, run)
+
+    def _delete(self, **params: Any) -> _CalendarRequest:
+        def run() -> str:
+            event = self.stored.get(params["eventId"])
+            if event is None:
+                raise google_http_error(404)
+            if event["status"] == "cancelled":
+                raise google_http_error(410)
+            event["status"] = "cancelled"
+            return ""
+
+        return _CalendarRequest(self, "delete", params, run)
+
+    def _query(self, **params: Any) -> _CalendarRequest:
+        def run() -> dict[str, Any]:
+            body = params["body"]
+            window_start = datetime.fromisoformat(body["timeMin"])
+            window_end = datetime.fromisoformat(body["timeMax"])
+            calendars: dict[str, Any] = {}
+            for item in body["items"]:
+                email = item["id"]
+                if email in self.omitted:
+                    continue
+                if email in self.calendar_errors:
+                    calendars[email] = {"errors": [{"domain": "global", "reason": self.calendar_errors[email]}], "busy": []}
+                    continue
+                busy = [
+                    {
+                        "start": max(start, window_start).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                        "end": min(end, window_end).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                    }
+                    for start, end in self.busy.get(email, [])
+                    if start < window_end and end > window_start
+                ]
+                calendars[email] = {"busy": busy}
+            return {"kind": "calendar#freeBusy", "calendars": calendars}
+
+        return _CalendarRequest(self, "query", params, run)
+
+
+@pytest.fixture
+def stub_calendar(monkeypatch: pytest.MonkeyPatch) -> StubCalendar:
+    """Replace the Calendar gateway factory of the core Calendar adapter with a ``StubCalendar``."""
+    stub = StubCalendar()
+    monkeypatch.setattr(google_calendar, "get_calendar_service", lambda **_: stub)
+    return stub

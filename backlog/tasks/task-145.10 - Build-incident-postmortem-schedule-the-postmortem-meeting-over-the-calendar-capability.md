@@ -126,6 +126,14 @@ created: 2026-11-20T22:06:00Z
 
 ---
 
+created: 2026-11-25T15:18:00Z
+
+---
+
+2026-11-25 (human, TASK-145.10.2 rulings): NC8 amended to 'description and one requestId source sent'; the 10-minute reminder is dropped (Calendar applies events.reminders to the authenticated bot user only; attendees keep their own defaults) and no reminder_minutes setting is added. Calendar create and delete keep SDK retries (keyed create, 410 delete); only patch is one attempt. [canada_holidays] base_url is a tenant entry (self-hostable API). The booking idempotency key is stable across re-claims, never a claim token. Legacy deletions are on TASK-145.10.4 AC #6.
+
+---
+
 created: 2026-11-25T19:10:00Z
 
 ---
