@@ -20,6 +20,11 @@ and ``conversation_is_writable`` is the check every caller applies before a writ
 ``IncidentTranscriptReader`` reads what was said in a conversation.
 ``VideoCall`` creates the incident's video call (``VideoCallReference``);
 ``get_video_call`` provides the Google Meet one.
+``MeetingScheduler`` books, reads, changes and deletes meetings on one calendar
+(``MeetingRequest``, ``MeetingChange``, ``ScheduledMeeting``);
+``build_meeting_scheduler`` builds the Google Calendar one for a calendar id.
+``CalendarAvailability`` reads people's free/busy (``AttendeeBusy``, ``BusyInterval``);
+``get_calendar_availability`` provides the Google Calendar one.
 ``IncidentListProjection`` writes the incident list sheet (append a row, update the status
 cell); ``get_incident_list_projection`` provides the Google Sheets one.
 ``read_incident_roles`` reads an incident's roles from the record, else through ``LegacyRolesReader``
@@ -43,6 +48,7 @@ from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
 from features.incident.common.settings import IncidentCoreSettings
 from features.incident.common.vocabulary import IncidentRole, IncidentStatus, StatusUpdateStage
+from features.incident.core.adapters.google_calendar import GoogleCalendarAvailability, GoogleCalendarMeetingScheduler
 from features.incident.core.adapters.google_docs import GoogleDocsIncidentReport
 from features.incident.core.adapters.google_meet import GoogleMeetVideoCall
 from features.incident.core.adapters.google_sheets import GoogleSheetsIncidentListProjection
@@ -51,7 +57,9 @@ from features.incident.core.adapters.legacy_roles import GoogleDriveLegacyRolesR
 from features.incident.core.adapters.legacy_schedule import GoogleDrivePlacementScheduleLookup
 from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
 from features.incident.core.domain import (
+    AttendeeBusy,
     BindingKind,
+    BusyInterval,
     ConversationName,
     ConversationReference,
     DocumentField,
@@ -62,11 +70,16 @@ from features.incident.core.domain import (
     IncidentBinding,
     IncidentChanges,
     Keep,
+    MeetingAttachment,
+    MeetingChange,
+    MeetingRequest,
+    MeetingStatus,
     MessageReference,
     PostmortemMeetingReference,
     ReferenceKind,
     ReportPlacement,
     ReportReference,
+    ScheduledMeeting,
     SectionDraft,
     SeverityChange,
     StatusUpdate,
@@ -96,7 +109,10 @@ from features.incident.core.store import (
 logger = structlog.get_logger()
 
 __all__ = [
+    "AttendeeBusy",
     "BindingKind",
+    "BusyInterval",
+    "CalendarAvailability",
     "ConversationName",
     "ConversationReference",
     "DocumentField",
@@ -114,12 +130,18 @@ __all__ = [
     "Keep",
     "LegacyRolesReader",
     "LegacyUpgrade",
+    "MeetingAttachment",
+    "MeetingChange",
+    "MeetingRequest",
+    "MeetingScheduler",
+    "MeetingStatus",
     "MessageReference",
     "PlacementScheduleLookup",
     "PostmortemMeetingReference",
     "ReferenceKind",
     "ReportPlacement",
     "ReportReference",
+    "ScheduledMeeting",
     "SectionDraft",
     "SeverityChange",
     "StatusUpdate",
@@ -137,9 +159,11 @@ __all__ = [
     "VideoCallReference",
     "build_incident_store",
     "build_legacy_upgrade",
+    "build_meeting_scheduler",
     "build_status_update_store",
     "conversation_is_writable",
     "find_incident_for_conversation",
+    "get_calendar_availability",
     "get_incident_conversation",
     "get_incident_list_projection",
     "get_incident_report",
@@ -511,6 +535,81 @@ class VideoCall(Protocol):
 def get_video_call() -> VideoCall:
     """Return the process-wide Google-Meet-backed ``VideoCall``."""
     return GoogleMeetVideoCall()
+
+
+@runtime_checkable
+class MeetingScheduler(Protocol):
+    """Interface booking and keeping meetings on one calendar; the calendar owns each meeting's time.
+
+    Purpose-neutral: it knows nothing of postmortems, and the caller holds the meeting
+    policy (title, duration, time zone, who is invited). Meetings are named by the
+    vendor's id, which the caller stores in its own reference. Every method is async:
+    an implementation over a blocking SDK offloads inside its own methods
+    (decisions/outbound-clients.md). Platform failures are classified results, never
+    exceptions; a deleted or cancelled meeting is NOT_FOUND with ``ErrorCode.NOT_FOUND``.
+    """
+
+    async def create(self, request: MeetingRequest) -> OperationResult[ScheduledMeeting]:
+        """Book the meeting, inviting the attendees, and return it.
+
+        Idempotent on ``request.idempotency_key``: a repeat with the key returns the meeting
+        it booked. The key of a meeting deleted since is a PERMANENT_ERROR (a new booking
+        needs a new key). Invitees cannot change the meeting or invite others.
+        """
+        ...
+
+    async def get(self, meeting_id: str) -> OperationResult[ScheduledMeeting]:
+        """Return the meeting as the calendar holds it now.
+
+        A meeting without a start and end time (an all-day hand edit) is a PERMANENT_ERROR
+        with ``ErrorCode.INVALID_RESPONSE``.
+        """
+        ...
+
+    async def patch(self, meeting_id: str, change: MeetingChange) -> OperationResult[ScheduledMeeting]:
+        """Change the fields the change sets, notify the invitees and return the meeting; one attempt."""
+        ...
+
+    async def delete(self, meeting_id: str) -> OperationResult[None]:
+        """Delete the meeting and notify the invitees; deleting a meeting already deleted succeeds."""
+        ...
+
+
+def build_meeting_scheduler(calendar_id: str) -> MeetingScheduler:
+    """Return the Google-Calendar-backed ``MeetingScheduler`` for ``calendar_id`` (the caller's setting).
+
+    Raises:
+        ValueError: ``calendar_id`` is blank.
+    """
+    return GoogleCalendarMeetingScheduler(calendar_id)
+
+
+@runtime_checkable
+class CalendarAvailability(Protocol):
+    """Interface reading when people are busy; it never books or changes anything.
+
+    It holds no availability policy (working hours, holidays, quorum): the caller does.
+    Async, offloading inside its own methods; platform failures are classified results.
+    """
+
+    async def busy_periods(
+        self, emails: Sequence[str], start: datetime, end: datetime
+    ) -> OperationResult[Mapping[str, AttendeeBusy]]:
+        """Return one answer per requested address, keyed by its stripped, case-folded spelling.
+
+        A person whose calendar could not be read is ``busy=None`` (unknown), never an empty
+        tuple (free). A failed read is an error result, never everyone free.
+
+        Raises:
+            ValueError: ``start`` or ``end`` is naive, or ``end`` is not after ``start``.
+        """
+        ...
+
+
+@lru_cache(maxsize=1)
+def get_calendar_availability() -> CalendarAvailability:
+    """Return the process-wide Google-Calendar-backed ``CalendarAvailability``."""
+    return GoogleCalendarAvailability()
 
 
 @runtime_checkable
