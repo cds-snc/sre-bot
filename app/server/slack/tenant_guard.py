@@ -13,7 +13,9 @@ Slack Connect user in a shared channel is not mistaken for another tenant.
 A refused request is acked (Bolt does not ack a middleware that stops the chain, and
 Slack shows the user a timeout), runs no listener, and logs slack_tenant_mismatch at
 error. Where the request has a response URL, an ephemeral notice is posted from a
-background worker, so it never delays the ack.
+background worker, so it never delays the ack. The notice is a direct reply: in the
+user's language when the payload names one, else in the instance's languages
+(decisions/languages.md).
 """
 
 from collections.abc import Callable
@@ -26,13 +28,15 @@ from slack_bolt import App, BoltRequest, BoltResponse
 from slack_bolt.middleware import Middleware
 from slack_sdk.webhook import WebhookClient
 
+from contracts.languages import LanguagePolicy, MultilingualText
 from infrastructure.i18n.factory import t
 from integrations.slack.settings import SlackTenant
+from server.languages.policy import ConfiguredLanguagePolicy
+from server.languages.settings import get_language_settings
 
 logger = structlog.get_logger(__name__)
 
 NOTICE_KEY = "transport.slack.tenant_mismatch"
-NOTICE_LOCALES = ("en-US", "fr-FR")
 NOTICE_TIMEOUT_SECONDS = 2
 
 
@@ -65,11 +69,9 @@ def check_slack_tenant(tenant: SlackTenant, *, team_id: str | None, enterprise_i
     )
 
 
-def _notice_text(locale: str | None) -> str:
-    """Return the notice in the user's locale when the payload names a supported one, otherwise in both."""
-    if locale in NOTICE_LOCALES:
-        return t(NOTICE_KEY, locale)
-    return "\n".join(t(NOTICE_KEY, each) for each in NOTICE_LOCALES)
+def _notice_text(languages: LanguagePolicy, locale: str | None) -> str:
+    """Return the notice in the languages the policy picks for a reply to ``locale``."""
+    return MultilingualText.of(languages.reply_languages(locale), lambda language: t(NOTICE_KEY, language)).plain_text()
 
 
 def _send_notice(response_url: str, text: str) -> None:
@@ -96,9 +98,10 @@ def _request_fields(body: dict[str, Any]) -> dict[str, Any]:
 class SlackTenantGuard(Middleware):
     """Global Bolt middleware refusing every request that does not come from the configured tenant."""
 
-    def __init__(self, tenant: SlackTenant, executor: Executor) -> None:
+    def __init__(self, tenant: SlackTenant, executor: Executor, languages: LanguagePolicy) -> None:
         self._tenant = tenant
         self._executor = executor
+        self._languages = languages
 
     def process(self, *, req: BoltRequest, resp: BoltResponse, next: Callable[[], BoltResponse]) -> BoltResponse:
         context = req.context
@@ -118,20 +121,28 @@ class SlackTenantGuard(Middleware):
         if response_url:
             user = req.body.get("user")
             locale = user.get("locale") if isinstance(user, dict) else None
-            self._executor.submit(_send_notice, response_url, _notice_text(locale))
+            self._executor.submit(_send_notice, response_url, _notice_text(self._languages, locale))
         if req.body.get("type") == "block_suggestion":
             return context.ack(options=[])
         return context.ack()
 
 
-def install_slack_tenant_guard(app: App, tenant: SlackTenant | None, *, executor: Executor | None = None) -> None:
+def install_slack_tenant_guard(
+    app: App,
+    tenant: SlackTenant | None,
+    *,
+    executor: Executor | None = None,
+    languages: LanguagePolicy | None = None,
+) -> None:
     """Install the tenant guard as a global middleware of the Bolt app.
 
     Fails closed: with no tenant entry there is nothing to verify against, so no app
     runs without the guard. The configuration phase already requires the entry when
-    the transport is switched on.
+    the transport is switched on. ``languages`` defaults to the instance's policy,
+    built from the validated [languages] slice.
     """
     if tenant is None:
         raise ValueError("[slack.tenant] is required to verify inbound Slack requests")
     notice_executor = executor or ThreadPoolExecutor(max_workers=1, thread_name_prefix="slack-tenant-notice")
-    app.use(SlackTenantGuard(tenant, notice_executor))
+    policy = languages or ConfiguredLanguagePolicy.from_settings(get_language_settings())
+    app.use(SlackTenantGuard(tenant, notice_executor, policy))

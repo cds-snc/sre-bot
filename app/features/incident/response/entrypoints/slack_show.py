@@ -3,15 +3,15 @@
 ``show`` opens the information modal on the channel's incident (slack_show_views.py):
 its links, five roles (``read_incident_roles``: the record, else the report's legacy
 Drive properties), severity, status, security flag and times. The command answers in
-the invoker's locale, which the modal carries in its private metadata for the rest of
-the flow.
+the invoker's language (matched to a supported one by the language policy), which the
+modal carries in its private metadata for the rest of the flow.
 
 An Update button acks, reads the incident again and pushes the field's modal over the
 information modal. Its submission acks first (the pushed view closes), then writes the
 record, the commit point: the status through ``change_status`` (then the report status
 line, the list row and the notice), any other field through ``update_fields`` (then
-the notice). The notice is posted to the incident's channel in English and French, a
-shared conversation (decisions/i18n.md); a refusal, a lost guard and a follower that
+the notice). The notice is posted to the incident's channel, a shared conversation, in
+the instance languages and order (decisions/languages.md); a refusal, a lost guard and a follower that
 failed or was skipped are told to the submitter privately in the modal's locale.
 Finally the information modal is refreshed from the incident as written; a refresh
 that fails because the user closed it is expected and only logged.
@@ -30,6 +30,7 @@ from typing import Any
 
 import structlog
 
+from contracts.languages import LanguagePolicy, MultilingualText
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.services import ServiceScopeOpener
@@ -47,7 +48,7 @@ from features.incident.core.api import (
 )
 from features.incident.core.api import translate as t
 from features.incident.response import providers
-from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.scope import incident_scope, language_policy, shared_languages
 from features.incident.response.entrypoints.slack_show_views import (
     FIELD_CALLBACK_ID,
     SELECT_BLOCK_ID,
@@ -68,8 +69,6 @@ from features.incident.response.service.status import StageOutcome, StageResult,
 logger = structlog.get_logger()
 
 STATUS_DOMAIN = "incident_response.status"
-# A shared conversation is written in both official languages; so is a reply to a payload that names no locale.
-_BOTH = ("en-US", "fr-FR")
 
 
 @dataclass(frozen=True)
@@ -134,7 +133,7 @@ def handle_show_command(payload: CommandPayload, reply: SlackReplySender, scopes
         the invoker's locale when the channel is no incident, the record can't
         be read or the view could not open.
     """
-    locales = (payload.user_locale or "en-US",)
+    locales = language_policy(scopes).reply_languages(payload.user_locale)
     log = logger.bind(command="incident_show", user_id=payload.user_id, channel_id=payload.channel_id)
     trigger_id = str(payload.platform_metadata.get("trigger_id", ""))
     if not payload.channel_id:
@@ -170,7 +169,7 @@ def handle_update_press(
     ack()
     metadata = _metadata(body)
     channel_id = str(metadata.get("channel_id", ""))
-    locales = _locales(metadata)
+    locales = _locales(language_policy(scopes), metadata)
     user_id = str((body.get("user") or {}).get("id", ""))
     value = str(((body.get("actions") or [{}])[0]).get("value", ""))
     log = logger.bind(operation="incident_update_press", user_id=user_id, channel_id=channel_id, field=value)
@@ -207,7 +206,8 @@ def handle_update_submission(
     view = body.get("view") or {}
     metadata = _parse(view.get("private_metadata"))
     channel_id = str(metadata.get("channel_id", ""))
-    locales = _locales(metadata)
+    policy = language_policy(scopes)
+    locales = _locales(policy, metadata)
     user_id = str((body.get("user") or {}).get("id", ""))
     field_name = str(metadata.get("field", ""))
     log = logger.bind(operation="incident_update_submission", user_id=user_id, channel_id=channel_id, field=field_name)
@@ -218,7 +218,8 @@ def handle_update_submission(
     field = Field(field_name)
 
     with incident_scope(scopes, channel_id) as (incidents, conversation):
-        result = asyncio.run(_submit(incidents, conversation, field, picked, user_id, locales))
+        notice_languages = shared_languages(policy, conversation)
+        result = asyncio.run(_submit(incidents, conversation, field, picked, user_id, locales, notice_languages))
     if not result.is_success or result.data is None:
         log.warning("incident_update_refused", operation_status=result.status.value, error_code=result.error_code)
         _tell(reply, channel_id, user_id, _refusal(result, locales), log)
@@ -242,6 +243,7 @@ async def _submit(
     picked: str | int,
     user_id: str,
     locales: Sequence[str],
+    notice_languages: Sequence[str],
 ) -> OperationResult[_Submitted]:
     at = datetime.now(UTC)
     if field is Field.STATUS:
@@ -254,7 +256,7 @@ async def _submit(
             conversation,
             status,
             at=at,
-            notice=_notice(user_id, field, status.value),
+            notice=_notice(user_id, field, status.value, notice_languages),
         )
         if not changed_status.is_success or changed_status.data is None:
             return _carry(changed_status)
@@ -269,7 +271,7 @@ async def _submit(
             changes,
             by=user_id,
             at=at,
-            notice=_notice(user_id, field, shown_value),
+            notice=_notice(user_id, field, shown_value, notice_languages),
         )
         if not changed.is_success or changed.data is None:
             return _carry(changed)
@@ -294,13 +296,14 @@ def _changes(field: Field, picked: str | int) -> tuple[IncidentChanges, str | da
     return IncidentChanges(severity=severity), str(picked)
 
 
-def _notice(user_id: str, field: Field, value: str | datetime) -> str:
-    """The notice posted to the incident's channel, one line per official language."""
-    lines = []
-    for locale in _BOTH:
+def _notice(user_id: str, field: Field, value: str | datetime, languages: Sequence[str]) -> MultilingualText:
+    """The notice posted to the incident's channel, in the instance languages and order (decisions/languages.md)."""
+
+    def line(locale: str) -> str:
         shown = instant_text(value) if isinstance(value, datetime) else option_text(field, value, locale)
-        lines.append(_t("notice", locale, user=f"<@{user_id}>", field=field.value, value=shown))
-    return "\n".join(lines)
+        return _t("notice", locale, user=f"<@{user_id}>", field=field.value, value=shown)
+
+    return MultilingualText.of(languages, line)
 
 
 def _read_shown(scopes: ServiceScopeOpener, channel_id: str) -> OperationResult[_Shown]:
@@ -399,10 +402,10 @@ def _parse(raw: Any) -> dict[str, Any]:
     return parsed if isinstance(parsed, dict) else {}
 
 
-def _locales(metadata: Mapping[str, Any]) -> tuple[str, ...]:
-    """The modal's locale from its metadata; a payload that names none is answered in both languages."""
+def _locales(policy: LanguagePolicy, metadata: Mapping[str, Any]) -> tuple[str, ...]:
+    """The reply languages for the modal's locale; a view that names none is answered in the instance languages."""
     locale = metadata.get("locale")
-    return (str(locale),) if locale else _BOTH
+    return policy.reply_languages(str(locale) if locale else None)
 
 
 def _render(locales: Sequence[str], key: str) -> str:

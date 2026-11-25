@@ -5,8 +5,8 @@ title: >-
   bilingual text
 status: Done
 assignee: []
-created_date: '2026-10-06 15:57'
-updated_date: '2026-10-08 15:57'
+created_date: 2026-10-06 15:57
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - incident
 dependencies:
@@ -46,7 +46,18 @@ ACs checked 2026-10-08 from the merged subtasks: AC1 by 140.6.2 #1/#3 and 140.6.
 
 <!-- COMMENTS:BEGIN -->
 created: 2026-10-07 14:56
+
 ---
+
 Human clarification 2026-10-07: nothing is ever pushed to an external platform. The flow is draft, review and adjust, approve and save; people then select the approved, saved update and copy and paste it into the system of their choice. Two reasons: the content and the translation need proofreading, and the bot has no access to product teams' platforms. The copy-ready publisher adapter is the whole publishing story for now. The draft comes from TASK-140.5.1 and is rendered by the comms profile from TASK-140.5.2.
+
+---
+
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): the copy-ready bilingual text orders its languages by the instance list ([languages] shared, decisions/languages.md); AI-written text keeps this task's rule (the human edits both languages).
+
 ---
 <!-- COMMENTS:END -->

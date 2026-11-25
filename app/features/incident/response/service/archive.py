@@ -18,6 +18,7 @@ from datetime import datetime
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.api import (
@@ -56,8 +57,8 @@ async def archive_incident(
     *,
     user_id: str,
     at: datetime,
-    status_notice: str,
-    archived_notice: str,
+    status_notice: str | MultilingualText,
+    archived_notice: str | MultilingualText,
 ) -> OperationResult[Archive]:
     """Close the conversation's incident and archive the conversation.
 

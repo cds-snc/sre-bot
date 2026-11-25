@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-20T22:04:00Z'
+updated_date: '2026-11-25T19:10:00Z'
 labels:
   - incident
   - features
@@ -81,6 +81,14 @@ created: 2026-11-20T22:04:00Z
 ---
 
 2026-11-20 (human, TASK-145.10 program-scope rulings): declare writes the incident commander as the declarer when on-call names none (not decided before; neither legacy nor TASK-145.7.9 sets it). Named change of kind (b) under the incident-role rule that lands with TASK-145.10.5; until then the core role check falls back to declared_by.
+
+---
+
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): declare's shared posts (DeclareTexts: announcement, severity warning, next steps, on-call notice) are MultilingualText from LanguagePolicy.shared_languages (decisions/languages.md); the locale toggle drives the modal and private replies only.
 
 ---
 <!-- COMMENTS:END -->

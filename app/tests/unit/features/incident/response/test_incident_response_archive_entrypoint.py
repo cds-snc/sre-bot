@@ -83,7 +83,13 @@ class _Client:
 class _Surface:
     """The records, the fakes behind the response providers, the event sink, the client and the replies."""
 
-    def __init__(self, monkeypatch: pytest.MonkeyPatch, conversations: InMemoryIncidentConversation | None = None) -> None:
+    def __init__(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        conversations: InMemoryIncidentConversation | None = None,
+        *,
+        languages: tuple[str, ...] | None = None,
+    ) -> None:
         self.records = SwitchableRecordStore()
         seed_legacy_incident(
             self.records, CHANNEL_ID, incident_id=INCIDENT_ID, report_url="https://docs.google.com/document/d/D0REPORT/edit"
@@ -97,7 +103,7 @@ class _Surface:
         self.client = _Client()
         self.responses: list[str] = []
         self.calls: list[str] = []
-        self.scopes = incident_scopes(self.records, tenants=TENANTS)
+        self.scopes = incident_scopes(self.records, tenants=TENANTS, languages=languages)
         monkeypatch.setattr(providers, "incident_report", lambda: self.reports)
         monkeypatch.setattr(providers, "incident_list_projection", lambda: self.projection)
         monkeypatch.setattr(providers, "incident_conversation", lambda: self.conversations)
@@ -208,6 +214,29 @@ def test_the_button_acks_first_announces_in_both_languages_archives_and_replies_
     assert surface.responses == []
     assert surface.client.ephemerals == []
     assert len(surface.events.sent) == 1
+
+
+def test_the_button_follows_the_instance_languages_and_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A French-first instance puts French first in both channel notices (decisions/languages.md)."""
+    surface = _Surface(monkeypatch, languages=("fr-FR", "en-US"))
+
+    surface.press()
+
+    assert surface.posts() == (
+        f"<@{USER_ID}> a changé le statut de l'incident à Closed.\n<@{USER_ID}> has updated the incident status to Closed.",
+        f"<@{USER_ID}> a archivé ce canal 👋\n<@{USER_ID}> has archived this channel 👋",
+    )
+
+
+def test_a_one_language_instance_answers_a_press_in_that_language_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A press names no locale, so its private refusal is in the instance languages too."""
+    surface = _Surface(monkeypatch, languages=("en-US",))
+
+    surface.press(OTHER_ID)
+
+    assert [call["text"] for call in surface.client.ephemerals] == [
+        "This channel is not an incident channel, so there is no incident to close."
+    ]
 
 
 def test_the_button_in_a_channel_with_no_incident_tells_the_presser_privately_in_both_languages(surface: _Surface) -> None:

@@ -16,6 +16,7 @@ import svcs
 from structlog.stdlib import BoundLogger
 
 from contracts.coordination import ConditionalWriteStore
+from contracts.languages import LanguagePolicy
 from contracts.records import RecordStore
 from contracts.services import ServiceResolver
 from contracts.workplace import ConfiguredSystems, TenantVerifier
@@ -23,6 +24,8 @@ from infrastructure.coordination import DynamoDBConditionalWriteStore, get_condi
 from infrastructure.records.service import DynamoDBRecordStore
 from integrations.aws.client import get_aws_client
 from server.configured_systems import read_configured_systems
+from server.languages.policy import ConfiguredLanguagePolicy
+from server.languages.settings import get_language_settings
 from server.tenant_verification import HostTenantVerifier
 
 logger = structlog.get_logger(__name__)
@@ -60,6 +63,10 @@ def _build_configured_systems() -> ConfiguredSystems:
     return systems
 
 
+def _build_language_policy() -> LanguagePolicy:
+    return ConfiguredLanguagePolicy.from_settings(get_language_settings())
+
+
 def _build_tenant_verifier() -> TenantVerifier:
     # Reads no settings and builds no client: both are read per verification call.
     return HostTenantVerifier()
@@ -70,6 +77,7 @@ CORE_SERVICES: tuple[CoreService, ...] = (
     CoreService(ConditionalWriteStore, _build_conditional_write_store),
     CoreService(ConfiguredSystems, _build_configured_systems),
     CoreService(TenantVerifier, _build_tenant_verifier),
+    CoreService(LanguagePolicy, _build_language_policy),
 )
 
 

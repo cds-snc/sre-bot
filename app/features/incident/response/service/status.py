@@ -21,6 +21,7 @@ from enum import StrEnum
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from contracts.operations.status import OperationStatus
 from features.incident.common.vocabulary import IncidentStatus
@@ -79,7 +80,7 @@ async def change_status(
     status: IncidentStatus,
     *,
     at: datetime,
-    notice: str,
+    notice: str | MultilingualText,
 ) -> OperationResult[StatusChange]:
     """Set the status of the conversation's incident, then fan it out to the report, the list and the channel.
 
@@ -146,7 +147,7 @@ async def _report_stage(reports: IncidentReport, incident: Incident, status: Inc
     return stage_result(await reports.set_status_text(incident.report, status))
 
 
-async def channel_stage(conversations: IncidentConversation, incident: Incident, notice: str) -> StageResult:
+async def channel_stage(conversations: IncidentConversation, incident: Incident, notice: str | MultilingualText) -> StageResult:
     """Post ``notice`` to the record's conversation when it is writable; skipped otherwise, never blocking the record."""
     writable = await conversation_is_writable(conversations, incident.conversation)
     if not writable.is_success:

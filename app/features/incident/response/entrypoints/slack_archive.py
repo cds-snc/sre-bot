@@ -1,13 +1,13 @@
 """Slack entry points for the archive: ``/sre incident close`` and the stale notice's archive button.
 
 Both call ``archive_incident`` (service/archive.py) at the sync Bolt edge with
-``asyncio.run``. The command replies in the invoker's locale like ``status
+``asyncio.run``. The command replies in the invoker's language like ``status
 update``: the outcome and a line per skipped or failed stage. The button is the
 legacy attachment ``archive_channel``, registered as ``incident.response.archive``
 with the alias scoped to its ``archive`` value (decisions/transport-slack.md), so
 ``ignore`` and ``schedule_retro`` still reach the legacy listener. A button press
-names no locale, so every text it renders (the channel notices and the replies)
-is English then French (decisions/i18n.md); it replies only on a refusal or a
+names no locale, so its channel notices and its replies are in the instance
+languages and order (decisions/languages.md); it replies only on a refusal or a
 skipped or failed stage, since the channel notices announce a success.
 """
 
@@ -18,6 +18,7 @@ from typing import Any
 
 import structlog
 
+from contracts.languages import LanguagePolicy, MultilingualText
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.services import ServiceScopeOpener
@@ -26,7 +27,7 @@ from contracts.slack.registrar import SlackCommandRegistrar
 from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.api import translate as t
 from features.incident.response import providers
-from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.scope import incident_scope, language_policy, shared_languages
 from features.incident.response.service.archive import Archive, archive_incident
 from features.incident.response.service.status import StageOutcome
 
@@ -36,9 +37,6 @@ ARCHIVE_DOMAIN = "incident_response.archive"
 STATUS_DOMAIN = "incident_response.status"
 ARCHIVE_CALLBACK_ID = "incident.response.archive"
 LEGACY_ARCHIVE_VALUES = {"archive_channel": ("archive",)}
-
-# A request whose payload names no locale is answered in both official languages (decisions/i18n.md).
-_NO_LOCALE = ("en-US", "fr-FR")
 
 
 def register_archive(registrar: SlackCommandRegistrar, scopes: ServiceScopeOpener) -> None:
@@ -79,10 +77,12 @@ def handle_close_command(payload: CommandPayload, scopes: ServiceScopeOpener) ->
         One ephemeral reply in the invoker's locale: the outcome and a line per
         skipped or failed stage, or why nothing was changed.
     """
-    locales = (payload.user_locale or "en-US",)
+    policy = language_policy(scopes)
+    locales = policy.reply_languages(payload.user_locale)
     if not payload.channel_id:
         return _reply(_render(locales, "not_an_incident"))
-    result = _archive(scopes, payload.channel_id, payload.user_id, locales)
+    # TASK-145.8.9 moves the command's channel notices to the instance languages; until then they follow the invoker.
+    result = _archive(scopes, payload.channel_id, payload.user_id, policy, notice_languages=locales)
     if not result.is_success or result.data is None:
         logger.warning(
             "incident_close_refused",
@@ -110,7 +110,9 @@ def handle_archive_press(
     ack()
     channel_id = str((body.get("channel") or {}).get("id", ""))
     user_id = str((body.get("user") or {}).get("id", ""))
-    result = _archive(scopes, channel_id, user_id, _NO_LOCALE)
+    policy = language_policy(scopes)
+    replies = policy.reply_languages(None)
+    result = _archive(scopes, channel_id, user_id, policy)
     if not result.is_success or result.data is None:
         logger.warning(
             "incident_archive_refused",
@@ -120,18 +122,27 @@ def handle_archive_press(
             error_code=result.error_code,
         )
         if result.error_code == ErrorCode.NOT_AN_INCIDENT:
-            client.chat_postEphemeral(channel=channel_id, user=user_id, text=_refusal(result, _NO_LOCALE))
+            client.chat_postEphemeral(channel=channel_id, user=user_id, text=_refusal(result, replies))
         else:
-            respond(_refusal(result, _NO_LOCALE))
+            respond(_refusal(result, replies))
         return
-    lines = _stage_lines(result.data, _NO_LOCALE)
+    lines = _stage_lines(result.data, replies)
     if lines:
         respond("\n".join(lines))
 
 
-def _archive(scopes: ServiceScopeOpener, channel_id: str, user_id: str, locales: Sequence[str]) -> OperationResult[Archive]:
+def _archive(
+    scopes: ServiceScopeOpener,
+    channel_id: str,
+    user_id: str,
+    policy: LanguagePolicy,
+    *,
+    notice_languages: Sequence[str] | None = None,
+) -> OperationResult[Archive]:
+    """Close and archive; the channel notices use ``notice_languages``, else the channel's shared languages."""
     user = f"<@{user_id}>"
     with incident_scope(scopes, channel_id) as (incidents, conversation):
+        languages = notice_languages if notice_languages is not None else shared_languages(policy, conversation)
         return asyncio.run(
             archive_incident(
                 incidents,
@@ -142,8 +153,11 @@ def _archive(scopes: ServiceScopeOpener, channel_id: str, user_id: str, locales:
                 conversation,
                 user_id=user_id,
                 at=datetime.now(UTC),
-                status_notice=_render(locales, "notice", domain=STATUS_DOMAIN, user=user, status=IncidentStatus.CLOSED.value),
-                archived_notice=_render(locales, "notice", user=user),
+                status_notice=MultilingualText.of(
+                    languages,
+                    lambda locale: _t("notice", locale, domain=STATUS_DOMAIN, user=user, status=IncidentStatus.CLOSED.value),
+                ),
+                archived_notice=MultilingualText.of(languages, lambda locale: _t("notice", locale, user=user)),
             )
         )
 
@@ -190,9 +204,14 @@ def _stage_lines(archive: Archive, locales: Sequence[str]) -> list[str]:
 
 
 def _render(locales: Sequence[str], key: str, *, domain: str = ARCHIVE_DOMAIN, **variables: str) -> str:
-    """Translate ``key`` in each locale, one line per locale; the key itself is the neutral fallback (decisions/i18n.md)."""
+    """Translate ``key`` in each reply language, one line each, for a private reply."""
+    return "\n".join(_t(key, locale, domain=domain, **variables) for locale in locales)
+
+
+def _t(key: str, locale: str, *, domain: str = ARCHIVE_DOMAIN, **variables: str) -> str:
+    """Translate ``key``; the key itself is the neutral fallback (decisions/i18n.md)."""
     full_key = f"{domain}.{key}"
-    return "\n".join(t(full_key, locale, full_key, **variables) for locale in locales)
+    return t(full_key, locale, full_key, **variables)
 
 
 def _reply(message: str) -> CommandResponse:

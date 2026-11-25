@@ -21,6 +21,7 @@ from slack_bolt import App, BoltRequest, BoltResponse
 from structlog.testing import capture_logs
 
 from integrations.slack.settings import SlackTenant
+from server.languages.policy import ConfiguredLanguagePolicy
 from server.slack import tenant_guard
 from server.slack.tenant_guard import install_slack_tenant_guard
 from tests.factories.slack_bolt import TEAM_ID, InlineExecutor, authorize_single_workspace, unpatched_app_init
@@ -224,6 +225,31 @@ def test_refused_request_gets_an_ephemeral_notice_only_where_a_response_url_exis
     assert "Slack" in notice["text"]
     assert "espace de travail" in notice["text"]
     assert TEAM_ID not in notice["text"]
+
+
+@pytest.mark.parametrize(
+    ("shared", "first_line"),
+    [
+        (("fr-FR", "en-US"), "espace de travail"),
+        (("en-US",), "Slack"),
+    ],
+)
+def test_the_notice_to_a_request_naming_no_locale_follows_the_instance_languages(
+    monkeypatch: pytest.MonkeyPatch, calls: list[str], shared: tuple[str, ...], first_line: str
+) -> None:
+    """A refused request names no language, so its notice is in the instance languages, in their order (decisions/languages.md)."""
+    monkeypatch.setattr(App, "__init__", unpatched_app_init())
+    bolt = App(authorize=authorize_single_workspace, request_verification_enabled=False, listener_executor=InlineExecutor())
+    policy = ConfiguredLanguagePolicy(shared=shared, supported=("en-US", "fr-FR"))
+    install_slack_tenant_guard(bolt, SlackTenant(team_id=TEAM_ID), executor=InlineExecutor(), languages=policy)
+
+    with capture_logs():
+        bolt.dispatch(_requests(OTHER_TEAM)["command"])
+
+    [notice] = RecordingWebhook.sent
+    lines = notice["text"].split("\n")
+    assert len(lines) == len(shared)
+    assert first_line in lines[0]
 
 
 def test_failing_notice_is_logged_and_the_request_is_still_acked(app: App) -> None:

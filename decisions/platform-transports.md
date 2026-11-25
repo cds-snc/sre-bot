@@ -39,7 +39,7 @@ HTTP is not a platform transport. It is the app's own protocol; its inbound boun
 
 ### Outbound messages are intents
 
-A feature says what to tell whom (a platform-neutral message intent); each platform renders it natively. A person is reached on the platform they use, resolved by the people capability ([people-and-accounts.md](people-and-accounts.md)). Bridging live conversations between Slack and Teams is out of scope.
+A feature says what to tell whom (a platform-neutral message intent); each platform renders it natively. A message in several languages is one intent (`MultilingualText`, [languages.md](languages.md)): each platform lays it out natively (Slack one message, top to bottom; Teams one card, a text block per language), and its `plain_text()` is the common fallback. A person is reached on the platform they use, resolved by the people capability ([people-and-accounts.md](people-and-accounts.md)). Bridging live conversations between Slack and Teams is out of scope.
 
 ### A platform is also a driven dependency
 
@@ -76,3 +76,4 @@ Tolerated until then:
 - 2026-10-01: `register_slack_listeners` is deleted (TASK-26.1) and the handler hookspecs are in `contracts/plugins/` (TASK-107); both tolerated items are closed.
 - 2026-10-06: feature entry points receive the SDK's listener arguments; connections and the app stay host-only (TASK-140.1).
 - 2026-10-23: current state: the transport settings live in `server/slack/settings.py`; `infrastructure/slack/` is gone (TASK-112.1).
+- 2026-11-25: a message in several languages is one intent the platform lays out, never lines a feature joins (TASK-193).

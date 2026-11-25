@@ -37,6 +37,7 @@ import structlog
 
 from capabilities.oncall.api import ScheduleReference
 from contracts.configuration import SettingError
+from contracts.languages import MultilingualText
 from contracts.operations.result import OperationResult
 from contracts.records import RecordStore
 from contracts.workplace import ConfiguredSystems, TenantVerifier, WorkplaceSystem
@@ -240,11 +241,17 @@ class IncidentConversation(Protocol):
         ...
 
     async def post(
-        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+        self,
+        conversation: ConversationReference,
+        text: str | MultilingualText,
+        *,
+        blocks: Sequence[Mapping[str, object]] = (),
     ) -> OperationResult[MessageReference]:
         """Post ``text`` as the bot and return the posted message's reference.
 
-        ``blocks`` lays the message out; ``text`` stays its notification fallback.
+        A ``MultilingualText`` is laid out by the platform (decisions/languages.md);
+        a plain string is accepted until TASK-145.13. ``blocks`` lays the message
+        out; ``text`` stays its notification fallback.
         """
         ...
 

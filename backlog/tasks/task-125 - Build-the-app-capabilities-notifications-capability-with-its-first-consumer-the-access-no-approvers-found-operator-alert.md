@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:07
-updated_date: '2026-11-06T02:58:00Z'
+updated_date: '2026-11-25T19:24:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -46,3 +46,23 @@ Its vocabulary is the organization's (reach a person, post to a channel), not Sl
 - [ ] #3 An in-memory fake of the notifications Protocol lives in the package and is exercised by tests
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T19:10:00Z
+
+---
+
+2026-11-25 (human, TASK-193 approved): the notifications intent carries the bot's own wording as MultilingualText (contracts/i18n/languages.py) in the instance languages for shared targets and the person's language for a direct one; forwarded content keeps its source language (decisions/languages.md).
+
+---
+
+created: 2026-11-25T19:24:00Z
+
+---
+
+2026-11-25 (TASK-193 implemented): MultilingualText and LanguagePolicy live in contracts/languages.py (not contracts/i18n/languages.py as the earlier comment said).
+
+---
+<!-- COMMENTS:END -->

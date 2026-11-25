@@ -31,6 +31,7 @@ from slack_sdk.errors import SlackApiError
 from slack_sdk.web.async_client import AsyncWebClient
 from slack_sdk.web.async_slack_response import AsyncSlackResponse
 
+from contracts.languages import MultilingualText
 from contracts.operations.codes import ErrorCode
 from contracts.operations.result import OperationResult
 from contracts.workplace import WorkplaceSystem
@@ -399,12 +400,20 @@ class SlackIncidentConversation:
                 return OperationResult.success(None)
 
     async def post(
-        self, conversation: ConversationReference, text: str, *, blocks: Sequence[Mapping[str, object]] = ()
+        self,
+        conversation: ConversationReference,
+        text: str | MultilingualText,
+        *,
+        blocks: Sequence[Mapping[str, object]] = (),
     ) -> OperationResult[MessageReference]:
-        """Post ``text`` (with ``blocks`` when given) to the channel and return the message's reference (its ``ts``)."""
+        """Post ``text`` (with ``blocks`` when given) to the channel and return the message's reference (its ``ts``).
+
+        A message in several languages is one Slack message, a line per language in order.
+        """
         if conversation.system is not WorkplaceSystem.SLACK:
             return _conversation_unsupported(conversation)
-        arguments: dict[str, Any] = {"channel": conversation.vendor_id, "text": text}
+        plain = text.plain_text() if isinstance(text, MultilingualText) else text
+        arguments: dict[str, Any] = {"channel": conversation.vendor_id, "text": plain}
         if blocks:
             arguments["blocks"] = list(blocks)
         try:

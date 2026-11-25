@@ -54,7 +54,8 @@ The app is the organisation's internal operations platform, with incident respon
 | [deployment.md](deployment.md) | Image identity, ECR tag policy, task-definition ownership, rollback and its rehearsal | now |
 | [toolchain.md](toolchain.md) | uv, Python version, lint, types, CI gates | target |
 | [testing.md](testing.md) | Test layers, doubles, coverage | target |
-| [i18n.md](i18n.md) | EN/FR translation | target |
+| [i18n.md](i18n.md) | Translation of user-facing text | target |
+| [languages.md](languages.md) | Which languages a message uses: instance languages for shared messages, the user's choice for direct interactions | target |
 | [organisation-content.md](organisation-content.md) | choosing configuration, code or content, and a content kind's source; rules every kind follows | target |
 | [provisioned-content.md](provisioned-content.md) | content as files: format, schema, loading, ownership, rollback with the image | target |
 | [managed-content.md](managed-content.md) | content as records changed in flight: validated, authorised, versioned, audited writes; untrusted reads; schema evolution | target |
