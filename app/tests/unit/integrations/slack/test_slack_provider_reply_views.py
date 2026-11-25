@@ -1,6 +1,6 @@
 """Behavior tests for view methods on the reply interface exposed by ``SlackPlatformProvider.reply``.
 
-Tests for open_view returning the view id and update_view sending view id and hash.
+Tests for open_view and push_view returning the view id and update_view sending view id and hash.
 """
 
 from types import SimpleNamespace
@@ -122,3 +122,42 @@ class TestUpdateView:
 
         assert result.status is OperationStatus.PERMANENT_ERROR
         assert result.error_code == "stale_hash"
+
+
+class TestPushView:
+    """push_view pushes a view onto the modal stack of the interaction and returns the pushed view's id."""
+
+    def test_push_view_sends_the_trigger_id_and_view_only_and_returns_the_view_id(self) -> None:
+        client = MagicMock()
+        client.views_push.return_value = {"ok": True, "view": {"id": "V0PUSHED"}}
+        view = {"type": "modal", "blocks": []}
+
+        result = _provider(client).reply.push_view(trigger_id="T1", view=view)
+
+        client.views_push.assert_called_once_with(trigger_id="T1", view=view)
+        assert result.status is OperationStatus.SUCCESS
+        assert result.data == "V0PUSHED"
+
+    def test_push_view_returns_error_when_response_has_no_id(self) -> None:
+        client = MagicMock()
+        client.views_push.return_value = {"ok": True}
+
+        result = _provider(client).reply.push_view(trigger_id="T2", view={"type": "modal"})
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.error_code == "MISSING_VIEW_ID"
+
+    def test_push_view_classifies_slack_error(self) -> None:
+        client = MagicMock()
+        client.views_push.side_effect = _slack_error("push_limit_reached")
+
+        result = _provider(client).reply.push_view(trigger_id="T3", view={"type": "modal"})
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.error_code == "push_limit_reached"
+
+    def test_push_view_without_a_client_is_an_initialization_error(self) -> None:
+        result = _provider(None).reply.push_view(trigger_id="T4", view={"type": "modal"})
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.error_code == "INITIALIZATION_ERROR"

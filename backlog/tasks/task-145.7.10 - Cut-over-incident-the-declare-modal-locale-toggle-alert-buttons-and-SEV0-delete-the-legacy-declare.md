@@ -68,6 +68,14 @@ created: 2026-11-17T19:10:00Z
 
 ---
 
+created: 2026-11-17T20:56:00Z
+
+---
+
+2026-11-17 (TASK-145.8.3 OQ7): the rebuilt field updates (L6a) and close (L7a.3) no longer append to the item's legacy logs list (incident-management.md:32, Migration rule 5). The legacy declare's append (db_operations.py:100 create_incident -> log_activity) ends with this cutover: name it in the PR body as a kind (b) change. Also from L6a: the update modal's severity options are one list; add SEV0 there with the declare picker.
+
+---
+
 created: 2026-11-20T22:04:00Z
 
 ---

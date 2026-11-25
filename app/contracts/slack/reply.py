@@ -38,6 +38,14 @@ class SlackReplySender(Protocol):
         """
         ...
 
+    def push_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
+        """Push a modal view onto the view stack of the interaction identified by ``trigger_id``.
+
+        Returns:
+            Success carrying the pushed view's id.
+        """
+        ...
+
     def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:  # noqa: A002 -- Slack's parameter name
         """Replace an open modal view; ``hash`` guards against concurrent updates."""
         ...

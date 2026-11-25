@@ -59,6 +59,14 @@ class FakeSlackReply:
         # Return error as-is
         return self.result  # type: ignore[return-value]
 
+    def push_view(self, *, trigger_id: str, view: dict[str, Any]) -> OperationResult[str]:
+        self.calls.append(("push_view", {"trigger_id": trigger_id, "view": view}))
+        if self.result is None:
+            return OperationResult.success(data="view-id-pushed")
+        if self.result.is_success:
+            return OperationResult.success(data=self.result.data or "view-id-pushed")  # type: ignore[arg-type]
+        return self.result  # type: ignore[return-value]
+
     def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:
         self.calls.append(("update_view", {"view_id": view_id, "view": view, "hash": hash}))
         if self.result is None:

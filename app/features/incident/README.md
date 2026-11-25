@@ -87,8 +87,8 @@ its own configuration file.
     reached by `load_incidents` at `app/modules/dev/incident.py:47`), removed by TASK-145.12.2.
 
   All three write through `db_operations.create_incident`. Recreate, a fourth, was retired with
-  `/sre incident create` by TASK-145.8.6. The field updater
-  (`information_update.py:322`) creates no items and is removed by TASK-145.8.3; close and the
+  `/sre incident create` by TASK-145.8.6. The legacy field updater created no items and was
+  removed by TASK-145.8.3 (show and the update modal rebuilt in `response/`); close and the
   stale notice's archive button left the legacy `incident_status.py` in TASK-145.8.5.3, which
   deleted it.
 - **Roles step (TASK-145.7.12).** Before any write, the job reads the report Drive properties
@@ -155,7 +155,7 @@ its own configuration file.
 | A new AI-assisted text use case over the incident transcript or report (a new draft, summary or rewrite) | `scribe/` | Follow [Adding a use case](scribe/README.md#adding-a-use-case). |
 | A change to `/sre incident draft` or `/sre incident summarize` | `scribe/` | See the at-a-glance table in [`scribe/README.md`](scribe/README.md). |
 | A change to `/sre incident status-update`, its modal, the approval or the copy-ready text | `comms/` | See [`comms/README.md`](comms/README.md). |
-| A change to an incident's status (`/sre incident status update`, later the update modal and close) | `response/service/status.py` (`change_status`) | The record first, then the report line, the list and the channel; see [`response/README.md`](response/README.md). |
+| A change to an incident's status (`/sre incident status update`, the update modal's status field and close) | `response/service/status.py` (`change_status`) | The record first, then the report line, the list and the channel; see [`response/README.md`](response/README.md). |
 | A resource interface two or more subdomains need (conversation, report, product catalogue, external case) | `core/api.py` + one adapter per system in `core/adapters/` | Adapters are selected by the stored reference, never by a setting. |
 | An interface only one subdomain needs | That subdomain's `adapters/` | Moves to `core/` when a second consumer appears. |
 | Reading what was said in an incident channel | Use `IncidentTranscriptReader` from `core/api.py` with the record's `conversation` | Do not read Slack history in a subdomain. |

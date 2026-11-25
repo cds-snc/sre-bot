@@ -41,6 +41,7 @@ User-facing labels keep today's "retro" wording in the catalogues; the code and 
 - [ ] #4 TASK-145.10.4 (M3) is merged: incident.postmortem registered with calendar_id required, legacy retro scheduling deleted, named changes NC1-NC10 listed in its PR body, pins pass
 - [ ] #5 TASK-145.10.5 (M4a) and TASK-145.10.6 (M4b) are merged: role check and meeting lifecycle in place
 - [ ] #6 Every ADR edit named in the program plan has landed with its layer (incident-management.md, configuration.md, service-accounts.md, workplace-systems.md wording, features/incident/README.md)
+- [ ] #7 incident show displays the postmortem meeting link from the record (a read-only line of the response show view built by TASK-145.8.3), replacing the Retro Link dropped there (TASK-145.8.3 OQ11, human 2026-11-17); delivered by the layer that writes the meeting reference (M3, TASK-145.10.4), placed there at its planning
 <!-- AC:END -->
 
 ## Implementation Plan
