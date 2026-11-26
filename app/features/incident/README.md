@@ -143,7 +143,11 @@ its own configuration file.
   read path already shows them. Confirm that a later report shows `pending` 0
   (a run cut short by throttling ends `write_failed`, and the next run resumes: each update is
   guarded on `record_version` at its read value, absent or 1, and a binding already put reports
-  as `bindings_existing`), then a PR sets the mode back to `off`.
+  as `bindings_existing`), then a PR sets the mode back to `off`. Production ran it on
+  2026-11-26 (TASK-145.7.8): 331 items upgraded and 17 role updates written over five runs. At the
+  `incidents` and bindings tables' provisioned write capacity of 2 units, a run throttles after
+  about 50 items, so expect several runs or raise the write capacity first. The rerun is delivery
+  row 18.L12, with its reports recorded on TASK-145.13.
 - **Locally.** `INCIDENT_RESPONSE__UPGRADE_MODE=dry_run` and `SCHEDULER__ENABLED=true` in
   `app/.env`; the plugin needs the Slack and Google Workspace tenants, as `incident.scribe` does.
 - **Removal.** TASK-145.13 deletes the job's registration in `plugin.py`, `legacy_upgrade_job.py`
