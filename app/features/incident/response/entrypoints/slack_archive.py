@@ -1,13 +1,14 @@
 """Slack entry points for the archive: ``/sre incident close`` and the stale notice's archive button.
 
 Both call ``archive_incident`` (service/archive.py) at the sync Bolt edge with
-``asyncio.run``. The command replies in the invoker's language like ``status
-update``: the outcome and a line per skipped or failed stage. The button is the
+``asyncio.run``. Both post their channel notices in the channel's shared
+languages, in order (decisions/languages.md). The command replies in the
+invoker's language like ``status update``: the outcome and a line per skipped
+or failed stage. The button is the
 legacy attachment ``archive_channel``, registered as ``incident.response.archive``
 with the alias scoped to its ``archive`` value (decisions/transport-slack.md), so
 ``ignore`` and ``schedule_retro`` still reach the legacy listener. A button press
-names no locale, so its channel notices and its replies are in the instance
-languages and order (decisions/languages.md); it replies only on a refusal or a
+names no locale, so its replies are in the instance languages too; it replies only on a refusal or a
 skipped or failed stage, since the channel notices announce a success.
 """
 
@@ -81,8 +82,7 @@ def handle_close_command(payload: CommandPayload, scopes: ServiceScopeOpener) ->
     locales = policy.reply_languages(payload.user_locale)
     if not payload.channel_id:
         return _reply(_render(locales, "not_an_incident"))
-    # TASK-145.8.9 moves the command's channel notices to the instance languages; until then they follow the invoker.
-    result = _archive(scopes, payload.channel_id, payload.user_id, policy, notice_languages=locales)
+    result = _archive(scopes, payload.channel_id, payload.user_id, policy)
     if not result.is_success or result.data is None:
         logger.warning(
             "incident_close_refused",
@@ -131,18 +131,11 @@ def handle_archive_press(
         respond("\n".join(lines))
 
 
-def _archive(
-    scopes: ServiceScopeOpener,
-    channel_id: str,
-    user_id: str,
-    policy: LanguagePolicy,
-    *,
-    notice_languages: Sequence[str] | None = None,
-) -> OperationResult[Archive]:
-    """Close and archive; the channel notices use ``notice_languages``, else the channel's shared languages."""
+def _archive(scopes: ServiceScopeOpener, channel_id: str, user_id: str, policy: LanguagePolicy) -> OperationResult[Archive]:
+    """Close and archive; the channel notices are in the channel's shared languages."""
     user = f"<@{user_id}>"
     with incident_scope(scopes, channel_id) as (incidents, conversation):
-        languages = notice_languages if notice_languages is not None else shared_languages(policy, conversation)
+        languages = shared_languages(policy, conversation)
         return asyncio.run(
             archive_incident(
                 incidents,

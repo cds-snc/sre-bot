@@ -3,9 +3,10 @@
 The handlers run over a scope opener resolving an in-memory record store seeded with one legacy
 incident on the channel (its report linked, Slack and Google configured); the response providers
 return the core in-memory conversation and legacy roles reader. The modal is read from the fake
-reply's recorded ``open_view`` and submitted through its own block and action ids. Replies and
-announcements are read in the invoker's locale from the real catalogues, which the directory's
-conftest loads. Assertions read what the invoker sees (the view, the private notice), the stored
+reply's recorded ``open_view`` and submitted through its own block and action ids. The modal and
+replies are read in the invoker's language and the announcements in the instance languages
+(English then French unless a test configures them), from the real catalogues, which the
+directory's conftest loads. Assertions read what the invoker sees (the view, the private notice), the stored
 roles and the channel's posts and purpose.
 """
 
@@ -243,20 +244,67 @@ def test_submitting_writes_the_five_roles_announces_each_change_and_sets_the_pur
         IncidentRole.POSTMORTEM_OWNER: None,
     }
     assert surface.posts() == (
-        "<@U0NEWIC> has been assigned as incident commander for this incident.",
-        "<@U0NEWOL> has been assigned as operations lead for this incident.",
-        "<@U0COMMS> has been assigned as communications lead for this incident.",
+        "<@U0NEWIC> has been assigned as incident commander for this incident.\n"
+        "<@U0NEWIC> a été désigné(e) commandant d'incident pour cet incident.",
+        "<@U0NEWOL> has been assigned as operations lead for this incident.\n"
+        "<@U0NEWOL> a été désigné(e) responsable des opérations pour cet incident.",
+        "<@U0COMMS> has been assigned as communications lead for this incident.\n"
+        "<@U0COMMS> a été désigné(e) responsable des communications pour cet incident.",
     )
     assert surface.purpose() == "Checkout outage \nIC: <@U0NEWIC> / OL: <@U0NEWOL>"
     assert surface.client.ephemerals == []
 
 
-def test_the_announcements_are_in_the_submitters_locale(surface: _Surface) -> None:
+def test_a_french_submitters_announcement_is_in_the_instance_languages(surface: _Surface) -> None:
     surface.manage(locale="fr-FR")
 
     surface.submit(surface.view(), {IC: "U0NEWIC"})
 
-    assert surface.posts() == ("<@U0NEWIC> a été désigné(e) commandant d'incident pour cet incident.",)
+    assert surface.posts() == (
+        "<@U0NEWIC> has been assigned as incident commander for this incident.\n"
+        "<@U0NEWIC> a été désigné(e) commandant d'incident pour cet incident.",
+    )
+
+
+def test_the_announcements_follow_the_instance_language_order(surface: _Surface) -> None:
+    surface.scopes = incident_scopes(surface.records, tenants=TENANTS, languages=("fr-FR", "en-US"))
+    surface.manage()
+
+    surface.submit(surface.view(), {IC: "U0NEWIC"})
+
+    assert surface.posts() == (
+        "<@U0NEWIC> a été désigné(e) commandant d'incident pour cet incident.\n"
+        "<@U0NEWIC> has been assigned as incident commander for this incident.",
+    )
+
+
+def test_an_instance_with_one_language_announces_in_one_line(surface: _Surface) -> None:
+    surface.scopes = incident_scopes(surface.records, tenants=TENANTS, languages=("en-US",))
+    surface.manage(locale="fr-FR")
+
+    surface.submit(surface.view(), {IC: "U0NEWIC"})
+
+    assert surface.posts() == ("<@U0NEWIC> has been assigned as incident commander for this incident.",)
+
+
+def test_a_french_submitters_private_notice_stays_in_french(surface: _Surface) -> None:
+    surface.manage(locale="fr-FR")
+    surface.conversations = InMemoryIncidentConversation(tenant=SLACK_TENANT, archived_ids=[CHANNEL_ID])
+
+    surface.submit(surface.view(), {IC: "U0NEWIC"})
+
+    [notice] = surface.client.ephemerals
+    assert notice["text"] == (
+        "Impossible d'écrire dans le canal de l'incident; les rôles sont enregistrés, mais rien n'y a été publié ni modifié."
+    )
+
+
+def test_an_unsupported_user_locale_opens_the_modal_in_the_first_instance_language(surface: _Surface) -> None:
+    surface.scopes = incident_scopes(surface.records, tenants=TENANTS, languages=("fr-FR", "en-US"))
+
+    surface.manage(locale="de-DE")
+
+    assert json.loads(surface.view()["private_metadata"])["locale"] == "fr-FR"
 
 
 def test_a_missing_commander_is_a_field_error_and_writes_nothing(surface: _Surface) -> None:

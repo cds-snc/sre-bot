@@ -145,7 +145,9 @@ def test_the_modal_opens_on_the_legacy_report_roles_and_its_submission_writes_th
         "postmortem_owner": None,
     }
     assert routed.conversations.posts_in(slack_conversation(CHANNEL_ID)) == (
-        "<@U0NEWOL> has been assigned as operations lead for this incident.",
-        "<@U0POLICY> has been assigned as policy lead for this incident.",
+        "<@U0NEWOL> has been assigned as operations lead for this incident.\n"
+        "<@U0NEWOL> a été désigné(e) responsable des opérations pour cet incident.",
+        "<@U0POLICY> has been assigned as policy lead for this incident.\n"
+        "<@U0POLICY> a été désigné(e) responsable des politiques pour cet incident.",
     )
     assert routed.conversations.purpose_of(slack_conversation(CHANNEL_ID)) == "Checkout outage \nIC: <@U0OLDIC> / OL: <@U0NEWOL>"

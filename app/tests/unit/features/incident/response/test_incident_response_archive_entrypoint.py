@@ -7,8 +7,10 @@ Assertions read what users see (the invoker's reply, the presser's private notic
 or ``response_url`` reply, the channel's posts, whether the channel is archived)
 and the events sent; the registration is read from the fake registrar.
 
-The command replies in the invoker's locale; a button press names no locale, so
-every text it renders is English then French (decisions/i18n.md).
+Both post their channel notices in the instance languages, English then French
+unless a test configures them (decisions/languages.md). The command replies in
+the invoker's language; a button press names no locale, so its replies are in
+the instance languages too.
 """
 
 import asyncio
@@ -155,20 +157,20 @@ def test_close_closes_the_incident_archives_the_channel_and_says_so(surface: _Su
     assert reply == "The incident is closed and its channel archived."
     assert surface.stored_status() is IncidentStatus.CLOSED
     assert surface.posts() == (
-        f"<@{USER_ID}> has updated the incident status to Closed.",
-        f"<@{USER_ID}> has archived this channel 👋",
+        f"<@{USER_ID}> has updated the incident status to Closed.\n<@{USER_ID}> a changé le statut de l'incident à Closed.",
+        f"<@{USER_ID}> has archived this channel 👋\n<@{USER_ID}> a archivé ce canal 👋",
     )
     assert surface.archived()
     assert [event.incident_id for event in surface.events.sent] == [INCIDENT_ID]
 
 
-def test_a_french_invoker_reads_the_reply_and_the_notices_in_french(surface: _Surface) -> None:
+def test_a_french_invoker_reads_the_reply_in_french_and_the_notices_in_the_instance_languages(surface: _Surface) -> None:
     reply = surface.close(locale="fr-FR")
 
     assert reply == "L'incident est fermé et son canal archivé."
     assert surface.posts() == (
-        f"<@{USER_ID}> a changé le statut de l'incident à Closed.",
-        f"<@{USER_ID}> a archivé ce canal 👋",
+        f"<@{USER_ID}> has updated the incident status to Closed.\n<@{USER_ID}> a changé le statut de l'incident à Closed.",
+        f"<@{USER_ID}> has archived this channel 👋\n<@{USER_ID}> a archivé ce canal 👋",
     )
 
 
@@ -222,6 +224,19 @@ def test_the_button_follows_the_instance_languages_and_order(monkeypatch: pytest
 
     surface.press()
 
+    assert surface.posts() == (
+        f"<@{USER_ID}> a changé le statut de l'incident à Closed.\n<@{USER_ID}> has updated the incident status to Closed.",
+        f"<@{USER_ID}> a archivé ce canal 👋\n<@{USER_ID}> has archived this channel 👋",
+    )
+
+
+def test_the_close_command_follows_the_instance_languages_and_order(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An English invoker on a French-first instance reads an English reply and French-first channel notices."""
+    surface = _Surface(monkeypatch, languages=("fr-FR", "en-US"))
+
+    reply = surface.close()
+
+    assert reply == "The incident is closed and its channel archived."
     assert surface.posts() == (
         f"<@{USER_ID}> a changé le statut de l'incident à Closed.\n<@{USER_ID}> has updated the incident status to Closed.",
         f"<@{USER_ID}> a archivé ce canal 👋\n<@{USER_ID}> has archived this channel 👋",

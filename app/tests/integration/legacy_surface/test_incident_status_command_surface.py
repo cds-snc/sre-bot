@@ -135,7 +135,11 @@ def test_status_update_moves_the_report_line_the_list_cell_and_tells_the_channel
 
     assert status_surface.report_status() == status
     assert status_surface.list_status() == status
-    assert status_surface.channel_messages() == [f"<@{USER_ID}> has updated the incident status to {status}."]
+    # decisions/migration.md step 4 kind (b): decisions/languages.md 2026-11-25 (i18n.md 2026-11-17), a post to a
+    # shared conversation is in the instance languages, in order (TASK-145.8.9 named change; legacy: English only).
+    assert status_surface.channel_messages() == [
+        f"<@{USER_ID}> has updated the incident status to {status}.\n<@{USER_ID}> a changé le statut de l'incident à {status}."
+    ]
 
 
 def test_status_update_with_an_unknown_status_lists_the_valid_ones_and_changes_nothing(

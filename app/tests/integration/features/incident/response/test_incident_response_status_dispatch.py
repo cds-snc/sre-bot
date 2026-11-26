@@ -107,7 +107,8 @@ def test_status_update_writes_the_record_and_fans_out(routed: _Routed) -> None:
     assert routed.reports.status_text_of(REPORT) is IncidentStatus.READY_TO_BE_REVIEWED
     assert [row[3] for row in routed.projection.rows] == ["Ready to be Reviewed"]
     assert routed.conversations.posts_in(slack_conversation(CHANNEL_ID)) == (
-        f"<@{USER_ID}> has updated the incident status to Ready to be Reviewed.",
+        f"<@{USER_ID}> has updated the incident status to Ready to be Reviewed.\n"
+        f"<@{USER_ID}> a changé le statut de l'incident à Ready to be Reviewed.",
     )
 
 

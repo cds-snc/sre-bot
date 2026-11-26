@@ -3,8 +3,9 @@
 The handlers run over a scope opener resolving an in-memory record store seeded
 with one legacy incident on the channel (its report linked, Slack and Google
 configured), and the response providers return the core in-memory report, list
-projection and conversation fakes. Replies are read in the invoker's locale from
-the real catalogues, which the directory's conftest loads. Assertions read the
+projection and conversation fakes. Replies are read in the invoker's language and
+the channel notice in the instance languages (English then French unless a test
+configures them), from the real catalogues, which the directory's conftest loads. Assertions read the
 reply, the stored status, the report's status line, the list row's status cell
 and the channel's posts, which is what the invoker and the channel see.
 """
@@ -62,9 +63,11 @@ class _Surface:
         monkeypatch.setattr(providers, "incident_list_projection", lambda: self.projection)
         monkeypatch.setattr(providers, "incident_conversation", lambda: self.conversations)
 
-    def update(self, text: str, *, channel_id: str = CHANNEL_ID, locale: str = "en-US") -> str:
+    def update(
+        self, text: str, *, channel_id: str = CHANNEL_ID, locale: str = "en-US", languages: tuple[str, ...] | None = None
+    ) -> str:
         payload = CommandPayload(text=text, user_id=USER_ID, channel_id=channel_id, user_locale=locale)
-        response = handle_status_update_command(payload, incident_scopes(self.records, tenants=TENANTS))
+        response = handle_status_update_command(payload, incident_scopes(self.records, tenants=TENANTS, languages=languages))
         assert response.ephemeral
         return response.message
 
@@ -89,7 +92,9 @@ def test_update_changes_the_record_the_report_the_list_and_tells_the_channel(sur
     assert surface.stored_status() is IncidentStatus.CLOSED
     assert surface.reports.status_text_of(REPORT) is IncidentStatus.CLOSED
     assert [row[3] for row in surface.projection.rows] == ["Closed"]
-    assert surface.posts() == (f"<@{USER_ID}> has updated the incident status to Closed.",)
+    assert surface.posts() == (
+        f"<@{USER_ID}> has updated the incident status to Closed.\n<@{USER_ID}> a changé le statut de l'incident à Closed.",
+    )
 
 
 def test_a_status_of_several_words_is_read_whole(surface: _Surface) -> None:
@@ -98,11 +103,33 @@ def test_a_status_of_several_words_is_read_whole(surface: _Surface) -> None:
     assert surface.stored_status() is IncidentStatus.READY_TO_BE_REVIEWED
 
 
-def test_a_french_invoker_reads_the_reply_and_the_notice_in_french(surface: _Surface) -> None:
+def test_a_french_invoker_reads_the_reply_in_french_and_the_channel_both_languages(surface: _Surface) -> None:
     reply = surface.update("Reviewed", locale="fr-FR")
 
     assert reply == "Le statut de l'incident est maintenant Reviewed."
+    assert surface.posts() == (
+        f"<@{USER_ID}> has updated the incident status to Reviewed.\n<@{USER_ID}> a changé le statut de l'incident à Reviewed.",
+    )
+
+
+def test_the_channel_notice_follows_the_instance_language_order(surface: _Surface) -> None:
+    surface.update("Reviewed", languages=("fr-FR", "en-US"))
+
+    assert surface.posts() == (
+        f"<@{USER_ID}> a changé le statut de l'incident à Reviewed.\n<@{USER_ID}> has updated the incident status to Reviewed.",
+    )
+
+
+def test_an_instance_with_one_language_posts_one_line(surface: _Surface) -> None:
+    surface.update("Reviewed", locale="fr-FR", languages=("fr-FR",))
+
     assert surface.posts() == (f"<@{USER_ID}> a changé le statut de l'incident à Reviewed.",)
+
+
+def test_an_unsupported_user_locale_is_answered_in_the_first_instance_language(surface: _Surface) -> None:
+    reply = surface.update("Reviewed", locale="de-DE", languages=("fr-FR", "en-US"))
+
+    assert reply == "Le statut de l'incident est maintenant Reviewed."
 
 
 @pytest.mark.parametrize(
@@ -177,7 +204,8 @@ def test_each_follower_that_did_not_write_gets_a_line(monkeypatch: pytest.Monkey
 
 
 def _status(text: str, locale: str = "en-US") -> CommandResponse:
-    return handle_status_command(CommandPayload(text=text, user_id=USER_ID, channel_id=CHANNEL_ID, user_locale=locale))
+    payload = CommandPayload(text=text, user_id=USER_ID, channel_id=CHANNEL_ID, user_locale=locale)
+    return handle_status_command(payload, incident_scopes(tenants=TENANTS))
 
 
 def test_a_bare_status_points_to_status_update_and_changes_nothing(surface: _Surface) -> None:
