@@ -13,7 +13,7 @@ Three concerns were mixed. **Translation** turns a key and a language into a tex
 
 The set and the order are an organisation's policy, set by its jurisdiction. The TBS Directive on Official Languages for Communications and Services, 6.1.1, puts French first when the issuing office is in Quebec and English first elsewhere ([TBS](https://www.tbs-sct.canada.ca/pol/doc-eng.aspx?id=26164)); the Directive on Official Languages for People Management requires regularly used electronic systems in both languages, and the interface in the language of the user's choice ([TBS](https://tbs-sct.gc.ca/pol/doc-eng.aspx?id=26168)). The Welsh Language Standards place Welsh to be read first on signs but set no order for social posts ([Welsh Government](https://www.gov.wales/welsh-language-standards-communication-and-marketing-guidelines)). GC Notify offers English-first and French-first bilingual templates ([GC Notify](https://notification.canada.ca/features)). Frameworks keep the language list in deployment configuration (Django `LANGUAGES`, Rails `available_locales`). This project is built for other organisations to adopt ([product-scope.md](product-scope.md)), some with one language.
 
-Current state: `[languages] shared` (`server/languages/settings.py`), `LanguagePolicy` and `MultilingualText` (`contracts/languages.py`), the host policy registered as a core service (`server/services.py`). The update modal's field notice, the archive button and the Slack tenant guard use it. `/sre incident status update`, the roles announcement and `/sre incident close` still post their channel notices in the invoker's language (TASK-145.8.9).
+Current state: `[languages] shared` (`server/languages/settings.py`), `LanguagePolicy` and `MultilingualText` (`contracts/languages.py`), the host policy registered as a core service (`server/services.py`). The incident channel notices (status, field, roles, close and the archive button), their private replies and the Slack tenant guard use it.
 
 ## Decision
 
@@ -43,12 +43,12 @@ Current state: `[languages] shared` (`server/languages/settings.py`), `LanguageP
 
 ## Migration
 
-Tickets: TASK-145.8.9 (status, roles and close notices), TASK-145.13 (`IncidentConversation.post` takes `MultilingualText` only), TASK-118 (the supported-language lists in `integrations/slack` move with the translator).
+Tickets: TASK-145.13 (`IncidentConversation.post` takes `MultilingualText` only), TASK-118 (the supported-language lists in `integrations/slack` move with the translator).
 
 Tolerated until then:
 - `IncidentConversation.post` accepts a plain string;
-- three incident channel notices in the invoker's language (TASK-145.8.9);
 - `integrations/slack/users.py` and `provider.py` keep their own supported-language lists, and the provider maps a command's Slack locale outside them to `en-US` before the policy sees it, so a `fr-CA` user is answered in English (TASK-118 passes the raw locale through).
 
 **Changes:**
 - 2026-11-25: Accepted. Instance languages configured; shared messages in the instance order, direct interactions in the user's language of choice; `LanguagePolicy` and `MultilingualText` (TASK-193; TASK-145.8.9 OQ2, human D1-D6).
+- 2026-11-26: `/sre incident status update`'s notice, the roles announcement and `/sre incident close`'s notices moved to the instance languages, their replies onto `reply_languages`; the tolerated line removed (TASK-145.8.9).

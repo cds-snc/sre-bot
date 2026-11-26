@@ -14,16 +14,19 @@ the purpose's ``IC: ... / OL: ...`` line. A refused or failed record write and a
 follower that failed or was skipped are told to the submitter privately.
 Handlers open one service scope and run the service in one event loop
 (``asyncio.run``, the sync Bolt edge). Every string goes through the
-``incident_response`` catalogue in the invoker's locale.
+``incident_response`` catalogue: the announcements in the conversation's shared
+languages, the modal and the private replies in the invoker's reply languages
+(decisions/languages.md).
 """
 
 import asyncio
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from typing import Any
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.services import ServiceScopeOpener
@@ -40,7 +43,7 @@ from features.incident.core.api import (
 )
 from features.incident.core.api import translate as t
 from features.incident.response import providers
-from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.scope import incident_scope, language_policy, shared_languages
 from features.incident.response.service.roles import RolesChange, assign_roles
 from features.incident.response.service.status import StageOutcome
 
@@ -104,25 +107,25 @@ def handle_roles_manage_command(payload: CommandPayload, reply: SlackReplySender
         notice when there is no trigger id or channel, the channel is no
         incident or its roles cannot be read, or the view could not open.
     """
-    locale = payload.user_locale or "en-US"
+    languages = language_policy(scopes).reply_languages(payload.user_locale)
     log = logger.bind(command="incident_roles_manage", user_id=payload.user_id, channel_id=payload.channel_id)
     trigger_id = str(payload.platform_metadata.get("trigger_id", ""))
     if not trigger_id or not payload.channel_id:
         log.warning("incident_roles_manage_no_trigger_or_channel")
-        return _reply(_t("open_failed", locale))
+        return _reply(_render(languages, "open_failed"))
 
     with incident_scope(scopes, payload.channel_id) as (incidents, conversation):
         shown = asyncio.run(_shown_roles(incidents, providers.legacy_roles_reader(), conversation))
     if not shown.is_success or shown.data is None:
         log.warning("incident_roles_manage_refused", operation_status=shown.status.value, error_code=shown.error_code)
-        return _reply(_refusal(shown, locale))
+        return _reply(_refusal(shown, languages))
 
     channel_name = str(payload.platform_metadata.get("channel_name") or payload.channel_id)
-    view = build_roles_view(shown.data, locale, payload.channel_id, channel_name)
+    view = build_roles_view(shown.data, languages[0], payload.channel_id, channel_name)
     opened = reply.open_view(trigger_id=trigger_id, view=view)
     if not opened.is_success:
         log.warning("incident_roles_manage_open_failed", error=opened.message, error_code=opened.error_code)
-        return _reply(_t("open_failed", locale))
+        return _reply(_render(languages, "open_failed"))
     return CommandResponse(message="", ephemeral=True)
 
 
@@ -140,12 +143,14 @@ def handle_roles_submission(ack: Callable[..., Any], body: dict[str, Any], clien
     """
     view = body.get("view") or {}
     metadata = _parse_metadata(view.get("private_metadata"))
-    locale = str(metadata.get("locale") or "en-US")
+    policy = language_policy(scopes)
+    locale = metadata.get("locale")
+    languages = policy.reply_languages(str(locale) if locale else None)
     channel_id = str(metadata.get("channel_id", ""))
     user_id = str((body.get("user") or {}).get("id", ""))
     selected = _selected_roles(view)
 
-    missing = {_block_id(role): _t("required", locale) for role in _REQUIRED if selected[role] is None}
+    missing = {_block_id(role): _render(languages, "required") for role in _REQUIRED if selected[role] is None}
     if missing:
         ack(response_action="errors", errors=missing)
         return
@@ -160,16 +165,17 @@ def handle_roles_submission(ack: Callable[..., Any], body: dict[str, Any], clien
                 providers.legacy_roles_reader(),
                 conversation,
                 selected,
-                announce=lambda role, holder: _t(
-                    "announcement", locale, user=f"<@{holder}>", role=_t(f"name.{role.value}", locale)
+                announce=lambda role, holder: MultilingualText.of(
+                    shared_languages(policy, conversation),
+                    lambda language: _t("announcement", language, user=f"<@{holder}>", role=_t(f"name.{role.value}", language)),
                 ),
             )
         )
     if not result.is_success or result.data is None:
         log.warning("incident_roles_refused", operation_status=result.status.value, error_code=result.error_code)
-        notice = _refusal(result, locale)
+        notice = _refusal(result, languages)
     else:
-        notice = _outcome(result.data, locale)
+        notice = _outcome(result.data, languages)
     if notice:
         _tell_submitter(client, channel_id, user_id, notice, log)
 
@@ -251,29 +257,34 @@ def _tell_submitter(client: Any, channel_id: str, user_id: str, text: str, log: 
         log.exception("incident_roles_notice_failed")
 
 
-def _refusal(result: OperationResult[Any], locale: str) -> str:
+def _refusal(result: OperationResult[Any], languages: Sequence[str]) -> str:
     match result.error_code:
         case ErrorCode.NOT_AN_INCIDENT:
-            return _t("not_an_incident", locale)
+            return _render(languages, "not_an_incident")
         case ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION:
-            return _t("ambiguous", locale)
+            return _render(languages, "ambiguous")
         case ErrorCode.INCIDENT_RECORD_CONFLICT:
-            return _t("conflict", locale)
+            return _render(languages, "conflict")
         case ErrorCode.INCIDENT_RECORD_UNREADABLE:
-            return _t("unreadable", locale)
-    return _t("unavailable", locale)
+            return _render(languages, "unreadable")
+    return _render(languages, "unavailable")
 
 
-def _outcome(change: RolesChange, locale: str) -> str:
+def _outcome(change: RolesChange, languages: Sequence[str]) -> str:
     """The private lines for a follower that was skipped or failed; empty when every follower was done."""
     lines = []
     if change.announcements.outcome is StageOutcome.SKIPPED:
-        lines.append(_t("channel_skipped", locale))
+        lines.append(_render(languages, "channel_skipped"))
     if change.announcements.outcome is StageOutcome.FAILED:
-        lines.append(_t("announcements_failed", locale))
+        lines.append(_render(languages, "announcements_failed"))
     if change.purpose.outcome is StageOutcome.FAILED:
-        lines.append(_t("purpose_failed", locale))
+        lines.append(_render(languages, "purpose_failed"))
     return "\n".join(lines)
+
+
+def _render(languages: Sequence[str], key: str) -> str:
+    """Translate ``key`` in each reply language, one line each, for a private reply."""
+    return "\n".join(_t(key, language) for language in languages)
 
 
 def _t(key: str, locale: str, **variables: str) -> str:

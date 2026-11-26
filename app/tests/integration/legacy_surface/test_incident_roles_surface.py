@@ -176,9 +176,13 @@ def test_submitting_new_roles_announces_each_one_in_the_channel(surface: RolesSu
     response = surface.slack.interaction(submission_payload(view, {IC_BLOCK: "U0NEWIC", OL_BLOCK: "U0NEWOL"}))
 
     assert (response.status, response.body) == (200, "")
+    # decisions/migration.md step 4 kind (b): decisions/languages.md 2026-11-25 (i18n.md 2026-11-17), a post to a
+    # shared conversation is in the instance languages, in order (TASK-145.8.9 named change; legacy: English only).
     assert posted_texts(surface) == [
-        "<@U0NEWIC> has been assigned as incident commander for this incident.",
-        "<@U0NEWOL> has been assigned as operations lead for this incident.",
+        "<@U0NEWIC> has been assigned as incident commander for this incident.\n"
+        "<@U0NEWIC> a été désigné(e) commandant d'incident pour cet incident.",
+        "<@U0NEWOL> has been assigned as operations lead for this incident.\n"
+        "<@U0NEWOL> a été désigné(e) responsable des opérations pour cet incident.",
     ]
 
 
@@ -188,7 +192,12 @@ def test_submitting_one_changed_role_announces_only_that_role(surface: RolesSurf
 
     surface.slack.interaction(submission_payload(view, {OL_BLOCK: "U0NEWOL"}))
 
-    assert posted_texts(surface) == ["<@U0NEWOL> has been assigned as operations lead for this incident."]
+    # decisions/migration.md step 4 kind (b): decisions/languages.md 2026-11-25 (i18n.md 2026-11-17), a post to a
+    # shared conversation is in the instance languages, in order (TASK-145.8.9 named change; legacy: English only).
+    assert posted_texts(surface) == [
+        "<@U0NEWOL> has been assigned as operations lead for this incident.\n"
+        "<@U0NEWOL> a été désigné(e) responsable des opérations pour cet incident."
+    ]
 
 
 def test_submitting_unchanged_roles_announces_nothing(surface: RolesSurface) -> None:

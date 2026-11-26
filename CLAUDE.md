@@ -134,12 +134,11 @@ plans and acceptance criteria.
   decomposed into incremental subtasks before implementation. A PR that only
   deletes is not bound by the size gate.
 - One task per session, one branch, one PR. Check off acceptance criteria one by
-  one as each is verified. A task stays `In Progress` while its PR is open. The
-  agent closes it (`backlog task edit <id> --status Done`, with a closing note)
-  once its PR is merged (`gh pr view <n> --json state`), every AC is checked and
-  no human post-deploy step is still open; the task-file edit rides with the next
-  commit. A task waiting on a human check stays `In Progress`, the check named in
-  its notes.
+  one as each is verified. A task's status moves with its work: when every AC is
+  checked and no human check is open, the closing commands set it `Done` before
+  `git add` so the task file ships in its PR; a task waiting on a human check
+  stays `In Progress`, the check named in its notes, and the agent closes it once
+  the user confirms the check. Details: `backlog-task-workflow` Status Discipline.
 
 See `backlog-task-workflow` and `implementation-planning` skills.
 

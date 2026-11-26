@@ -38,7 +38,7 @@ Each stack has one doc under `backlog/docs/stacks/`, created with `backlog doc c
 ## End
 
 1. Make sure every layer touched this session has task notes and checked ACs through the CLI, and stays at `In Progress` while its PR is open.
-2. Check the PR state of every layer marked `in review` (`gh pr view <n> --json state`). For each merged layer whose task is not Done yet, close it yourself (`backlog task edit <id> --status Done`, with a closing note) when every AC is checked and no human post-deploy step is still open; otherwise leave it `In Progress` and name the open check. The task-file edit is committed with the next layer.
+2. Check the PR state of every layer marked `in review` (`gh pr view <n> --json state`). A layer with nothing left open carries its own `Done` in its commit ([backlog-task-workflow](../backlog-task-workflow/SKILL.md) Status Discipline). For each merged layer whose task is not Done yet, close it yourself (`backlog task edit <id> --status Done`, with a closing note) when every AC is checked and no human check is still open, or once the user confirms it; otherwise leave it `In Progress` and name the open check. The task-file edit is committed with the next layer.
 3. Print the commands that put the human on the next layer's branch before the next session starts, in order:
    - if a lower layer merged: `gh stack sync` (or `gh stack rebase`), then `gh stack submit` to update the PR bases;
    - `gh stack checkout <top branch>` if the top of the stack is not checked out;

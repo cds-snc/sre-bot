@@ -113,9 +113,10 @@ platform), the `DeclarePolicy` from `[incident_response]` and the texts (`Declar
 - `entrypoints/slack.py`: the status commands and the registration; `entrypoints/slack_roles.py`:
   the roles command and modal; `entrypoints/slack_archive.py`: close and the archive button;
   `entrypoints/slack_show.py` and `slack_show_views.py`: show and the update modal;
-  `entrypoints/scope.py`: the service scope they open and the language policy. Replies come
-  from `locales/` in the invoker's language, or the instance languages when the payload names
-  none (decisions/languages.md).
+  `entrypoints/scope.py`: the service scope they open and the language policy. Every post to
+  the incident channel (status, field and archived notices, role announcements) is in the
+  channel's shared languages, in order; replies and modals come from `locales/` in the invoker's
+  language, or the instance languages when the payload names none (decisions/languages.md).
 - `service/status.py`: `change_status`; `service/fields.py`: `update_fields`; `service/roles.py`:
   `assign_roles`; `service/archive.py`: `archive_incident`; `service/declare.py`: `declare`;
   `service/conversation.py`: `ensure_conversation`.

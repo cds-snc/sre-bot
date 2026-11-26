@@ -21,14 +21,18 @@ event loop (``asyncio.run``, the sync Bolt edge). The report, list and
 conversation ports come from ``response/providers.py``. Registration reads the
 configured systems once: without a Slack tenant nothing is registered and one
 startup event names ``[slack.tenant]``. Every string goes through the
-``incident_response`` catalogue in the invoker's locale.
+``incident_response`` catalogue: the channel notice in the conversation's
+shared languages, the replies in the invoker's reply languages
+(decisions/languages.md).
 """
 
 import asyncio
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from contracts.services import ServiceScopeOpener
@@ -38,7 +42,7 @@ from contracts.workplace import ConfiguredSystems, WorkplaceSystem
 from features.incident.common.vocabulary import IncidentStatus
 from features.incident.core.api import translate as t
 from features.incident.response import providers
-from features.incident.response.entrypoints.scope import incident_scope
+from features.incident.response.entrypoints.scope import incident_scope, language_policy, shared_languages
 from features.incident.response.entrypoints.slack_archive import register_archive
 from features.incident.response.entrypoints.slack_roles import register_roles
 from features.incident.response.entrypoints.slack_show import register_show
@@ -74,12 +78,15 @@ def register(registrar: SlackCommandRegistrar) -> None:
         logger.warning("incident_response_registration_skipped", reason="slack_not_configured", setting="[slack.tenant]")
         return
 
+    def _dispatch_status(payload: CommandPayload) -> CommandResponse:
+        return handle_status_command(payload, scopes)
+
     def _dispatch_status_update(payload: CommandPayload) -> CommandResponse:
         return handle_status_update_command(payload, scopes)
 
     registrar.register_command(
         command="status",
-        handler=handle_status_command,
+        handler=_dispatch_status,
         parent="sre.incident",
         description="Change this incident's status",
         description_key=f"{STATUS_DOMAIN}.description",
@@ -102,22 +109,23 @@ def register(registrar: SlackCommandRegistrar) -> None:
     register_show(registrar, scopes)
 
 
-def handle_status_command(payload: CommandPayload) -> CommandResponse:
+def handle_status_command(payload: CommandPayload, scopes: ServiceScopeOpener) -> CommandResponse:
     """Answer ``/sre incident status`` without a known subcommand: a pointer for a bare status, otherwise the help.
 
     Args:
         payload: Command payload; ``text`` is what followed ``status``.
+        scopes: Opens the service scope the language policy is resolved in.
 
     Returns:
         An ephemeral pointer to ``status update`` when the text is a valid
         status, the command's help otherwise. Nothing is read or written.
     """
-    locale = payload.user_locale or "en-US"
+    languages = language_policy(scopes).reply_languages(payload.user_locale)
     text = payload.text.strip()
     if text in set(IncidentStatus):
         logger.info("incident_status_bare_form_answered", user_id=payload.user_id, channel_id=payload.channel_id)
-        return _reply(_t("bare_status", locale, status=text))
-    return _reply(_t("help", locale, statuses=_statuses()))
+        return _reply(_render(languages, "bare_status", status=text))
+    return _reply(_render(languages, "help", statuses=_statuses()))
 
 
 def handle_status_update_command(payload: CommandPayload, scopes: ServiceScopeOpener) -> CommandResponse:
@@ -128,21 +136,25 @@ def handle_status_update_command(payload: CommandPayload, scopes: ServiceScopeOp
         scopes: Opens the service scope the incident store is built in.
 
     Returns:
-        One ephemeral reply: the outcome and a line per skipped or failed
-        follower write, or why nothing was changed.
+        One ephemeral reply in the invoker's reply languages: the outcome and a
+        line per skipped or failed follower write, or why nothing was changed.
     """
-    locale = payload.user_locale or "en-US"
+    policy = language_policy(scopes)
+    languages = policy.reply_languages(payload.user_locale)
     text = payload.text.strip()
     if not text:
-        return _reply(_t("missing", locale))
+        return _reply(_render(languages, "missing"))
     if text not in set(IncidentStatus):
-        return _reply(_t("invalid", locale, statuses=_statuses()))
+        return _reply(_render(languages, "invalid", statuses=_statuses()))
     if not payload.channel_id:
-        return _reply(_t("not_an_incident", locale))
+        return _reply(_render(languages, "not_an_incident"))
     status = IncidentStatus(text)
-    notice = _t("notice", locale, user=f"<@{payload.user_id}>", status=status.value)
+    user = f"<@{payload.user_id}>"
 
     with incident_scope(scopes, payload.channel_id) as (incidents, conversation):
+        notice = MultilingualText.of(
+            shared_languages(policy, conversation), lambda language: _t("notice", language, user=user, status=status.value)
+        )
         result = asyncio.run(
             change_status(
                 incidents,
@@ -163,28 +175,28 @@ def handle_status_update_command(payload: CommandPayload, scopes: ServiceScopeOp
             operation_status=result.status.value,
             error_code=result.error_code,
         )
-        return _reply(_refusal(result, locale))
-    return _reply(_outcome(result.data, locale))
+        return _reply(_refusal(result, languages))
+    return _reply(_outcome(result.data, languages))
 
 
-def _refusal(result: OperationResult[StatusChange], locale: str) -> str:
+def _refusal(result: OperationResult[StatusChange], languages: Sequence[str]) -> str:
     match result.error_code:
         case ErrorCode.NOT_AN_INCIDENT:
-            return _t("not_an_incident", locale)
+            return _render(languages, "not_an_incident")
         case ErrorCode.AMBIGUOUS_INCIDENT_CONVERSATION:
-            return _t("ambiguous", locale)
+            return _render(languages, "ambiguous")
         case ErrorCode.INCIDENT_RECORD_CONFLICT:
-            return _t("conflict", locale)
+            return _render(languages, "conflict")
         case ErrorCode.INCIDENT_RECORD_UNREADABLE:
-            return _t("unreadable", locale)
-    return _t("unavailable", locale)
+            return _render(languages, "unreadable")
+    return _render(languages, "unavailable")
 
 
-def _outcome(change: StatusChange, locale: str) -> str:
-    lines = [_t("updated", locale, status=change.incident.status.value)]
-    lines += _stage_line("report", change.report, locale)
-    lines += _stage_line("projection", change.projection, locale)
-    lines += _stage_line("channel", change.channel, locale)
+def _outcome(change: StatusChange, languages: Sequence[str]) -> str:
+    lines = [_render(languages, "updated", status=change.incident.status.value)]
+    lines += _stage_line("report", change.report, languages)
+    lines += _stage_line("projection", change.projection, languages)
+    lines += _stage_line("channel", change.channel, languages)
     return "\n".join(lines)
 
 
@@ -200,14 +212,19 @@ _STAGE_LINES = frozenset(
 )
 
 
-def _stage_line(stage: str, result: StageResult, locale: str) -> list[str]:
+def _stage_line(stage: str, result: StageResult, languages: Sequence[str]) -> list[str]:
     if (stage, result.outcome) not in _STAGE_LINES:
         return []
-    return [_t(f"{stage}_{result.outcome.value}", locale)]
+    return [_render(languages, f"{stage}_{result.outcome.value}")]
 
 
 def _statuses() -> str:
     return ", ".join(status.value for status in _LISTED_STATUSES)
+
+
+def _render(languages: Sequence[str], key: str, **variables: str) -> str:
+    """Translate ``key`` in each reply language, one line each, for a private reply."""
+    return "\n".join(_t(key, language, **variables) for language in languages)
 
 
 def _t(key: str, locale: str, **variables: str) -> str:

@@ -21,6 +21,7 @@ from dataclasses import dataclass
 
 import structlog
 
+from contracts.languages import MultilingualText
 from contracts.operations import OperationResult
 from features.incident.common.vocabulary import IncidentRole
 from features.incident.core.api import (
@@ -72,7 +73,7 @@ async def assign_roles(
     conversation: ConversationReference,
     roles: Mapping[IncidentRole, str | None],
     *,
-    announce: Callable[[IncidentRole, str], str],
+    announce: Callable[[IncidentRole, str], str | MultilingualText],
 ) -> OperationResult[RolesChange]:
     """Give the conversation's incident the five ``roles``, then announce the changes and rewrite the purpose.
 
@@ -82,7 +83,7 @@ async def assign_roles(
         legacy: Reads the roles a legacy incident carries on its report, for what the modal showed.
         conversation: The conversation the modal was opened from.
         roles: Each role's holder after the change; ``None`` unassigns it.
-        announce: Renders the announcement of a role and its new holder, in the submitter's locale.
+        announce: Renders the announcement of a role and its new holder, in the conversation's shared languages.
 
     Returns:
         The committed change with each follower's outcome; the command check's
@@ -138,7 +139,7 @@ async def _announce(
     conversations: IncidentConversation,
     conversation: ConversationReference,
     changed: tuple[tuple[IncidentRole, str], ...],
-    announce: Callable[[IncidentRole, str], str],
+    announce: Callable[[IncidentRole, str], str | MultilingualText],
 ) -> tuple[tuple[IncidentRole, ...], StageResult]:
     """Post each changed role's announcement in role order; every post is tried and the first failure is reported."""
     announced: list[IncidentRole] = []

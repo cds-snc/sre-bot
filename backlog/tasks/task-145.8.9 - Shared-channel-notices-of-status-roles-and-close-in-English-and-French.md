@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.9
-title: Shared-channel notices of status, roles and close in English and French
-status: To Do
+title: Shared-channel notices of status, roles and close in the instance languages
+status: Done
 assignee: []
 created_date: '2026-11-17T20:55:00Z'
-updated_date: '2026-11-25T19:10:00Z'
+updated_date: '2026-11-26T13:28:00Z'
 labels:
   - incident
   - i18n
@@ -27,104 +27,107 @@ i18n.md 2026-11-17 (TASK-145.8.3 OQ3, human): a message posted to a shared conve
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 change_status's channel notice, the roles announcement and /sre incident close's archived notice are posted in English and French from their catalogues (one line per language, no second copy of a string)
-- [ ] #2 Private replies of the same surfaces stay in the actor's locale
-- [ ] #3 Each changed pin assertion cites i18n.md 2026-11-17 as a named change of kind (b), listed in the PR body
-- [ ] #4 ruff, mypy (no new errors in touched files), lint-imports, make check-test-seams and pytest tests --ignore=tests/smoke pass
+- [x] #1 change_status's channel notice, the roles announcement and /sre incident close's status and archived notices are posted as MultilingualText in the conversation's shared_languages, in order, each line from its own catalogue (no second copy of a string)
+- [x] #2 Private replies of the same surfaces use reply_languages for the user's locale
+- [x] #3 Each changed pin assertion cites decisions/languages.md 2026-11-25 (i18n.md 2026-11-17) as a named change of kind (b), listed in the PR body
+- [x] #4 ruff, mypy (no new errors in touched files), make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams and pytest tests --ignore=tests/smoke pass
+- [x] #5 No language tag literal and no notice_languages override remain in incident/response entrypoints; decisions/languages.md no longer tolerates the three notices
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-SUPERSEDED 2026-11-25 (human D1-D6, see comments): re-plan after TASK-193. Previous proposal kept below as evidence.
+Planned 2026-11-26 against main 876f7f7f, on the merged TASK-193 contract (#1887). The 2026-11-25 plan (a core in_official_languages helper) is superseded by TASK-193 D1-D6; its text stays in git history (task file at 87471ee9).
 
-Goal: the three single-locale notices still posted to an incident channel by rebuilt response surfaces follow i18n.md:31 (2026-11-17): a post to a shared conversation is in English then French, one line per language from its own catalogue; private replies stay in the actor's locale. No catalogue string changes (both languages already exist, parity-checked); only which locales are rendered.
+Goal: the three incident channel notices that still follow the invoker (decisions/languages.md Migration, "tolerated until then", line 2) go out in the instance languages, in order: a MultilingualText built from LanguagePolicy.shared_languages for the incident's conversation. Private replies of the same surfaces use LanguagePolicy.reply_languages, as show and archive already do. No catalogue string changes; only which languages are rendered and in what order.
 
-Current state (call sites)
-- Status: entrypoints/slack.py:143 notice = _t("notice", locale, ...) with locale = payload.user_locale (:134); posted by service/status.py:149-156 channel_stage. Keys incident_response.status.notice (en/fr :10).
-- Roles: entrypoints/slack_roles.py:161-166 announce lambda in the modal's private_metadata locale (:145); posted once per changed role by service/roles.py:137-147. Keys roles.announcement (:43) and roles.name.<role>.
-- Close: entrypoints/slack_archive.py:84 locales = (payload.user_locale,) feeds _archive (:132-148), which renders status_notice (status.notice) and archived_notice (archive.notice, :56) in that one locale. The archive button already passes _NO_LOCALE (:41, bilingual, TASK-145.8.5.3).
-- Already bilingual: the update modal's field notice (slack_show.py:72 _BOTH, :297-303 _notice; N14), so a status change from the modal is bilingual while /sre incident status update is not; the archive button is bilingual while /sre incident close is not. This task removes both inconsistencies.
-- Two copies of the locale pair exist (slack_show.py:72 _BOTH, slack_archive.py:41 _NO_LOCALE) and upcoming tasks add more shared posts (145.9.2 stale notice, 145.10.x postmortem posts (D6), 192 reminders, 145.7.10 declare's DeclareTexts).
+Current state (call sites, main 876f7f7f)
+- Contract: contracts/languages.py (MultilingualText.of(languages, line), plain_text(); LanguagePolicy.shared_languages(system, tenant, conversation_id), reply_languages(user_locale)). Response helpers: entrypoints/scope.py:27 language_policy(scopes), :33 shared_languages(policy, conversation). Posts: IncidentConversation.post accepts str | MultilingualText (core/api.py:246, adapters/slack.py:405-415, laid out with plain_text()).
+- Status: entrypoints/slack.py:134 locale = payload.user_locale or "en-US"; :143 notice = _t("notice", locale, ...) (str) passed to change_status (service/status.py:83, already str | MultilingualText; posted by channel_stage :150). Replies _refusal/_outcome take one locale. handle_status_command :115 (help, bare pointer) also uses or "en-US".
+- Roles: entrypoints/slack_roles.py:107 locale = payload.user_locale or "en-US" (modal, replies); :143 locale = metadata locale or "en-US" at submission; :161-166 announce lambda renders one locale; service/roles.py:75 and :141 announce: Callable[[IncidentRole, str], str], posted at :147.
+- Close: entrypoints/slack_archive.py:81-85 handle_close_command passes notice_languages=reply_languages(payload.user_locale) to _archive (:134-162), under a marker comment naming this task; the archive button already uses shared_languages (no notice_languages). Replies already via reply_languages (_render :206).
+- Default instance languages: [languages] shared = (en-US, fr-FR) (server/languages/settings.py:27, base.toml:25); no override in local/ci/production toml. CommandPayload.user_locale defaults to "en-US" (contracts/slack/models.py:143), and the Slack provider normalises it to en-US or fr-FR (integrations/slack/provider.py:915-971).
 
-Steps
-1. Pins first (red on main): edit the three legacy pins to the bilingual notice, each assertion with a comment citing "decisions/migration.md step 4 kind (b): i18n.md 2026-11-17, a post to a shared conversation is in English and French (TASK-145.8.9 named change)":
-   - tests/integration/legacy_surface/test_incident_status_command_surface.py:138 (status notice EN -> EN+FR)
-   - tests/integration/legacy_surface/test_incident_roles_surface.py:180-181, :191 (announcement EN -> EN+FR per role)
-   - tests/integration/legacy_surface/test_incident_close_command_surface.py:127-128 (status and archived notices EN -> EN+FR)
-   Plus a private-reply assertion in each pin's French case where one exists, or a unit test (step 4), showing the reply stays one language.
-2. Core helper (OQ1): features/incident/core/adapters/i18n.py gains OFFICIAL_LOCALES (tuple derived from infrastructure.i18n Locale, en-US first) and in_official_languages(line: Callable[[str], str]) -> str ("\n".join(line(locale) for locale in OFFICIAL_LOCALES)); re-exported by core/api.py beside translate. The adapter stays the umbrella's one import of infrastructure.i18n. The order is the Locale enum's (English first: CDS issues from Ottawa, TBS Directive 6.1.1); the docstring names TASK-118 as the owner of the configurable order (OQ2).
-3. Entry points:
-   - slack.py:143 notice = in_official_languages(lambda loc: _t("notice", loc, user=..., status=...)); replies keep locale.
-   - slack_roles.py:161-166 announce renders both lines, the role name translated per line; replies keep locale.
-   - slack_archive.py: _archive renders both notices with OFFICIAL_LOCALES and drops its locales parameter; the command path keeps (payload.user_locale,) for its refusal and stage lines only; _NO_LOCALE replaced by OFFICIAL_LOCALES.
-   - slack_show.py:72 _BOTH replaced by OFFICIAL_LOCALES (mechanical, ~3 lines, named in the PR body).
-4. Unit and integration tests edited to the bilingual notice, French replies kept French:
-   - tests/unit/features/incident/response/test_incident_response_status_entrypoint.py:92, :105 (FR invoker: notice EN+FR, reply FR)
+Steps (TDD: pins and tests red first, then code)
+1. Pins (named change, kind (b)): edit each assertion to the two-line notice, with a comment citing "decisions/migration.md step 4 kind (b): decisions/languages.md 2026-11-25 (i18n.md 2026-11-17), a post to a shared conversation is in the instance languages, in order (TASK-145.8.9 named change)":
+   - tests/integration/legacy_surface/test_incident_status_command_surface.py:138 (EN -> EN\nFR)
+   - tests/integration/legacy_surface/test_incident_roles_surface.py:172-191 (each announcement EN -> EN\nFR, one post per changed role)
+   - tests/integration/legacy_surface/test_incident_close_command_surface.py:126-129 (status and archived notices EN -> EN\nFR)
+2. Unit and integration tests edited to the bilingual notice, replies unchanged:
+   - tests/unit/features/incident/response/test_incident_response_status_entrypoint.py:92, :105 (FR invoker: notice EN\nFR, reply FR)
    - tests/integration/features/incident/response/test_incident_response_status_dispatch.py:110
-   - tests/unit/features/incident/response/test_incident_response_roles_entrypoint.py:246-248, :259 (FR submitter: announcement EN+FR, ephemeral FR), :295-296 unchanged
-   - tests/integration/features/incident/response/test_incident_response_roles_dispatch.py:148-149
-   - tests/unit/features/incident/response/test_incident_response_archive_entrypoint.py:152-153, :164-165 (FR invoker: notices EN+FR, reply FR); button tests :59/:61 unchanged
-   - new tests/unit/features/incident/core/test_incident_core_official_languages_render.py: in_official_languages renders English then French, one line each, each line from its own locale; OFFICIAL_LOCALES matches the catalogue locales (the parity gate's set).
-   - Service-level tests (status_change :40, archive_service :45-46, fields_update :34) take the notice as an argument: unchanged.
-5. Docs riding with the code: tests/integration/legacy_surface/INVENTORY.md rows for status (:124), roles (:125), close (:128) name the TASK-145.8.9 named change (b); features/incident/response/README.md :13, :52-57, :116-117 (channel notices English then French on every surface; replies in the invoker's locale); decisions/i18n.md (OQ5): Decision gains the order rule and the render rule; Checks extend the existing entrypoints grep to locale tuples; Migration names TASK-118 for the contract operation and the order setting; Changes line for TASK-145.8.9.
+   - tests/unit/features/incident/response/test_incident_response_roles_entrypoint.py:246-250, :254-259 (renamed: the announcements are in the instance languages and the submitter's notice in theirs; FR submitter: EN\nFR post, French ephemeral)
+   - tests/integration/features/incident/response/test_incident_response_roles_dispatch.py:147
+   - tests/unit/features/incident/response/test_incident_response_archive_entrypoint.py:152-171 (close: notices EN\nFR for EN and FR invokers; FR reply stays French); button tests :59, :226 unchanged
+   - New cases (same files): an instance configured fr-FR then en-US (incident_scopes with a ConfiguredLanguagePolicy override, tests/factories/incident.py:134) puts French first in the status notice, each roles announcement and both close notices; an instance configured with one language posts one line. A user locale outside the supported set (en-GB) gets the instance's first language in the status and roles replies.
+3. Status (entrypoints/slack.py): handle_status_update_command and handle_status_command take languages = reply_languages(payload.user_locale) for replies (render one line per reply language, like slack_archive._render); the notice is built inside incident_scope: MultilingualText.of(shared_languages(policy, conversation), lambda language: _t("notice", language, user=..., status=...)). The two `or "en-US"` defaults go. handle_status_command gains the scopes argument (registration wiring updated in register_*; the help path reads no store).
+4. Roles (entrypoints/slack_roles.py, service/roles.py): announce becomes Callable[[IncidentRole, str], str | MultilingualText] in service/roles.py (:75, :141, docstring :85 "in the conversation's shared languages"); the entry point builds MultilingualText.of(shared_languages(policy, conversation), lambda language: _t("announcement", language, user=..., role=_t(f"name.{role.value}", language))). The modal and replies use reply_languages: the command takes its first reply language for the modal and stores it in private_metadata as today; the submission reads reply_languages(metadata locale) for the field error and the private notice. The `or "en-US"` defaults go.
+5. Close (entrypoints/slack_archive.py): handle_close_command calls _archive without notice_languages; _archive drops the notice_languages parameter and the marker comment, so both paths take shared_languages. Replies unchanged.
+6. Docs riding with the code:
+   - decisions/languages.md: Context current state (:16) drops the "still post ... (TASK-145.8.9)" sentence; Migration drops the tolerated line "three incident channel notices in the invoker's language" and TASK-145.8.9 from Tickets; Changes line 2026-11-26.
+   - tests/integration/legacy_surface/INVENTORY.md rows :124 (status), :125 (roles), :128 (close) name the TASK-145.8.9 named change (b).
+   - features/incident/response/README.md: channel notices in the instance languages on every surface, replies in the user's language of choice.
 
 AC -> step -> test
-- AC #1 -> steps 2, 3 -> pins (step 1), status/roles/archive entrypoint and dispatch tests, core helper test. "No second copy of a string": no catalogue edit; every line comes from translate per locale.
-- AC #2 -> step 3 (reply locale untouched) -> the French-invoker unit tests of status, roles, close (step 4).
-- AC #3 -> step 1 comments + PR body list -> the three edited pins.
-- AC #4 -> gates: ruff, lint-imports (make check-import-contracts), make check-settings-key-ownership, check-package-shape, check-test-seams; mypy then pytest once each at the end.
+- AC #1 -> steps 3, 4, 5 -> the three pins (step 1), status/roles/archive entrypoint and dispatch tests, the French-first and one-language cases (step 2).
+- AC #2 -> steps 3, 4 (replies via reply_languages), 5 (unchanged) -> the French-invoker tests and the en-GB case (step 2).
+- AC #3 -> step 1 comments and the PR body list -> the three edited pins.
+- AC #4 -> gates at the end.
+- AC #5 (new) -> steps 3-5 -> grep evidence in the notes.
 
 Test matrix
-- happy: EN invoker and FR invoker each get EN+FR notices (status, each role, close's two notices).
-- boundary: roles with several changed roles: one bilingual post per role; close where the status notice is skipped (channel not writable) still reports the stage line in the invoker's locale.
-- failure: post failure stage lines (status.channel_failed, roles.announcements_failed, archive.notice_failed) stay in the invoker's locale (existing tests, unchanged expectations).
-- authorization/idempotency: unchanged (no new path).
+- happy: EN and FR invokers each get EN\nFR notices (status, each changed role, both close notices); replies in the invoker's language.
+- boundary: instance order fr-FR, en-US puts French first; one configured language posts one line; several changed roles give one two-line post per role; unchanged roles post nothing.
+- failure: refusals and stage lines (status.channel_failed, roles.announcements_failed, archive.notice_failed, not writable) stay in the reply language (existing tests, unchanged expectations); a user locale outside the supported set is answered in the instance's first language.
+- authorization and idempotency: unchanged (no new path, no new write).
 
-Named changes (PR body)
-- (b) /sre incident status update's channel notice in English and French (legacy: English only; TASK-145.8.4 AC #6: invoker's locale). Revert target: the squash commit.
-- (b) the roles announcement in English and French (TASK-145.8.5.1: submitter's locale).
-- (b) /sre incident close's status and archived notices in English and French (TASK-145.8.5.3: invoker's locale; the button already bilingual).
+Named changes (PR body, kind (b), revert target the squash commit)
+- /sre incident status update's channel notice in the instance languages (legacy: English; TASK-145.8.4 AC #6: the invoker's language).
+- The roles announcement in the instance languages (TASK-145.8.5.1: the submitter's language).
+- /sre incident close's status and archived notices in the instance languages (TASK-145.8.5.3: the invoker's language; the archive button already uses them).
+With the default configuration a status change, a role change and a close now read the same from the modal, the button and the commands.
 
-Size: production ~45 LOC over 6 files (core adapters/i18n.py, core/api.py, slack.py, slack_roles.py, slack_archive.py, slack_show.py); tests ~9 files; docs 3. One subsystem (incident response). Under the gate.
+Size: production about 50 LOC over 4 Python files (entrypoints/slack.py, slack_roles.py, slack_archive.py, service/roles.py) plus 3 docs (languages.md, INVENTORY.md, response README.md); tests about 7 files. One subsystem (incident response). Under the gate.
 
-Domain-model gate: not applicable (no entity, port or stored shape changes; the service ports already take rendered text).
+Domain-model gate: not applicable (no entity, port, stored shape or setting changes; post already takes MultilingualText; the roles announce callable widens its return type only).
 
 Assumptions to verify at implementation
-- A1 Slack renders "\n" in a chat.postMessage text as a line break (already true for the field notice and the button notices in production since #1867/#1857).
-- A2 infrastructure.i18n Locale has exactly en-US and fr-FR (models.py:11-17); the helper test pins the order.
+- A1 Slack shows the "\n" of plain_text() as a line break (true for the field notice and archive button since #1867/#1887).
+- A2 No other caller of handle_status_command or of the roles announce callable outside response (rg at implementation).
 
-Blast radius and rollback: the text of three channel posts in every incident (two lines instead of one). Nothing stored, no ids, no buttons. Wrong ship: a malformed line (missing key shows the key, the neutral fallback). One git revert restores the single-locale notices. No ordering constraint; no terraform, no settings.
+Blast radius and rollback: the text of three channel posts in every incident (one line per instance language instead of the invoker's); nothing stored, no ids, no buttons, no settings, no terraform. Wrong ship: a malformed line (a missing key shows the key, the neutral fallback). One git revert restores the old notices. No ordering constraint with other open PRs (#1888 and Lane B's W1 touch none of these files). If production's [languages] shared order changes later (separate config PR), these notices follow it with no code change.
 
-Open questions, assessed at program scope (re-assessed 2026-11-25 on request: decisions/, doc-11, doc-15, doc-16, doc-17, prior and upcoming tasks, cited practice)
+Open questions (assessed at program scope: decisions/languages.md, i18n.md, migration.md; doc-11 rows 18.L6c.0, 18.L9b, 18.L10b, doc-15 165.x, doc-17)
+- OQ1 Replies of status and roles onto reply_languages. ADR: languages.md Decision (direct interactions in the user's language of choice, matched by the policy) and Checks (no language tag literals in app/features/). Today slack.py and slack_roles.py default to a literal "en-US". Prior: show and archive already moved (TASK-193). Recommend: move them here (steps 3, 4); no visible change with the default config and normalised Slack locales; one more test case. Alternative: leave them (keeps four "en-US" literals the ADR's grep forbids, owned by no task).
+- OQ2 TASK-189 (closing UX design session, To Do). languages.md applies to any redesigned close; the change here is one removed parameter. Recommend: keep close in scope (carried from 2026-11-25); no edit to TASK-189.
+- OQ3 The D3 gap on TASK-118 (provider maps fr-CA and any other Slack locale to en-US before an entry point sees it). Weighed: passing the raw locale through here would change every slash command in every feature, not only incident; most features still call t(key, locale) directly, and t() has no primary-subtag fallback, so a raw fr-CA would reach users as the key (TASK-193 finding). The fix needs the translator move TASK-118 owns (decisions/languages.md Migration, line 3). Recommend: out of scope; TASK-118 keeps it as a named, user-visible change with its own announcement. This PR is correct for fr-CA users once TASK-118 lands, because the notices no longer depend on the invoker and the replies go through reply_languages.
+- OQ4 Comments on upcoming shared posts (145.7.10, 165, 145.9.2, 145.10, 192): TASK-193 already left them on 2026-11-25 (use LanguagePolicy and MultilingualText). Recommend: no further comments.
+- OQ5 AC #4 reworded to the current gate list; AC #1/#2 reworded from "English and French"/"actor's locale" to the instance languages and reply languages; new AC #5. Title "in English and French" -> "in the instance languages". Applied after approval.
 
-OQ1 Where the bilingual render lives.
-- ADR: i18n.md Decision: the translator is a framework service, its contract in app/contracts/, implementation in app/server/; Checks: "no dict keyed by locale or language (en-US, fr-FR tables) in any entrypoints/ module" (the existing _BOTH, slack_show.py:72, and _NO_LOCALE, slack_archive.py:41, are locale tables in entrypoints, against the Check's intent). Migration tolerates features importing infrastructure/i18n directly until the contract exists. incident-management.md:48: core/ reached only through core/api.py.
-- Prior: four copies of the pair: server/slack/tenant_guard.py:35 NOTICE_LOCALES, slack_archive.py:41, slack_show.py:72, legacy modules/incident/incident_conversation.py:383. TASK-145.2 put the umbrella's one translator import in core/adapters/i18n.py, re-exported by core/api.
-- Upcoming: TASK-118 (doc-11 P7/C5; To Do; waits 117, 72, 109) defines the contract and repoints every importer; no AC on rendering several locales. Consumers of a bilingual render inside the incident umbrella: 145.9.2 (stale notice, ignore reply), 145.7.10 (declare's channel posts, L9b), Stack M (doc-17) M3/M4 postmortem posts (145.10 D6 "English first line", 145.10.6 AC #3 "bilingual posts"), 192 (reminders), and doc-15's 165.x posts (engagement, workstreams, audiences: no locale line in any 165.x task; i18n.md applies to them by default).
-- Practice: frameworks keep one translator and render a message in another language by overriding the active locale per call (Django translation.override, https://docs.djangoproject.com/en/5.2/topics/i18n/translation/); a message in several languages is one render per locale, never a second copy of the string.
-- Gap: the contract (TASK-118) does not yet offer the operation; the incident umbrella needs it now.
-- Recommend: in_official_languages in core/adapters/i18n.py through core/api (one subsystem; postmortem and the coordinated subdomains reach it through core/api), replace _BOTH and _NO_LOCALE here, and add to TASK-118 an AC: the translator contract renders a line in every official language in the configured order; the incident core helper and server/slack/tenant_guard.py NOTICE_LOCALES repointed to it. Alternative A: put it in infrastructure/i18n now (platform-wide at once, but grows a module TASK-118 deletes, and repointing tenant_guard makes three subsystems). Alternative B: local tuples per entry point (two more copies against the i18n.md Check).
+AC changes proposed (after approval)
+- #1 change_status's channel notice, the roles announcement and /sre incident close's status and archived notices are posted as MultilingualText in the conversation's shared_languages, in order, each line from its own catalogue (no second copy of a string)
+- #2 Private replies of the same surfaces use reply_languages for the user's locale
+- #4 ruff, mypy (no new errors in touched files), make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams and pytest tests --ignore=tests/smoke pass
+- #5 (new) No language tag literal and no notice_languages override remain in incident/response entrypoints; decisions/languages.md no longer tolerates the three notices
 
-OQ2 Line order, and whether the language set or order is a setting.
-- ADR: i18n.md says "English and French" but never the order. GAP. Prior: every bilingual surface puts English first (tenant guard, archive button, field notice; 145.10 D6 ruled "English first line" for postmortem only).
-- Practice: TBS Directive on Official Languages for Communications and Services 6.1.1: when both languages are used, French comes first when the issuing office is in Quebec (https://www.tbs-sct.canada.ca/pol/doc-eng.aspx?id=26164); otherwise English comes first; where requirements conflict the department's head of communications decides (FIP design standard, https://www.canada.ca/en/treasury-board-secretariat/services/government-communications/design-standard/treatment-official-languages-design-standard-fip.html). Short bilingual communications may be top-bottom with equal prominence (TBS HR guide); both versions complete, same quality, released together (rescinded 2012 electronic communications directive, https://tbs-sct.gc.ca/pol/doc-eng.aspx?id=12527).
-- So the set of languages is fixed by law and by the parity gate (i18n.md:29): a constant derived from the catalogue Locale set. The order depends on the deploying office: a policy value, so a typed setting with a default (standing rule: policy values are settings unless they must never change).
-- Owner: the order is platform-wide (the tenant guard's notice is a server/ surface), so the setting belongs to the host translator (TASK-118), not incident common/settings.py.
-- Recommend: i18n.md Decision gains: "Lines in both official languages are one message, top-bottom, each complete from its own catalogue, in the order of the TBS Directive 6.1.1: French first where the issuing office is in Quebec, otherwise English first; the deployment sets the order in one host setting (default English first)." This task uses the Locale enum order (English first, CDS in Ottawa). TASK-118 gains the AC: "[i18n] official-language order is a typed host setting, default en-US then fr-FR, validated against the catalogue locales at boot". Alternative: add the setting now in an incident slice (wrong owner, tenant guard not covered, moved again by 118).
-
-OQ3 TASK-189 (closing UX design session, To Do, may replace /sre incident close and the archive button). ADR: i18n.md applies to any redesigned close that posts to the channel. Not a conflict: the change is two render calls in slack_archive.py. Recommend: keep close in scope; TASK-189 gets no edit.
-
-OQ4 Upcoming shared posts outside this task. ADR: i18n.md:31 already rules; no gap. Upcoming tasks that post to shared conversations without a locale line: 145.7.10 (declare's DeclareTexts: announcement, severity warning, next steps, on-call notice; its locale toggle sets the modal and private replies only), 165 (doc-15: engagement, workstreams, audiences). Tasks already bilingual: 145.9.2, 145.10/145.10.6 (Stack M), 192. Recommend comments, no AC changes: 145.7.10 (channel posts through core.api in_official_languages; private replies in the toggle/opener locale), 165 parent (shared posts through the same render), 145.9.2, 145.10 and 192 (use the helper; order per i18n.md). Stack M's doc-17 needs no edit (M3/M4 planning reads the task comment).
-
-OQ5 ADR edits riding with this PR. i18n.md: Decision (OQ2 order rule; "a shared-conversation post renders through the translator's official-languages operation"), Checks (extend the entrypoints grep: no locale tuple such as ("en-US", "fr-FR") in entrypoints/; bilingual lines through the render), Migration (TASK-118 owns the contract operation and the order setting; the incident core helper is tolerated until then), Changes 2026-11-25. No incident-management.md edit.
-
-OQ6 AC #4 reworded to the current gate list: "ruff, mypy (no new errors in touched files), make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams and pytest tests --ignore=tests/smoke pass". New AC #5: "No locale tuple remains in incident/response entrypoints; shared-channel lines render through core.api in_official_languages".
-
-Task edits applied only after approval: 145.8.9 AC #4 reworded and AC #5 added; TASK-118 two ACs (OQ1, OQ2); comments on 145.7.10, 165, 145.9.2, 145.10, 192; doc-11 row 18.L6c.
-
-User announcement: yes (end users see two-line notices); written at implementation per delivery-session user-announcement.md.
+User announcement: yes (every incident channel sees two-line notices on status update, role changes and close); written at implementation per delivery-session user-announcement.md. No developer change notice (no API, setting or contract change).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 implemented (TDD) on task-145.8.9-bilingual-channel-notices, plan approved as recommended (OQ1-OQ5).
+What landed:
+- entrypoints/slack.py: the status notice is MultilingualText.of(shared_languages(policy, conversation), ...) built inside incident_scope; replies through reply_languages (_render, one line per reply language); handle_status_command takes the scope opener (registered through a closure like status update); the two "en-US" defaults removed.
+- entrypoints/slack_roles.py: each announcement is MultilingualText in the conversation's shared languages; the modal opens in the first reply language (stored in private_metadata as before); the field error and private notice use reply_languages of the metadata locale; the two "en-US" defaults removed. service/roles.py: announce returns str | MultilingualText.
+- entrypoints/slack_archive.py: the command's notice_languages override and its marker comment removed; both close paths take shared_languages.
+- Docs: decisions/languages.md (current state, the tolerated line and the ticket removed, Changes 2026-11-26); legacy_surface INVENTORY.md rows for status, roles and close name the TASK-145.8.9 named change (b); response README (every channel post in the shared languages).
+- Pins edited citing decisions/migration.md step 4 kind (b): status command surface (5 statuses), roles surface (2 tests), close command surface (1 test). New cases: French-first order, one-language instance, unsupported locale (de-DE) answered in the instance's first language, French submitter's private notice stays French, close command on a French-first instance.
+AC #5 evidence: rg '"en-US"|"fr-FR"' features/incident/response --type py: no match; notice_languages remains only as slack_show's local name for shared_languages (not an override).
+Size: 4 production Python files, about 50 net production LOC; one subsystem.
+Evidence (from app/): uv run ruff check . -> All checks passed!; make check-import-contracts -> Contracts: 15 kept, 0 broken; check-settings-key-ownership -> OK; check-package-shape -> OK (2 baselined); check-test-seams -> OK (47 strict, 12 legacy pin baselined); uv run mypy . -> Found 33 errors in 11 files (pre-existing count as on TASK-193; mypy features/incident/response: no issues in 23 files); uv run pytest tests --ignore=tests/smoke -> 8075 passed.
+User-visible: announcement and screenshot list in the PR body. No change notice. In Progress until the PR merges.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 
@@ -153,3 +156,9 @@ created: 2026-11-25T19:10:00Z
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Status, roles and close channel notices post in the instance languages (MultilingualText from shared_languages); status and roles replies and the roles modal use reply_languages; three pins edited as kind (b) named changes; decisions/languages.md no longer tolerates them. Ships with the delivery-session change notice and the task-close-with-PR rule.
+<!-- SECTION:FINAL_SUMMARY:END -->

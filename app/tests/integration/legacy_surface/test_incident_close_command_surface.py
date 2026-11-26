@@ -12,7 +12,8 @@ conversation, seeded as the legacy edges were.
 
 Named changes, cited where a pin was edited: the command names the invoker's locale, so a
 refusal is in that one language (kind b, decisions/i18n.md; the legacy reply was English and
-French), and a channel with no incident record is refused by the record (kind b).
+French), a channel with no incident record is refused by the record (kind b), and the
+status and archived notices are in the instance languages (kind b, decisions/languages.md).
 """
 
 import asyncio
@@ -123,9 +124,11 @@ def test_close_closes_the_incident_announces_it_and_archives_the_channel(surface
     assert surface.report_status() == "Closed"
     assert surface.list_status() == "Closed"
     assert surface.stored_status() is IncidentStatus.CLOSED
+    # decisions/migration.md step 4 kind (b): decisions/languages.md 2026-11-25 (i18n.md 2026-11-17), a post to a
+    # shared conversation is in the instance languages, in order (TASK-145.8.9 named change; legacy: English only).
     assert surface.channel_messages() == [
-        f"<@{USER_ID}> has updated the incident status to Closed.",
-        f"<@{USER_ID}> has archived this channel 👋",
+        f"<@{USER_ID}> has updated the incident status to Closed.\n<@{USER_ID}> a changé le statut de l'incident à Closed.",
+        f"<@{USER_ID}> has archived this channel 👋\n<@{USER_ID}> a archivé ce canal 👋",
     ]
     assert surface.archived()
 
