@@ -4,7 +4,7 @@ title: 'Webhooks slice 2.1: event model and engines (dark)'
 status: In Progress
 assignee: []
 created_date: '2026-11-25T20:47:00Z'
-updated_date: '2026-11-26T13:47:00Z'
+updated_date: '2026-11-26T18:52:00Z'
 labels:
   - migration
   - webhooks
@@ -195,6 +195,8 @@ No task id in any .py file (migration.md rule 7). No deploy-checks: no terraform
 
 - Full pytest (under the shared lock): the first run gave 1 failed, 8294 passed. The failure was tests/integration/server/test_lifespan_plugin_loading.py, whose exact enabled-plugin set now includes webhooks; that one line was fixed. Rerun: 8295 passed, 232 warnings in 267.71s.
 Ready to commit; stays In Progress while its PR is open.
+
+2026-11-26 (TASK-37.2.3 planning, human-approved S1): Destination is a workplace reference, Destination(system: WorkplaceSystem, tenant, conversation_id, triage), never a bare channel id (workplace-systems.md rule 4); validated on construction; webhooks.md 5a and a Changes line updated.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

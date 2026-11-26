@@ -6,6 +6,7 @@ A stored instance is untrusted: unknown, repeated or excess ids are skipped and 
 import pytest
 
 from capabilities.webhooks.domain.kinds import AuthTier, Destination, Owner, SenderKind, WebhookInstance, resolve_kinds
+from contracts.workplace import WorkplaceSystem
 from tests.unit.capabilities.webhooks.conftest import build_kind, kind_document
 
 pytestmark = pytest.mark.unit
@@ -19,7 +20,7 @@ def _instance(*kind_ids: str) -> WebhookInstance:
         auth_tier=AuthTier.LEGACY,
         protocol="aws_sns",
         sender_kinds=kind_ids,
-        destinations=(Destination(channel="C123", triage=True),),
+        destinations=(Destination(system=WorkplaceSystem.SLACK, tenant="T123", conversation_id="C123", triage=True),),
     )
 
 

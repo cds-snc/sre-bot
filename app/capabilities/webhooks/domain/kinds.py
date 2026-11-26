@@ -14,6 +14,7 @@ from jsonpath import JSONPath
 from liquid import Template
 
 from capabilities.webhooks.domain.events import EventType, JsonDocument, Scalar
+from contracts.workplace import WorkplaceSystem
 
 
 class ConditionOp(StrEnum):
@@ -140,10 +141,24 @@ class Owner:
 
 @dataclass(frozen=True)
 class Destination:
-    """Where an instance posts, and whether triage consumers apply to its alerts."""
+    """Where an instance posts, and whether triage consumers apply to its alerts.
 
-    channel: str
+    A workplace reference, never a bare vendor id (decisions/workplace-systems.md rule 4):
+    the system picks the poster and, with the tenant, names the conversation the language
+    policy is asked about.
+    """
+
+    system: WorkplaceSystem
+    tenant: str
+    conversation_id: str
     triage: bool = False
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.system, WorkplaceSystem):
+            raise ValueError(f"system must be a WorkplaceSystem member, got {self.system!r}")
+        for name in ("tenant", "conversation_id"):
+            if not getattr(self, name).strip():
+                raise ValueError(f"{name} must not be blank")
 
 
 @dataclass(frozen=True)
