@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-28 18:40
-updated_date: '2026-11-25T20:54:00Z'
+updated_date: '2026-11-26T13:19:00Z'
 labels:
   - migration
   - webhooks
@@ -58,6 +58,9 @@ Change notice: none (dark slice, packet section 7.4).
 - [ ] #6 The incident feature registers an alert consumer that contributes the triage actions; webhooks core imports no feature and the button contract is unchanged (test)
 - [ ] #7 A CODEOWNERS entry exists for each app/content/<owner>/ folder when its first content lands, and a check fails when a folder under app/content/ has no CODEOWNERS entry (check)
 - [ ] #8 The slice is dark: no instance uses the kinds and no route is mounted (review)
+- [ ] #9 Each kind's bot-worded templates hold en-US and fr-FR wording, the French reviewed by a human before merge; parity tests compare the en-US part (test + review)
+- [ ] #10 A kind whose handler: id no plugin registered fails boot naming the file (test)
+- [ ] #11 The Notify package's product area is named; the webhooks enablement key sits in that area's table, or in [plugins.shared] when its consumers span areas (check)
 <!-- AC:END -->
 
 ## Comments
@@ -98,6 +101,17 @@ created: 2026-11-25T20:54:00Z
 ---
 
 Carried from TASK-168 comment #4 (2026-11-25, human, TASK-193 approved): bot-authored wording (headers, buttons, titles the bot writes) is MultilingualText from LanguagePolicy; sender-supplied alert content (AWS, other senders) keeps its source language, placed once (decisions/languages.md). Applies to the incident alert consumer's triage actions and any bot-authored wording in the sender-kind templates.
+
+---
+
+created: 2026-11-26T13:19:00Z
+
+---
+
+2026-11-26 (TASK-37.2.1 planning, human-approved P2 and P5).
+- P2: each kind's bot wording (title, summary, link labels) is one Liquid template per supported language (en-US and fr-FR), required by the kind's model; the French wording of the 11 kinds needs a human review before merge; parity tests compare the en-US part with the legacy English output; sender text goes in details, once.
+- P5: OQ8 names the Notify key-revocation package's product area; if it is not incident response, the webhooks enablement key moves from [plugins.incident_response] to [plugins.shared] in this task (plugins.md 2026-11-06).
+- The boot check that a kind's handler: id was registered by a plugin lands here, with the first handler (TASK-37.2.3 collects handlers).
 
 ---
 <!-- COMMENTS:END -->

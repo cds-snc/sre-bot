@@ -300,6 +300,7 @@ sheet_id = ""
 oncall_sync = true
 oncall = true
 ai_writing = true
+webhooks = true
 
 [plugins.cloud_operations]
 # No plugin yet: the AWS surfaces are still legacy modules (TASK-88).
@@ -320,3 +321,21 @@ rant = true
 root = "content"
 max_file_bytes = 16384
 max_items_per_kind = 200
+
+[webhooks]
+# Limits on webhook sender-kind content and on what its engines produce (decisions/webhooks.md Content rules).
+max_kind_file_bytes = 16384
+max_kinds = 200
+max_kinds_per_instance = 20
+max_conditions = 50
+max_condition_depth = 2
+max_extracted_fields = 30
+max_field_value_chars = 4096
+max_list_items = 50
+max_url_chars = 2048
+max_template_chars = 2048
+max_title_chars = 150
+max_loop_iterations = 100
+max_render_chars = 3000
+max_context_depth = 10
+email_lookups_per_message = 10

@@ -32,6 +32,8 @@ dependencies = [
     "uvicorn>=0.54.0",
     "email-validator>=2.3.0",
     "svcs>=26.2",
+    "python-liquid>=3.0.0",
+    "python-jsonpath>=2.2.2",
 ]
 
 # One line per feature plugin (decisions/plugins.md); the group is PLUGIN_NAMESPACE.
@@ -48,6 +50,7 @@ oncall_sync = "packages.oncall_sync"
 rant = "packages.rant"
 oncall = "capabilities.oncall.plugin"
 ai_writing = "capabilities.ai_writing.plugin"
+webhooks = "capabilities.webhooks.plugin"
 
 [tool.ruff]
 target-version = "py314"
@@ -454,6 +457,7 @@ protected_modules = [
     "packages.rant",
     "capabilities.oncall.plugin",
     "capabilities.ai_writing.plugin",
+    "capabilities.webhooks.plugin",
 ]
 allowed_importers = []
 unmatched_ignore_imports_alerting = "error"
@@ -488,3 +492,18 @@ name = "(o) integrations.openai is imported only by the AI writing OpenAI adapte
 type = "protected"
 protected_modules = ["integrations.openai"]
 allowed_importers = ["server", "capabilities.ai_writing.adapters.openai"]
+
+[[tool.importlinter.contracts]]
+id = "webhooks-core-no-slack"
+name = "(p) the webhooks capability core imports no Slack SDK; Slack shapes live only in its adapters"
+# decisions/webhooks.md Checks: no slack_sdk or WebClient import and no Block Kit construction in the
+# capability core. List each core module here as it lands; adapters/ is the only exception.
+type = "forbidden"
+source_modules = [
+    "capabilities.webhooks.api",
+    "capabilities.webhooks.domain",
+    "capabilities.webhooks.plugin",
+    "capabilities.webhooks.schemas",
+    "capabilities.webhooks.settings",
+]
+forbidden_modules = ["slack_sdk", "slack_bolt"]
