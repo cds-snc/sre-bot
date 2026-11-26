@@ -4,14 +4,14 @@ title: Action-item status sync from GitHub through the webhooks capability
 status: To Do
 assignee: []
 created_date: 2026-10-13 14:00
-updated_date: '2026-11-25T20:53:00Z'
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - incident
   - features
 dependencies:
   - TASK-147.4
   - TASK-37.4.3
-  - TASK-37.2.1
+  - TASK-37.2.3
 references:
   - https://github.com/cds-snc/sre-bot/issues/1710
 parent_task_id: TASK-147

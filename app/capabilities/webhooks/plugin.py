@@ -5,9 +5,14 @@ startup-driven and side effect free at import time: only decorated hookimpls
 are defined here (decisions/plugins.md).
 """
 
-from capabilities.webhooks.schemas import SENDER_KINDS_NAME, SENDER_KINDS_OWNER, SenderKindFile, build_sender_kind
-from capabilities.webhooks.settings import content_settings
-from contracts.content import ContentKind, ContentKindRegistrar
+from pathlib import Path
+
+from capabilities.webhooks.hookspecs import WebhooksSpecs
+from capabilities.webhooks.schemas import sender_kinds_content_kind
+from capabilities.webhooks.service import WebhookExtensions, initialize_extensions
+from contracts.content import ContentKindRegistrar
+from contracts.i18n.resources import I18nResourceRegistrar, I18nResourceSpec
+from contracts.plugins.extension_points import ExtensionPoint, ExtensionPointRegistrar
 from contracts.plugins.namespace import hookimpl
 from contracts.plugins.requirements import Requirement
 
@@ -21,14 +26,24 @@ def register_requirements() -> list[Requirement]:
 @hookimpl
 def register_content_kinds(registrar: ContentKindRegistrar) -> None:
     """Register the sender kinds, optional until the first kinds ship."""
-    settings = content_settings()
-    registrar.register(
-        ContentKind(
-            owner=SENDER_KINDS_OWNER,
-            name=SENDER_KINDS_NAME,
-            model=SenderKindFile,
-            build=build_sender_kind,
-            max_file_bytes=settings.max_kind_file_bytes,
-            max_items=settings.max_kinds,
+    registrar.register(sender_kinds_content_kind())
+
+
+@hookimpl
+def register_i18n_resources(registry: I18nResourceRegistrar) -> None:
+    """Register the capability's catalogue: the bot's own wording, such as the fallback header."""
+    registry.register(
+        I18nResourceSpec(
+            owner="capabilities.webhooks",
+            path=str(Path(__file__).parent / "locales"),
+            required=False,
+            format="yaml",
+            domain="webhooks",
         )
     )
+
+
+@hookimpl
+def register_extension_points(registrar: ExtensionPointRegistrar) -> None:
+    """Declare the event-consumer extension point; an empty point is valid (the poster serves)."""
+    registrar.declare(ExtensionPoint(specs=WebhooksSpecs, provides=WebhookExtensions, initialize=initialize_extensions))

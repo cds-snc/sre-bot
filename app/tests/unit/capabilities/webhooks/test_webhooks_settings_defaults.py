@@ -58,3 +58,8 @@ def test_content_is_checked_against_the_defaults_without_configuration(monkeypat
 
     assert content_settings().limits() == WebhooksSettings.model_construct().limits()
     assert content_settings().max_conditions == 50
+
+
+def test_a_post_attempt_fits_inside_the_inline_deadline() -> None:
+    """Each platform call gets its own short timeout, so a post and the lookups fit one delivery."""
+    assert get_webhooks_settings().post_attempt_timeout_seconds == 2

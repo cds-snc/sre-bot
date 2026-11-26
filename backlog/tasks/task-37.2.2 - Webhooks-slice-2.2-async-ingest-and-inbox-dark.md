@@ -4,7 +4,7 @@ title: 'Webhooks slice 2.2: async ingest and inbox (dark)'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
-updated_date: '2026-11-26T13:23:00Z'
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - migration
   - webhooks
@@ -67,6 +67,12 @@ Change notice: none (dark slice, packet section 7.4).
 - [ ] #10 The slice is dark: no route is mounted and production behaviour is unchanged; make check-import-contracts is green with no new ignore entry (check)
 - [ ] #11 Protocol decoders parse JSON strictly (RFC 7493): a duplicate key, NaN or Infinity, a lone surrogate, a non-finite number or nesting past the depth limit answers 400 (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved): the processor resolves each destination's languages through LanguagePolicy before rendering, posts through the ChannelPoster for the destination's WorkplaceSystem (a destination with no poster, or slack.passthrough to a non-Slack destination, is skipped and reported), gathers consumer actions only where the destination sets triage, and sets the item's retry_at from a 429's retry_after (the inbox is the one retry point; posts are never retried in process).
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

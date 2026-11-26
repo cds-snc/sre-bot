@@ -36,6 +36,11 @@ class WebhooksSettings(ConfigurationSlice):
     email_lookups_per_message: int = Field(
         default=10, ge=1, description="Most distinct email addresses resolved to mentions in one message."
     )
+    post_attempt_timeout_seconds: int = Field(
+        default=2,
+        ge=1,
+        description="Timeout of one platform call while posting (a post or a mention lookup); posts are retried by the inbox, never in process.",
+    )
 
     def limits(self) -> WebhookLimits:
         """Return the limits as the frozen value the engines take."""

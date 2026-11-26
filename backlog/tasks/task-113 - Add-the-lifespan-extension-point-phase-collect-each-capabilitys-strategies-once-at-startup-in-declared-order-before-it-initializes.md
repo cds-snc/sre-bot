@@ -3,10 +3,10 @@ id: TASK-113
 title: >-
   Add the lifespan extension-point phase: collect each capability's strategies
   once at startup, in declared order, before it initializes
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-09-24 19:59
-updated_date: '2026-11-26T14:35:00Z'
+updated_date: '2026-11-26T19:06:00Z'
 labels:
   - plugin-architecture
   - plugins
@@ -103,3 +103,9 @@ PS6 (other consumers). (a) TASK-131 and authorization.md:32 declare permission i
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-26, implemented (TDD) on task-113-host-extension-points from origin/main 876f7f7f. Production: contracts/plugins/extension_points.py (ExtensionPoint[T], ExtensionPointContext, ExtensionPointRegistrar), the register_extension_points hookspec on FeatureLifecycleSpecs, server/plugins/extension_points.py (run_extension_points: per-plugin registrar refusing non-capabilities and second declarations; add_hookspecs with PluginValidationError attributed to its plugin; graphlib order over depends_on with load-order ties, cycle and undeclared dependency refused; duplicate provides refused; collect limited to the point's own hooks and closed after initialize, resolver closed too, service_scopes kept; one INFO extension_points_initialized, DEBUG per point), and server/lifespan.py (phase 4 after i18n, before feature registration). collect returns one result per contributing plugin (pluggy allows one hookimpl per plugin per hook), typed Mapping[str, object]: the capability validates contributed values. ADRs: plugins.md, lifecycle.md, plugin-architecture.md, dependency-injection.md, approvals.md, each with a Changes line. Tests: inventory test, 18 unit tests (test_server_plugins_extension_points_initialize.py), 2 lifespan integration tests; the ci boot INFO budget rises 10 -> 11 for the new phase event. Gates: ruff clean; check-import-contracts 15 kept; settings ownership, package shape, test seams OK; mypy 33 errors in 11 untouched files, pre-existing, none in touched files. Conflicts to expect: #1889 (hookspecs.py, the inventory test, lifespan.py, plugins.md's hookspec list line); whichever merges second rebases, and content loading goes before run_extension_points.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Merged in #1894 (d886a357, 2026-11-26): lifecycle phase 4 runs each capability's extension point once, in depends_on order, after plugin loading, i18n and provisioned content and before feature registration; register_extension_points, ExtensionPoint, ExtensionPointRegistrar and ExtensionPointContext in contracts/plugins; ADRs updated. All ACs checked; no human post-deploy step (no extension point is declared until TASK-37.2.3).
+<!-- SECTION:FINAL_SUMMARY:END -->

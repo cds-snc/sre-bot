@@ -55,28 +55,44 @@ def get_slack_web_client(*, actor: SlackActor = "bot") -> WebClient:
     )
 
 
-def get_async_slack_web_client() -> AsyncWebClient:
-    """Build an async Web client for the bot token."""
+def get_async_slack_web_client(*, timeout_seconds: int | None = None, retries: int | None = None) -> AsyncWebClient:
+    """Build an async Web client for the bot token.
+
+    A caller bounded by its own deadline passes ``timeout_seconds`` and ``retries``
+    (0 builds no retry handler); every other caller keeps the configured values.
+    """
     settings = get_slack_settings()
-    retries = settings.retry_max_attempts
+    budget = settings.retry_max_attempts if retries is None else retries
+    handlers = (
+        [
+            AsyncConnectionErrorRetryHandler(max_retry_count=budget),
+            AsyncRateLimitErrorRetryHandler(max_retry_count=budget),
+            AsyncServerErrorRetryHandler(max_retry_count=budget),
+        ]
+        if budget > 0
+        else []
+    )
     return AsyncWebClient(
         token=settings.bot_token.get_secret_value(),
-        timeout=settings.request_timeout_seconds,
-        retry_handlers=[
-            AsyncConnectionErrorRetryHandler(max_retry_count=retries),
-            AsyncRateLimitErrorRetryHandler(max_retry_count=retries),
-            AsyncServerErrorRetryHandler(max_retry_count=retries),
-        ],
+        timeout=settings.request_timeout_seconds if timeout_seconds is None else timeout_seconds,
+        retry_handlers=handlers,
     )
 
 
-def get_async_slack_write_client() -> AsyncWebClient:
-    """Build the async bot write handle, which retries only rate-limited requests."""
+def get_async_slack_write_client(*, timeout_seconds: int | None = None, rate_limit_retries: int | None = None) -> AsyncWebClient:
+    """Build the async bot write handle, which retries only rate-limited requests.
+
+    A caller that owns durable retry passes ``rate_limit_retries=0`` so a 429 is
+    returned to it instead of slept on, and its own ``timeout_seconds``
+    (decisions/outbound-clients.md: one retry point); every other caller keeps the
+    configured values.
+    """
     settings = get_slack_settings()
+    budget = settings.retry_max_attempts if rate_limit_retries is None else rate_limit_retries
     return AsyncWebClient(
         token=settings.bot_token.get_secret_value(),
-        timeout=settings.request_timeout_seconds,
-        retry_handlers=[AsyncRateLimitErrorRetryHandler(max_retry_count=settings.retry_max_attempts)],
+        timeout=settings.request_timeout_seconds if timeout_seconds is None else timeout_seconds,
+        retry_handlers=[AsyncRateLimitErrorRetryHandler(max_retry_count=budget)] if budget > 0 else [],
     )
 
 

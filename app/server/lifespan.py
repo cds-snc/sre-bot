@@ -47,6 +47,7 @@ from server.configuration import HostConfiguration
 from server.configuration.loader import CONFIG_DIR
 from server.configuration.summary import summarize
 from server.configured_systems import read_configured_systems
+from server.i18n.translator import register_translator
 from server.plugins.boot import call_hook_per_plugin, plugin_built_slices, reset_plugin_built_slices
 from server.plugins.extension_points import run_extension_points
 from server.plugins.manager import (
@@ -291,6 +292,8 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     load_provisioned_content(pm, registry, logger.bind(phase="content_loading"), get_content_settings(), CONFIG_DIR.parent)
 
     translation_service = _initialize_translation_service(pm, logger)
+    # Capabilities word their messages through the Translator contract, resolved from the registry.
+    register_translator(registry, translation_service)
     # Inject translation service into all platform providers and their formatters
     # before command registration so help-text translations work at startup.
     app.state.slack_provider.set_translator(translation_service.translator)

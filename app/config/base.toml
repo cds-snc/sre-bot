@@ -339,3 +339,4 @@ max_loop_iterations = 100
 max_render_chars = 3000
 max_context_depth = 10
 email_lookups_per_message = 10
+post_attempt_timeout_seconds = 2

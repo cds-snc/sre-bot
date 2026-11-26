@@ -93,7 +93,13 @@ def _module_name(plugin: object) -> str:
 
 
 def _add_specs(pm: pluggy.PluginManager, name: str, point: ExtensionPoint[Any], logger: BoundLogger) -> None:
-    """Add the point's hookspec class; pluggy verifies every hookimpl already registered for it."""
+    """Add the point's hookspec class; pluggy verifies every hookimpl already registered for it.
+
+    The plugin manager outlives one lifespan (an in-process restart, the test client), so a
+    class added by an earlier startup is not added again.
+    """
+    if _specs_added(pm, point.specs):
+        return
     try:
         pm.add_hookspecs(point.specs)
     except pluggy.PluginValidationError as error:
@@ -102,6 +108,14 @@ def _add_specs(pm: pluggy.PluginManager, name: str, point: ExtensionPoint[Any], 
     except Exception as error:
         log_plugin_boot_failed(logger, plugin=name, phase=PHASE, error=error)
         raise
+
+
+def _specs_added(pm: pluggy.PluginManager, specs: type) -> bool:
+    names = _hook_names(pm, specs)
+    callers = [getattr(pm.hook, name, None) for name in names]
+    return bool(names) and all(
+        caller is not None and caller.spec is not None and caller.spec.namespace is specs for caller in callers
+    )
 
 
 def _order(points: Mapping[str, ExtensionPoint[Any]], logger: BoundLogger) -> list[str]:

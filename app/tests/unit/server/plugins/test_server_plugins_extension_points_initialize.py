@@ -378,3 +378,14 @@ def test_the_phase_logs_one_info_event_with_its_counts(registry: svcs.Registry) 
     ]
     (detail,) = [e for e in events if e["event"] == "extension_point_initialized"]
     assert (detail["log_level"], detail["extension_point"], detail["plugins"]) == ("debug", "alpha", ["fake_user"])
+
+
+def test_a_second_startup_on_the_same_manager_initializes_again() -> None:
+    """The plugin manager outlives one lifespan (tests, an in-process restart), so the phase is re-entrant."""
+    pm = _manager({"alpha": _capability("alpha", _alpha()), "fake_user": _alpha_feature("one")})
+    with svcs.Registry() as first:
+        _run(pm, first)
+    with svcs.Registry() as second:
+        _run(pm, second)
+
+        assert _get(second, AlphaValue).strategies == {"fake_user": ["one"]}

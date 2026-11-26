@@ -497,13 +497,18 @@ allowed_importers = ["server", "capabilities.ai_writing.adapters.openai"]
 id = "webhooks-core-no-slack"
 name = "(p) the webhooks capability core imports no Slack SDK; Slack shapes live only in its adapters"
 # decisions/webhooks.md Checks: no slack_sdk or WebClient import and no Block Kit construction in the
-# capability core. List each core module here as it lands; adapters/ is the only exception.
+# capability core. List each core module here as it lands; adapters/ and the composition root
+# providers.py (imported only by entrypoints and jobs) are the only exceptions. Indirect imports
+# count, so no core module reaches the SDK through an adapter either.
 type = "forbidden"
 source_modules = [
     "capabilities.webhooks.api",
     "capabilities.webhooks.domain",
+    "capabilities.webhooks.hookspecs",
+    "capabilities.webhooks.interfaces",
     "capabilities.webhooks.plugin",
     "capabilities.webhooks.schemas",
+    "capabilities.webhooks.service",
     "capabilities.webhooks.settings",
 ]
 forbidden_modules = ["slack_sdk", "slack_bolt"]

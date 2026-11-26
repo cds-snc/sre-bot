@@ -4,6 +4,7 @@ title: 'Webhooks slice 6.1: management service and API'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:49:00Z'
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - migration
   - webhooks
@@ -53,3 +54,9 @@ Change notice: developer notice, no action: a new authenticated /api/v1/webhooks
 - [ ] #7 Ingest is unaffected and the legacy /sre webhooks surface still works (TASK-36 smoke)
 - [ ] #8 The PR body carries the developer change notice (review)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved S1): destinations are workplace references (system, tenant, conversation_id, triage); create and update validate a destination's system and tenant against ConfiguredSystems.
+<!-- SECTION:NOTES:END -->
