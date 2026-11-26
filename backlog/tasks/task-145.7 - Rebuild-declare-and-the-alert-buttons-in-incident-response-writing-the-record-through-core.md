@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-09 16:43
-updated_date: '2026-11-10T21:16:00Z'
+updated_date: '2026-11-26T18:28:00Z'
 labels:
   - incident
   - features
@@ -68,7 +68,7 @@ RECORD SHAPE (decisions/incident-management.md Stored form and Migration)
 - [x] #10 incident.response reads the handbook id from [incident_response] handbook_id (features/incident/response/settings.py) and states it as required when it registers (decisions/plugins.md: a plugin states what it requires by resolving it; boot fails naming the key when it is empty). The key itself is already in place (TASK-111.10.3: non-public, declared empty in base.toml, value from the environment only)
 - [ ] #11 Cutover per decisions/migration.md step 4 and decisions/testing.md seams: the pins pass with assertions unchanged, their fixtures rewired to the target Protocol fakes with the matching seam-baseline entries removed; legacy_only_* tests for behaviour this task ends are deleted; modal-internal ids take the incident.<subdomain> prefix and ids on posted messages stay registered as legacy aliases; new tests pass make check-test-seams; the host registrar registers posted-message ids (the alert buttons, the stale-nudge archive button) as legacy aliases of the new listeners and lists them for TASK-145.13
 - [ ] #12 find_incident_for_conversation reads the IncidentBinding by_conversation index first and falls back to channel_id/by_channel until TASK-145.13, failing closed on ambiguity; a binding whose record is missing is not an incident (tested)
-- [ ] #13 The TASK-145.5.7 job puts one binding per item and raises the marker to 2 in one pass, idempotently (tested); it is switched on in production (dry run, then apply) after TASK-145.8's cutovers deploy and before the declare cutover
+- [x] #13 The TASK-145.5.7 job puts one binding per item and raises the marker to 2 in one pass, idempotently (tested); it is switched on in production (dry run, then apply) after TASK-145.8's cutovers deploy and before the declare cutover
 - [ ] #14 Declare invites the on-call people through capabilities.oncall.api (TASK-146.3) with the schedule resolved by an incident-owned schedule-source port; no module in the incident umbrella imports integrations.opsgenie
 - [ ] #15 The alert-button producer (api/v1/routes/webhooks.py) posts the new id only in a separate PR merged after the declare cutover has baked
 <!-- AC:END -->
@@ -213,6 +213,8 @@ L0 TASK-145.7.1; L1 TASK-145.7.2; L2a TASK-145.7.3; L2b TASK-145.7.4; L3 TASK-14
 2026-11-10: ACs #9 and #10 checked by TASK-145.7.2 (startup_warmup resolves the policy, SettingError names incident_core.new_incident_system; production and local set google; Requirement("incident_response.handbook_id")). AC #11: the host-registrar part (legacy aliases on block and attachment actions, listed by the provider's legacy_ids() for TASK-145.13) is in place via TASK-145.7.2; the cutover parts land with 145.7.10 and 145.9.2.
 
 2026-11-10: AC #3 checked by TASK-145.7.6 (L4b): features/incident/meet deleted; GoogleMeetVideoCall in core/adapters/google_meet.py behind VideoCall.
+
+2026-11-26: AC #13 checked. The tested part shipped with TASK-145.7.4; the production part is TASK-145.7.8's apply (five runs, 331 upgraded, pending 0; report in TASK-145.7.8's notes), done before the declare cutover (TASK-145.7.10).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

@@ -1,10 +1,10 @@
 ---
 id: TASK-145.7.8
 title: 'Switch the legacy upgrade job on in production: dry run, then apply'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-26T14:15:00Z'
+updated_date: '2026-11-26T18:42:00Z'
 labels:
   - incident
   - config
@@ -31,7 +31,7 @@ Stack L L8. After the TASK-145.8 cutovers have deployed: one config PR sets [inc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The dry-run and apply reports are recorded in the notes with zero blockers left (checks the production part of parent AC #13)
+- [x] #1 The dry-run and apply reports are recorded in the notes with zero blockers left (checks the production part of parent AC #13)
 - [x] #2 ruff, mypy (no new errors in touched files), lint-imports, make check-package-shape, make check-test-seams and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
 
@@ -155,6 +155,21 @@ dropped 8, all field roles (missing report, permanent Drive refusal or no Google
 - One report per interval since TASK-64.2's minimum hold (the 2026-11-17 duplicate is gone).
 Apply-half re-check against main: TASK-145.7.12 (#1869) is on main, so the apply maps the 17 role plans in the same run (no separate roles rerun for these items). TASK-64.2's hold is min(TTL 900 s, interval 1800 s - 5 s) = 900 s; an apply run (331 guarded updates and binding puts plus the Drive reads the dry run already does) fits well inside it, and a rerun is guarded on record_version.
 2026-11-26: apply half implemented (TDD) on task-145.7.8-job-apply: production.toml upgrade_mode = "apply"; test_production_applies_the_upgrade_job (failed first: 1 failed, 29 passed; then passed); README Apply bullet notes the roles written and the dropped items. Human after merge and deploy: read the report about 30 min after the task starts; record upgraded, marker_raised, bindings_put, roles_mapped, pending (expected 0), dropped; then a PR sets the mode back to off (README Apply). AC #1 checks once the apply report is recorded.
+
+2026-11-26: production apply report (human ran the README command; image 20fbd2ed, #1893 merged 15:35Z). Five apply runs, one per interval; the last one completes the upgrade.
+| Run (UTC) | outcome | upgraded | marker_raised | bindings_put | bindings_existing | guard_lost | roles_mapped | pending after |
+| 16:10:38 | failed, write_failed | 48 | 0 | 49 | 0 | 0 | 1 | 283 |
+| 16:40, 17:10 (reports not read; derived from already_upgraded 10 -> 150 and roles_to_map 17 -> 10) | failed, write_failed (17:43 found 1 binding already put) | 92 | 0 | about 92 | about 1 | - | 6 | 191 |
+| 17:43:17 | failed, write_failed | 77 | 0 | 76 | 1 | 0 | 2 | 114 |
+| 18:15:16 | succeeded | 114 | 0 | 114 | 0 | 0 | 8 | 0 |
+Totals: upgraded 331 (the dry run's to_upgrade), marker_raised 0, roles_mapped 17 (the dry run's roles_to_map), guard_lost 0 in every run read, pending 0. Every planned item has its binding (binding_skipped 0 in every run; a binding put by a run cut short was found as bindings_existing by the next). Every run: scanned 341, unbound [], unmatched_status [], unreadable [], roles_unread [], roles_none 315, tenant_check verified (T2G2S06PM), dropped the same 8 roles as the dry run (4137a21d, cbeb4edd, 827e5751, e0398a03, cfd7dfbf, 3953235a, a1f42eaa, a1b0e67e; full ids in the dry-run note), counted per Migration rule 7.
+Why five runs: write throttling, not a data fault. The 16:10 run's records_update_error (table incidents, 16:10:38.783Z) is ProvisionedThroughputExceededException after 3 SDK retries. incidents (2 WCU), its by_channel and open indexes (2 each), and sre_bot_incident_bindings with by_conversation (2 each) absorb about 50 upgrades on burst credit, then throttle; the runner stops at the first failed write, as designed, and the next run resumes. The dry-run plan sized the read cost only, not the writes.
+Temporary capacity raise (human, AWS console, outside terraform): about 17:30, incidents and both its indexes to 100 WCU (the 17:43 run then stopped at the still-2 WCU bindings table); after 17:43, sre_bot_incident_bindings and by_conversation to 100 WCU (the 18:15 run finished the remaining 114). Restoring all five to 2 WCU is the human step before the off PR's commit (confirmed with describe-table), so terraform plans no change.
+Each failed run logged its report at error (4 error events over 2 hours); expected for a run cut short.
+For the 18.L12 rerun: expect the same throttle; raise the write capacity first or move the incident tables to on-demand (proposed as its own task, 2026-11-26).
+Off PR (branch task-145.7.8-job-off from main 20fbd2ed): production.toml upgrade_mode = "off"; the production test folded into test_every_environment_leaves_the_upgrade_job_off (ci, local, production; failed first for production: 1 failed, 29 passed; then 30 passed); README Apply bullet records the production run, the throttle and the rerun (row 18.L12, reports on TASK-145.13).
+
+2026-11-26: Done. The apply finished with pending 0 and zero blockers (five runs, recorded above); the write capacity raised for the last two runs is back at 2 WCU on all five (human, describe-table). This PR sets production's mode back to off. The rerun is row 18.L12, its reports on TASK-145.13.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

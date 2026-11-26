@@ -6,8 +6,8 @@ stubbed. The Slack ids are deployment configuration: declared empty in base.toml
 production.toml only. The handbook id is non-public: declared empty in base.toml, held by no
 environment file, read only from INCIDENT_RESPONSE__HANDBOOK_ID, and kept out of the repr. The
 legacy upgrade job keys are declared in base.toml at their defaults (mode off); ci and local
-leave the job unregistered, and production.toml sets only the mode, to apply, so production
-writes the upgrade once a dry run has reported no blocker. The Notify placement folder id is
+keep them, and production.toml sets the mode back to off after its apply, so every environment
+runs with the job unregistered until its run procedure sets the mode again. The Notify placement folder id is
 non-public like the handbook id. A declared incident's initial status is a setting, declared Open
 in base.toml, so an organisation changes it in configuration, never in code; only an open status
 is accepted. A value outside its range fails naming the key. An unknown key fails naming it.
@@ -56,31 +56,19 @@ def test_base_declares_every_id_empty_and_the_upgrade_keys_at_their_defaults() -
     assert "incident" not in base
 
 
-@pytest.mark.parametrize("environment", ["ci", "local"])
-def test_ci_and_local_leave_the_upgrade_job_off(environment: str) -> None:
-    """ci and local run with the job unregistered; only an environment's run procedure sets the mode in its file."""
+@pytest.mark.parametrize("environment", ["ci", "local", "production"])
+def test_every_environment_leaves_the_upgrade_job_off(environment: str) -> None:
+    """Each environment's real loader resolves the mode off with the base interval and lease.
+
+    Only an environment's run procedure sets another mode in its file; the assertion is on the
+    resolved slice, not on the file text.
+    """
     install_configuration_files(load_configuration_files(environment))
 
     settings = IncidentResponseSettings()
 
     assert (settings.upgrade_mode, settings.upgrade_interval_minutes, settings.upgrade_lease_ttl_seconds) == (
         UpgradeMode.OFF,
-        30,
-        900,
-    )
-
-
-def test_production_applies_the_upgrade_job() -> None:
-    """production.toml sets the mode to apply and keeps the base interval and lease.
-
-    The real production loader is used, so the assertion is on the resolved slice, not on the file text.
-    """
-    install_configuration_files(load_configuration_files("production"))
-
-    settings = IncidentResponseSettings()
-
-    assert (settings.upgrade_mode, settings.upgrade_interval_minutes, settings.upgrade_lease_ttl_seconds) == (
-        UpgradeMode.APPLY,
         30,
         900,
     )

@@ -32,8 +32,8 @@ announcement_channel_id = "CUYR73ESX"
 security_group_id = "S057X3XB5FX"
 notify_management_group_id = "S0BC6L00PUG"
 policy_group_id = "S0CHP1YRQNQ"
-# Incident legacy upgrade job: writes the upgrade (features/incident/README.md, run procedure).
-upgrade_mode = "apply"
+# Incident legacy upgrade job: applied 2026-11-26, off until the rerun (features/incident/README.md, run procedure).
+upgrade_mode = "off"
 
 [sre_ops]
 sre_ops_channel_id = "C0388M21LKZ"
