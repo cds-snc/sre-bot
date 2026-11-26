@@ -93,7 +93,7 @@ Whether it is generic or supporting is recorded in its README, not by its direct
 
 **A capability's public surface** is `api.py` (Protocol, domain types, provider function) plus its own hookspecs module. Everything else in it is private.
 - An extension point belongs to one capability. Features register into it at startup, before that capability initializes.
-- A capability may import a lower capability's `api.py`, in a declared order, with no cycles.
+- A capability may import a lower capability's `api.py`, in a declared order, with no cycles. The declared order is its extension point's `depends_on` ([plugins.md](plugins.md)); the first task in which one capability imports another adds an import-linter layers contract enforcing it.
 
 **Engines take strategies and hold no feature logic.** The approvals engine exposes `start`, `submit_decision`, `get_state` and `cancel`. Features supply a pure, deterministic `ApprovalPolicy` and an idempotent `EffectHandler` keyed by request id. A durable-execution engine can then replace the in-house state machine without changing any feature.
 
@@ -168,3 +168,4 @@ Tolerated until then:
 - 2026-11-19: TASK-25.10.3: the AI writing capability's `[ai_writing]` slice holds the model (unset means unavailable, logged as `ai_writing_model_unset`; a required consumer declares `Requirement("ai_writing.model")`); `AIWriter.write` requires `max_output_tokens` and takes an optional `temperature`; the OpenAI slice holds the connection only.
 - 2026-11-19: TASK-134 (human, plan review): `AIWriter.fill_template()` with the same budget and temperature rules as `write()`; sections and fields both carry optional instructions; the result holds answers and `truncated` only, never diagnostics or model text; an unusable answer is `AI_WRITING_UNPARSEABLE`; list-of-records output is a separate extracting capability.
 - 2026-11-19: TASK-25.10.2 (human, 2026-11-19, review of #1877): the text-generation capability is named `ai_writing` (`AIWriter.write`, `AI_WRITING_UNAVAILABLE`) so readers see it is a language model writing text; its purpose is AI-written text only, and any other AI use is its own capability named for its purpose, not a wider `language_model` capability.
+- 2026-11-26: TASK-113 (human, plan review): a capability's declared order is its extension point's `depends_on`; an import-linter layers contract comes with the first capability-to-capability import.

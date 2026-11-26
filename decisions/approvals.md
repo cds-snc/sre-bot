@@ -34,7 +34,7 @@ Copying that package per workflow would triplicate the engine and its multi-repl
 - an `ApprovalPolicy`: who may approve, threshold, auto-approve rules, eligibility. It is pure and deterministic: same request and decisions in, same answer out, no I/O.
 - an `EffectHandler`: the write to the managed system on `approved`. It is idempotent, keyed by request id, so a retry or a second replica never applies the effect twice.
 
-The host calls the approvals hookspecs once at startup, before the capability initializes, and collects one policy and one effect handler per workflow type. At runtime the engine awaits their async methods; it never calls a pluggy hook per request.
+The host collects the approvals hookspecs once at startup through the capability's extension point, before the capability initializes ([plugins.md](plugins.md)); the capability's `initialize` checks that each workflow type has one policy and one effect handler and fails boot naming it otherwise. At runtime the engine awaits their async methods; it never calls a pluggy hook per request.
 
 **Records.** The engine persists through the records contract, resolved from the registry ([dependency-injection.md](dependency-injection.md)). It never imports `RecordStore` or any `infrastructure` module. The single-partition aggregate (request, decisions and audit read in one query) moves from `access/request` into the engine unchanged.
 
@@ -76,3 +76,4 @@ Tolerated until closed:
 **Changes:**
 - 2026-09-24: Migration names epic tickets only; the engine becomes a capability with strategies collected at startup, storage and coordination contracts, and queue-based continuation.
 - 2026-10-13: the storage contract is the records contract (`RecordStore`, TASK-27.4).
+- 2026-11-26: strategies are collected through the capability's extension point (`register_extension_points`), and the one-policy-one-handler rule per workflow type is the capability's `initialize` check (TASK-113).
