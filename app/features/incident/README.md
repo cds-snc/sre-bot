@@ -138,7 +138,9 @@ its own configuration file.
   items without a conversation: set their `channel_id` or mark them Closed by hand in the table.
   Switch the mode back to `off`, fix the listed items, then dry run again. If two items share one
   `channel_id`, the conversation lookup was already ambiguous and stays so: fix it by hand.
-- **Apply.** A PR sets `upgrade_mode = "apply"`. Confirm that a later report shows `pending` 0
+- **Apply.** A PR sets `upgrade_mode = "apply"` (production: TASK-145.7.8). The first apply run
+  writes the roles too (`roles_mapped`); its `dropped` items keep no roles in the record, as the
+  read path already shows them. Confirm that a later report shows `pending` 0
   (a run cut short by throttling ends `write_failed`, and the next run resumes: each update is
   guarded on `record_version` at its read value, absent or 1, and a binding already put reports
   as `bindings_existing`), then a PR sets the mode back to `off`.

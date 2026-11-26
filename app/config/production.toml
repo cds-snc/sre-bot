@@ -32,8 +32,8 @@ announcement_channel_id = "CUYR73ESX"
 security_group_id = "S057X3XB5FX"
 notify_management_group_id = "S0BC6L00PUG"
 policy_group_id = "S0CHP1YRQNQ"
-# Incident legacy upgrade job: report only, no write (features/incident/README.md, run procedure).
-upgrade_mode = "dry_run"
+# Incident legacy upgrade job: writes the upgrade (features/incident/README.md, run procedure).
+upgrade_mode = "apply"
 
 [sre_ops]
 sre_ops_channel_id = "C0388M21LKZ"

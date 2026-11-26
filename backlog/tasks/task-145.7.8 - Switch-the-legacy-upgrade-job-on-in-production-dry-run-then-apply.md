@@ -4,7 +4,7 @@ title: 'Switch the legacy upgrade job on in production: dry run, then apply'
 status: In Progress
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T23:52:00Z'
+updated_date: '2026-11-26T14:15:00Z'
 labels:
   - incident
   - config
@@ -147,6 +147,14 @@ Reading:
 - already_upgraded 1: one legacy item upgraded on write since #1859.
 Finding: the same report was logged twice per interval, by two replicas (instance 6c30fec7 at 23:30:04.497Z, 5636151a at 23:30:05.196Z). run_if_leased releases the lease when the job ends (infrastructure/coordination/lease.py:14-17), so a run shorter than the replicas' tick offset (about 1 s here) runs again on the other replica. Harmless here: a dry run writes nothing, and an apply run is guarded on record_version, so a second run counts the items as already_upgraded. It doubles the scan (still about 4% of an interval's read capacity) and gives two reports per interval. ADR gap raised with the human (reliability.md lease semantics, TASK-64 scope).
 AC #1 stays open until the apply report. The apply now waits only on 145.8.3 (L6a) and 145.8.5.3 (L7a.3) deployed and soaked.
+
+2026-11-26: fresh production dry-run report (human ran the README command; image 876f7f7f, after #1867 deployed 2026-11-25; runs at 12:19:45Z, 13:22:07Z and 13:52:44Z, one report per interval):
+mode dry_run, outcome succeeded, failures [], cap 10000, scanned 341, already_upgraded 10, to_upgrade 331, pending 331, binding_skipped 0, unbound [], unmatched_status [], unreadable [], roles_to_map 17, roles_mapped 0, roles_none 315, roles_unread [], tenant_check verified (tenant T2G2S06PM).
+dropped 8, all field roles (missing report, permanent Drive refusal or no Google report): 4137a21d-75b4-4dc0-b5be-fe52985d6e0a, cbeb4edd-965c-439c-ac97-46762724ec1d, 827e5751-3b84-4eba-bc8a-54f3d8c3f2b2, e0398a03-f089-46ae-8d58-ac55324bc827, cfd7dfbf-1d70-4d7e-8bc5-2e34397ac18a, 3953235a-67ef-4294-89ba-5bbe84ab5fa5, a1f42eaa-3a6d-48b3-b805-50e0a30d2962, a1b0e67e-56af-4842-9d8c-b5d44146ae69.
+- Zero blockers: the apply's dry-run gate is met. The 8 role drops are counted values (Migration rule 7), not blockers: read_incident_roles already finds no roles for them, so the apply loses nothing the read path shows. Below the 10-drop warning-alarm threshold (OQ4), so no drop sink is needed.
+- One report per interval since TASK-64.2's minimum hold (the 2026-11-17 duplicate is gone).
+Apply-half re-check against main: TASK-145.7.12 (#1869) is on main, so the apply maps the 17 role plans in the same run (no separate roles rerun for these items). TASK-64.2's hold is min(TTL 900 s, interval 1800 s - 5 s) = 900 s; an apply run (331 guarded updates and binding puts plus the Drive reads the dry run already does) fits well inside it, and a rerun is guarded on record_version.
+2026-11-26: apply half implemented (TDD) on task-145.7.8-job-apply: production.toml upgrade_mode = "apply"; test_production_applies_the_upgrade_job (failed first: 1 failed, 29 passed; then passed); README Apply bullet notes the roles written and the dropped items. Human after merge and deploy: read the report about 30 min after the task starts; record upgraded, marker_raised, bindings_put, roles_mapped, pending (expected 0), dropped; then a PR sets the mode back to off (README Apply). AC #1 checks once the apply report is recorded.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
