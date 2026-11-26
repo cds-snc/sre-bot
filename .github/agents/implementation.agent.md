@@ -44,8 +44,9 @@ evidence — never assert success without it.
   `app/modules` is legacy and is not a pattern to copy.
 - Type boundary rules, partitioned package-owned settings, structured logging,
   non-blocking async, explicit error mapping.
-- Backlog tasks: CLI-only mutations, ACs checked off one by one as verified, never
-  set a task to Done before its PR is merged, one task per session/branch/PR.
+- Backlog tasks: CLI-only mutations, ACs checked off one by one as verified, Done
+  only in the task's own PR (closing commands, once nothing is left open) or once
+  the user confirms the open check, one task per session/branch/PR.
 - IMPORTANT: never run git commands unless the user explicitly asks.
 - If the diff outgrows the single-PR size gate, stop and hand off to
   `task-planner` rather than finishing an unreviewable PR.

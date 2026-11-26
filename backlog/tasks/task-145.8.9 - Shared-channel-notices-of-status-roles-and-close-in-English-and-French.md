@@ -1,10 +1,10 @@
 ---
 id: TASK-145.8.9
 title: Shared-channel notices of status, roles and close in the instance languages
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-17T20:55:00Z'
-updated_date: '2026-11-26T13:05:00Z'
+updated_date: '2026-11-26T13:28:00Z'
 labels:
   - incident
   - i18n
@@ -156,3 +156,9 @@ created: 2026-11-25T19:10:00Z
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Status, roles and close channel notices post in the instance languages (MultilingualText from shared_languages); status and roles replies and the roles modal use reply_languages; three pins edited as kind (b) named changes; decisions/languages.md no longer tolerates them. Ships with the delivery-session change notice and the task-close-with-PR rule.
+<!-- SECTION:FINAL_SUMMARY:END -->
