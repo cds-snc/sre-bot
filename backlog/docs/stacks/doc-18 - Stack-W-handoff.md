@@ -8,7 +8,7 @@ updated_date: '2026-11-26T20:00:00Z'
 ## Stack
 
 - Name: Stack W, webhooks dark chain (Lane B): the provisioned-content loader and the decisions/webhooks.md rewrite (TASK-37.1), the event model and engines (TASK-37.2.1), the event-consumer extension point and the Slack poster (TASK-37.2.3), async ingest and the inbox (TASK-37.2.2), then the content port, the Notify handler and the incident alert consumer (TASK-37.3). Every layer is dark; production-changing slices after W4 are single PRs from `main` (doc-11 rows 22.5-22.14).
-- doc-2 line: Wave 5, "Webhooks" (rewritten to Stack W in W1's PR). doc-11 rows 22.1-22.4 and 22.2b, unit "Stack W"; side PRs 22.1a (TASK-25.8, before W4), 22.1c (TASK-195, before W2b), 22.1d (TASK-196).
+- doc-2 line: Wave 5, "Webhooks" (rewritten to Stack W in W1's PR). doc-11 rows 22.1-22.4 and 22.2b, unit "Stack W"; side PRs 22.1a (TASK-25.8, before W4), 22.1c (TASK-113, before W2b; TASK-195 folded into it and archived 2026-11-26), 22.1d (TASK-196).
 - Program plan: decisions/webhooks.md (rewritten in W1) and the re-cut tasks; background in the TASK-168 research packet (untracked, `/workspace/task-168-webhooks-research-packet.md`), approved 2026-11-25. Content layout (W1, approved corrections C1-C5 in TASK-37.1's plan): `<root>/<owner>/<kind>/[<folder>/]<id>.yaml`, self-describing files (`kind`, `version`), schemas owned by the app at `app/content/schemas/<owner>/<kind>.json`, validator `python -m bin.check_content_schemas --root`.
 - Trunk `main`. Worktree `/home/vscode/worktrees/sre-bot-webhooks` (Lane B; Lane A runs in `/workspace`, whose checked-out `main` is never touched; base on `origin/main`). Branches: stacked layers `stack-w/<task-id>-<slug>`; Lane B side PRs `task-<id>-<slug>` from `origin/main`.
 - Planning: the agent plans each layer (plan-task skill, task-planner agent), writes it with `backlog task edit <id> --plan`, and stops for approval.
@@ -33,7 +33,7 @@ updated_date: '2026-11-26T20:00:00Z'
 | --- | --- | --- | --- | --- | --- |
 | W1 | TASK-37.1 provisioned-content loader (dark, no kind registered) + webhooks.md rewrite + ADR touches + task re-cut + TASK-168 ACs #1-#4 + delivery-session change-notice.md | `stack-w/task-37.1-content-loader` | #1889 | in review | plan approved 2026-11-25 with C1-C11; implemented, all 8 ACs checked, gates green (full pytest 8151 passed; mypy 33 pre-existing in untouched files); In Progress; committed 1197c9f and submitted 2026-11-25; stays in review until W2 is open above it |
 | W2 | TASK-37.2.1 skeleton, domain (InboundEvent, event types, SenderKind, WebhookInstance), the webhooks/sender-kinds content kind, matcher, JSONPath, Liquid with per-language bot wording, email finder, [webhooks] settings | `stack-w/task-37.2.1-event-model` | - | ready | plan approved 2026-11-26 (P1-P5; P2 respecting #1889's content decisions; OWASP corrections); all 12 ACs checked; full pytest 8295 passed, mypy 33 pre-existing in untouched files; In Progress; commit and `gh stack submit` pending (human) |
-| W2b | TASK-37.2.3 event-consumer extension point (consumers by type, handlers by id), escaping Slack poster with MultilingualText wording, fallback rendering, Slack lookup cap | `stack-w/task-37.2.3-...` | - | planned (task, no plan) | created 2026-11-26 by the P1 split; also waits on TASK-195 (row 22.1c) merged |
+| W2b | TASK-37.2.3 event-consumer extension point (consumers by type, handlers by id), escaping Slack poster with MultilingualText wording, fallback rendering, Slack lookup cap | `stack-w/task-37.2.3-...` | - | planned (task, no plan) | created 2026-11-26 by the P1 split; also waits on TASK-113 (row 22.1c; TASK-195 folded in 2026-11-26) merged |
 | W3 | TASK-37.2.2 async ingest: protocols (entrypoints/http_<protocol>.py, adapters/aws_sns.py), inbox (conditional insert as dedupe), inline processor + leased sweeper, KMS helper; route not mounted | `stack-w/task-37.2.2-...` | - | planned (task, no plan) | waits on W2b; also 58.2 (done) |
 | W4 | TASK-37.3 sender kinds as YAML (en-US and fr-FR bot wording, French reviewed by a human), parity + injection tests, Notify handler, incident alert consumer | `stack-w/task-37.3-...` | - | planned (task, no plan) | also waits on TASK-25.8 (doc-11 row 22.1a, single PR from main); names the Notify package's area (P5) |
 
@@ -46,7 +46,7 @@ updated_date: '2026-11-26T20:00:00Z'
 ## Next actions
 
 1. **human**: commit W2 and `gh stack submit` (the session's command block). W1 (#1889) may then merge; W2 stays open (more layers are planned), so never merge the top layer.
-2. **agent, next Lane B session**: plan TASK-195 (row 22.1c, single PR from origin/main), then W2b (TASK-37.2.3) once W2 is open; W2b's branch is added with `gh stack add` above W2.
+2. **agent, next Lane B session**: plan TASK-113 (row 22.1c, single PR from origin/main; TASK-195 folded in), then W2b (TASK-37.2.3) once W2 is open; W2b's branch is added with `gh stack add` above W2.
 3. **agent, later**: row 22.1a, TASK-25.8, a single PR from origin/main; it must merge before W4. Row 22.1d (TASK-196) any time.
 4. **human, when W1 merges**: Lane A drops the /workspace copies of the delivery-session skill files; the next Lane B session closes TASK-37.1 and TASK-168.
 
@@ -56,7 +56,7 @@ updated_date: '2026-11-26T20:00:00Z'
 
 ## Planning queue
 
-- TASK-195 (22.1c): task written, plan at pickup.
-- W2b TASK-37.2.3: plan once W2 is open; waits on TASK-195 merged before implementation.
+- TASK-113 (22.1c, TASK-195 folded in): planned 2026-11-26 (D0 approved; D1-D4 and PS1-PS6 awaiting approval); single PR from origin/main on task-113-host-extension-points. W2 carries a follow-up commit: TASK-195 archived, TASK-37.2.3 repointed to TASK-113, this doc.
+- W2b TASK-37.2.3: plan once W2 is open; waits on TASK-113 merged before implementation.
 - W3 TASK-37.2.2: plan after W2b's plan.
 - W4 TASK-37.3: plan after W3's; waits on TASK-25.8 (row 22.1a).

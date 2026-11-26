@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-26T13:18:00Z'
+updated_date: '2026-11-26T14:06:00Z'
 labels:
   - plugins
   - lifecycle
@@ -43,3 +44,9 @@ Size: ~130 production LOC, ~6 files.
 - [ ] #4 A disabled capability's extension point is never declared or called, and no pluggy hook is called per request (test)
 - [ ] #5 plugins.md and lifecycle.md record the phase and the declared capability order (review)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (human-approved at row 22.1c planning): folded into TASK-113, which already held the same phase on main with Lane A dependents (TASK-60, 83.15, 131, 165.2, 37.7); this file exists only on Stack W, so a single PR from origin/main could not carry it. Scope, ACs and plan live on TASK-113; TASK-37.2.3 now depends on TASK-113. Archived; the id is not reused.
+<!-- SECTION:NOTES:END -->

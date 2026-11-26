@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-26T13:18:00Z'
-updated_date: '2026-11-26T13:23:00Z'
+updated_date: '2026-11-26T14:06:00Z'
 labels:
   - migration
   - webhooks
@@ -14,7 +14,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-37.2.1
-  - TASK-195
+  - TASK-113
 references:
   - decisions/webhooks.md
   - decisions/languages.md
@@ -28,10 +28,10 @@ ordinal: 554000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Stack W layer W2b, split out of TASK-37.2.1 at its planning (P1, human-approved 2026-11-26). Stacked above W2; waits on TASK-195 (host extension-point phase) merged. decisions/webhooks.md 5a Extension point and 9 Output encoding; languages.md.
+Stack W layer W2b, split out of TASK-37.2.1 at its planning (P1, human-approved 2026-11-26). Stacked above W2; waits on TASK-113 (host extension-point phase, which TASK-195 was folded into) merged. decisions/webhooks.md 5a Extension point and 9 Output encoding; languages.md.
 
 Scope:
-- capabilities/webhooks/hookspecs.py: the webhooks extension point (event consumers by event type, handlers by id), declared through TASK-195's register_extension_points and collected once at startup into a frozen WebhookExtensions value in the service registry; a duplicate handler id or a consumer for an unregistered event type fails boot naming the plugin.
+- capabilities/webhooks/hookspecs.py: the webhooks extension point (event consumers by event type, handlers by id), declared through TASK-113's register_extension_points and collected once at startup into a frozen WebhookExtensions value in the service registry; a duplicate handler id or a consumer for an unregistered event type fails boot naming the plugin.
 - api.py: the EventConsumer, EventHandler and registrar Protocols, and EventAction (a consumer's contributed action: a MultilingualText label, an action id, a value), so the incident alert consumer (TASK-37.3) contributes triage actions without Slack types.
 - adapters/slack.py: the channel poster on AsyncWebClient, the default consumer for alert and notification. It escapes every content-derived value (&, <, >) before inserting trusted tokens (resolved mentions, adapter-built https links), and lays out MultilingualText (title, summary, link and action labels) in the destination's shared languages (LanguagePolicy). Sender details are posted once, and Slack's 3,000-character section and 50-block limits are adapter constants (Slack API facts).
 - The fallback rendering for an unmatched delivery or a render failure: escaped, truncated text of the decoded message under a bot-worded header from catalogue keys in capabilities/webhooks/locales/ (en-US and fr-FR parity).
