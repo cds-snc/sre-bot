@@ -23,7 +23,7 @@ pytestmark = pytest.mark.integration
 
 APP_DIR = Path(__file__).resolve().parents[3]
 BOOT_TIMEOUT_SECONDS = 120
-MAX_INFO_EVENTS_BESIDE_CONFIGURATION_SLICES = 10
+MAX_INFO_EVENTS_BESIDE_CONFIGURATION_SLICES = 11
 PHASE_EVENTS = {
     "application_startup",
     "core_services_initialized",
@@ -31,6 +31,7 @@ PHASE_EVENTS = {
     "directory_provider_initialized",
     "feature_plugins_loaded",
     "i18n_initialized",
+    "extension_points_initialized",
     "feature_integrations_registered",
     "plugin_configuration_summary",
     "scheduled_tasks_skipped",

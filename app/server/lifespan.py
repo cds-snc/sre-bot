@@ -44,6 +44,7 @@ from server.configuration import HostConfiguration
 from server.configuration.summary import summarize
 from server.configured_systems import read_configured_systems
 from server.plugins.boot import call_hook_per_plugin, plugin_built_slices, reset_plugin_built_slices
+from server.plugins.extension_points import run_extension_points
 from server.plugins.manager import (
     FeaturePluginManager,
     get_plugin_manager,
@@ -257,7 +258,10 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     # before command registration so help-text translations work at startup.
     app.state.slack_provider.set_translator(translation_service.translator)
     app.state.slack_provider.set_scope_opener(service_scopes)
-    # Phase 3: Register feature commands, routes, and run startup warmup.
+    # Phase 4: each capability's extension point is collected and initialized once, before
+    # any feature registers; a declaration, ordering or initialize failure stops startup here.
+    run_extension_points(pm, registry, service_scopes, logger)
+    # Phase 5: Register feature commands, routes, and run startup warmup.
     # Providers now have the translator set, so description_key translations
     # resolve correctly at registration time.
     register_feature_integrations(

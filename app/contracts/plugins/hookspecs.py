@@ -5,6 +5,7 @@ Covers the full lifecycle of a feature package:
   - Slack command, block action and view submission registration
   - HTTP route registration
   - Startup settings validation / cache warmup
+  - Capability extension-point declaration
 """
 
 from collections.abc import Callable, Sequence
@@ -14,6 +15,7 @@ from fastapi import FastAPI
 from structlog.stdlib import BoundLogger
 
 from contracts.i18n.resources import I18nResourceRegistrar
+from contracts.plugins.extension_points import ExtensionPointRegistrar
 from contracts.plugins.namespace import hookspec
 from contracts.plugins.requirements import Requirement
 from contracts.scheduler.registry import BackgroundJobRegistry
@@ -42,6 +44,7 @@ class FeatureLifecycleSpecs:
         - HTTP route registration
         - Background job registration
         - i18n resource registration
+        - Extension-point declaration (capabilities only)
         - Event handler registration
 
     Each hookspec is optional and called at the appropriate point in the
@@ -87,6 +90,18 @@ class FeatureLifecycleSpecs:
 
         Args:
             registry: Registrar for translation resource specifications.
+        """
+
+    @hookspec
+    def register_extension_points(self, registrar: ExtensionPointRegistrar) -> None:
+        """Declare the capability's extension point, if it owns one.
+
+        Capabilities only, at most one each. Called once per plugin after plugin
+        loading; the host then adds the point's hookspec class and initializes it
+        before feature registration (decisions/lifecycle.md phase 4).
+
+        Args:
+            registrar: Registrar scoped to the calling plugin.
         """
 
     @hookspec

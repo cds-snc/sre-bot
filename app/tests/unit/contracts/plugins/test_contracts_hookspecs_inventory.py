@@ -10,6 +10,7 @@ import pluggy
 import pytest
 
 from contracts.plugins import hookspecs as specs
+from contracts.plugins.extension_points import ExtensionPointRegistrar
 from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE, hookspec
 from contracts.slack.registrar import SlackCommandRegistrar
@@ -19,6 +20,7 @@ EXPECTED_HOOKS = [
     "register_slack_commands",
     "register_routes",
     "register_i18n_resources",
+    "register_extension_points",
     "register_event_handlers",
     "register_background_jobs",
     "startup_warmup",
@@ -30,6 +32,7 @@ EXPECTED_PARAMS = {
     "register_slack_commands": ["self", "registrar"],
     "register_routes": ["self", "app"],
     "register_i18n_resources": ["self", "registry"],
+    "register_extension_points": ["self", "registrar"],
     "register_event_handlers": ["self", "dispatcher"],
     "register_background_jobs": ["self", "registry"],
     "startup_warmup": ["self", "logger", "systems"],
@@ -79,6 +82,12 @@ def test_slack_hookspecs_expose_no_sdk_runtime_object() -> None:
     annotation = inspect.signature(FeatureLifecycleSpecs.register_slack_commands).parameters["registrar"].annotation
     assert annotation is SlackCommandRegistrar
     assert not any(name in vars(specs) for name in ("AsyncApp", "App", "SlackPlatformProvider"))
+
+
+def test_extension_point_hookspec_takes_the_registrar_protocol() -> None:
+    # A capability declares its extension point through a contracts Protocol, never a host object.
+    annotation = inspect.signature(FeatureLifecycleSpecs.register_extension_points).parameters["registrar"].annotation
+    assert annotation is ExtensionPointRegistrar
 
 
 def test_plugin_manager_exposes_hooks_after_adding_specs() -> None:
