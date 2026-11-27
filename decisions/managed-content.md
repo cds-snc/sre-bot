@@ -50,8 +50,9 @@ scope: Organisation content stored as records and changed while the app runs: th
 
 ## Migration
 
-Tickets: the first managed kind (TASK-166, TASK-165 or the TASK-146 re-cut, whichever lands first) builds the version store and audit pattern the others reuse; TASK-168 moves the legacy webhook instances onto it. Tolerated until closed: the `webhooks` table's unversioned, unaudited create and delete from Slack (TASK-168).
+Tickets: the first managed kind (TASK-166, TASK-165 or the TASK-146 re-cut, whichever lands first) builds the version store and audit pattern the others reuse. The webhook-instance kind's one write path is the webhooks capability's control plane ([webhooks.md](webhooks.md)): `WebhookAdmin` behind `/api/v1/webhooks` and the `webhooks:admin` permission, with AU-3 audit events (TASK-37.6.1), and `/sre webhooks` as a Slack binding over it (TASK-37.6.2); TASK-37.8 moves the instances onto the version store, with export excluding secrets and the kill switch. Tolerated until closed: the `webhooks` table's unpermissioned, unaudited create, toggle and reveal from Slack (TASK-37.6.2), and its unversioned writes, conditional updates plus audit events once the control plane lands (TASK-37.8).
 
 **Changes:**
 - 2026-10-28: Draft (TASK-167). One write path per kind with model and whole-set validation and limits, a declared permission and optional approval; append-only versions with restore and retention; AU-3 audit; readers skip invalid items and a per-kind flag switches the managed source off (Cloudflare 2025-11-18, Google Cloud 2025-06-12); schema version per record, compatible both ways; export; Git Sync not adopted for now (human).
 - 2026-10-28: Accepted (human review, TASK-167).
+- 2026-11-25: the webhook-instance kind's write path is the webhooks control plane (`WebhookAdmin`, `/api/v1/webhooks`, `webhooks:admin`, TASK-37.6.1); versions and export follow in TASK-37.8; the Slack tolerance ends at TASK-37.6.2 (TASK-168, lands with TASK-37.1).

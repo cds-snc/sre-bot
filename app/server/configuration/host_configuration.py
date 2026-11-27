@@ -25,6 +25,7 @@ from features.talent.settings import get_talent_settings
 from infrastructure.audit.settings import get_audit_settings
 from infrastructure.configuration.features.aws_ops import get_aws_feature_settings
 from infrastructure.configuration.features.sre_ops import SreOpsSettings, get_sre_ops_settings
+from infrastructure.content.settings import get_content_settings
 from infrastructure.coordination.settings import get_conditional_write_settings
 from infrastructure.directory import DirectorySettings, get_directory_settings
 from infrastructure.logging.settings import get_logging_settings
@@ -226,6 +227,7 @@ def _validate_slices(identity: IdentitySettings) -> HostConfiguration:
     directory_settings = get_directory_settings()
     get_audit_settings()
     get_conditional_write_settings()
+    get_content_settings()
     sre_ops = get_sre_ops_settings()
     get_language_settings()
     # Vendor and feature slices validate with the host slices: an invalid entry fails boot here.

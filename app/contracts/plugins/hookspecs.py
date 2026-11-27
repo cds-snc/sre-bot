@@ -14,6 +14,7 @@ from typing import Any, Protocol
 from fastapi import FastAPI
 from structlog.stdlib import BoundLogger
 
+from contracts.content import ContentKindRegistrar
 from contracts.i18n.resources import I18nResourceRegistrar
 from contracts.plugins.extension_points import ExtensionPointRegistrar
 from contracts.plugins.namespace import hookspec
@@ -44,6 +45,7 @@ class FeatureLifecycleSpecs:
         - HTTP route registration
         - Background job registration
         - i18n resource registration
+        - Provisioned-content kind registration
         - Extension-point declaration (capabilities only)
         - Event handler registration
 
@@ -90,6 +92,17 @@ class FeatureLifecycleSpecs:
 
         Args:
             registry: Registrar for translation resource specifications.
+        """
+
+    @hookspec
+    def register_content_kinds(self, registrar: ContentKindRegistrar) -> None:
+        """Register the provisioned-content kinds the plugin reads from the content root.
+
+        Called once per enabled plugin during plugin loading, before any other
+        registration hook. A disabled plugin is skipped, so its content directory is never read.
+
+        Args:
+            registrar: Registrar the plugin declares its kinds through.
         """
 
     @hookspec

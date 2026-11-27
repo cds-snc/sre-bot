@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-26T22:38:00Z'
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - configuration
   - deployment
@@ -28,3 +29,15 @@ End state recorded in decisions/product-scope.md and decisions/configuration.md 
 - [ ] #2 This organisation's instance is configured, deployed and rolled back from its deployment repository, and production behaviour is unchanged
 - [ ] #3 decisions/configuration.md, deployment.md and product-scope.md describe the two repositories
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved; TASK-37.1 plan correction C10): provisioned content now lives under app/content/<owner>/<kind>/ (TASK-37.1 loader; first kind webhooks/sender-kinds in TASK-37.2.1 and 37.3), with JSON Schemas owned by the app at app/content/schemas/ and shipped in the image. When the content root moves to the deployment repository, two things move with it: the validator command, run there from the pinned image as python -m bin.check_content_schemas --root <path>, and the CODEOWNERS entries per app/content/<owner>/ folder (added by TASK-37.3). No dependency change.
+
+---
+<!-- COMMENTS:END -->

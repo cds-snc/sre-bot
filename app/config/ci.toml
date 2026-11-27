@@ -17,3 +17,6 @@ oncall_sync = false
 
 [plugins.workplace_utilities]
 rant = false
+
+[content]
+root = "content/examples"

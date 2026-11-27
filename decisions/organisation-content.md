@@ -40,22 +40,22 @@ A kind starts provisioned unless its owners need in-flight change, because manag
 
 **An item has one source.** Each item records which source holds it, as Backstage's `managed-by-location` does ([entity providers](https://backstage.io/docs/features/software-catalog/external-integrations/entity-providers)); a managed item never shadows a provisioned one with the same id, and the admin surface shows provisioned items read-only, as incident.io locks a catalog type managed in GitHub and Grafana refuses to save a provisioned dashboard ([incident.io](https://docs.incident.io/catalog/github-managed-types), [Grafana](https://grafana.com/docs/grafana/latest/administration/provisioning/)). Moving an item between sources is an explicit step, never a merge: export the record to its file, merge the pull request, then delete the record; or import the file once and delete it, as Keycloak's realm import seeds and the database owns afterwards ([Keycloak import](https://www.keycloak.org/server/importExport)).
 
-**Content is never executable.** Matching is declarative (field paths and comparisons), as PagerDuty's Event Orchestration conditions and GitHub Actions expressions are ([Event Orchestration](https://support.pagerduty.com/docs/event-orchestration), [expressions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions)); a template is logic-light over a fixed data model, with an undefined name an error; every rule and template has size and count limits, as PagerDuty caps conditions and Kubernetes budgets CEL's cost ([CEL](https://kubernetes.io/docs/reference/using-api/cel/)). A sandbox is not a security boundary on its own ([Jinja sandbox](https://jinja.palletsprojects.com/en/stable/sandbox/)): the limits and who may edit are. A step that needs code is a plugin. TASK-168 chooses the template and matching engine for every kind.
+**Content is never executable.** Matching is declarative (field paths and comparisons), as PagerDuty's Event Orchestration conditions and GitHub Actions expressions are ([Event Orchestration](https://support.pagerduty.com/docs/event-orchestration), [expressions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions)); a template is logic-light over a fixed data model, with an undefined name an error; every rule and template has size and count limits, as PagerDuty caps conditions and Kubernetes budgets CEL's cost ([CEL](https://kubernetes.io/docs/reference/using-api/cel/)). A sandbox is not a security boundary on its own ([Jinja sandbox](https://jinja.palletsprojects.com/en/stable/sandbox/)): the limits and who may edit are. A step that needs code is a plugin. The engines are named per kind in the table below (TASK-168): a declarative condition list for matching, [RFC 9535](https://datatracker.ietf.org/doc/html/rfc9535) JSONPath singular queries for field paths, and [python-liquid](https://github.com/jg-rp/python-liquid) with strict undefined names and every limit set as the one engine for organisation-authored text templates; organisation wording uses the app's i18n message format, never Liquid ([i18n.md](i18n.md)).
 
-**Non-public values.** A provisioned file in this public repository never holds a non-public value ([configuration.md](configuration.md)); it names a configured key instead. A managed record may hold one and never logs it in full.
+**Non-public values.** A provisioned file in this public repository never holds a non-public value ([configuration.md](configuration.md)); it names a configured key instead. A managed record may hold one, never logs it in full, and encrypts it at the application level (a KMS key with the record's identity as encryption context), because storage encryption does not stop a reader of the table, a backup or an export; it is **never exported**, and an import mints a new value ([security.md](security.md) Webhooks, TASK-168).
 
 **Each kind's own record states its rules**: its model, its source, its limits, its permission. The rules here and in the source's record apply to every kind.
 
-| Kind | Source | Owner |
-| --- | --- | --- |
-| Webhook sender kinds (match, extract, template) | provisioned | TASK-168 |
-| Webhook instances (a channel's endpoint and its sender kind) | managed | TASK-168 |
-| Team playbooks, incident types, per-type document templates | managed, with a provisioned starting set | TASK-165 |
-| Entitlement catalogue | managed | TASK-166 |
-| Products (the product catalogue's default source; an external catalogue is an optional adapter) | provisioned or managed, decided by TASK-165.1 | TASK-165.1 |
-| On-call schedule mappings (a schedule source's schedule to a Slack user group) | provisioned | TASK-146 re-cut |
-| Self-managed rosters (members and cadence) | managed | TASK-146 re-cut |
-| Organisation wording (message overrides by key over the app's generic strings, [i18n.md](i18n.md)) | provisioned | each surface's rebuild |
+| Kind | Source | Engine | Owner |
+| --- | --- | --- | --- |
+| Webhook sender kinds (match, extract, template) | provisioned | conditions, RFC 9535 singular paths, python-liquid ([webhooks.md](webhooks.md)) | TASK-168 |
+| Webhook instances (an endpoint's protocol, its ordered sender kinds and destinations) | managed | none; model validation only | TASK-168 |
+| Team playbooks, incident types, per-type document templates | managed, with a provisioned starting set | python-liquid for any text template; a document template is a Google Doc filled by the incident report, not this engine | TASK-165 |
+| Entitlement catalogue | managed | none; model validation only | TASK-166 |
+| Products (the product catalogue's default source; an external catalogue is an optional adapter) | provisioned or managed, decided by TASK-165.1 | none; model validation only | TASK-165.1 |
+| On-call schedule mappings (a schedule source's schedule to a Slack user group) | provisioned | none; model validation only | TASK-146 re-cut |
+| Self-managed rosters (members and cadence) | managed | none; model validation only | TASK-146 re-cut |
+| Organisation wording (message overrides by key over the app's generic strings, [i18n.md](i18n.md)) | provisioned | the app's i18n message format, never Liquid | each surface's rebuild |
 
 ## Consequences
 
@@ -83,3 +83,4 @@ Tickets: TASK-165, TASK-166, TASK-168, the TASK-146 re-cut, the incident surface
 - 2026-10-28: Accepted (human review, TASK-167).
 - 2026-11-05: products added to the kinds table: the product catalogue's default source is the bot's own content, an external catalogue an optional adapter (TASK-145.6 re-plan, human).
 - 2026-11-17: the tolerated in-code rosters moved byte-identical to `capabilities/oncall/adapters/rotation_files/`, inside the layout table's `adapters/` slot rather than a new capability-level name, since rosters end as managed content (TASK-146.1.2, human).
+- 2026-11-25: the kinds table names each kind's engine (conditions, RFC 9535 singular paths, python-liquid; i18n format for wording); a non-public value in a managed record is encrypted at the application level and never exported (TASK-168, lands with TASK-37.1).

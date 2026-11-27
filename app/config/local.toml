@@ -41,3 +41,6 @@ database_path = "./geodb/GeoLite2-City.mmdb"
 [canada_holidays.tenant]
 # The public Canada Holidays API (canada-holidays.ca) every development environment reads.
 base_url = "https://canada-holidays.ca/api/v1"
+
+[content]
+root = "content/examples"

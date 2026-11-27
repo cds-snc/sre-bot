@@ -11,9 +11,12 @@ from slack_bolt import App
 from structlog.stdlib import BoundLogger
 
 from contracts.configuration import HostInfo
+from contracts.content import ContentCatalogue, ContentLoadError
 from contracts.i18n.resources import I18nResourceSpec
 from contracts.services import ServiceScopeOpener
 from contracts.slack.registrar import SlackCommandRegistrar
+from infrastructure.content.loader import ContentLoader
+from infrastructure.content.settings import ContentSettings, get_content_settings
 from infrastructure.directory import (
     DirectorySettings,
     get_directory_provider,
@@ -41,6 +44,7 @@ from modules import (
     webhook_helper,
 )
 from server.configuration import HostConfiguration
+from server.configuration.loader import CONFIG_DIR
 from server.configuration.summary import summarize
 from server.configured_systems import read_configured_systems
 from server.plugins.boot import call_hook_per_plugin, plugin_built_slices, reset_plugin_built_slices
@@ -205,6 +209,36 @@ def _initialize_translation_service(pm: FeaturePluginManager, logger: BoundLogge
     return translation_service
 
 
+def load_provisioned_content(
+    pm: FeaturePluginManager,
+    registry: svcs.Registry,
+    logger: BoundLogger,
+    settings: ContentSettings,
+    app_directory: Path,
+) -> None:
+    """Load every enabled plugin's content kinds from the content root and register the catalogue.
+
+    A disabled plugin is skipped by the per-plugin hook call, so its directory is never read.
+    Each problem is logged once as a CRITICAL ``content_load_failed`` naming the kind, file and
+    field, never the input value; the error is then re-raised and stops startup.
+    """
+    loader = ContentLoader(
+        settings.resolved_root(app_directory),
+        max_file_bytes=settings.max_file_bytes,
+        max_items_per_kind=settings.max_items_per_kind,
+    )
+    call_hook_per_plugin(pm, "register_content_kinds", logger, registrar=loader)
+    try:
+        catalogue = loader.load()
+    except ContentLoadError as error:
+        for problem in error.problems:
+            logger.critical(
+                "content_load_failed", kind=problem.kind, file=problem.file, field=problem.field, reason=problem.message
+            )
+        raise
+    registry.register_value(ContentCatalogue, catalogue)
+
+
 def build_lifespan(configuration: HostConfiguration) -> Callable[[FastAPI], AbstractAsyncContextManager[dict[str, object]]]:
     """Return the app lifespan bound to the configuration the app factory loaded."""
 
@@ -252,6 +286,9 @@ async def _serve(app: FastAPI, registry: svcs.Registry, configuration: HostConfi
     # An enabled plugin whose required vendor or capability is not configured stops startup here.
     systems = read_configured_systems()
     resolve_plugin_requirements(pm, logger.bind(phase="plugin_requirements"), systems)
+
+    # Content kinds are known once the enabled plugins are loaded; an invalid file stops startup here.
+    load_provisioned_content(pm, registry, logger.bind(phase="content_loading"), get_content_settings(), CONFIG_DIR.parent)
 
     translation_service = _initialize_translation_service(pm, logger)
     # Inject translation service into all platform providers and their formatters

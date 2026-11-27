@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-07 19:56
-updated_date: '2026-11-03T19:00:00Z'
+updated_date: '2026-11-25T20:53:00Z'
 labels:
   - infrastructure
   - phase-4
@@ -83,6 +83,14 @@ created: 2026-11-03T19:00:00Z
 ---
 
 Coordination is the first durable cross-process consumer. When the E4 foundation is planned, split this task into atomic multi-item record write, queue infrastructure, and outbox write/relay slices, each within the PR size gate; coordination consumes the resulting idempotent event path.
+
+---
+
+created: 2026-11-25T20:53:00Z
+
+---
+
+2026-11-25 (TASK-168 re-cut, human-approved; packet OQ19): the webhook inbox (TASK-37.2.2: conditional-insert dedupe, item state machine, inline processing plus a lease-guarded sweeper) is a candidate first consumer, and may itself be the durable cross-process reaction that justifies building this task. TASK-37.7 moves the inbox onto QueueService once this lands and depends on it. No dependency change here.
 
 ---
 <!-- COMMENTS:END -->
