@@ -57,7 +57,9 @@ data "aws_iam_policy_document" "sre-bot_secrets_manager" {
     resources = [
       "${aws_dynamodb_table.incidents_table.arn}/index/*",
       "${aws_dynamodb_table.sre_bot_incident_bindings.arn}/index/*",
-      "${aws_dynamodb_table.sre_bot_audit_trail.arn}/index/*"
+      "${aws_dynamodb_table.sre_bot_audit_trail.arn}/index/*",
+      "${aws_dynamodb_table.webhooks_table.arn}/index/*",
+      "${aws_dynamodb_table.sre_bot_webhook_inbox.arn}/index/*"
     ]
   }
 }

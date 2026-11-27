@@ -1,12 +1,118 @@
+# Webhook instances, keyed by the URL token. instance_ref is the internal reference the sweeper and
+# the control plane address an instance by, never the token; items without it stay out of
+# the by_instance_ref index, which is sparse (app/capabilities/webhooks/store.py, decisions/webhooks.md section 3).
 resource "aws_dynamodb_table" "webhooks_table" {
-  name           = "webhooks"
-  hash_key       = "id"
-  read_capacity  = 1
-  write_capacity = 1
+  name         = "webhooks"
+  hash_key     = "id"
+  billing_mode = "PAY_PER_REQUEST"
+
+  on_demand_throughput {
+    max_read_request_units  = var.dynamodb_max_read_request_units
+    max_write_request_units = var.dynamodb_max_write_request_units
+  }
 
   attribute {
     name = "id"
     type = "S"
+  }
+
+  attribute {
+    name = "instance_ref"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "by_instance_ref"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "instance_ref"
+      key_type       = "HASH"
+    }
+  }
+}
+
+# Webhook inbox: one item per accepted delivery, keyed 'webhooks:<instance_ref>:<delivery id>'
+# (app/capabilities/webhooks/store.py, decisions/webhooks.md section 3). Items expire through
+# expires_at (epoch seconds, [webhooks] inbox_ttl_seconds, default 7 days). due is set only while an
+# item is processing or awaiting a retry, so by_due holds only the items the sweeper must look at;
+# by_instance lists an instance's deliveries by received_at (epoch milliseconds).
+# The recovery window equals the item TTL: the inbox's retention is its TTL, so it is also left out
+# of the AWS Backup selection below (decisions/deployment.md Tables).
+resource "aws_dynamodb_table" "sre_bot_webhook_inbox" {
+  name                        = "sre_bot_webhook_inbox"
+  hash_key                    = "item_key"
+  billing_mode                = "PAY_PER_REQUEST"
+  deletion_protection_enabled = true
+
+  on_demand_throughput {
+    max_read_request_units  = var.dynamodb_max_read_request_units
+    max_write_request_units = var.dynamodb_max_write_request_units
+  }
+
+  attribute {
+    name = "item_key"
+    type = "S"
+  }
+
+  attribute {
+    name = "due"
+    type = "S"
+  }
+
+  attribute {
+    name = "due_at"
+    type = "N"
+  }
+
+  attribute {
+    name = "instance_ref"
+    type = "S"
+  }
+
+  attribute {
+    name = "received_at"
+    type = "N"
+  }
+
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  point_in_time_recovery {
+    enabled                 = true
+    recovery_period_in_days = 7
+  }
+
+  global_secondary_index {
+    name            = "by_due"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "due"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "due_at"
+      key_type       = "RANGE"
+    }
+  }
+
+  global_secondary_index {
+    name            = "by_instance"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "instance_ref"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "received_at"
+      key_type       = "RANGE"
+    }
   }
 }
 
@@ -310,6 +416,7 @@ locals {
     aws_dynamodb_table.sre_bot_incident_bindings.arn,
     aws_dynamodb_table.sre_bot_idempotency.arn,
     aws_dynamodb_table.sre_bot_audit_trail.arn,
+    aws_dynamodb_table.sre_bot_webhook_inbox.arn,
   ]
 }
 
@@ -354,6 +461,10 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
   plan_id      = aws_backup_plan.sre_bot_backup_plan.id
 
   resources = local.dynamodb_table_arns
+
+  # Left out on purpose: the webhook inbox is a delivery log whose retention is its 7-day item TTL,
+  # and its point-in-time recovery covers the same window; 30-day backups would keep envelopes past it.
+  not_resources = [aws_dynamodb_table.sre_bot_webhook_inbox.arn]
 }
 
 # Create an IAM role to allow AWS Backup to perform backups.
