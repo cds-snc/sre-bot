@@ -161,12 +161,20 @@ class Destination:
                 raise ValueError(f"{name} must not be blank")
 
 
+class InstanceState(StrEnum):
+    """Whether an instance takes deliveries; a disabled one answers 404."""
+
+    ACTIVE = "active"
+    DISABLED = "disabled"
+
+
 @dataclass(frozen=True)
 class WebhookInstance:
     """One endpoint: its protocol, the sender kinds it tries in order, and its destinations.
 
     ``instance_ref`` is the internal, non-secret id that logs, metrics and buttons carry;
-    the URL token never appears here.
+    the URL token never appears here. ``topic_arns`` is the SNS allowlist: empty means none
+    until the instance is backfilled (decisions/security.md Webhooks).
     """
 
     instance_ref: str
@@ -176,6 +184,8 @@ class WebhookInstance:
     protocol: str
     sender_kinds: tuple[str, ...]
     destinations: tuple[Destination, ...] = field(default=())
+    state: InstanceState = InstanceState.ACTIVE
+    topic_arns: tuple[str, ...] = field(default=())
 
 
 def resolve_kinds(

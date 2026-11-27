@@ -4,7 +4,7 @@ title: 'Webhooks slice 6.1: management service and API'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:49:00Z'
-updated_date: '2026-11-26T19:07:00Z'
+updated_date: '2026-11-27T17:31:00Z'
 labels:
   - migration
   - webhooks
@@ -59,4 +59,6 @@ Change notice: developer notice, no action: a new authenticated /api/v1/webhooks
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-26 (TASK-37.2.3, human-approved S1): destinations are workplace references (system, tenant, conversation_id, triage); create and update validate a destination's system and tenant against ConfiguredSystems.
+
+2026-11-27 (TASK-37.2.2 implementation): instances are read by instance_ref through RecordWebhookStore.by_ref (the by_instance_ref index, TASK-37.2.4); the delivery list reads the inbox's by_instance index (instance_ref, received_at in ms). Replay of a dead or render_failed item is a guarded replace from its terminal state (owner None) to retry with a due_at, through InboxStore.replace.
 <!-- SECTION:NOTES:END -->

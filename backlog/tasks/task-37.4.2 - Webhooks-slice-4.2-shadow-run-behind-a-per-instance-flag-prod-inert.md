@@ -4,7 +4,7 @@ title: 'Webhooks slice 4.2: shadow run behind a per-instance flag (prod, inert)'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
-updated_date: '2026-11-27T16:47:00Z'
+updated_date: '2026-11-27T17:31:00Z'
 labels:
   - migration
   - webhooks
@@ -51,4 +51,6 @@ Change notice: none (inert); an internal ops note only (packet section 7.4).
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 (TASK-37.2.2 planning, human-approved): mounting the route needs the inbox table (TASK-37.2.4, row 22.3a) and the received-bytes body cap with a ceiling above the SNS cap (TASK-198, row 22.3b), both merged first.
+
+2026-11-27 (TASK-37.2.2 implementation): the router is capabilities/webhooks/entrypoints/http.py (router, get_ingress), built and tested but not included; include it through register_routes here. Each new-path delivery logs webhook_received with the instance_ref and the passthrough-hardening fingerprint (field names only), which AC #4 can aggregate.
 <!-- SECTION:NOTES:END -->

@@ -4,7 +4,7 @@ title: 'Webhooks slice 2.2: async ingest and inbox (dark)'
 status: In Progress
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
-updated_date: '2026-11-27T16:45:00Z'
+updated_date: '2026-11-27T17:35:00Z'
 labels:
   - migration
   - webhooks
@@ -52,18 +52,18 @@ Change notice: none (dark slice, packet section 7.4).
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The SNS verifier accepts SignatureVersion 1 (SHA1) and 2 (SHA256) and answers 403 with a generic body on a bad signature, an unknown version, an off-host SigningCertURL or a Timestamp older than the replay bound; the TASK-36.2 SignatureVersion 2 legacy_only pin records the new path's accepting counterpart (test)
-- [ ] #2 SNS sub-types are a discriminated union on the SNS Type field; a body that fails the instance's declared protocol answers 400 and no other model is tried (test)
-- [ ] #3 A SubscriptionConfirmation is confirmed from its inbox item only when SubscribeURL is https on an sns.<region>.amazonaws.com host, with no redirects; a TopicArn outside an instance's allowlist answers 403; the certificate fetch is async through the integrations/aws_sns factory and cached (test)
-- [ ] #4 A redelivered message with the same delivery id is persisted and processed once: the inbox item's conditional insert is the dedupe, and any outcome other than a confirmed insert answers 503 and does no work (test asserts single dispatch)
-- [ ] #5 Every inbox state transition is a guarded update carrying the owner token; the inline attempt and the sweeper never process one item twice, and a stale token changes nothing (test)
-- [ ] #6 The handler answers 200 once the item is persisted, whether processing finished, failed or hit the deadline, 503 only when the inbox store is unavailable, and 404, 405, 413 and 415 per decisions/webhooks.md Responses (test)
-- [ ] #7 The sweeper runs under a lease, retries with backoff (full jitter, retry_after honoured), dead-letters after the cap with a webhook_dead_lettered event, and builds its async clients inside its run (test)
-- [ ] #8 legacy_slack_json items are not deduplicated (the written exception), an optional Idempotency-Key header is honoured, the passthrough-hardening fields are fingerprinted by name only, and a payload channel is ignored (test)
-- [ ] #9 Body caps, Content-Types, JSON depth, the inline deadline, the lease margin, the inbox table name and TTL, the SNS replay bound and fetch values, and the retry and sweeper values are typed [webhooks] settings with defaults; make check-settings-key-ownership is green (test + check)
-- [ ] #10 The slice is dark: no route is mounted, no job is registered and production behaviour is unchanged; make check-import-contracts is green with no new ignore entry and contract (p) lists every new core module (check)
-- [ ] #11 Protocol decoders parse JSON strictly (RFC 7493): a duplicate key, NaN or Infinity, a lone surrogate, a non-finite number or nesting past the depth limit answers 400 (test)
-- [ ] #12 An item records each finished post, consume and handler, and a retry repeats none of them (test)
+- [x] #1 The SNS verifier accepts SignatureVersion 1 (SHA1) and 2 (SHA256) and answers 403 with a generic body on a bad signature, an unknown version, an off-host SigningCertURL or a Timestamp older than the replay bound; the TASK-36.2 SignatureVersion 2 legacy_only pin records the new path's accepting counterpart (test)
+- [x] #2 SNS sub-types are a discriminated union on the SNS Type field; a body that fails the instance's declared protocol answers 400 and no other model is tried (test)
+- [x] #3 A SubscriptionConfirmation is confirmed from its inbox item only when SubscribeURL is https on an sns.<region>.amazonaws.com host, with no redirects; a TopicArn outside an instance's allowlist answers 403; the certificate fetch is async through the integrations/aws_sns factory and cached (test)
+- [x] #4 A redelivered message with the same delivery id is persisted and processed once: the inbox item's conditional insert is the dedupe, and any outcome other than a confirmed insert answers 503 and does no work (test asserts single dispatch)
+- [x] #5 Every inbox state transition is a guarded update carrying the owner token; the inline attempt and the sweeper never process one item twice, and a stale token changes nothing (test)
+- [x] #6 The handler answers 200 once the item is persisted, whether processing finished, failed or hit the deadline, 503 only when the inbox store is unavailable, and 404, 405, 413 and 415 per decisions/webhooks.md Responses (test)
+- [x] #7 The sweeper runs under a lease, retries with backoff (full jitter, retry_after honoured), dead-letters after the cap with a webhook_dead_lettered event, and builds its async clients inside its run (test)
+- [x] #8 legacy_slack_json items are not deduplicated (the written exception), an optional Idempotency-Key header is honoured, the passthrough-hardening fields are fingerprinted by name only, and a payload channel is ignored (test)
+- [x] #9 Body caps, Content-Types, JSON depth, the inline deadline, the lease margin, the inbox table name and TTL, the SNS replay bound and fetch values, and the retry and sweeper values are typed [webhooks] settings with defaults; make check-settings-key-ownership is green (test + check)
+- [x] #10 The slice is dark: no route is mounted, no job is registered and production behaviour is unchanged; make check-import-contracts is green with no new ignore entry and contract (p) lists every new core module (check)
+- [x] #11 Protocol decoders parse JSON strictly (RFC 7493): a duplicate key, NaN or Infinity, a lone surrogate, a non-finite number or nesting past the depth limit answers 400 (test)
+- [x] #12 An item records each finished post, consume and handler, and a retry repeats none of them (test)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -150,6 +150,22 @@ Production: dark. Revert: one git revert. Change notice: none (dark layer; row 2
 2026-11-26 (TASK-37.2.3, human-approved): the processor resolves each destination's languages through LanguagePolicy before rendering, posts through the ChannelPoster for the destination's WorkplaceSystem (a destination with no poster, or slack.passthrough to a non-Slack destination, is skipped and reported), gathers consumer actions only where the destination sets triage, and sets the item's retry_at from a 429's retry_after (the inbox is the one retry point; posts are never retried in process).
 
 2026-11-27: plan approved by the human (Q1-Q6). The KMS helper moved to TASK-197 and the rate-limit settings to TASK-49; the inbox table is TASK-37.2.4 (row 22.3a) and the server body cap TASK-198 (row 22.3b).
+
+2026-11-27 implementation (all 12 ACs verified):
+- #1 test_webhooks_sns_protocol_verifies (v1 SHA1 and v2 SHA256 verify; 403 on tampered, bad or non-base64 signature, unknown version, off-host, http or suffix-host cert URL, Timestamp past the 24 h replay bound); the legacy pin test_legacy_only_webhook_sns_signature_version_2_is_rejected_with_500 names its accepting counterpart.
+- #2 schemas.py SNS_MESSAGE discriminated union on Type; undecodable cases answer 400 and nothing else is tried.
+- #3 http_aws_sns plus adapters/aws_sns.py (test_webhooks_sns_certificates_fetch: SNS hosts only, no redirects, TTL and size-capped cache, classified failures); SubscribeURL host rule at decode; confirmation from the item (processor tests); TopicArn allowlist 403.
+- #4 test_webhooks_inbox_processor_delivers (a redelivery posts and consumes once; an unconfirmed insert processes nothing) and test_webhooks_inbox_store_guards.
+- #5 guarded replace on state and owner; takeover locks out the old owner; a replayed write that landed counts as applied; an unexpired lease is never taken.
+- #6 test_webhooks_ingress_route_responses: 200 (new, duplicate, downstream failure), 400, 403, 404 (unknown, disabled, unknown protocol), 405, 413 (declared length and chunked stream), 415, 503 with Retry-After (inbox, instance store, certificate host).
+- #7 test_webhooks_sweeper_job_runs (leased interval from settings; one loop per run, clients built inside and closed, also on failure) and the processor tests (full-jitter backoff, retry_after floor, dead-letter with webhook_dead_lettered after the cap).
+- #8 test_webhooks_legacy_protocol_passthrough and test_webhooks_slack_poster_passthrough (no dedupe without a key, Idempotency-Key honoured and validated, fingerprint by name, payload channel and non-allowlisted keys never forwarded).
+- #9 [webhooks] ingest settings with validators, set in base.toml; make check-settings-key-ownership green.
+- #10 test_webhooks_ingest_stays_dark; make check-import-contracts 16 kept, contract (p) lists capabilities.webhooks.store, no new ignore.
+- #11 test_webhooks_strict_json_rejects (RFC 7493 refusals, depth, recursion, linear time at the cap).
+- #12 per-target progress: a retry after a 429 posts only the failed destination; a failed consumer is retried without reposting.
+Course-corrections found during implementation: (a) TASK-37.2.4 also adds a sparse by_instance_ref index on the webhooks table, since the sweeper reloads an item's instance by instance_ref and the URL token is never stored; (b) webhooks.md 503 row now covers an unavailable instance store or SNS certificate host (a 4xx makes SNS drop a valid message); (c) the bug the processor test caught: one DeliveryPoster per item per system (dict.setdefault would have built one per destination and lost the shared mention cache). cryptography is a direct dependency at the locked 50.0.2 (uv.lock metadata only).
+Gates: ruff clean; make check-import-contracts, check-settings-key-ownership, check-package-shape, check-test-seams, check-vendor-package-contract, check-fake-coverage, check-sdk-typing, check-runtime-imports, check-aws-platform-seam, check-content-schemas green; full mypy 33 errors in 11 files, all pre-existing in untouched files, none in W3 code; full pytest 8667 passed. Size: about 2,060 production lines in 24 files, under the approved size-gate exception (dark).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

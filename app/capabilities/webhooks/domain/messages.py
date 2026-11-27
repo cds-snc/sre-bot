@@ -7,7 +7,9 @@ messages are intents).
 """
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from capabilities.webhooks.domain.events import Alert, InboundEvent, JsonDocument, Link, Notification
 from capabilities.webhooks.domain.extensions import EventAction
@@ -45,7 +47,20 @@ class FallbackMessage:
     body: str
 
 
-type OutboundMessage = ChannelMessage | FallbackMessage
+@dataclass(frozen=True)
+class PassthroughMessage:
+    """A sender-built Slack message from the legacy protocol, posted as the sender shaped it.
+
+    Only a Slack poster takes it (``poster_for``). The destination decides the conversation:
+    a ``channel`` in the message is never used. Hardening is monitored by the shadow run
+    before it is enforced (decisions/webhooks.md 9 Passthrough hardening).
+    TODO(TASK-37.5): drop the hardening fields before posting.
+    """
+
+    message: Mapping[str, Any]
+
+
+type OutboundMessage = ChannelMessage | FallbackMessage | PassthroughMessage
 
 
 def channel_message(event: InboundEvent, *, actions: tuple[EventAction, ...] = (), mentions: bool = False) -> ChannelMessage:

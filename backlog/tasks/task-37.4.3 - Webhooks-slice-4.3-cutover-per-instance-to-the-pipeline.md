@@ -4,7 +4,7 @@ title: 'Webhooks slice 4.3: cutover per instance to the pipeline'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
-updated_date: '2026-11-27T16:47:00Z'
+updated_date: '2026-11-27T17:31:00Z'
 labels:
   - migration
   - webhooks
@@ -62,4 +62,6 @@ Change notice: developer notice, no action needed: redelivered SNS messages post
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 (TASK-37.2.2 planning, human-approved): AC added. TASK-37.2.2 builds the sweeper but registers no job, since the webhooks plugin is enabled in base.toml and a registered job would run against a table that does not exist; AC #2 here already assumes the sweeper runs.
+
+2026-11-27 (TASK-37.2.2 implementation): call capabilities.webhooks.entrypoints.jobs.register_sweeper(registry) from a register_background_jobs hookimpl in plugin.py; its interval and lease come from [webhooks] sweeper_interval_seconds and sweeper_lease_ttl_seconds.
 <!-- SECTION:NOTES:END -->

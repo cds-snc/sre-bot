@@ -27,7 +27,7 @@ from capabilities.webhooks.domain.events import Link
 from capabilities.webhooks.domain.extensions import EventAction
 from capabilities.webhooks.domain.kinds import Destination
 from capabilities.webhooks.domain.mentions import find_email_addresses
-from capabilities.webhooks.domain.messages import ChannelMessage, FallbackMessage, OutboundMessage
+from capabilities.webhooks.domain.messages import ChannelMessage, FallbackMessage, OutboundMessage, PassthroughMessage
 from capabilities.webhooks.domain.values import ELLIPSIS, truncate
 from capabilities.webhooks.interfaces import ChannelPoster, DeliveryPoster
 from capabilities.webhooks.settings import WebhooksSettings
@@ -52,6 +52,24 @@ _USER_ID = re.compile(r"[UW][A-Z0-9]{2,}")
 _LINK_BREAKERS = frozenset("|<> \t\r\n")
 _WHITESPACE = re.compile(r"(\s+)")
 _SLACK_UNREACHABLE = (TimeoutError, aiohttp.ClientError)
+# chat.postMessage arguments a sender-built message may set; any other key (``channel``,
+# ``token``, ``as_user``...) is never forwarded, so a payload cannot pick the conversation or
+# the credential (OWASP API10:2023). TODO(TASK-37.5): drop the hardening fields as well.
+PASSTHROUGH_ARGUMENTS = (
+    "attachments",
+    "blocks",
+    "icon_emoji",
+    "icon_url",
+    "link_names",
+    "mrkdwn",
+    "parse",
+    "reply_broadcast",
+    "text",
+    "thread_ts",
+    "unfurl_links",
+    "unfurl_media",
+    "username",
+)
 
 
 @dataclass(frozen=True)
@@ -138,14 +156,16 @@ class SlackDeliveryPoster(DeliveryPoster):
         """Lay out ``message`` and post it; failures are classified, never retried here."""
         if destination.system is not WorkplaceSystem.SLACK or destination.tenant != self._tenant:
             return OperationResult.permanent_error("destination is not in the configured Slack tenant", ErrorCode.TENANT_MISMATCH)
-        if isinstance(message, ChannelMessage):
-            blocks, text = await self._channel_layout(message)
+        if isinstance(message, PassthroughMessage):
+            arguments = {name: message.message[name] for name in PASSTHROUGH_ARGUMENTS if name in message.message}
         else:
-            blocks, text = _fallback_layout(message)
+            if isinstance(message, ChannelMessage):
+                blocks, text = await self._channel_layout(message)
+            else:
+                blocks, text = _fallback_layout(message)
+            arguments = {"text": text, "blocks": blocks, "unfurl_links": False, "unfurl_media": False}
         try:
-            response = await self._writes.chat_postMessage(
-                channel=destination.conversation_id, text=text, blocks=blocks, unfurl_links=False, unfurl_media=False
-            )
+            response = await self._writes.chat_postMessage(channel=destination.conversation_id, **arguments)
         except SlackApiError as exc:
             status, code, retry_after = classify_slack_error(exc)
             return OperationResult.error(status=status, message="slack post failed", error_code=code, retry_after=retry_after)

@@ -8,6 +8,7 @@ dependencies = [
     "blinker>=1.9.0",
     "boto3>=1.43.116",
     "botocore>=1.43.116",
+    "cryptography>=50.0.2",
     "fastapi>=0.156.8",
     "geoip2>=5.3.0",
     "google-api-python-client>=2.201.0",
@@ -510,5 +511,6 @@ source_modules = [
     "capabilities.webhooks.schemas",
     "capabilities.webhooks.service",
     "capabilities.webhooks.settings",
+    "capabilities.webhooks.store",
 ]
 forbidden_modules = ["slack_sdk", "slack_bolt"]

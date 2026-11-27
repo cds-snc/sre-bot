@@ -300,8 +300,10 @@ def test_legacy_only_webhook_sns_signature_version_2_is_rejected_with_500(webhoo
     """A correctly SHA256-signed SignatureVersion 2 message is rejected: the validator accepts only version 1.
 
     AWS signs with SHA256 when the topic's SignatureVersion attribute is 2, so such a topic
-    cannot deliver today. Ended by TASK-37.2, whose validation accepts both versions (the
-    webhooks architecture review rules on it).
+    cannot deliver on this route. The rebuilt route accepts both versions: its accepting
+    counterpart is test_signature_versions_1_and_2_verify in
+    tests/unit/capabilities/webhooks/test_webhooks_sns_protocol_verifies.py.
+    TODO(TASK-37.5): delete this pin with the legacy route.
     """
     webhook_surface.records.seed(hook_type="info")
     message = sns.signer.message(
