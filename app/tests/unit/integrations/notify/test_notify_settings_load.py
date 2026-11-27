@@ -2,7 +2,8 @@
 
 Each test installs a base and a local file from tmp_path (``install_notify_files``) with
 every Notify variable removed and the .env file disabled (the autouse isolation fixture),
-so it observes only the values it writes and sets. The timeout comes from [notify], the API
+so it observes only the values it writes and sets. The timeout and the connect retries come
+from [notify], the API
 host from the optional [notify.tenant] entry, and the credentials only from
 NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET.
 """
@@ -11,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from contracts.configuration import ConfigurationSlice
+from contracts.configuration import ConfigurationError, ConfigurationSlice
 from integrations.notify.settings import NotifySettings, get_notify_settings
 from tests.unit.integrations.notify.conftest import API_URL, TENANT, install_notify_files
 
@@ -52,6 +53,20 @@ def test_nothing_set_is_notify_not_configured(tmp_path: Path) -> None:
     assert settings.sre_user_name.get_secret_value() == ""
     assert settings.sre_client_secret.get_secret_value() == ""
     assert settings.timeout_seconds == 60.0
+    assert settings.connect_retries == 2
+
+
+def test_the_connect_retries_come_from_the_notify_table(tmp_path: Path) -> None:
+    install_notify_files(tmp_path, base="[notify]\nconnect_retries = 0\n")
+
+    assert NotifySettings().connect_retries == 0
+
+
+def test_negative_connect_retries_are_rejected(tmp_path: Path) -> None:
+    install_notify_files(tmp_path, base="[notify]\nconnect_retries = -1\n")
+
+    with pytest.raises(ConfigurationError, match=r"\[notify\] connect_retries"):
+        NotifySettings()
 
 
 def test_the_tenant_entry_and_the_credentials_configure_notify(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
