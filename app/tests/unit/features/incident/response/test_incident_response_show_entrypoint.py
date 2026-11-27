@@ -281,7 +281,7 @@ def test_pressing_update_acks_and_pushes_a_select_on_the_current_value(surface: 
     [field_input] = [block for block in pushed["view"]["blocks"] if block["type"] == "input"]
     element = field_input["element"]
     assert element["initial_option"]["value"] == "sev-2"
-    assert [option["value"] for option in element["options"]] == ["none", "sev-1", "sev-2", "sev-3", "sev-4"]
+    assert [option["value"] for option in element["options"]] == ["none", "sev-0", "sev-1", "sev-2", "sev-3", "sev-4"]
     assert pushed["view"]["callback_id"] == FIELD_CALLBACK_ID
 
 

@@ -231,6 +231,8 @@ timeline_update_attempts = 3
 # Most names an incident's conversation is tried under (the first, then -2 onward); the next
 # is tried only when the current one is proven another incident's or not the bot's.
 conversation_name_attempts = 5
+# Whether conversation names start incident-dev- instead of incident- (non-production files say true).
+dev_conversation_names = false
 folder_id = ""
 report_template_id = ""
 list_sheet_id = ""

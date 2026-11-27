@@ -97,6 +97,24 @@ POLICY = DeclarePolicy(
 )
 
 
+class ChannelLanguages:
+    """English only everywhere but the announcement channel, which is written in French then English."""
+
+    def shared_languages(self, *, system: WorkplaceSystem, tenant: str, conversation_id: str) -> tuple[str, ...]:
+        return ("fr-FR", "en-US") if conversation_id == ANNOUNCEMENTS else ("en-US",)
+
+    def reply_languages(self, user_locale: str | None) -> tuple[str, ...]:
+        return ("en-US",)
+
+
+LANGUAGES = ChannelLanguages()
+
+
+def _in(languages: tuple[str, ...]) -> str:
+    """Nothing for the incident channel's English; the languages otherwise, so a test sees which ones a post got."""
+    return "" if languages == ("en-US",) else f" [{', '.join(languages)}]"
+
+
 class Texts:
     """Renders each message from its inputs, so a test can tell which incident and reference it names."""
 
@@ -109,17 +127,17 @@ class Texts:
     def canvas(self, incident: Incident) -> str:
         return f"# canvas {incident.title}"
 
-    def announcement(self, incident: Incident, conversation: ConversationReference) -> str:
-        return f"announce {incident.id} in {conversation.vendor_id}"
+    def announcement(self, incident: Incident, conversation: ConversationReference, languages: tuple[str, ...]) -> str:
+        return f"announce {incident.id} in {conversation.vendor_id}{_in(languages)}"
 
-    def severity_warning(self, incident: Incident) -> str | None:
-        return None if incident.severity is None else f"severity {incident.severity.name}"
+    def severity_warning(self, incident: Incident, languages: tuple[str, ...]) -> str | None:
+        return None if incident.severity is None else f"severity {incident.severity.name}{_in(languages)}"
 
     def report_bookmark(self) -> str:
         return "Report"
 
-    def report_posted(self, report: ReportReference) -> str:
-        return f"report {report.vendor_id}"
+    def report_posted(self, report: ReportReference, languages: tuple[str, ...]) -> str:
+        return f"report {report.vendor_id}{_in(languages)}"
 
     def report_placeholders(
         self, incident: Incident, conversation: ConversationReference | None, on_call: tuple[OnCallPerson, ...]
@@ -130,20 +148,20 @@ class Texts:
     def video_call_bookmark(self) -> str:
         return "Meet"
 
-    def video_call_posted(self, call: VideoCallReference) -> str:
-        return f"meet {call.url}"
+    def video_call_posted(self, call: VideoCallReference, languages: tuple[str, ...]) -> str:
+        return f"meet {call.url}{_in(languages)}"
 
     def source_alert_bookmark(self) -> str:
         return "Alert"
 
-    def source_alert_posted(self, alert: MessageReference) -> str:
-        return f"alert {alert.message_id}"
+    def source_alert_posted(self, alert: MessageReference, languages: tuple[str, ...]) -> str:
+        return f"alert {alert.message_id}{_in(languages)}"
 
-    def on_call_unavailable(self, incident: Incident) -> str:
-        return "nobody on call invited"
+    def on_call_unavailable(self, incident: Incident, languages: tuple[str, ...]) -> str:
+        return f"nobody on call invited{_in(languages)}"
 
-    def next_steps(self, incident: Incident) -> str:
-        return "next steps"
+    def next_steps(self, incident: Incident, languages: tuple[str, ...]) -> str:
+        return f"next steps{_in(languages)}"
 
 
 @dataclass
@@ -168,7 +186,7 @@ class World:
             claims=self.claims,
             schedules=self.schedules,
             oncall=self.oncall,
-            chat=ChatSurface(self.conversations, tenant=SLACK_TENANT) if chat else None,
+            chat=ChatSurface(self.conversations, tenant=SLACK_TENANT, languages=LANGUAGES) if chat else None,
         )
 
 
@@ -265,7 +283,7 @@ async def test_the_conversation_is_named_set_up_bookmarked_and_announced() -> No
     )
     assert world.conversations.posts_in(channel) == ("report D0REPORT", "meet https://meet.google.com/call-1", "next steps")
     announcements = ConversationReference(system=WorkplaceSystem.SLACK, tenant=SLACK_TENANT, vendor_id=ANNOUNCEMENTS)
-    assert world.conversations.posts_in(announcements) == (f"announce {declared.incident.id} in C0NEW1",)
+    assert world.conversations.posts_in(announcements) == (f"announce {declared.incident.id} in C0NEW1 [fr-FR, en-US]",)
 
 
 async def test_the_report_is_filed_in_the_placement_with_its_placeholders() -> None:
@@ -281,6 +299,16 @@ async def test_the_report_is_filed_in_the_placement_with_its_placeholders() -> N
         "{{slack-channel}}": "C0NEW1",
         "{{on-call}}": "2",
     }
+
+
+async def test_the_declarer_is_the_incident_commander() -> None:
+    world = _world()
+
+    declared = await _declare(world)
+
+    stored = (await world.incidents.get(incident_id_for(KEY))).data
+    assert stored is not None
+    assert stored.incident_commander == DECLARER == declared.incident.incident_commander
 
 
 async def test_the_initial_status_comes_from_the_policy() -> None:

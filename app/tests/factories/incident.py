@@ -9,6 +9,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
+from contracts.coordination import ConditionalWriteStore
 from contracts.languages import LanguagePolicy
 from contracts.operations import OperationResult
 from contracts.operations.status import OperationStatus
@@ -20,6 +21,7 @@ from features.incident.core.adapters.in_memory import InMemoryIncidentStore
 from features.incident.core.api import StatusUpdateStore, build_status_update_store
 from features.incident.core.domain import BindingKind, ConversationReference, Incident, IncidentBinding
 from features.incident.core.store import RecordIncidentStore, RecordTimelineStore, bindings_table, incidents_table, timeline_table
+from infrastructure.coordination.in_memory import InMemoryConditionalWriteStore
 from infrastructure.records.in_memory import InMemoryRecordStore
 from server.languages.policy import ConfiguredLanguagePolicy
 from tests.factories.services import FakeServiceScopeOpener
@@ -136,16 +138,21 @@ def incident_scopes(
     *,
     tenants: Mapping[WorkplaceSystem, str] | None = None,
     languages: Sequence[str] | None = None,
+    claims_store: ConditionalWriteStore | None = None,
 ) -> FakeServiceScopeOpener:
-    """A scope opener resolving the RecordStore, ConfiguredSystems and LanguagePolicy an incident entry point needs.
+    """A scope opener resolving the stores, ConfiguredSystems and LanguagePolicy an incident entry point needs.
 
-    ``records`` defaults to an empty ``InMemoryRecordStore``; ``tenants``
-    defaults to Slack configured under ``SLACK_TENANT``; ``languages`` is the
-    instance's shared list, English then French by default (the base file's).
-    The policy is the host's own, a pure value with no I/O.
+    ``records`` defaults to an empty ``InMemoryRecordStore`` and ``claims_store``
+    to an empty ``InMemoryConditionalWriteStore``; ``tenants`` defaults to Slack
+    configured under ``SLACK_TENANT``; ``languages`` is the instance's shared
+    list, English then French by default (the base file's). The policy is the
+    host's own, a pure value with no I/O.
     """
     return FakeServiceScopeOpener(
         {
+            ConditionalWriteStore: claims_store
+            if claims_store is not None
+            else InMemoryConditionalWriteStore(record_ttl_seconds=3600, in_progress_ttl_seconds=300),
             RecordStore: records if records is not None else InMemoryRecordStore(),
             ConfiguredSystems: FakeConfiguredSystems({WorkplaceSystem.SLACK: SLACK_TENANT} if tenants is None else tenants),
             LanguagePolicy: ConfiguredLanguagePolicy(

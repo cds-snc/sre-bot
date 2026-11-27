@@ -1,9 +1,9 @@
 """Declare: the record first, then the conversation and its binding, then the resources, invites and list row.
 
 ``declare`` serves every way an incident is declared (the Slack modal and the alert
-buttons from TASK-145.7.10, the HTTP route from TASK-165.2); it names no platform. The
-record is the commit point (decisions/incident-management.md): it is written first,
-under the id derived from the declare's idempotency key, and never rolled back. Every
+buttons today); it names no platform. The record is the commit point
+(decisions/incident-management.md): it is written first, under the id derived from the
+declare's idempotency key, with the declarer as incident commander, and never rolled back. Every
 later step is retriable and leaves its reference empty when it fails; the declare
 continues and reports each step's outcome. Running the declare again with the same key
 is the retry: the record write replays, each step is skipped when its reference is set,
@@ -18,7 +18,8 @@ links, the severity warning, the source alert, the announcement, the invites (th
 declarer, the on-call people, and the security, policy and Notify management groups,
 each group only when its id is configured), the on-call notice when nobody on call
 could be invited, and the next steps; last, the list row, written whatever failed
-before it.
+before it. Each message posted to a conversation is rendered in that conversation's
+languages, read from the chat surface's language policy.
 """
 
 from collections.abc import Awaitable, Callable, Sequence
@@ -30,6 +31,7 @@ import structlog
 
 from capabilities.oncall.api import OnCallLookup, OnCallPerson
 from contracts.coordination import ClaimResult
+from contracts.languages import LanguagePolicy
 from contracts.operations import OperationResult
 from contracts.operations.codes import ErrorCode
 from features.incident.common.vocabulary import IncidentStatus, Severity
@@ -71,7 +73,7 @@ class DeclareRequest:
             message, the HTTP Idempotency-Key with its caller); the incident id derives from it.
         title: Short name of the incident.
         security_incident: Whether it is declared a security incident.
-        declarer: The chat account id of the person declaring (a person id with TASK-83).
+        declarer: The chat account id of the person declaring.
         declared_at: When it was declared, timezone-aware.
         severity: The severity chosen at declare, ``None`` when not rated yet.
         placement: The report placement chosen (a product folder), ``None`` for the default folder.
@@ -92,10 +94,11 @@ class DeclareRequest:
 
 @dataclass(frozen=True)
 class ChatSurface:
-    """The chat platform declare creates the conversation on, and its tenant."""
+    """The chat platform declare creates the conversation on, its tenant, and the languages each conversation is written in."""
 
     conversations: IncidentConversation
     tenant: str
+    languages: LanguagePolicy
 
 
 @dataclass(frozen=True)
@@ -213,6 +216,7 @@ async def _run(
         declared_by=request.declarer,
         declared_at=request.declared_at,
         security_incident=request.security_incident,
+        incident_commander=request.declarer,
         severity=request.severity,
         source_alert=request.source_alert,
     )
@@ -366,6 +370,7 @@ class _Steps:
         talk = chat.conversations
         texts = self._texts
         incident = self.incident
+        here = _languages(chat, conversation)
         results: list[StageResult] = [
             stage_result(await talk.set_topic(conversation, texts.topic(incident))),
             stage_result(await talk.set_purpose(conversation, texts.purpose(incident))),
@@ -373,39 +378,43 @@ class _Steps:
         ]
         if self._new_report and incident.report is not None and incident.report.url:
             results.append(stage_result(await talk.add_bookmark(conversation, texts.report_bookmark(), incident.report.url)))
-            results.append(stage_result(await talk.post(conversation, texts.report_posted(incident.report))))
+            results.append(stage_result(await talk.post(conversation, texts.report_posted(incident.report, here))))
         if self._new_video_call and incident.video_call is not None and incident.video_call.url:
             link = incident.video_call.url
             results.append(stage_result(await talk.add_bookmark(conversation, texts.video_call_bookmark(), link)))
-            results.append(stage_result(await talk.post(conversation, texts.video_call_posted(incident.video_call))))
-        warning = texts.severity_warning(incident)
+            results.append(stage_result(await talk.post(conversation, texts.video_call_posted(incident.video_call, here))))
+        warning = texts.severity_warning(incident, here)
         if warning is not None:
             results.append(await self._once("severity_warning", lambda: talk.post(conversation, warning)))
         alert = incident.source_alert
         if alert is not None:
-            results.append(await self._once("source_alert", lambda: self._post_source_alert(talk, conversation, alert)))
+            results.append(await self._once("source_alert", lambda: self._post_source_alert(talk, conversation, alert, here)))
         if self._policy.announcement_channel_id:
             channel = ConversationReference(
                 system=conversation.system, tenant=conversation.tenant, vendor_id=self._policy.announcement_channel_id
             )
-            announcement = texts.announcement(incident, conversation)
+            announcement = texts.announcement(incident, conversation, _languages(chat, channel))
             results.append(await self._once("announcement", lambda: talk.post(channel, announcement)))
         invites = await self._invite(talk, conversation, people)
         if on_call.outcome is not StageOutcome.DONE:
-            notice = texts.on_call_unavailable(incident)
+            notice = texts.on_call_unavailable(incident, here)
             results.append(await self._once("on_call_unavailable", lambda: talk.post(conversation, notice)))
-        steps = texts.next_steps(incident)
+        steps = texts.next_steps(incident, here)
         results.append(await self._once("next_steps", lambda: talk.post(conversation, steps)))
         return _first_failure(results), invites
 
     async def _post_source_alert(
-        self, talk: IncidentConversation, conversation: ConversationReference, alert: MessageReference
+        self,
+        talk: IncidentConversation,
+        conversation: ConversationReference,
+        alert: MessageReference,
+        languages: tuple[str, ...],
     ) -> OperationResult[None]:
         if alert.url:
             bookmarked = await talk.add_bookmark(conversation, self._texts.source_alert_bookmark(), alert.url)
             if not bookmarked.is_success:
                 return bookmarked
-        posted = await talk.post(conversation, self._texts.source_alert_posted(alert))
+        posted = await talk.post(conversation, self._texts.source_alert_posted(alert, languages))
         return OperationResult.success() if posted.is_success else _as_none(posted)
 
     async def _invite(
@@ -466,6 +475,13 @@ class _Steps:
         if written.is_success and written.data is not None:
             self.incident = written.data
         return stage_result(written)
+
+
+def _languages(chat: ChatSurface, conversation: ConversationReference) -> tuple[str, ...]:
+    """The languages, in order, of a message posted to ``conversation``."""
+    return chat.languages.shared_languages(
+        system=conversation.system, tenant=conversation.tenant, conversation_id=conversation.vendor_id
+    )
 
 
 def _on_call_accounts(people: Sequence[OnCallPerson], conversation: ConversationReference) -> tuple[list[str], list[str]]:

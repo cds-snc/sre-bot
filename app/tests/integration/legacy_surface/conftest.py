@@ -68,7 +68,6 @@ from contracts.plugins.hookspecs import FeatureLifecycleSpecs
 from contracts.plugins.namespace import PLUGIN_NAMESPACE
 from contracts.workplace import WorkplaceSystem
 from features.incident.common.settings import get_incident_core_settings
-from features.incident.core.adapters import google_docs as incident_drive
 from features.incident.core.adapters.slack import SlackIncidentTranscriptReader
 from features.incident.scribe import service as incident_scribe_service
 from infrastructure.configuration.features.sre_ops import get_sre_ops_settings
@@ -83,7 +82,6 @@ from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from integrations.slack.settings import SlackSettings
 from models.incidents import Incident
-from modules.slack import webhooks as legacy_webhooks
 from modules.sre.platforms import slack as sre_slack
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from packages.aws_platform.adapters import dynamodb as dynamodb_adapter
@@ -111,12 +109,6 @@ TRIGGER_ID = "trigger-123"
 TEAM_ID = "T0TEAM"
 RESPONSE_URL = "https://hooks.slack.test/commands/response"
 REPORT_URL = "https://docs.google.com/document/d/doc-source/edit"
-
-
-INCIDENT_FOLDERS: tuple[dict[str, str], ...] = (
-    {"id": "F0PLATFORM", "name": "Platform"},
-    {"id": "F0FORMS", "name": "Forms"},
-)
 
 
 class RecordingApp(App):
@@ -281,7 +273,6 @@ class LegacyHandlerHarness:
     client: FakeSlackClient
     command_prefix: str
     sentinel_events: list[dict[str, Any]] = field(default_factory=list)
-    acknowledged_webhooks: list[str] = field(default_factory=list)
     responses: list[dict[str, Any]] = field(default_factory=list)
 
     def command(self, command: str, text: str = "", **fields: str) -> BoltResponse:
@@ -315,38 +306,7 @@ class LegacyHandlerHarness:
 
 
 @pytest.fixture
-def legacy_acknowledged_webhooks_seam(monkeypatch: pytest.MonkeyPatch) -> list[str]:
-    """Internal legacy seam: the webhook acknowledged-count increment, recorded instead of stored.
-
-    The alert buttons in ``modules/incident/incident_alert.py`` call
-    ``modules.slack.webhooks.increment_acknowledged_count`` directly, so no
-    external edge is reachable; the returned list records each webhook id.
-    Owning rebuild task: TASK-145.7, which rebuilds declare and the alert
-    buttons in incident/response; this fixture is deleted there.
-    """
-    acknowledged: list[str] = []
-    monkeypatch.setattr(legacy_webhooks, "increment_acknowledged_count", acknowledged.append)
-    return acknowledged
-
-
-@pytest.fixture
-def legacy_incident_folders_seam(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Internal legacy seam: the declare form's product-folder listing, as a fixed list.
-
-    ``modules/incident/incident_folder.py`` lists the folders through the core
-    Google Docs adapter's module function; the declare pins assert on the
-    rendered options, so the listing returns ``INCIDENT_FOLDERS``. Pins over the
-    Drive edge (``incident_surface``) never request it. Owning rebuild task:
-    TASK-145.13, which deletes modules/incident (folder metadata is retired, not
-    rebuilt); this fixture is deleted there.
-    """
-    monkeypatch.setattr(incident_drive, "list_child_folders", lambda parent_folder_id: [dict(f) for f in INCIDENT_FOLDERS])
-
-
-@pytest.fixture
-def legacy_handler_harness(
-    monkeypatch: pytest.MonkeyPatch, legacy_acknowledged_webhooks_seam: list[str]
-) -> Iterator[LegacyHandlerHarness]:
+def legacy_handler_harness(monkeypatch: pytest.MonkeyPatch) -> Iterator[LegacyHandlerHarness]:
     """Bolt app with ``_register_legacy_handlers`` applied and every external edge faked.
 
     Listener-injected Web API clients reach the harness's ``FakeSlackClient``
@@ -362,7 +322,6 @@ def legacy_handler_harness(
         app=app,
         client=client,
         command_prefix=get_slack_transport_settings().command_prefix,
-        acknowledged_webhooks=legacy_acknowledged_webhooks_seam,
     )
 
     def route_api_call(web_client: WebClient, api_method: str, **kwargs: Any) -> Any:

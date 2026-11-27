@@ -14,6 +14,7 @@ Backlog doc-2 (Delivery Sequence and Stacked Pull Requests) says which stacks ex
 - A session may carry several layers of one stack. Record the position in the handoff doc before switching layers.
 - Git and `gh stack` write operations are run by the human. The agent prints the exact commands to run, in order, and runs read-only checks itself (`git status`, `git log`, `gh stack view`, `gh pr view`). The agent runs a write command only when the human asks for that specific command.
 - Branch names are `<stack>/<task-id>-<slug>`, for example `stack-a/task-18-import-linter`. A planning layer is `<stack>/plan`.
+- Review is requested once two layers are stacked, and at least two stacked PRs stay open before any closes: a lone PR is not a stack, and a layer merges only when a higher layer is already submitted (human, 2026-10-14).
 - Keep the top layer open while more layers are planned. If the latest layer merges or closes, `gh stack` treats the stack as finished and closes it, and new layers cannot be added. When a stack pauses for side PRs, its top PR stays open and unmerged until the next layer is added above it. Never print a merge command for the top layer of a stack that still has planned layers.
 - If a lower layer needs a fix, change that layer (`gh stack checkout <branch>`, commit, then `gh stack rebase`). Never patch it from a higher layer.
 

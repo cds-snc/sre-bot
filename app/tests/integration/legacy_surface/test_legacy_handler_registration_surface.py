@@ -5,6 +5,9 @@ app that records every ``command``, ``action``, ``view`` and ``event``
 registration. Each test compares one kind against literal names, so renaming,
 dropping or adding a legacy slash command, interaction id or event listener
 fails here. What each listener does is pinned by the per-surface test files.
+``/incident``, ``incident_change_locale``, ``incident_view`` and
+``handle_incident_action_buttons`` are served by incident.response (the declare
+cutover), so the legacy modules no longer register them.
 """
 
 from collections import Counter
@@ -15,7 +18,7 @@ from .conftest import LegacyHandlerHarness
 
 pytestmark = pytest.mark.integration
 
-LEGACY_COMMANDS = ("aws", "talent-role", "secret", "atip", "aiprp", "incident")
+LEGACY_COMMANDS = ("aws", "talent-role", "secret", "atip", "aiprp")
 
 LEGACY_ACTIONS = (
     "role_change_locale",
@@ -27,8 +30,6 @@ LEGACY_ACTIONS = (
     "next_page",
     "channel",
     "hook_type",
-    "incident_change_locale",
-    "handle_incident_action_buttons",
     "add_folder_metadata",
     "view_folder_metadata",
     "delete_folder_metadata",
@@ -43,7 +44,6 @@ LEGACY_VIEWS = (
     "aws_health_view",
     "secret_view",
     "create_webhooks_view",
-    "incident_view",
     "view_folder_metadata_modal",
     "add_metadata_view",
     "view_save_event",
@@ -58,8 +58,8 @@ LEGACY_EVENTS = (
 )
 
 
-def test_legacy_handlers_register_exactly_the_six_slash_commands(legacy_handler_harness: LegacyHandlerHarness) -> None:
-    """The legacy modules register these six commands, each once, under the transport prefix."""
+def test_legacy_handlers_register_exactly_the_five_slash_commands(legacy_handler_harness: LegacyHandlerHarness) -> None:
+    """The legacy modules register these five commands, each once, under the transport prefix."""
     prefix = legacy_handler_harness.command_prefix
     expected = Counter(f"/{prefix}{name}" for name in LEGACY_COMMANDS)
 

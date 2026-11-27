@@ -23,7 +23,8 @@ class IncidentCoreSettings(ConfigurationSlice):
 
     Keys of [incident_core]:
         incidents_table, timeline_table, status_updates_table, bindings_table, full_read_max_items,
-        timeline_update_attempts, conversation_name_attempts, new_incident_system (absent: unset).
+        timeline_update_attempts, conversation_name_attempts, dev_conversation_names,
+        new_incident_system (absent: unset).
 
     Environment only (non-public values):
         INCIDENT_CORE__FOLDER_ID, INCIDENT_CORE__REPORT_TEMPLATE_ID, INCIDENT_CORE__LIST_SHEET_ID.
@@ -64,6 +65,13 @@ class IncidentCoreSettings(ConfigurationSlice):
         description=(
             "Most names an incident's conversation is tried under: the first, then a -<attempt> suffix "
             "from the second; the next name is tried only when the current one is proven another's."
+        ),
+    )
+    dev_conversation_names: bool = Field(
+        default=False,
+        description=(
+            "Whether incident conversation names start incident-dev- instead of incident-, "
+            "so a non-production instance's conversations are told apart from production's."
         ),
     )
     new_incident_system: WorkplaceSystem | None = Field(

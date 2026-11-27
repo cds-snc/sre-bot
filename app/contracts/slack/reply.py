@@ -7,6 +7,7 @@ into an ``OperationResult`` and never raise.
 See: decisions/transport-slack.md (Errors)
 """
 
+from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
 from contracts.operations import OperationResult
@@ -48,4 +49,20 @@ class SlackReplySender(Protocol):
 
     def update_view(self, *, view_id: str, view: dict[str, Any], hash: str | None = None) -> OperationResult[None]:  # noqa: A002 -- Slack's parameter name
         """Replace an open modal view; ``hash`` guards against concurrent updates."""
+        ...
+
+    def update_message(
+        self,
+        *,
+        channel_id: str,
+        ts: str,
+        text: str,
+        attachments: Sequence[Mapping[str, Any]] = (),
+        blocks: Sequence[Mapping[str, Any]] = (),
+    ) -> OperationResult[None]:
+        """Replace a message the bot posted, its text, legacy attachments and blocks together."""
+        ...
+
+    def permalink(self, *, channel_id: str, message_ts: str) -> OperationResult[str]:
+        """Return the permanent link of a message."""
         ...

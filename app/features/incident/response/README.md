@@ -64,8 +64,8 @@ submission; `entrypoints/slack_show_views.py` builds the views; `service/fields.
   closed it fails with `not_found`, an expected outcome logged at info.
 - The security flag is a yes/no field anyone who passes the command check may change; a flip
   triggers nothing beyond the record and the notice (decisions/incident-management.md).
-- Severity options stay `none` and `sev-1` to `sev-4` until TASK-145.7.10 adds SEV0 to both
-  pickers (`SEVERITY_OPTIONS`).
+- Severity options are `none`, then `sev-0` to `sev-4`, one list (`SEVERITY_OPTIONS`) shared
+  with the declare form.
 
 ## Archive
 
@@ -82,12 +82,13 @@ submission; `entrypoints/slack_show_views.py` builds the views; `service/fields.
 
 ## Declare
 
-`service/declare.py` holds `declare`; nothing registers it yet (TASK-145.7.10 cuts the Slack
-declare and the alert buttons over to it, TASK-165.2 adds the HTTP route). It names no platform:
-the caller passes a `DeclareRequest`, the ports (`DeclarePorts`; `chat` is `None` without a chat
-platform), the `DeclarePolicy` from `[incident_response]` and the texts (`DeclareTexts`).
+`service/declare.py` holds `declare`; `entrypoints/slack_declare.py` serves it on Slack. It names
+no platform: the caller passes a `DeclareRequest`, the ports (`DeclarePorts`, built by
+`providers.declare_ports`; `chat` is `None` without a chat platform), the `DeclarePolicy` from
+`[incident_response]` and the texts (`DeclareTexts`; `entrypoints/slack_declare_texts.py` on Slack).
 
-- The record first, under `incident_id_for(idempotency_key)`: the commit point, never rolled back.
+- The record first, under `incident_id_for(idempotency_key)`, with the declarer as incident
+  commander: the commit point, never rolled back.
 - Then the conversation (`service/conversation.py`, `ensure_conversation`: the five
   one-conversation rules) and its primary binding, who is on call for the placement's schedule
   (`PlacementScheduleLookup`, then the on-call capability), the report filed in the placement with
@@ -103,6 +104,29 @@ platform), the `DeclarePolicy` from `[incident_response]` and the texts (`Declar
   group only when its id is configured. A missing schedule or a failing source invites nobody on
   call and posts `on_call_unavailable`.
 - The first status is `[incident_response] initial_status` (Open or In Progress, default Open).
+- Each post to a conversation is rendered in that conversation's languages
+  (`ChatSurface.languages`, the instance language policy); the announcement channel has its own.
+
+Slack (`entrypoints/slack_declare.py`, views in `slack_declare_views.py`):
+
+- `/incident <name>` (a host root command) opens a loading view on the trigger, then the form
+  (callback `incident.response.declare`): name, product (the report placements), severity with
+  SEV0, security and policy-help questions, the handbook link. Its locale button
+  (`incident.response.locale`, legacy alias `incident_change_locale`) re-renders it in the other
+  language, keeping the name.
+- The submission is validated before its single ack (the name's field error in the instance
+  languages), then declared with the view id as idempotency key. The success view opens on the
+  submission's trigger; a refused record or a missing channel is told to the declarer in a direct
+  message; a failed later step posts a warning in the incident channel.
+- The alert buttons (`incident.response.alert_buttons`, legacy alias
+  `handle_incident_action_buttons`, which the webhook producer posts): `call-incident` opens the
+  form named after the alert with its channel and message, which become the source alert;
+  `ignore-incident` claims the message (`incident:alert_ignore:<channel>:<ts>`), counts one
+  acknowledgement on the first press (`AlertAcknowledgements`, `adapters/alert_acknowledgements.py`
+  over the webhooks table; approximate, decisions/webhooks.md section 8; TODO(TASK-37.6.2)), and
+  replaces the buttons with who ignored it.
+- Each handler sends its Sentinel event (`incident_called`, `call_incident_button_pressed`,
+  `ignore_incident_button_pressed`) with ids only, through `DeclareEventSink`.
 
 ## Layout
 
@@ -120,10 +144,13 @@ platform), the `DeclarePolicy` from `[incident_response]` and the texts (`Declar
 - `service/status.py`: `change_status`; `service/fields.py`: `update_fields`; `service/roles.py`:
   `assign_roles`; `service/archive.py`: `archive_incident`; `service/declare.py`: `declare`;
   `service/conversation.py`: `ensure_conversation`.
-- `interfaces.py`: `ArchiveEventSink` and `ArchivedEvent`, `adapters/sentinel.py` implements it;
+- `interfaces.py`: `ArchiveEventSink` and `ArchivedEvent`, and `DeclareEventSink`,
+  `adapters/sentinel.py` implements both; `AlertAcknowledgements`,
+  `adapters/alert_acknowledgements.py` implements it;
   `Claims` (async claims), `adapters/claims.py` implements it over the `IdempotencyStore`;
   `DeclareTexts`, the declare's words, which the cutover's entry points render.
 - `providers.py`: the core report, list projection, conversation, video call, placement schedule
   lookup and legacy roles reader, the on-call lookup, claims over the scope's conditional-write
-  store, the declare policy and the archive event sink, the services use; tests substitute them here.
+  store, the declare policy and ports, the alert acknowledgements, and the archive and declare
+  event sinks, the services use; tests substitute them here.
 - `settings.py`, `legacy_upgrade_job.py`: see the umbrella README.

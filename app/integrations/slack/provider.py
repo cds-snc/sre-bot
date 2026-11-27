@@ -100,6 +100,39 @@ class SlackWebReply:
             lambda client: client.views_update(view=view, view_id=view_id, hash=hash),
         )
 
+    def update_message(
+        self,
+        *,
+        channel_id: str,
+        ts: str,
+        text: str,
+        attachments: Sequence[Mapping[str, Any]] = (),
+        blocks: Sequence[Mapping[str, Any]] = (),
+    ) -> OperationResult[None]:
+        """Replace a message the bot posted."""
+        return self._call(
+            "chat_update",
+            lambda client: client.chat_update(
+                channel=channel_id,
+                ts=ts,
+                text=text,
+                attachments=[dict(attachment) for attachment in attachments],
+                blocks=[dict(block) for block in blocks],
+            ),
+        )
+
+    def permalink(self, *, channel_id: str, message_ts: str) -> OperationResult[str]:
+        """Return a message's permanent link."""
+        response = self._request(
+            "chat_getPermalink", lambda client: client.chat_getPermalink(channel=channel_id, message_ts=message_ts)
+        )
+        if not response.is_success:
+            return _carry_error(response)
+        link = _field(response.data, "permalink")
+        if link is None:
+            return OperationResult.permanent_error("Slack chat_getPermalink returned no permalink")
+        return OperationResult.success(data=link)
+
     def _call(self, method: str, call: Callable[[WebClient], object]) -> OperationResult[None]:
         """Run one Web API call whose response is not needed."""
         result = self._request(method, call)
@@ -140,6 +173,15 @@ def _carry_error[T](result: OperationResult[Any]) -> OperationResult[T]:
         retry_after=result.retry_after,
         cause=result.cause,
     )
+
+
+def _field(response: Any, name: str) -> str | None:
+    """Read a non-empty string field of a Slack response, or ``None`` when absent."""
+    try:
+        value = response[name]
+    except KeyError, TypeError:
+        return None
+    return value if isinstance(value, str) and value else None
 
 
 def _view_id(response: Any) -> str | None:

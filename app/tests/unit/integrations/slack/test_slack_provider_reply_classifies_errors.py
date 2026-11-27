@@ -88,6 +88,33 @@ class TestWebApiCalls:
         client.views_open.assert_called_once_with(trigger_id="T1", view=view)
         assert result.status is OperationStatus.SUCCESS
 
+    def test_update_message_replaces_text_attachments_and_blocks(self) -> None:
+        client = MagicMock()
+        attachments = [{"color": "3AA3E3", "text": "ignored"}]
+
+        result = _provider(client).reply.update_message(channel_id="C1", ts="1.2", text="", attachments=attachments)
+
+        client.chat_update.assert_called_once_with(channel="C1", ts="1.2", text="", attachments=attachments, blocks=[])
+        assert result.status is OperationStatus.SUCCESS
+
+    def test_permalink_returns_the_message_link(self) -> None:
+        client = MagicMock()
+        client.chat_getPermalink.return_value = {"ok": True, "permalink": "https://slack.test/archives/C1/p12"}
+
+        result = _provider(client).reply.permalink(channel_id="C1", message_ts="1.2")
+
+        client.chat_getPermalink.assert_called_once_with(channel="C1", message_ts="1.2")
+        assert (result.status, result.data) == (OperationStatus.SUCCESS, "https://slack.test/archives/C1/p12")
+
+    def test_permalink_without_a_link_is_a_permanent_error(self) -> None:
+        client = MagicMock()
+        client.chat_getPermalink.return_value = {"ok": True}
+
+        result = _provider(client).reply.permalink(channel_id="C1", message_ts="1.2")
+
+        assert result.status is OperationStatus.PERMANENT_ERROR
+        assert result.data is None
+
 
 class TestFailuresAreClassifiedNotRaised:
     """Web API failures come back as error results."""

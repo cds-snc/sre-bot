@@ -7,6 +7,8 @@ from typing import Any, Protocol
 
 from capabilities.oncall.api import OnCallPerson
 from contracts.coordination import ClaimOutcome
+from contracts.languages import MultilingualText
+from contracts.operations import OperationResult
 from features.incident.core.api import (
     ConversationReference,
     Incident,
@@ -57,7 +59,12 @@ class Claims(Protocol):
 
 
 class DeclareTexts(Protocol):
-    """The declare's words, rendered by the caller (locale, platform markup); the service chooses none of them."""
+    """The declare's words, rendered by the caller (locale, platform markup); the service chooses none of them.
+
+    A message posted to a shared conversation is rendered in ``languages``, the
+    languages of that conversation in order (decisions/languages.md), which the
+    service reads from the language policy for each conversation it posts to.
+    """
 
     def topic(self, incident: Incident) -> str:
         """The conversation's topic."""
@@ -71,11 +78,13 @@ class DeclareTexts(Protocol):
         """The markdown the conversation's canvas starts from."""
         ...
 
-    def announcement(self, incident: Incident, conversation: ConversationReference) -> str:
+    def announcement(
+        self, incident: Incident, conversation: ConversationReference, languages: tuple[str, ...]
+    ) -> str | MultilingualText:
         """The announcement posted in the announcement channel, naming the incident's conversation."""
         ...
 
-    def severity_warning(self, incident: Incident) -> str | None:
+    def severity_warning(self, incident: Incident, languages: tuple[str, ...]) -> str | MultilingualText | None:
         """The warning posted when the incident is declared with a severity; ``None`` when there is none."""
         ...
 
@@ -83,7 +92,7 @@ class DeclareTexts(Protocol):
         """The report bookmark's title."""
         ...
 
-    def report_posted(self, report: ReportReference) -> str:
+    def report_posted(self, report: ReportReference, languages: tuple[str, ...]) -> str | MultilingualText:
         """The message that links the new report."""
         ...
 
@@ -97,7 +106,7 @@ class DeclareTexts(Protocol):
         """The video call bookmark's title."""
         ...
 
-    def video_call_posted(self, call: VideoCallReference) -> str:
+    def video_call_posted(self, call: VideoCallReference, languages: tuple[str, ...]) -> str | MultilingualText:
         """The message that links the new video call."""
         ...
 
@@ -105,14 +114,30 @@ class DeclareTexts(Protocol):
         """The source alert bookmark's title."""
         ...
 
-    def source_alert_posted(self, alert: MessageReference) -> str:
+    def source_alert_posted(self, alert: MessageReference, languages: tuple[str, ...]) -> str | MultilingualText:
         """The message that links the alert the incident was declared from."""
         ...
 
-    def on_call_unavailable(self, incident: Incident) -> str:
+    def on_call_unavailable(self, incident: Incident, languages: tuple[str, ...]) -> str | MultilingualText:
         """The message saying nobody on call was invited (no schedule, or the source failed)."""
         ...
 
-    def next_steps(self, incident: Incident) -> str:
+    def next_steps(self, incident: Incident, languages: tuple[str, ...]) -> str | MultilingualText:
         """The closing message listing what responders do next."""
+        ...
+
+
+class AlertAcknowledgements(Protocol):
+    """Counts an alert's acknowledgements by its webhook; the count is approximate (a retried write may count twice)."""
+
+    async def increment(self, webhook_id: str) -> OperationResult[None]:
+        """Add one acknowledgement to ``webhook_id``; a missing webhook is ``NOT_FOUND`` and creates nothing."""
+        ...
+
+
+class DeclareEventSink(Protocol):
+    """Where the declare's audit events go (the command, the alert buttons); a send failure is the sink's to log."""
+
+    async def send(self, event: str, message: Mapping[str, str]) -> None:
+        """Send ``event`` with ``message``, ids only, never a request body; never raises."""
         ...

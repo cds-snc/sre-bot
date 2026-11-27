@@ -253,7 +253,10 @@ def test_updating_a_field_acks_the_submission_and_refreshes_the_information_moda
 
 
 def test_pressing_update_pushes_a_field_modal_that_starts_on_the_current_value(surface: FieldSurface) -> None:
-    """The update button acks empty and pushes a modal over the information modal, preselecting the stored severity."""
+    """The update button acks empty and pushes a modal over the information modal, preselecting the stored severity.
+
+    SEV0 is offered first after none (the declare cutover's named change N4).
+    """
     info = show(surface)
 
     response = surface.slack.interaction(click_payload(info, view_button(info, value="severity")))
@@ -263,7 +266,7 @@ def test_pressing_update_pushes_a_field_modal_that_starts_on_the_current_value(s
     assert pushed["trigger_id"] == "trigger-click"
     [dropdown] = [block["element"] for block in pushed["view"]["blocks"] if block.get("type") == "input"]
     assert dropdown["initial_option"]["value"] == "sev-2"
-    assert [option["value"] for option in dropdown["options"]] == ["none", "sev-1", "sev-2", "sev-3", "sev-4"]
+    assert [option["value"] for option in dropdown["options"]] == ["none", "sev-0", "sev-1", "sev-2", "sev-3", "sev-4"]
 
 
 def test_updating_a_time_stores_the_picked_instant(surface: FieldSurface) -> None:

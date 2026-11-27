@@ -15,7 +15,6 @@ from integrations.slack import (
     commands as slack_commands,
 )
 from modules.incident import (
-    incident_alert,
     incident_conversation,
     incident_folder,
     schedule_retro,
@@ -125,7 +124,6 @@ def register(bot: App):
     Args:
         bot (SlackBot): The SlackBot instance to which the module will be registered.
     """
-    bot.action("handle_incident_action_buttons")(incident_alert.handle_incident_action_buttons)
     bot.action("add_folder_metadata")(incident_folder.add_folder_metadata)
     bot.action("view_folder_metadata")(incident_folder.view_folder_metadata)
     bot.view("view_folder_metadata_modal")(incident_folder.list_folders_view)

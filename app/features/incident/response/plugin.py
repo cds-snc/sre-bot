@@ -1,10 +1,10 @@
-"""The incident.response plugin: its requirements, the new-incident policy check, the status and roles commands and the incident legacy upgrade job.
+"""The incident.response plugin: its requirements, the new-incident policy check, its Slack commands and the incident legacy upgrade job.
 
 The entry point names this module, not the package, because the host
 configuration phase and the legacy modules read ``response/settings.py`` before
 plugins load (decisions/plugins.md). Registration is startup-driven and side
 effect free at import time (only decorated hookimpls are defined here).
-TASK-145.13 deletes the job's registration and its ``upgrade_*`` keys once a
+TODO(TASK-145.13): delete the job's registration and its ``upgrade_*`` keys once a
 production run reports nothing pending.
 """
 
@@ -57,7 +57,7 @@ def startup_warmup(logger: structlog.stdlib.BoundLogger, systems: ConfiguredSyst
 
 @hookimpl
 def register_slack_commands(registrar: SlackCommandRegistrar) -> None:
-    """Register ``/sre incident status``, ``status update`` and ``roles manage`` with the roles modal.
+    """Register the incident commands under ``/sre incident`` and ``/incident`` with the declare form and alert buttons.
 
     Args:
         registrar: Slack command registrar.
