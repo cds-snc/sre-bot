@@ -404,6 +404,9 @@ resource "aws_dynamodb_table" "sre_bot_audit_trail" {
 
 # Every DynamoDB table goes in this list: it feeds both the backup selection below
 # and the task role's table statement in iam.tf, so a new table is backed up and reachable.
+# A table left out of the backups goes in dynamodb_backup_excluded_arns too, with its reason;
+# the selection takes the difference, because AWS Backup rejects an ARN that a selection both
+# includes and excludes (not_resources only narrows wildcard or tag selections).
 locals {
   dynamodb_table_arns = [
     aws_dynamodb_table.webhooks_table.arn,
@@ -416,6 +419,12 @@ locals {
     aws_dynamodb_table.sre_bot_incident_bindings.arn,
     aws_dynamodb_table.sre_bot_idempotency.arn,
     aws_dynamodb_table.sre_bot_audit_trail.arn,
+    aws_dynamodb_table.sre_bot_webhook_inbox.arn,
+  ]
+
+  dynamodb_backup_excluded_arns = [
+    # The webhook inbox is a delivery log whose retention is its 7-day item TTL, and its
+    # point-in-time recovery covers the same window; 30-day backups would keep envelopes past it.
     aws_dynamodb_table.sre_bot_webhook_inbox.arn,
   ]
 }
@@ -460,11 +469,7 @@ resource "aws_backup_selection" "sre_bot_backup_selection" {
   name         = "sre-bot-dynamodb-backup-selection"
   plan_id      = aws_backup_plan.sre_bot_backup_plan.id
 
-  resources = local.dynamodb_table_arns
-
-  # Left out on purpose: the webhook inbox is a delivery log whose retention is its 7-day item TTL,
-  # and its point-in-time recovery covers the same window; 30-day backups would keep envelopes past it.
-  not_resources = [aws_dynamodb_table.sre_bot_webhook_inbox.arn]
+  resources = setsubtract(local.dynamodb_table_arns, local.dynamodb_backup_excluded_arns)
 }
 
 # Create an IAM role to allow AWS Backup to perform backups.
