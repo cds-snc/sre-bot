@@ -4,10 +4,8 @@ import i18n  # type: ignore
 import pytz  # type: ignore
 from slack_sdk import WebClient  # type: ignore
 from slack_sdk.errors import SlackApiError  # type: ignore
-from slack_sdk.web import SlackResponse  # type: ignore
 from structlog import get_logger
 
-from contracts.configuration import host_info
 from contracts.operations.codes import ErrorCode
 from features.incident.core.adapters import google_docs as incident_documents
 from features.incident.core.adapters.google_docs import (  # TODO(TASK-145.9.2): the handlers move onto IncidentReport
@@ -20,56 +18,6 @@ from integrations.slack import users as slack_users
 from modules.incident import schedule_retro
 
 logger = get_logger()
-
-
-def create_incident_conversation(client: WebClient, incident_name: str):
-    """Create an incident conversation channel.
-
-    Args:
-        client (WebClient): The Slack WebClient instance.
-        incident_name (str): The name of the incident.
-
-    Returns:
-        dict: A dictionary containing the channel ID, channel name, and slug.
-    """
-    date_now = datetime.now().strftime("%Y-%m-%d")
-    slug = f"{date_now} {incident_name}".strip().replace(" ", "-").lower()
-    channel_name_prefix = "incident-dev-" if host_info().environment != "production" else "incident-"
-    base_channel_name = channel_name_prefix + slug
-    # Ensure base_channel_name is at most 80 chars
-    if len(base_channel_name) > 80:
-        base_channel_name = base_channel_name[:80]
-    i = 0
-    while True:
-        if i == 0:
-            attempt_channel_name = base_channel_name
-        else:
-            # Calculate the max length for the base part so that the suffix fits in 80 chars
-            suffix = f"-{i}"
-            max_base_length = 80 - len(suffix)
-            truncated_base = base_channel_name[:max_base_length]
-            attempt_channel_name = f"{truncated_base}{suffix}"
-        try:
-            response: SlackResponse = client.conversations_create(name=attempt_channel_name)
-            if response.get("ok"):
-                if i > 0:
-                    slug = f"{slug}{suffix}"
-                channel_details = response.get("channel")
-                if not isinstance(channel_details, dict):
-                    raise SlackApiError("Error creating the channel", response)
-                channel_id = channel_details.get("id", "")
-                channel_name = attempt_channel_name
-                break
-            elif response.get("error") != "name_taken":
-                raise SlackApiError("Error creating the channel", response)
-        except SlackApiError as e:
-            # If the error is name_taken, continue to next attempt; otherwise, raise
-            if hasattr(e, "response") and getattr(e.response, "data", {}).get("error") == "name_taken":
-                pass  # Try next channel name
-            else:
-                raise
-        i += 1
-    return {"channel_id": channel_id, "channel_name": channel_name, "slug": slug}
 
 
 # Make sure that we are listening only on floppy disk reaction

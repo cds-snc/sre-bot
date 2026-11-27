@@ -18,7 +18,7 @@ APP_DIR = Path(__file__).resolve().parents[3]
 
 PROBE = (
     "import server.server\n"
-    "import modules.incident.core, modules.incident.incident, modules.ops.notifications\n"
+    "import modules.ops.notifications\n"
     "import modules.aws.groups, modules.aws.users\n"
     "from features.incident.response.settings import get_incident_response_settings\n"
     "from integrations.sentinel.settings import get_sentinel_settings\n"

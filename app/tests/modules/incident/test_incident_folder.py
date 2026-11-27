@@ -1,10 +1,9 @@
-from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
 import pytest
 
-from contracts.operations import OperationResult, OperationStatus
-from infrastructure.spreadsheets import RANGE_NOT_FOUND, SheetCell
+from contracts.operations import OperationResult
+from infrastructure.spreadsheets import SheetCell
 from modules.incident import incident_folder
 
 
@@ -13,42 +12,6 @@ def logger_mock():
     with patch("modules.incident.incident_folder.logger") as mock:
         mock.bind.return_value = mock
         yield mock
-
-
-@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
-@patch("modules.incident.incident_folder.incident_drive")
-def test_list_incident_folders(incident_drive_mock):
-    incident_drive_mock.list_child_folders.return_value = [{"id": "foo", "name": "bar"}]
-    assert incident_folder.list_incident_folders() == [{"id": "foo", "name": "bar"}]
-    incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
-
-
-@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
-@patch("modules.incident.incident_folder.incident_drive")
-def test_list_incident_folders_sorted(incident_drive_mock):
-    incident_drive_mock.list_child_folders.return_value = [
-        {"id": "baz", "name": "qux"},
-        {"id": "foo", "name": "bar"},
-    ]
-    assert incident_folder.list_incident_folders() == [
-        {"id": "foo", "name": "bar"},
-        {"id": "baz", "name": "qux"},
-    ]
-    incident_drive_mock.list_child_folders.assert_called_once_with("SRE_INCIDENT_FOLDER")
-
-
-@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(folder_id="SRE_INCIDENT_FOLDER"))
-@patch("modules.incident.incident_folder.incident_drive")
-def test_list_incident_folders_truncates_to_the_display_limit(incident_drive_mock):
-    """Drive listings are unbounded now, so the Slack option limit is enforced here."""
-    limit = incident_folder.LEGACY_FOLDER_DISPLAY_LIMIT
-    incident_drive_mock.list_child_folders.return_value = [{"id": str(i), "name": f"folder-{i:03d}"} for i in range(limit + 10)]
-
-    result = incident_folder.list_incident_folders()
-
-    assert len(result) == limit
-    assert result[0]["name"] == "folder-000"
-    assert result[-1]["name"] == f"folder-{limit - 1:03d}"
 
 
 def _view_client() -> MagicMock:
@@ -192,18 +155,6 @@ def test_save_metadata(view_folder_metadata_mock, add_metadata_mock):
     )
 
 
-@patch("modules.incident.incident_folder.incident_drive")
-def test_get_folder_metadata(incident_drive_mock):
-    metadata = {
-        "id": "folder_id",
-        "name": "folder",
-        "appProperties": {"key": "value"},
-    }
-    incident_drive_mock.get_metadata.return_value = metadata
-    assert incident_folder.get_folder_metadata("foo") == metadata
-    incident_drive_mock.get_metadata.assert_called_once_with("foo", fields="id, name, appProperties")
-
-
 @patch("modules.incident.incident_folder.incident_drive.get_metadata")
 @patch("modules.incident.incident_folder.metadata_items")
 def test_view_folder_metadata_open(metadata_items_mock, get_metadata_mock):
@@ -345,55 +296,6 @@ class FakeSpreadsheetProvider:
         return self.read_cells_result
 
 
-@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(list_sheet_id="INCIDENT_LIST"))
-@patch("modules.incident.incident_folder.datetime")
-def test_add_new_incident_to_list_success(datetime_mock):
-    provider = FakeSpreadsheetProvider()
-    datetime_mock.datetime.now.return_value.strftime.return_value = "2021-01-01"
-    document_link = "http://example.com"
-    name = "foo"
-    slug = "bar"
-    product = "baz"
-    channel_url = "http://channel.com"
-    values = [
-        [
-            "2021-01-01",
-            '=HYPERLINK("http://example.com", "foo")',
-            "baz",
-            "In Progress",
-            '=HYPERLINK("http://channel.com", "#bar")',
-        ],
-    ]
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        assert incident_folder.add_new_incident_to_list(document_link, name, slug, product, channel_url)
-    assert provider.append_values_calls == [("INCIDENT_LIST", "Sheet1!A:A", values)]
-
-
-@patch.object(incident_folder, "get_incident_core_settings", new=lambda: SimpleNamespace(list_sheet_id="INCIDENT_LIST"))
-def test_add_new_incident_to_list_raises_on_failure():
-    provider = FakeSpreadsheetProvider()
-    provider.append_values_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "write failed")
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        with pytest.raises(incident_folder.IncidentSheetError, match="write failed"):
-            incident_folder.add_new_incident_to_list("doc", "name", "slug", "product", "channel")
-
-
-@pytest.mark.parametrize(
-    ("link", "expected"),
-    [
-        ("https://gcdigital.slack.com/archives/C0123456789", "C0123456789"),
-        ("https://other.slack.com/archives/C0123456789", "C0123456789"),
-        ("https://slack.com/app_redirect?channel=C0123456789&team=T0TEAM", "C0123456789"),
-        ("https://slack.com/app_redirect?channel=C0123456789", "C0123456789"),
-        ("https://example.com/archives/C0123456789", None),
-        ("https://slack.com/app_redirect?team=T0TEAM", None),
-    ],
-)
-def test_channel_id_from_link_reads_both_link_forms(link, expected):
-    """Rows written before the deep link keep the workspace archive URL; both forms give the channel id."""
-    assert incident_folder.channel_id_from_link(link) == expected
-
-
 def _incident_row_data():
     return [
         [SheetCell("header")],
@@ -405,62 +307,3 @@ def _incident_row_data():
             SheetCell("#incident-2024-01-01-test", "https://gcdigital.slack.com/archives/C0123456789"),
         ],
     ]
-
-
-def test_get_incidents_from_sheet_returns_parsed_incidents():
-    provider = FakeSpreadsheetProvider()
-    provider.read_cells_result = OperationResult.success(data=_incident_row_data())
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        incidents = incident_folder.get_incidents_from_sheet()
-
-    assert incidents == [
-        {
-            "channel_id": "C0123456789",
-            "channel_name": "incident-2024-01-01-test",
-            "name": "Incident name",
-            "user_id": "",
-            "teams": ["Team A"],
-            "report_url": "https://report.example.com/doc",
-            "status": "Closed",
-            "created_at": "2024-01-01",
-            "meet_url": "TBC",
-        }
-    ]
-
-
-def test_get_incidents_from_sheet_skips_row_without_created_at_when_looking_back():
-    """A row with an empty created-at cell is skipped by the lookback filter.
-
-    The fake provider returns one row whose first cell has no formatted value;
-    with days > 0 the row is treated as outside the window instead of comparing
-    None to the lookback date string.
-    """
-    rows = _incident_row_data()
-    rows[1][0] = SheetCell(None)
-    provider = FakeSpreadsheetProvider()
-    provider.read_cells_result = OperationResult.success(data=rows)
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        incidents = incident_folder.get_incidents_from_sheet(days=30)
-
-    assert incidents == []
-
-
-@patch("modules.incident.incident_folder.logger")
-def test_get_incidents_from_sheet_swallows_range_not_found(mock_logger):
-    provider = FakeSpreadsheetProvider()
-    provider.read_cells_result = OperationResult.error(
-        OperationStatus.NOT_FOUND,
-        "Unable to parse range: Sheet1",
-        error_code=RANGE_NOT_FOUND,
-    )
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        assert incident_folder.get_incidents_from_sheet() == []
-    mock_logger.warning.assert_called_once()
-
-
-def test_get_incidents_from_sheet_raises_on_other_failure():
-    provider = FakeSpreadsheetProvider()
-    provider.read_cells_result = OperationResult.error(OperationStatus.TRANSIENT_ERROR, "Internal error", error_code="X")
-    with patch.object(incident_folder, "get_spreadsheet_provider", lambda: provider):
-        with pytest.raises(incident_folder.IncidentSheetError, match="Internal error"):
-            incident_folder.get_incidents_from_sheet()

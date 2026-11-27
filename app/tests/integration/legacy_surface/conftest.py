@@ -81,7 +81,6 @@ from integrations.sentinel import client as sentinel_client
 from integrations.slack.formatter import SlackBlockKitFormatter
 from integrations.slack.provider import SlackPlatformProvider
 from integrations.slack.settings import SlackSettings
-from models.incidents import Incident
 from modules.sre.platforms import slack as sre_slack
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 from packages.aws_platform.adapters import dynamodb as dynamodb_adapter
@@ -475,22 +474,34 @@ class FakeIncidentTable:
 
     def seed(self, **overrides: Any) -> None:
         """Add one incident on the test channel; ``overrides`` replace any field of the stored record."""
-        record = Incident(
-            id="inc-1",
-            channel_id=CHANNEL_ID,
-            channel_name=INCIDENT_CHANNEL_NAME,
-            name="Checkout outage",
-            user_id=USER_ID,
-            teams=["Forms"],
-            report_url=REPORT_URL,
-            status="Open",
-            created_at="1760000000.0",
-            severity="sev-2",
-            meet_url="https://meet.google.com/abc-defg-hij",
-            **overrides,
-        )
+        # The item the legacy declare stored: every attribute it wrote, unset ones as None.
+        record: dict[str, Any] = {
+            "id": "inc-1",
+            "channel_id": CHANNEL_ID,
+            "channel_name": INCIDENT_CHANNEL_NAME,
+            "name": "Checkout outage",
+            "user_id": USER_ID,
+            "teams": ["Forms"],
+            "report_url": REPORT_URL,
+            "status": "Open",
+            "created_at": "1760000000.0",
+            "start_impact_time": "Unknown",
+            "end_impact_time": "Unknown",
+            "detection_time": "Unknown",
+            "environment": "prod",
+            "logs": [],
+            "meet_url": "https://meet.google.com/abc-defg-hij",
+            "incident_commander": None,
+            "operations_lead": None,
+            "severity": "sev-2",
+            "retrospective_url": None,
+            "security_incident": None,
+        }
+        unknown = set(overrides) - set(record)
+        assert not unknown, f"not a legacy incident attribute: {sorted(unknown)}"
+        record.update(overrides)
         serializer = TypeSerializer()
-        item = {name: serializer.serialize(value) for name, value in record.model_dump().items()}
+        item = {name: serializer.serialize(value) for name, value in record.items()}
         self._client.tables.setdefault("incidents", []).append(item)
 
     def go_down(self) -> None:

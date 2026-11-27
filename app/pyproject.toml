@@ -475,7 +475,6 @@ unmatched_ignore_imports_alerting = "error"
 ignore_imports = [
     # Seeded 2026-11-16 by TASK-146.1.1. Shrink-only: remove an entry when its import is gone; never add one.
     "jobs.scheduled_tasks -> integrations.opsgenie",  # TASK-127
-    "modules.incident.on_call -> integrations.opsgenie",  # TASK-145.7.10
     "packages.oncall_sync.adapters.opsgenie -> integrations.opsgenie",  # TASK-146.2
 ]
 

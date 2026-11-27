@@ -11,8 +11,6 @@ _MODULES = [
     "server.server",
     "main",
     "api.routes.system",
-    "modules.incident.core",
-    "modules.incident.incident",
     "modules.ops.notifications",
     "modules.aws.groups",
     "modules.aws.users",

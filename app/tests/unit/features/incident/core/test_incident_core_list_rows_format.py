@@ -1,6 +1,6 @@
 """The incident list row: columns A-E as the legacy writer wrote them, column F the incident id.
 
-Pure functions, no stubs. The pinned values are what ``add_new_incident_to_list``
+Pure functions, no stubs. The pinned values are what the legacy list writer
 wrote for the same inputs (date, ``=HYPERLINK`` report, product, status,
 ``=HYPERLINK`` channel), so people and formulas reading the sheet see no change.
 Free text is never evaluated by the sheet: a plain-text cell starting with a

@@ -52,15 +52,11 @@ class Recorder:
 
 @dataclass(frozen=True)
 class IncidentStore:
-    """Recorders standing in for every incident store read the legacy paths used."""
+    """The recorder standing in for the DynamoDB adapter builder the legacy store reads went through."""
 
-    channel_lookup: Recorder
-    field_lookup: Recorder
     adapter_builder: Recorder
 
     def assert_untouched(self) -> None:
-        assert self.channel_lookup.calls == []
-        assert self.field_lookup.calls == []
         assert self.adapter_builder.calls == []
 
 
@@ -73,14 +69,10 @@ def harness(slack_command_harness: SlackCommandHarness, monkeypatch: pytest.Monk
 
 @pytest.fixture
 def incident_store(monkeypatch: pytest.MonkeyPatch) -> IncidentStore:
-    """Record the channel lookup, the field lookup and the DynamoDB adapter builder."""
+    """Record the DynamoDB adapter builder (the legacy channel and field lookups are deleted)."""
     store = IncidentStore(
-        channel_lookup=Recorder(returns={"id": {"S": "incident-42"}}),
-        field_lookup=Recorder(returns=[{"incident_updates": {"L": [{"S": "stored update"}]}}]),
         adapter_builder=Recorder(),
     )
-    monkeypatch.setattr(db_operations, "get_incident_by_channel_id", store.channel_lookup)
-    monkeypatch.setattr(db_operations, "lookup_incident", store.field_lookup)
     monkeypatch.setattr(db_operations, "build_dynamodb_adapter", store.adapter_builder)
     return store
 
