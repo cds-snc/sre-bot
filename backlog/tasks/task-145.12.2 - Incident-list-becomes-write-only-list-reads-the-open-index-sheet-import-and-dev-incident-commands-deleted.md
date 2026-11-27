@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-26T19:33:00Z'
+updated_date: '2026-11-27T19:09:00Z'
 labels:
   - incident
   - features
@@ -64,6 +64,14 @@ created: 2026-11-26T19:33:00Z
 ---
 
 2026-11-26 (human, TASK-145.7.10 OQ1): dev add-incident and load-incidents, create_missing_incidents and add_new_incident_to_list move to TASK-145.7.10.1 (deleted with app/models/incidents.py, kind (d)); this task keeps the sheet read, the list cutover and the remaining dev incident commands. Re-ground at pickup with rg.
+
+---
+
+created: 2026-11-27T19:09:00Z
+
+---
+
+2026-11-27 (TASK-145.7.10.1, 18.L9b.1): the sheet import is deleted there with the dev commands: incident_folder get_incidents_from_sheet, complete_incidents_details, get_incident_details, create_missing_incidents, channel_id_from_link, add_new_incident_to_list and list_incident_folders, and db_operations get_incident_by_channel_id and lookup_incident (no caller left). This task's remaining scope: dev list (modules/dev/incident.py list_incidents, the last db_operations reader for incident data) and the list as a write-only projection; AC #1 is checked against what remains.
 
 ---
 <!-- COMMENTS:END -->

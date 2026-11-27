@@ -18,7 +18,7 @@ APP_DIR = Path(__file__).resolve().parents[3]
 
 PROBE = (
     "import server.server\n"
-    "import modules.atip.atip, modules.incident.on_call\n"
+    "import modules.atip.atip\n"
     "import modules.webhooks.patterns.aws_sns_notification.api_key_detected\n"
     "import packages.oncall_sync.adapters.opsgenie, packages.geolocate.service, jobs.scheduled_tasks\n"
     "import api.v1.routes.geolocate\n"

@@ -87,10 +87,8 @@ REGISTERED_COMMAND_TREE: dict[str, bool] = {
     "sre.access.sync.status": False,
     "sre.access.sync.user": False,
     "sre.dev": False,
-    "sre.dev.add-incident": False,
     "sre.dev.google": False,
     "sre.dev.incident": False,
-    "sre.dev.load-incidents": False,
     "sre.dev.slack": False,
     "sre.dev.stale": False,
     "sre.geolocate": False,
@@ -206,14 +204,19 @@ def test_sre_incident_subcommand_forwards_to_incident_helper(
 
 
 def test_dev_group_acks_and_lists_its_subcommands(slack_command_harness: SlackCommandHarness) -> None:
-    """/sre dev is a grouping node: it acks and answers with its subcommand help."""
+    """/sre dev is a grouping node: it acks and answers with its subcommand help.
+
+    ``add-incident`` and ``load-incidents`` are retired with the legacy declare (named change of kind (d)).
+    """
     response = slack_command_harness.dispatch("sre", "dev")
 
     assert response.status == 200
     reply = only_response(slack_command_harness)
     assert reply["response_type"] == "ephemeral"
-    for subcommand in ("add-incident", "google", "incident", "load-incidents", "slack", "stale"):
+    for subcommand in ("google", "incident", "slack", "stale"):
         assert f"/sre dev {subcommand}" in reply["text"]
+    for retired in ("add-incident", "load-incidents"):
+        assert f"/sre dev {retired}" not in reply["text"]
 
 
 def test_dev_leaf_outside_the_development_environment_is_refused(

@@ -1,8 +1,7 @@
 """Slack platform implementation for the dev module.
 
 Uses decorator-based command registration via auto-discovery.
-Registers the /sre dev subcommands for google, slack, stale, incident,
-load-incidents and add-incident.
+Registers the /sre dev subcommands for google, slack, stale and incident.
 
 Only available in local development (ENVIRONMENT=local).
 """
@@ -251,44 +250,6 @@ def handle_incident_dev_command(payload: CommandPayload) -> CommandResponse:
     return _call_legacy_handler(payload, incident.list_incidents, noop_ack, logger=logger)
 
 
-def handle_load_incidents_command(payload: CommandPayload) -> CommandResponse:
-    """Handle /sre dev load-incidents - load incidents from Google Sheet."""
-    logger.info(
-        "command_received",
-        command="load-incidents",
-    )
-
-    if error := _require_dev_environment(payload):
-        return error
-
-    def noop_ack():
-        pass
-
-    return _call_legacy_handler(payload, incident.load_incidents, noop_ack, logger=logger)
-
-
-def handle_add_incident_command(payload: CommandPayload) -> CommandResponse:
-    """Handle /sre dev add-incident - add incident from current channel."""
-    logger.info(
-        "command_received",
-        command="add-incident",
-        channel_id=payload.channel_id,
-    )
-
-    if error := _require_dev_environment(payload):
-        return error
-
-    def noop_ack():
-        pass
-
-    return _call_legacy_handler(
-        payload,
-        incident.add_incident,
-        noop_ack,
-        logger=logger,
-    )
-
-
 def register_commands(registrar: SlackCommandRegistrar) -> None:
     """Register dev module commands with the Slack registrar.
 
@@ -334,20 +295,4 @@ def register_commands(registrar: SlackCommandRegistrar) -> None:
         parent="sre.dev",
         description="List incidents",
         description_key="dev.subcommands.incident.description",
-    )
-
-    registrar.register_command(
-        command="load-incidents",
-        handler=handle_load_incidents_command,
-        parent="sre.dev",
-        description="Load incidents",
-        description_key="dev.subcommands.load_incidents.description",
-    )
-
-    registrar.register_command(
-        command="add-incident",
-        handler=handle_add_incident_command,
-        parent="sre.dev",
-        description="Add incident",
-        description_key="dev.subcommands.add_incident.description",
     )

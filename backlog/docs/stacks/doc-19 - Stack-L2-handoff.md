@@ -3,7 +3,7 @@ id: doc-19
 title: Stack L2 handoff
 type: guide
 created_date: '2026-11-27T18:22:00Z'
-updated_date: '2026-11-27T18:32:00Z'
+updated_date: '2026-11-27T19:14:00Z'
 ---
 ## Stack
 
@@ -19,8 +19,8 @@ updated_date: '2026-11-27T18:32:00Z'
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| 18.L9b | TASK-145.7.10 declare cutover: /incident, the form, locale toggle, alert buttons, SEV0 (legacy left on disk for the revert; size exception) | `stack-l2/task-145.7.10-declare-cutover` | - | ready | 2026-11-27 implemented; gates green (mypy 33/11 unchanged, pytest 8369 passed); all ACs checked. Carries decisions/migration.md step 5, the TASK-145.7.13 Done change, the deletion of doc-5/7/10/13, this doc, and the stacked-pr-session rule. Task stays In Progress until the post-deploy check. |
-| 18.L9b.1 | TASK-145.7.10.1 delete the legacy declare, models/incidents.py, the L5r guard, dev add-incident/load-incidents (deletion only) | `stack-l2/task-145.7.10.1-delete-legacy-declare` | - | plan approved | prepared this session above 18.L9b once the human runs `gh stack add`; PR open until the exit criterion |
+| 18.L9b | TASK-145.7.10 declare cutover: /incident, the form, locale toggle, alert buttons, SEV0 (legacy left on disk for the revert; size exception) | `stack-l2/task-145.7.10-declare-cutover` | #1900 | in review | committed 80b58cf4 2026-11-27; gates green (mypy 33/11, pytest 8369 passed); all ACs checked; task In Progress until the post-deploy check. |
+| 18.L9b.1 | TASK-145.7.10.1 delete the legacy declare, models/incidents.py, the L5r guard, dev add-incident/load-incidents (deletion only) | `stack-l2/task-145.7.10.1-delete-legacy-declare` | - | ready | 2026-11-27 prepared (deletion only); gates green (mypy 32/10, pytest 8116 passed); ACs #1-#4 and #6 checked; #5 exit criterion open; PR stays open until it, then merges after 18.L9b. |
 | 18.L10b | TASK-145.9.2 cut over timeline capture and the stale nudge | `stack-l2/task-145.9.2-capture-nudge` | - | planned (outline) | waits 145.9.1, 145.8.1, 145.8.5, 145.7.10; at pickup check TASK-189's outcome and the TASK-145.9.2 note on the scheduled-meeting nudge |
 | 18.L10c | TASK-145.9.3 summarize moved into response (pure move, size exception) | `stack-l2/task-145.9.3-summarize-move` | - | planned (outline) | waits 145.9.2, 25.10.3 |
 | 18.L10d | TASK-145.9.4 core security guard, transcript rendering, summarize command check | `stack-l2/task-145.9.4-guard-rendering` | - | planned (outline) | waits 145.9.3 |
@@ -29,20 +29,20 @@ updated_date: '2026-11-27T18:32:00Z'
 
 ## Position
 
-- /workspace on `stack-l2/task-145.7.10-declare-cutover` at 3c196467 (= origin/main, #1897), 18.L9b uncommitted and gated: app code and tests, decisions/migration.md step 5, the TASK-145.7.10, 145.7.13 and new TASK-199 task files, `.claude/skills/stacked-pr-session/SKILL.md` (the two-open-PRs rule), this doc, and the staged deletion of doc-5, doc-7, doc-10, doc-13. doc-17's citation edit is uncommitted and rides with the next Stack M commit.
-- Baselines on main 3c196467: mypy 33 errors in 11 files; import contracts 15 kept; test seams 47 strict / 12 legacy (9 after 18.L9b).
-- Carried from doc-16: 18.L8 apply 2026-11-26 (upgraded 331, roles_mapped 17, pending 0; throttled at 2 WCU, raised to 100 for the last two runs, restored); the upgrade job is off (#1895). 18.L12 reruns it once TASK-145.12.2 is deployed (dry_run, apply, off; reports on TASK-145.13), with write capacity raised first or the on-demand billing task.
-- Tooling: `gh stack sync` aborts a rebase on conflict; use `gh stack rebase`, resolve, `gh stack rebase --continue`. Stash untracked files first (`git stash push --include-untracked -m ...`), pop after. Before any push or PR command, `gh pr list --head <branch> --state all`. Finished stacks may still be listed in `.git/gh-stack`; `gh stack view` on main asks which stack.
+- /workspace on `stack-l2/task-145.7.10.1-delete-legacy-declare` (created by `gh stack add` on 80b58cf4, the 18.L9b commit, #1900 open). 18.L9b.1 uncommitted: the deletion (app/modules, app/models, app/features/incident/core/adapters/legacy_rollback.py, tests), README and INVENTORY wording, locales, pyproject ignore, seam baseline (7 legacy), the TASK-145.7.10.1 and TASK-145.12.2 task files, this doc. doc-17's citation edit is uncommitted and rides with the next Stack M commit.
+- Baselines: main 3c196467 mypy 33/11; after 18.L9b.1 32/10 (the deleted incident.py error). Import contracts 15 kept. Test seams 47 strict / 7 legacy after 18.L9b.1.
+- Order coupling seen only in a targeted run: tests/modules/webhooks/ before test_webhook_route_payload_surface.py fails 4 payload pins; untouched by this stack, passes in the full suite's order (Lane B's area).
+- Carried from doc-16: 18.L8 apply 2026-11-26 (upgraded 331, roles_mapped 17, pending 0; throttled at 2 WCU, raised to 100 for the last two runs, restored); the upgrade job is off (#1895). 18.L12 reruns it once TASK-145.12.2 is deployed (dry_run, apply, off; reports on TASK-145.13), with write capacity raised first or the on-demand billing task. With 18.L9b.1 merged no legacy writer is left.
+- Tooling: `gh stack sync` aborts a rebase on conflict; use `gh stack rebase`, resolve, `gh stack rebase --continue`. Stash untracked files first, pop after. Before any push or PR command, `gh pr list --head <branch> --state all`.
 - Background agents: none.
 
 ## Next actions
 
-1. **human**: commit and submit 18.L9b (commands in the session's final message). No terraform, IAM, SSM or task-definition env change, so deploy-checks are not required; the new `[incident_core] dev_conversation_names` key is a configuration-file key (base false, local true).
-2. **human**: `gh stack add stack-l2/task-145.7.10.1-delete-legacy-declare`, then tell the agent.
-3. **agent**: prepare 18.L9b.1 (TASK-145.7.10.1, deletion only, plan approved): S11-S15 of TASK-145.7.10's plan; gates; PR stays open until the exit criterion.
-4. **human**: merge 18.L9b in a quiet window once reviewed (18.L9b.1 submitted above it); deploy-checks post summary; the post-deploy check in a test incident channel (TASK-145.7.10 plan section 8 step 4) and report it.
-5. **agent**: record the post-deploy check on TASK-145.7.10, close it; start the 18.L9b.1 exit-criterion clock (deploy date).
-6. **agent**: plan 18.L10b (TASK-145.9.2) against main, stacked above 18.L9b.1.
+1. **human**: commit and submit 18.L9b.1 (commands in the session's final message); its PR stays open until the exit criterion.
+2. **human**: review and merge 18.L9b (#1900) in a quiet window once reviewed; the post-deploy check in a test incident channel (TASK-145.7.10 plan section 8 step 4) and report it with the deploy date.
+3. **agent**: record the post-deploy check on TASK-145.7.10 and close it; record the deploy date on TASK-145.7.10.1 (exit criterion clock).
+4. **agent**: plan 18.L10b (TASK-145.9.2) against main, stacked above 18.L9b.1 (`gh stack add stack-l2/task-145.9.2-capture-nudge`, human); at pickup check TASK-189's outcome and the TASK-145.9.2 note on the scheduled-meeting nudge.
+5. **human** (after 7 days, the check, no revert, one declare): merge 18.L9b.1 once a higher layer is submitted above it.
 
 ## Open decisions
 

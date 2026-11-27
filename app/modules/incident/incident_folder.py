@@ -1,42 +1,19 @@
 """Module for managing SRE incident folders in Google Drive.
 
-Includes functions to manage the folders, the metadata, and the list of incidents in a Google Sheets spreadsheet.
+Includes the folder metadata views and actions (the product's on-call schedule reference).
 """
 
-import datetime
-import re
-import time
-from typing import Any
-from urllib.parse import parse_qs, urlsplit
-
 from slack_bolt import Ack
-from slack_sdk.errors import SlackApiError
 from slack_sdk.web import WebClient
 from structlog import get_logger
 
-from contracts.operations import OperationStatus
 from features.incident.common.settings import get_incident_core_settings
 from features.incident.core.adapters import google_docs as incident_drive
-from infrastructure.spreadsheets import RANGE_NOT_FOUND, get_spreadsheet_provider
-from modules.incident import db_operations
 
 logger = get_logger()
 
 # Temporary TASK-25.1.6 shim for Slack's modal block and option-list limits.
 LEGACY_FOLDER_DISPLAY_LIMIT = 25
-
-
-class IncidentSheetError(Exception):
-    def __init__(self, message: str | None, error_code: str | None = None) -> None:
-        super().__init__(message)
-        self.message = message
-        self.error_code = error_code
-
-
-def list_incident_folders():
-    folders = incident_drive.list_child_folders(get_incident_core_settings().folder_id)
-    folders.sort(key=lambda x: x["name"])
-    return folders[:LEGACY_FOLDER_DISPLAY_LIMIT]
 
 
 def _folders_modal(blocks: list[dict]) -> dict:
@@ -110,11 +87,6 @@ def save_metadata(client: WebClient, body, ack, view):
     body["actions"] = [{"value": folder_id}]
     del body["view"]
     view_folder_metadata(client, body, ack)
-
-
-def get_folder_metadata(folder_id) -> dict:
-    """Get metadata for a folder."""
-    return incident_drive.get_metadata(folder_id, fields="id, name, appProperties")
 
 
 def view_folder_metadata(client, body, ack):
@@ -274,200 +246,3 @@ def metadata_items(folder):
             }
             for key, value in folder["appProperties"].items()
         ]
-
-
-def add_new_incident_to_list(document_link, name, slug, product, channel_url):
-    """Update the incident list spreadsheet with a new incident.
-
-    Args:
-        document_link (str): The link to the incident document.
-        name (str): The name of the incident.
-        slug (str): The slug of the incident.
-        product (str): The product affected by the incident.
-        channel_url (str): The link to the Slack channel for the incident.
-
-    Returns:
-        bool: True if the incident was added successfully.
-
-    Raises:
-        IncidentSheetError: If the spreadsheet write fails.
-    """
-    incident_data = [
-        [
-            datetime.datetime.now().strftime("%Y-%m-%d"),
-            f'=HYPERLINK("{document_link}", "{name}")',
-            product,
-            "In Progress",
-            f'=HYPERLINK("{channel_url}", "#{slug}")',
-        ]
-    ]
-    result = get_spreadsheet_provider().append_values(get_incident_core_settings().list_sheet_id, "Sheet1!A:A", incident_data)
-    if not result.is_success:
-        logger.error("add_new_incident_to_list_failed", error=result.message, error_code=result.error_code)
-        raise IncidentSheetError(result.message, result.error_code)
-    return True
-
-
-_ARCHIVE_PATH = re.compile(r"^/archives/(\w+)")
-
-
-def channel_id_from_link(link: str) -> str | None:
-    """Read the channel id from a sheet row's channel link: a workspace archive URL or Slack's deep link."""
-    parts = urlsplit(link)
-    host = parts.hostname or ""
-    if host != "slack.com" and not host.endswith(".slack.com"):
-        return None
-    if parts.path == "/app_redirect":
-        return next(iter(parse_qs(parts.query).get("channel", [])), None)
-    match = _ARCHIVE_PATH.match(parts.path)
-    return match.group(1) if match else None
-
-
-def get_incidents_from_sheet(days=0) -> list:
-    """Get incidents from the incident list spreadsheet."""
-    date_lookback = datetime.datetime.now() - datetime.timedelta(days=days)
-    date_lookback_str = date_lookback.strftime("%Y-%m-%d")
-    result = get_spreadsheet_provider().read_cells(get_incident_core_settings().list_sheet_id, "Sheet1")
-    if not result.is_success:
-        if result.status is OperationStatus.NOT_FOUND and result.error_code == RANGE_NOT_FOUND:
-            logger.warning("get_incidents_from_sheet_unable_to_parse_range", error=result.message)
-            return []
-        logger.error("get_incidents_from_sheet_failed", error=result.message, error_code=result.error_code)
-        raise IncidentSheetError(result.message, result.error_code)
-
-    row_data = result.data or []
-    incidents_details: list[dict[str, Any]] = []
-    for row in row_data[1:]:
-        if not row or len(row) < 5:
-            continue
-        channel_cell = row[4]
-        channel_id = None
-        if channel_cell.link:
-            channel_id = channel_id_from_link(channel_cell.link)
-        channel_name = channel_cell.formatted_value
-        channel_name = "TBC" if not channel_name else channel_name[1:]
-        incident_details: dict[str, Any] = {
-            "channel_id": channel_id,
-            "channel_name": channel_name,
-            "name": row[1].formatted_value,
-            "user_id": "",
-            "teams": [row[2].formatted_value],
-            "report_url": row[1].link,
-            "status": row[3].formatted_value,
-            "created_at": row[0].formatted_value,
-            "meet_url": "TBC",
-        }
-        if incident_details["channel_id"] is None:
-            continue
-        if days > 0 and (incident_details["created_at"] or "") < date_lookback_str:
-            continue
-        incidents_details.append(incident_details)
-    return incidents_details
-
-
-def complete_incidents_details(client: WebClient, incidents: list[dict]):
-    """Complete incidents details with channel info"""
-    for incident in incidents:
-        logger.info(
-            "get_incident_details",
-            channel_id=incident["channel_id"],
-            channel_name=incident["channel_name"],
-        )
-        incident.update(get_incident_details(client, incident))
-        time.sleep(0.2)
-    return incidents
-
-
-def get_incident_details(client: WebClient, incident):
-    """Get incident details from Slack"""
-    max_retries = 5
-    retry_attempts = 0
-    while retry_attempts < max_retries:
-        try:
-            response = client.conversations_info(channel=incident["channel_id"])
-            if response.get("ok"):
-                channel_info = response["channel"]
-                incident["channel_name"] = channel_info.get("name")
-
-                creator = channel_info.get("creator")
-                if incident.get("user_id") == "":
-                    incident["user_id"] = creator
-
-                if "incident-dev-" in incident["channel_name"] or "Development" in incident["teams"]:
-                    incident["environment"] = "dev"
-                else:
-                    incident["environment"] = "prod"
-                created_at = channel_info.get("created", incident["created_at"])
-                incident["created_at"] = str(created_at)
-
-                is_archived = channel_info.get("is_archived")
-                is_member = channel_info.get("is_member")
-
-                meet_url = ""
-                if not is_archived:
-                    if not is_member:
-                        client.conversations_join(channel=incident["channel_id"])
-                    response = client.bookmarks_list(channel_id=incident["channel_id"])
-                    if response["ok"]:
-                        for item in range(len(response["bookmarks"])):
-                            if response["bookmarks"][item]["title"] == "Meet link":
-                                meet_url = response["bookmarks"][item]["link"]
-                if meet_url:
-                    incident["meet_url"] = meet_url
-            return incident
-
-        except SlackApiError as e:
-            if retry_attempts < max_retries:
-                retry_attempts += 1
-                logger.warning(
-                    "get_incident_details_error",
-                    channel_id=incident["channel_id"],
-                    error=str(e),
-                    retry_attempts=retry_attempts,
-                )
-                time.sleep(10)
-            else:
-                logger.error(
-                    "get_incident_details_max_retries",
-                    channel_id=incident["channel_id"],
-                    error=str(e),
-                )
-    return incident
-
-
-def create_missing_incidents(incidents):
-    """Create missing incidents"""
-    count = 0
-    for incident in incidents:
-        incident_exists = db_operations.lookup_incident("channel_id", incident["channel_id"])
-        if len(incident_exists) == 0:
-            incident_data = {
-                "channel_id": incident["channel_id"],
-                "channel_name": incident["channel_name"],
-                "name": incident["name"],
-                "user_id": incident["user_id"],
-                "teams": incident["teams"],
-                "report_url": incident["report_url"],
-                "status": incident["status"],
-                "created_at": incident["created_at"],
-                "meet_url": incident["meet_url"],
-                "environment": incident["environment"],
-            }
-            incident_id = db_operations.create_incident(incident_data)
-            if incident_id:
-                message = "Automated import of the incident from the Google Sheet via the SRE Bot"
-                db_operations.log_activity(incident_id, message)
-            logger.info(
-                "incident_created",
-                incident_id=incident_id,
-                incident_name=incident["name"],
-            )
-            count += 1
-        else:
-            logger.info(
-                "incident_not_created",
-                reason="Incident already exists",
-                incident_id=incident_exists[0]["id"]["S"],
-                incident_name=incident["name"],
-            )
-    return count

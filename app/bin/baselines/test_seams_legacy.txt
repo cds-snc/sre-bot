@@ -6,8 +6,6 @@
 # Seeded once from main 929e6c3c (TASK-187); only ratchets down: the owning rebuild task deletes its
 # seam and the pins it replaces. One exception (decisions/migration.md rule 3): a pin task whose
 # approved plan names a new seam adds that entry, with its owner, in that task's own PR.
-inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.incident.db_operations.get_incident_by_channel_id
-inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.incident.db_operations.lookup_incident
 inline:tests/integration/legacy_surface/test_incident_updates_command_surface.py::modules.sre.platforms.slack._web_client
 inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::features.incident.scribe.service.draft_incident_document
 inline:tests/integration/legacy_surface/test_slack_command_registration_surface.py::features.incident.scribe.service.summarize_transcript

@@ -22,7 +22,7 @@ APP_DIR = Path(__file__).resolve().parents[3]
 
 PROBE = (
     "import server.server\n"
-    "import modules.incident.incident, modules.incident.incident_document, modules.incident.incident_folder\n"
+    "import modules.incident.incident_document, modules.incident.incident_folder\n"
     "import modules.incident.incident_helper, modules.incident.schedule_retro\n"
     "import modules.role.role, modules.dev.incident\n"
     "import features.incident.core.adapters.google_docs, packages.talent.adapters.google_drive\n"

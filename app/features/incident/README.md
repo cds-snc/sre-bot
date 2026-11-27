@@ -78,19 +78,15 @@ its own configuration file.
   properties, which `read_incident_roles` bridges and the roles step below maps into the record in a
   rerun, items already at 2 included. Running it, with a report of nothing pending, is a
   precondition of TASK-145.9 merging.
-- **Legacy writers.** Each of these still creates legacy-shaped items, so the job must run again
-  after the last one is gone (Migration rule 6):
-  - the legacy declare, `app/modules/incident/core.py:36` (`initiate_resources_creation`), removed
-    by TASK-145.7.10;
-  - the dev add-incident command, `app/modules/dev/incident.py:104`, removed by TASK-145.12.2;
-  - the sheet import, `app/modules/incident/incident_folder.py:541` (`create_missing_incidents`,
-    reached by `load_incidents` at `app/modules/dev/incident.py:47`), removed by TASK-145.12.2.
-
-  All three write through `db_operations.create_incident`. Recreate, a fourth, was retired with
+- **Legacy writers.** None is left: the legacy declare was cut over by TASK-145.7.10 and deleted
+  with the dev add-incident command and the sheet import (`create_missing_incidents`, reached by the
+  dev load-incidents command) by TASK-145.7.10.1; all three wrote through
+  `db_operations.create_incident`, deleted with them. Recreate was retired with
   `/sre incident create` by TASK-145.8.6. The legacy field updater created no items and was
   removed by TASK-145.8.3 (show and the update modal rebuilt in `response/`); close and the
   stale notice's archive button left the legacy `incident_status.py` in TASK-145.8.5.3, which
-  deleted it.
+  deleted it. The job runs again once these deletions and TASK-145.12.2 are deployed (Migration
+  rule 6).
 - **Roles step (TASK-145.7.12).** Before any write, the job reads the report Drive properties
   `ic_id` and `ol_id` of every planned item and every item at 2 whose record holds none of the five
   roles and whose report is a Google document, one `files.get` each, through the legacy

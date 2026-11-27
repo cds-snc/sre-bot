@@ -3,8 +3,6 @@ dev:
   subcommands.slack.description: "Commandes de développement Slack"
   subcommands.stale.description: "Tester la notification de canal inactif"
   subcommands.incident.description: "Lister les incidents"
-  subcommands.load_incidents.description: "Charger les incidents"
-  subcommands.add_incident.description: "Ajouter un incident"
   help.title: "Commandes de développement"
   help.section_header: "Sous-commandes disponibles:"
   help.footer: "Tapez `/dev <sous-commande> help` pour plus de détails."
