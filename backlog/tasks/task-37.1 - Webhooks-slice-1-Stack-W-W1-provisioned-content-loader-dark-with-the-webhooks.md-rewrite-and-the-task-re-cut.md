@@ -3,10 +3,10 @@ id: TASK-37.1
 title: >-
   Webhooks slice 1 (Stack W, W1): provisioned-content loader, dark, with the
   webhooks.md rewrite and the task re-cut
-status: In Progress
+status: Done
 assignee: []
 created_date: 2026-07-28 18:39
-updated_date: '2026-11-25T21:14:00Z'
+updated_date: '2026-11-27T15:57:00Z'
 labels:
   - migration
   - webhooks
@@ -191,6 +191,8 @@ Gates (from app/): ruff check . All checks passed; targeted content/server/contr
 Open for the human: TASK-193's MultilingualText rule (bot wording multilingual, sender content in its source language) sits as comments on 37.2.1 and 37.3; decide at 37.2.1 planning whether it becomes an AC. Task files whose slugs no longer match their titles are renamed with git mv in the session's commands.
 
 2026-11-25: committed 1197c9f on stack-w/task-37.1-content-loader, PR #1889 open (Stack W bottom layer; stays in review until W2 is open above it). In Progress.
+
+2026-11-27: merged in #1889 (ba7e479b). All 8 ACs checked, no post-deploy step (dark layer). Closed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

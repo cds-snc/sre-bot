@@ -340,3 +340,30 @@ max_render_chars = 3000
 max_context_depth = 10
 email_lookups_per_message = 10
 post_attempt_timeout_seconds = 2
+# Ingest and the inbox (decisions/webhooks.md Pipeline): tables, deadlines, leases, retention and retries.
+instances_table_name = "webhooks"
+inbox_table_name = "sre_bot_webhook_inbox"
+inbox_ttl_seconds = 604800
+inline_processing_deadline_seconds = 5.0
+processing_lease_margin_seconds = 30
+unavailable_retry_after_seconds = 30
+retry_base_seconds = 30
+retry_max_seconds = 3600
+retry_max_attempts = 8
+sweeper_interval_seconds = 60
+sweeper_lease_ttl_seconds = 300
+sweeper_batch_size = 25
+# Wire protocols: body caps, media types and strict JSON depth.
+aws_sns_max_body_bytes = 524288
+legacy_slack_json_max_body_bytes = 262144
+aws_sns_content_types = ["text/plain", "application/json"]
+legacy_slack_json_content_types = ["application/json"]
+max_json_depth = 64
+max_envelope_bytes = 358400
+idempotency_key_max_chars = 255
+# SNS: replay bound and the certificate and confirmation fetches.
+sns_max_message_age_seconds = 86400
+sns_fetch_timeout_seconds = 3.0
+sns_connect_retries = 2
+sns_certificate_cache_ttl_seconds = 86400
+sns_certificate_cache_size = 32

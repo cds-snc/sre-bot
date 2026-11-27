@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-24 15:02
-updated_date: '2026-11-25T20:52:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - security
   - phase-4
@@ -36,7 +36,7 @@ Scope, in the capability's entrypoints/http.py:
 - Before lookup: a per-address limit that counts only unknown or inactive ids and failed verifications, with a short negative cache for unknown ids.
 - After lookup: a per-instance limit keyed by instance_ref (never the URL token), with an optional higher limit per instance set through the management API (TASK-37.6.1) for non-legacy-tier instances only; legacy-tier instances keep the default, so the override cannot bypass the TASK-48 migration.
 - A limited request answers 429 with Retry-After.
-- Limits and the negative-cache TTL in the [webhooks] settings (added in TASK-37.2.2).
+- Limits and the negative-cache TTL in the [webhooks] settings (added here: TASK-37.2.2 planning, 2026-11-27, human-approved, moved the two-layer rate-limit settings to this task, which first reads them).
 
 Size: ~150 production LOC.
 Production: prod.

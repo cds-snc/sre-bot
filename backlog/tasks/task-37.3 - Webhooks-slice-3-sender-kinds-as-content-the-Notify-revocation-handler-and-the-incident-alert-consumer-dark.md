@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-28 18:40
-updated_date: '2026-11-26T13:19:00Z'
+updated_date: '2026-11-27T17:31:00Z'
 labels:
   - migration
   - webhooks
@@ -62,6 +62,12 @@ Change notice: none (dark slice, packet section 7.4).
 - [ ] #10 A kind whose handler: id no plugin registered fails boot naming the file (test)
 - [ ] #11 The Notify package's product area is named; the webhooks enablement key sits in that area's table, or in [plugins.shared] when its consumers span areas (check)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 (TASK-37.2.2 implementation, hand-offs): (a) SNS kinds match the decoded document: the signed fields (Type, MessageId, TopicArn, Subject, Timestamp) with Message parsed when it is a strict JSON object, so paths read $.Message.<field>; a text Message stays a string (decisions/webhooks.md 2). (b) A kind with suppress: true yields no event, so neither consumers nor its handler run (interpret returns Suppressed with no event): decide at planning how the Notify revocation kind runs its handler without posting (for example no destinations on its instance, or a suppress that still hands the event to the handler). (c) Consumers and handlers receive the event rendered in the instance languages (LanguagePolicy.reply_languages(None)); each destination's post is rendered in that destination's shared languages. (d) Each consume and handler call is recorded on the inbox item, so a retry never repeats a finished one; an exception is retried by the inbox.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

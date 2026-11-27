@@ -4,6 +4,7 @@ Each test reads the slice through the files the package conftest installs, so it
 the values it writes.
 """
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -63,3 +64,40 @@ def test_content_is_checked_against_the_defaults_without_configuration(monkeypat
 def test_a_post_attempt_fits_inside_the_inline_deadline() -> None:
     """Each platform call gets its own short timeout, so a post and the lookups fit one delivery."""
     assert get_webhooks_settings().post_attempt_timeout_seconds == 2
+
+
+def test_the_ingest_bounds_default_to_the_recorded_values() -> None:
+    """decisions/webhooks.md 3 Pipeline: a 5 s inline deadline, a 7-day inbox, SNS capped at twice its message."""
+    settings = get_webhooks_settings()
+
+    assert (settings.inline_processing_deadline_seconds, settings.inbox_ttl_seconds) == (5.0, 604800)
+    assert (settings.aws_sns_max_body_bytes, settings.legacy_slack_json_max_body_bytes) == (524288, 262144)
+    assert settings.aws_sns_content_types == ("text/plain", "application/json")
+    assert (settings.sns_max_message_age_seconds, settings.max_json_depth) == (86400, 64)
+    assert (settings.retry_base_seconds, settings.retry_max_seconds, settings.retry_max_attempts) == (30, 3600, 8)
+    assert (settings.inbox_table_name, settings.instances_table_name) == ("sre_bot_webhook_inbox", "webhooks")
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        pytest.param("inbox_ttl_seconds = 3600\nsns_max_message_age_seconds = 7200\n", id="replay-bound-past-the-dedupe-window"),
+        pytest.param("retry_base_seconds = 600\nretry_max_seconds = 60\n", id="base-past-the-ceiling"),
+        pytest.param("inline_processing_deadline_seconds = 60\n", id="deadline-past-the-sender-timeouts"),
+    ],
+)
+def test_bounds_that_contradict_each_other_are_refused(tmp_path: Path, table: str) -> None:
+    install_webhooks_files(tmp_path, environment=f"[webhooks]\n{table}")
+
+    with pytest.raises(ConfigurationError):
+        WebhooksSettings()
+
+
+def test_the_base_file_sets_every_ingest_key_to_its_default() -> None:
+    """app/config/base.toml carries each new key, so an organisation sees and tunes it in one place."""
+    base = tomllib.loads((Path(__file__).parents[4] / "config" / "base.toml").read_text(encoding="utf-8"))["webhooks"]
+    defaults = WebhooksSettings.model_construct()
+
+    for key, value in base.items():
+        expected = getattr(defaults, key)
+        assert (tuple(value) if isinstance(value, list) else value) == expected, key

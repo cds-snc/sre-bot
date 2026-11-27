@@ -1,17 +1,20 @@
-"""The sender-kind file model: the untrusted-input boundary for ``webhooks/sender-kinds`` files.
+"""The capability's untrusted-input boundary: the sender-kind file model and the protocol envelopes.
 
 A sender kind is provisioned content (decisions/provisioned-content.md): this model
 validates every file, its JSON Schema is exported to ``app/content/schemas/`` and
 ``build_sender_kind`` turns a valid file into the frozen ``SenderKind`` the engines read.
 Checks that need the [webhooks] limits, compile a path or parse a template raise ValueError,
 so the loader reports the file and the field.
+
+The SNS envelope is a discriminated union on ``Type`` (decisions/webhooks.md 2 Three layers):
+a body that fits none of the variants fails its protocol's decode, and no other model is tried.
 """
 
 from collections.abc import Callable
 from typing import Annotated, Literal, Self
 
 from liquid import Template
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, field_validator, model_validator
 
 from capabilities.webhooks.domain.events import EventType
 from capabilities.webhooks.domain.extraction import compile_path
@@ -336,3 +339,47 @@ def sender_kinds_content_kind() -> ContentKind[SenderKindFile, SenderKind]:
         max_file_bytes=settings.max_kind_file_bytes,
         max_items=settings.max_kinds,
     )
+
+
+class _SnsEnvelope(BaseModel):
+    """Fields every SNS message carries; unknown fields are ignored, every known one is strict text."""
+
+    model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
+
+    MessageId: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9-]+$")
+    TopicArn: str = Field(min_length=1, max_length=1024)
+    Message: str
+    Timestamp: str = Field(min_length=1, max_length=64)
+    SignatureVersion: str = Field(min_length=1, max_length=8)
+    Signature: str = Field(min_length=1, max_length=4096)
+    SigningCertURL: str = Field(min_length=1, max_length=2048)
+
+
+class SnsNotification(_SnsEnvelope):
+    """A message published to the topic."""
+
+    Type: Literal["Notification"]
+    Subject: str | None = Field(default=None, max_length=100)
+    UnsubscribeURL: str | None = Field(default=None, max_length=2048)
+
+
+class SnsSubscriptionConfirmation(_SnsEnvelope):
+    """SNS asks the endpoint to confirm a subscription."""
+
+    Type: Literal["SubscriptionConfirmation"]
+    Token: str = Field(min_length=1, max_length=2048)
+    SubscribeURL: str = Field(min_length=1, max_length=2048)
+
+
+class SnsUnsubscribeConfirmation(_SnsEnvelope):
+    """SNS reports that the subscription was removed."""
+
+    Type: Literal["UnsubscribeConfirmation"]
+    Token: str = Field(min_length=1, max_length=2048)
+    SubscribeURL: str = Field(min_length=1, max_length=2048)
+
+
+type SnsMessage = Annotated[
+    SnsNotification | SnsSubscriptionConfirmation | SnsUnsubscribeConfirmation, Field(discriminator="Type")
+]
+SNS_MESSAGE = TypeAdapter[SnsMessage](SnsMessage)
