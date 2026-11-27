@@ -4,7 +4,7 @@ title: 'Webhooks slice 8: instances onto managed content'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:49:00Z'
-updated_date: '2026-11-25T20:49:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - migration
   - webhooks
@@ -12,6 +12,7 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-37.6.1
+  - TASK-197.2
 references:
   - decisions/managed-content.md
   - decisions/webhooks.md
@@ -49,4 +50,6 @@ Change notice: none expected unless the admin flow changes visibly; confirm at p
 
 <!-- SECTION:NOTES:BEGIN -->
 Dependency to add when it lands: the first of TASK-166, TASK-165 or the TASK-146 re-cut that builds the managed-content version store (TASK-168 packet section 7.2). Add it with backlog task edit 37.8 --dep TASK-37.6.1,<that task> once known.
+
+2026-11-27 (TASK-37.2.2 planning, human-approved Q3a): a non-public value in a managed record is sealed through the platform field-encryption contract (TASK-197.2) with the record's identity as context, per organisation-content.md.
 <!-- SECTION:NOTES:END -->

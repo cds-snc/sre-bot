@@ -4,6 +4,7 @@ title: 'Webhooks slice 4.2: shadow run behind a per-instance flag (prod, inert)'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - migration
   - webhooks
@@ -11,6 +12,8 @@ labels:
 milestone: m-4
 dependencies:
   - TASK-37.4.1
+  - TASK-37.2.4
+  - TASK-198
 references:
   - decisions/webhooks.md
   - decisions/migration.md
@@ -43,3 +46,9 @@ Change notice: none (inert); an internal ops note only (packet section 7.4).
 - [ ] #5 The TASK-36.2 pins pass unchanged with every instance on legacy or shadow (test)
 - [ ] #6 An internal ops note says how to move an instance to shadow and how to read the results (review)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 (TASK-37.2.2 planning, human-approved): mounting the route needs the inbox table (TASK-37.2.4, row 22.3a) and the received-bytes body cap with a ceiling above the SNS cap (TASK-198, row 22.3b), both merged first.
+<!-- SECTION:NOTES:END -->

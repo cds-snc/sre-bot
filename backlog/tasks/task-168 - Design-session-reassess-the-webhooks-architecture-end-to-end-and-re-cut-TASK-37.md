@@ -3,10 +3,10 @@ id: TASK-168
 title: >-
   Design session: reassess the webhooks architecture end to end and re-cut
   TASK-37
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-26T14:02:00Z'
-updated_date: '2026-11-25T21:01:00Z'
+updated_date: '2026-11-27T15:57:00Z'
 labels:
   - architecture
   - webhooks
@@ -48,6 +48,8 @@ Invariants carried over (not reopened): nothing registers at import time and not
 2026-11-03: AC added from TASK-28.2's approved plan; 28.2 leaves the import-time webhook pattern lines plain (unconfigured structlog, local-time stamp) and excludes them in deploy-checks.
 
 2026-11-03 (from TASK-28.4's approved plan): TASK-28.4 lowers the import-time webhook pattern lines (registered_pattern, registered_notification_pattern, no_handlers_found_in_module) to DEBUG and deletes the dead modules/webhooks/patterns/examples.py (pattern_registration_success had no caller); they still print plain at import because structlog is unconfigured then, so AC #5's exclusion removal stays this task's.
+
+2026-11-27: ACs 1-4 delivered by TASK-37.1, merged in #1889 (ba7e479b); AC 5 moved to TASK-37.5 (C8). No human step open. Closed.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

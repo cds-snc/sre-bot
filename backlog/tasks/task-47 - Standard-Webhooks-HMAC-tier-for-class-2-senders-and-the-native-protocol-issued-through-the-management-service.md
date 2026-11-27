@@ -6,13 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-24 13:59
-updated_date: '2026-11-25T20:52:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - security
   - webhooks
 milestone: m-4
 dependencies:
   - TASK-37.6.1
+  - TASK-197.2
 references:
   - decisions/webhooks.md
   - decisions/security.md
@@ -56,6 +57,12 @@ Change notice: developer notice: signing is available, with a guide and snippets
 - [ ] #7 HMAC configuration (tolerance, rotation expiry, cache TTL) is typed [webhooks] settings with defaults, not a central aggregator or constants (test + review)
 - [ ] #8 The PR body carries the developer change notice with a guide and snippets (review)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 (TASK-37.2.2 planning, human-approved Q3a): secrets at rest use the platform field-encryption contract (TASK-197.2, Tink envelope AEAD, cloud-neutral) with encryption context instance_ref; the 'AWS Database Encryption SDK or direct KMS, chosen at planning' choice is settled there, so AC #4 consumes that contract and builds no KMS code of its own.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

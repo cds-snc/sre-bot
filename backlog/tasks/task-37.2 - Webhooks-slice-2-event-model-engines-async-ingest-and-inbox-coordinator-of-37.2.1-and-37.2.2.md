@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-07-28 18:39
-updated_date: '2026-11-25T20:50:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - migration
   - webhooks
@@ -91,6 +91,14 @@ created: 2026-11-25T20:50:00Z
 - #7 "The SNS verifier accepts SignatureVersion 1 (SHA1) and 2 (SHA256) per TASK-168's ruling" -> TASK-37.2.2 AC #1.
 Comments #1 and #2 (fail-closed dedupe through the TASK-58.2 facade) -> TASK-37.2.2 description and AC #4. Comment #3 findings F-E and F-F -> tests in TASK-37.3 (AC #4).
 Old dependencies: TASK-46, TASK-58, TASK-109 (all Done) dropped; TASK-58.2 moves to TASK-37.2.2. Nothing is archived.
+
+---
+
+created: 2026-11-27T16:47:00Z
+
+---
+
+2026-11-27 (TASK-37.2.2 planning, human-approved Q1): comments #1 and #2 asked for the ingest claim to go through the TASK-58.2 IdempotencyStore with an explicit fail-closed policy. The inbox instead dedupes with its own item's conditional insert on the records contract (put_if_not_exists, then guarded updates per state), as the incident status updates do; a coordination record cannot hold the envelope, state or index, so the facade would make persisting two non-atomic writes. Fail-closed holds: any outcome other than a confirmed insert answers 503 and does no work. reliability.md records it with TASK-37.2.2.
 
 ---
 <!-- COMMENTS:END -->

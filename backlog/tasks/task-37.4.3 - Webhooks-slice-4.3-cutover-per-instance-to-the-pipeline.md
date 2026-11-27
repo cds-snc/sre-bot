@@ -4,6 +4,7 @@ title: 'Webhooks slice 4.3: cutover per instance to the pipeline'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - migration
   - webhooks
@@ -54,4 +55,11 @@ Change notice: developer notice, no action needed: redelivered SNS messages post
 - [ ] #7 TASK-46 fingerprint emission and TASK-7 hardening are preserved on the new route; a non-POST method answers 405 and an unexpected Content-Type answers 415 (test)
 - [ ] #8 TASK-36 smoke tests pass after cutover (test)
 - [ ] #9 The PR body carries the developer change notice (no action needed) (review)
+- [ ] #10 The inbox sweeper job (built dark in TASK-37.2.2) registers through register_background_jobs with a lease_ttl from [webhooks], so retry, takeover of an expired lease and dead-lettering run once the first instance is on the pipeline (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 (TASK-37.2.2 planning, human-approved): AC added. TASK-37.2.2 builds the sweeper but registers no job, since the webhooks plugin is enabled in base.toml and a registered job would run against a table that does not exist; AC #2 here already assumes the sweeper runs.
+<!-- SECTION:NOTES:END -->

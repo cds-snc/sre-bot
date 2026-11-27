@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:49:00Z'
+updated_date: '2026-11-27T16:47:00Z'
 labels:
   - migration
   - webhooks
@@ -52,4 +53,11 @@ Change notice: developer notice: management is in the API and Slack is one inter
 - [ ] #4 The webhook URL shown to users is built from HostInfo.public_base_url, with no host written in code (test)
 - [ ] #5 Deprecated-import and import-linter baselines shrank or held (check)
 - [ ] #6 The PR body carries the developer change notice and the user announcement with screenshots (review)
+- [ ] #7 The incident feature's interim AlertAcknowledgements adapter (marked TODO(TASK-37.6.2)) and its acknowledged_count increments are deleted; the attribute is no longer written, and stored items keep it untouched (test + grep)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 (Lane B, TASK-37.2.2 planning; Lane A hand-off from TASK-145.7.10): AC added. The adapter's TODO already names this task (migration.md rule 7) and webhooks.md lists it as tolerated until TASK-37.6.2, which replaces the legacy admin surface that displays the count.
+<!-- SECTION:NOTES:END -->
