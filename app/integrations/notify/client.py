@@ -1,140 +1,105 @@
-"""GC Notify client."""
+"""GC Notify vendor client: a JWT-authenticated async httpx client factory and its error classifier.
 
-import calendar
+The key revocation lives with its consumer (decisions/outbound-clients.md): today the legacy SNS
+``api_key_detected`` pattern.
+"""
+
 import json
 import time
+from collections.abc import Generator
 
+import httpx
 import jwt
-import requests
-import structlog
 
-from integrations.notify.settings import get_notify_settings
-
-logger = structlog.get_logger()
+from contracts.operations.codes import ErrorCode
+from contracts.operations.status import OperationStatus
+from integrations.notify.settings import NotifySettings, get_notify_settings
 
 
-# generate the epoch seconds for the jwt token
-def epoch_seconds():
-    return calendar.timegm(time.gmtime())
+def _issued_at() -> int:
+    """The ``iat`` claim: the current time in epoch seconds (UTC)."""
+    return int(time.time())
 
 
-def create_jwt_token(secret, client_id):
+class _NotifyJwtAuth(httpx.Auth):
+    """Sign every request with a fresh HS256 JWT issued to the SRE client.
+
+    GC Notify accepts a token only while its ``iat`` is within 30 seconds of the server's clock,
+    so a token fixed in the client's headers would expire while the client lives; httpx runs this
+    flow once per request (https://www.python-httpx.org/advanced/authentication/).
     """
-    Generate a JWT Token for the Notify API
 
-    Tokens have a header consisting of:
-    {
-        "typ": "JWT",
-        "alg": "HS256"
-    }
+    def __init__(self, client_id: str, secret: str) -> None:
+        self._client_id = client_id
+        self._secret = secret
 
-    Parameters:
-    secret: Application signing secret
-    client_id: Identifier for the client
+    def auth_flow(self, request: httpx.Request) -> Generator[httpx.Request, httpx.Response]:
+        claims = {"iss": self._client_id, "iat": _issued_at()}
+        token = jwt.encode(claims, self._secret, algorithm="HS256", headers={"typ": "JWT"})
+        request.headers["Authorization"] = f"Bearer {token}"
+        yield request
 
-    Claims are:
-    iss: identifier for the client
-    iat: epoch seconds for the token (UTC)
 
-    Returns a JWT token for this request
+def build_notify_client(
+    settings: NotifySettings | None = None,
+    *,
+    timeout_seconds: float | None = None,
+    connect_retries: int | None = None,
+) -> httpx.AsyncClient:
+    """Build a JWT-authenticated httpx client for the tenant's GC Notify API.
+
+    The retry policy is set here, once: the transport retries a connection that never opened
+    ([notify] connect_retries), so a sent request is never repeated, beside the per-attempt
+    timeout ([notify] timeout_seconds). A caller that owns durable retry passes its own
+    ``timeout_seconds`` and ``connect_retries``; every other caller keeps the configured values.
+    The caller checks the tenant first and manages the client's lifecycle (use it as an async
+    context manager). No network I/O at construction.
     """
-    log = logger.bind(client_id=client_id)
-    if not secret:
-        log.error("jwt_token_creation_failed", error="Missing secret key")
-        raise ValueError("Missing secret key")
-    if not client_id:
-        log.error("jwt_token_creation_failed", error="Missing client id")
-        raise ValueError("Missing client id")
-
-    headers = {"typ": "JWT", "alg": "HS256"}
-
-    claims = {"iss": client_id, "iat": epoch_seconds()}
-    t = jwt.encode(payload=claims, key=secret, headers=headers)
-    if isinstance(t, str):
-        return t
-    else:
-        return t.decode()
-
-
-def create_authorization_header():
-    """Function to create the authorization header for the Notify API"""
-    settings = get_notify_settings()
-    client_id = settings.sre_user_name.get_secret_value()
-    secret = settings.sre_client_secret.get_secret_value()
-
-    # If the client_id or secret is missing, raise an error
-    if not client_id:
-        error = "NOTIFY__SRE_USER_NAME is missing"
-        logger.error(
-            "authorization_header_creation_failed",
-            error=error,
-        )
-        raise ValueError(error)
-    if not secret:
-        error = "NOTIFY__SRE_CLIENT_SECRET is missing"
-        logger.error(
-            "authorization_header_creation_failed",
-            error=error,
-        )
-        raise ValueError(error)
-
-    # Create the jwt token and return the authorization header
-    token = create_jwt_token(secret=secret, client_id=client_id)
-    return "Authorization", f"Bearer {token}"
-
-
-def post_event(url, payload):
-    """Function to post an api call to Notify"""
-    # Create the authorization headers
-    header_key, header_value = create_authorization_header()
-    header = {header_key: header_value, "Content-Type": "application/json"}
-
-    # Post the response
-    response = requests.post(url, data=json.dumps(payload), headers=header, timeout=get_notify_settings().timeout_seconds)
-    return response
-
-
-def revoke_api_key(api_key: str, api_type: str, github_repo: str, source: str) -> str:
-    """Function to revoke an api key by calling Notify's revoke api endpoint.
-
-    Returns:
-        "revoked" if the key was successfully revoked (201),
-        "not_found" if the key was not found (200),
-        "error" for any other response or failure.
-    """
-    log = logger.bind(
-        api_key=api_key,
-        api_type=api_type,
-        github_repo=github_repo,
-        source=source,
+    settings = settings or get_notify_settings()
+    if settings.tenant is None:
+        raise ValueError("Notify is not configured: [notify.tenant] is unset")
+    return httpx.AsyncClient(
+        base_url=settings.tenant.api_url,
+        auth=_NotifyJwtAuth(settings.sre_user_name.get_secret_value(), settings.sre_client_secret.get_secret_value()),
+        timeout=settings.timeout_seconds if timeout_seconds is None else timeout_seconds,
+        transport=httpx.AsyncHTTPTransport(retries=settings.connect_retries if connect_retries is None else connect_retries),
     )
-    tenant = get_notify_settings().tenant
-    if tenant is None:
-        log.warning("revoke_api_key_not_configured")
-        return "error"
 
-    url = tenant.api_url.rstrip("/") + "/sre-tools/api-key-revoke"
 
-    # generate the payload
-    payload = {
-        "token": api_key,
-        "type": api_type,
-        "url": github_repo,
-        "source": source,
-    }
+def classify_notify_error(exc: Exception) -> tuple[OperationStatus, str | None, int | None]:
+    """Classify expected httpx and body-parse failures from the GC Notify API; propagate unknown exceptions.
 
-    # post the event (ie call the api)
-    response = post_event(url, payload)
-    if response.status_code == 201:
-        log.info("revoke_api_key_success", api_key=api_key)
-        return "revoked"
-    elif response.status_code == 200:
-        log.warning("revoke_api_key_not_found", api_key=api_key)
-        return "not_found"
-    else:
-        log.error(
-            "revoke_api_key_error",
-            api_key=api_key,
-            response_code=response.status_code,
-        )
-        return "error"
+    ``retry_after`` is the 429 response's Retry-After delay in seconds, or ``None`` when the header
+    is absent or not a number of seconds.
+    """
+    if isinstance(exc, httpx.HTTPStatusError):
+        status_code = exc.response.status_code
+        if status_code == 401:
+            return OperationStatus.UNAUTHORIZED, ErrorCode.UNAUTHENTICATED, None
+        if status_code == 403:
+            return OperationStatus.UNAUTHORIZED, ErrorCode.FORBIDDEN, None
+        if status_code == 404:
+            return OperationStatus.NOT_FOUND, ErrorCode.NOT_FOUND, None
+        if status_code == 429:
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.RATE_LIMITED, _retry_after(exc.response)
+        if 500 <= status_code < 600:
+            return OperationStatus.TRANSIENT_ERROR, ErrorCode.SERVER_ERROR, None
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.HTTP_ERROR, None
+    if isinstance(exc, httpx.TimeoutException):
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.TIMEOUT, None
+    if isinstance(exc, httpx.HTTPError):
+        return OperationStatus.TRANSIENT_ERROR, ErrorCode.CONNECTION_ERROR, None
+    if isinstance(exc, json.JSONDecodeError):
+        return OperationStatus.PERMANENT_ERROR, ErrorCode.INVALID_RESPONSE, None
+    raise exc
+
+
+def _retry_after(response: httpx.Response) -> int | None:
+    """Return the Retry-After delay in seconds, or ``None`` when absent or an HTTP-date."""
+    value = response.headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None

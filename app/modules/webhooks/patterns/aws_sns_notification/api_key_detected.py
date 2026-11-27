@@ -1,14 +1,72 @@
+import asyncio
 import re
+from typing import Literal
 
+import httpx
 from slack_sdk import WebClient
 from structlog import get_logger
 
-from integrations import notify
+from contracts.operations.codes import ErrorCode
+from contracts.operations.status import OperationStatus
+from integrations.notify import build_notify_client, classify_notify_error, get_notify_settings
 from models.webhooks import AwsSnsPayload
 from modules.webhooks.aws_sns_notification import AwsNotificationPattern
 from modules.webhooks.patterns.aws_sns_notification.settings import get_notify_api_key_leak_settings
 
 logger = get_logger()
+
+type RevocationOutcome = Literal["revoked", "not_found", "error"]
+
+
+# TODO(TASK-37.5): deleted with the legacy SNS patterns; the webhooks Notify handler revokes keys instead.
+def revoke_api_key(
+    api_key: str, api_type: str, github_repo: str, source: str, *, key_name: str, service_id: str
+) -> RevocationOutcome:
+    """Ask GC Notify to revoke a leaked API key: "revoked" (201), "not_found" (200) or "error".
+
+    The SNS route is a sync handler, so this runs the async request with one ``asyncio.run``.
+    The logs name the key by ``key_name`` and ``service_id``, never by its value. Classified
+    failures and a missing [notify.tenant] are "error"; unexpected exceptions propagate.
+
+    Replay: the client never re-sends a request it sent, but Notify's endpoint is not
+    side-effect idempotent: a repeated report answers 201 again, re-emails the service owners
+    and moves the recorded revocation time. Each SNS redelivery therefore revokes again; the
+    tolerance is recorded in decisions/reliability.md until the webhooks cutover.
+    """
+    return asyncio.run(_revoke_api_key(api_key, api_type, github_repo, source, key_name=key_name, service_id=service_id))
+
+
+async def _revoke_api_key(
+    api_key: str, api_type: str, github_repo: str, source: str, *, key_name: str, service_id: str
+) -> RevocationOutcome:
+    log = logger.bind(api_key_name=key_name, service_id=service_id, api_type=api_type, github_repo=github_repo, source=source)
+    settings = get_notify_settings()
+    if settings.tenant is None:
+        log.warning("revoke_api_key_not_configured")
+        return "error"
+    report = {"token": api_key, "type": api_type, "url": github_repo, "source": source}
+    try:
+        async with build_notify_client(settings) as client:
+            response = await client.post("/sre-tools/api-key-revoke", json=report)
+            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        status, error_code, _ = classify_notify_error(exc)
+        response_code = exc.response.status_code if isinstance(exc, httpx.HTTPStatusError) else None
+        log.error("revoke_api_key_error", status=status.value, error_code=error_code, response_code=response_code)
+        return "error"
+    if response.status_code == 201:
+        log.info("revoke_api_key_success")
+        return "revoked"
+    if response.status_code == 200:
+        log.warning("revoke_api_key_not_found")
+        return "not_found"
+    log.error(
+        "revoke_api_key_error",
+        status=OperationStatus.PERMANENT_ERROR.value,
+        error_code=ErrorCode.HTTP_ERROR,
+        response_code=response.status_code,
+    )
+    return "error"
 
 
 def send_message_to_notify_channel(client: WebClient, blocks: list[dict]):
@@ -37,7 +95,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
     match = re.search(regex, msg)
 
     if not match:
-        logger.warning("failed_to_parse_api_key_detection_message", message=msg)
+        logger.warning("failed_to_parse_api_key_detection_message", message_length=len(msg))
         return []
 
     api_key = match.groups()[0]
@@ -63,7 +121,7 @@ def handle_api_key_detected(payload: AwsSnsPayload, client: WebClient) -> list[d
         raise ValueError("notify_api_key_leak.oncall_group_id is not set")
 
     # Attempt to revoke the API key
-    revocation_result = notify.revoke_api_key(api_key, key_type, github_repo, source)
+    revocation_result = revoke_api_key(api_key, key_type, github_repo, source, key_name=api_key_name, service_id=service_id)
 
     if revocation_result == "revoked":
         revoke_api_key_message = f"API key {api_key_name} has been successfully revoked."

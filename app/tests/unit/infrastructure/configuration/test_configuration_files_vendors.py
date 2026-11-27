@@ -85,7 +85,7 @@ def test_production_reaches_the_us_opsgenie_host_and_the_image_database() -> Non
 def test_base_names_no_entry() -> None:
     files = tomllib.loads((CONFIG_DIR / "base.toml").read_text(encoding="utf-8"))
 
-    assert files["notify"] == {"timeout_seconds": 60.0}
+    assert files["notify"] == {"timeout_seconds": 60.0, "connect_retries": 2}
     assert files["opsgenie"] == {"timeout_seconds": 30.0, "connect_retries": 2}
     assert files["trello"] == {}
     assert files["maxmind"] == {}

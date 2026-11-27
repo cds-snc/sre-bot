@@ -1,7 +1,7 @@
 """GC Notify vendor settings slice: the [notify] table of the configuration files.
 
 Exposes ``NotifySettings``, its tenant entry ``NotifyTenant``, and the cached
-``get_notify_settings()`` provider, read at use by ``integrations.notify.client``.
+``get_notify_settings()`` provider, read at use by ``integrations.notify.client`` and its callers.
 
 The deployment chooses which GC Notify host it reaches, so the tenant entry is that API
 host. The credentials are secrets read from the environment. The slice is validated at
@@ -39,7 +39,8 @@ class NotifySettings(ConfigurationSlice):
     """Vendor credential, endpoint and timeout settings for the GC Notify API.
 
     Keys of [notify]:
-        timeout_seconds.
+        timeout_seconds: the per-attempt HTTP timeout.
+        connect_retries: retries of a connection that never opened, set once on the transport.
         [notify.tenant] api_url: the API host. Default: none (Notify not configured).
 
     Environment only:
@@ -52,7 +53,12 @@ class NotifySettings(ConfigurationSlice):
     tenant: NotifyTenant | None = Field(default=None, description="The GC Notify API this instance works with.")
     sre_user_name: SecretStr = env_only("Client id the JWT is issued for.", "codespaces", default=SecretStr(""))
     sre_client_secret: SecretStr = env_only("Secret the JWT is signed with.", "codespaces", default=SecretStr(""))
-    timeout_seconds: float = Field(default=60.0, gt=0, description="Per-request HTTP timeout in seconds.")
+    timeout_seconds: float = Field(default=60.0, gt=0, description="Per-attempt HTTP timeout in seconds.")
+    connect_retries: int = Field(
+        default=2,
+        ge=0,
+        description="Retries of a connection that never opened (connect error or timeout); a sent request is never repeated.",
+    )
 
     @model_validator(mode="after")
     def _tenant_and_credentials_go_together(self) -> NotifySettings:

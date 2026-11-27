@@ -1,3 +1,4 @@
+import json
 from typing import Any, cast
 
 from fastapi import Request
@@ -17,6 +18,16 @@ from modules.webhooks.simple_text import process_simple_text_payload
 from utils.models import select_best_model
 
 logger = get_logger()
+
+
+# TODO(TASK-37.5): deleted with this module; the webhooks capability logs no payload either.
+def _payload_shape(payload: dict[str, Any]) -> dict[str, Any]:
+    """The payload's diagnostic shape: its top-level keys and serialised size, never its values.
+
+    A webhook body can carry tokens and callback URLs in any field, which key-name redaction
+    cannot catch (decisions/observability.md, OWASP Logging Cheat Sheet: data to exclude).
+    """
+    return {"payload_keys": sorted(str(key) for key in payload), "payload_bytes": len(json.dumps(payload, default=str))}
 
 
 def _get_bot_client(request: Request) -> WebClient | None:
@@ -53,11 +64,11 @@ def validate_payload(
         logger.debug(
             "payload_validation_success",
             model=model.__name__,
-            payload=validated_payload.model_dump(),
+            **_payload_shape(validated_payload.model_dump()),
         )
         return model, validated_payload
     else:
-        logger.error("payload_validation_failure", payload=payload_dict)
+        logger.error("payload_validation_failure", **_payload_shape(payload_dict))
         return None
 
 
@@ -73,7 +84,7 @@ def handle_webhook_payload(
             - action (Literal["post", "log", "none"]): The action to take.
             - payload (Optional[WebhookPayload]): The payload to post, if applicable.
     """
-    logger.debug("processing_webhook_payload", payload=payload_dict)
+    logger.debug("processing_webhook_payload", **_payload_shape(payload_dict))
     payload_validation_result = validate_payload(payload_dict)
 
     webhook_result = WebhookResult(status="error", message="Failed to process payload for unknown reasons")

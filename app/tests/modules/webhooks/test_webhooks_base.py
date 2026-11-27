@@ -1,6 +1,8 @@
+import json
 from unittest.mock import ANY, MagicMock, patch
 
 from pydantic import BaseModel
+from structlog.testing import capture_logs
 
 from models.webhooks import (
     AccessRequest,
@@ -36,8 +38,40 @@ def test_validate_payload_returns_model_if_valid(mock_select_best_model, mock_lo
     mock_logger.debug.assert_called_once_with(
         "payload_validation_success",
         model="MockModel",
-        payload={"text": "validated_payload"},
+        payload_keys=["text"],
+        payload_bytes=len('{"text": "validated_payload"}'),
     )
+
+
+SECRET_VALUE = "gcntfy-a-token-that-must-never-be-logged"
+
+
+@patch("modules.webhooks.base.select_best_model")
+def test_an_unrecognised_payload_logs_its_shape_never_its_values(mock_select_best_model):
+    """A payload of no known type may carry a token in any field, so only its keys and size are logged."""
+    mock_select_best_model.return_value = None
+    payload = {"unknown_field": SECRET_VALUE, "nested": {"token": SECRET_VALUE}}
+
+    with capture_logs() as entries:
+        base.validate_payload(payload)
+
+    [entry] = [entry for entry in entries if entry["event"] == "payload_validation_failure"]
+    assert entry["payload_keys"] == ["nested", "unknown_field"]
+    assert entry["payload_bytes"] == len(json.dumps(payload))
+    assert "payload" not in entry
+    assert SECRET_VALUE not in repr(entries)
+
+
+@patch("modules.webhooks.base.validate_payload")
+def test_processing_a_payload_logs_its_shape_never_its_values(mock_validate_payload):
+    mock_validate_payload.return_value = None
+
+    with capture_logs() as entries:
+        base.handle_webhook_payload({"Message": SECRET_VALUE}, MagicMock())
+
+    [entry] = [entry for entry in entries if entry["event"] == "processing_webhook_payload"]
+    assert entry["payload_keys"] == ["Message"]
+    assert SECRET_VALUE not in repr(entries)
 
 
 @patch("modules.webhooks.base.select_best_model")

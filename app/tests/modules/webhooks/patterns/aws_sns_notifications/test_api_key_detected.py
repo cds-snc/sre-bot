@@ -36,7 +36,7 @@ def mock_api_key_detected():
     )
 
 
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_success(revoke_api_key_mock):
     client = MagicMock()
     revoke_api_key_mock.return_value = "revoked"
@@ -45,7 +45,7 @@ def test_api_key_detected_handler_success(revoke_api_key_mock):
     assert any("successfully revoked" in b["text"]["text"] for b in blocks if "text" in b)
 
 
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_not_found(revoke_api_key_mock):
     client = MagicMock()
     revoke_api_key_mock.return_value = "not_found"
@@ -54,13 +54,30 @@ def test_api_key_detected_handler_not_found(revoke_api_key_mock):
     assert any("was not found" in b["text"]["text"] for b in blocks if "text" in b)
 
 
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_failure(revoke_api_key_mock):
     client = MagicMock()
     revoke_api_key_mock.return_value = "error"
     payload = mock_api_key_detected()
     blocks = api_key_detected.handle_api_key_detected(payload, client)
     assert any("could not be revoked" in b["text"]["text"] for b in blocks if "text" in b)
+
+
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
+def test_api_key_detected_handler_revokes_the_reported_key_by_name(revoke_api_key_mock):
+    """The handler sends the reported key and names it for the logs by its name and service id."""
+    revoke_api_key_mock.return_value = "revoked"
+
+    api_key_detected.handle_api_key_detected(mock_api_key_detected(), MagicMock())
+
+    revoke_api_key_mock.assert_called_once_with(
+        "api-key-blah",
+        "cds_test_type",
+        "https://github.com/blah",
+        "source_data",
+        key_name="Unknown Key",
+        service_id="Unknown",
+    )
 
 
 def test_api_key_detected_matcher():
@@ -70,7 +87,7 @@ def test_api_key_detected_matcher():
 
 
 @patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.send_message_to_notify_channel")
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_sends_message(mock_revoke, mock_send):
     client = MagicMock()
     mock_revoke.return_value = "revoked"
@@ -79,7 +96,7 @@ def test_api_key_detected_handler_sends_message(mock_revoke, mock_send):
     mock_send.assert_called_once()
 
 
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_mentions_configured_oncall_group(revoke_api_key_mock):
     """The notification includes the configured Slack user-group mention after the repository."""
     revoke_api_key_mock.return_value = "revoked"
@@ -90,7 +107,7 @@ def test_api_key_detected_handler_mentions_configured_oncall_group(revoke_api_ke
     assert message.endswith("(cc <!subteam^S0123456789|notify-oncall>)")
 
 
-@patch("integrations.notify.revoke_api_key")
+@patch("modules.webhooks.patterns.aws_sns_notification.api_key_detected.revoke_api_key")
 def test_api_key_detected_handler_requires_oncall_group_id(revoke_api_key_mock, monkeypatch):
     """The handler rejects delivery when the Slack user-group ID is not configured."""
     revoke_api_key_mock.return_value = "revoked"

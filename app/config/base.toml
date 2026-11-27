@@ -159,10 +159,12 @@ record_ttl_seconds = 3600
 in_progress_ttl_seconds = 300
 
 [notify]
-# The GC Notify request timeout. The API host is the [notify.tenant] entry (api_url), named in the
+# The GC Notify per-attempt timeout and the retries of a connection that never opened (a sent
+# revocation is never repeated). The API host is the [notify.tenant] entry (api_url), named in the
 # deployment's environment file; with no entry Notify is not configured. The credentials are secrets
 # from NOTIFY__SRE_USER_NAME and NOTIFY__SRE_CLIENT_SECRET.
 timeout_seconds = 60.0
+connect_retries = 2
 
 [opsgenie]
 # The Opsgenie per-attempt timeout and the retries of a connection that never opened (every call is

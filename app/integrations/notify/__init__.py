@@ -1,17 +1,12 @@
-"""Notify module for sending events to the Notify API."""
+"""GC Notify vendor package: the client factory, its error classifier and the settings slice."""
 
-from .client import (
-    create_authorization_header,
-    create_jwt_token,
-    epoch_seconds,
-    post_event,
-    revoke_api_key,
-)
+from .client import build_notify_client, classify_notify_error
+from .settings import NotifySettings, NotifyTenant, get_notify_settings
 
 __all__ = [
-    "epoch_seconds",
-    "create_jwt_token",
-    "create_authorization_header",
-    "post_event",
-    "revoke_api_key",
+    "NotifySettings",
+    "NotifyTenant",
+    "build_notify_client",
+    "classify_notify_error",
+    "get_notify_settings",
 ]

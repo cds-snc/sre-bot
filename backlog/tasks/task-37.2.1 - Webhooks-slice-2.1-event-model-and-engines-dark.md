@@ -1,10 +1,10 @@
 ---
 id: TASK-37.2.1
 title: 'Webhooks slice 2.1: event model and engines (dark)'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-25T20:47:00Z'
-updated_date: '2026-11-26T18:52:00Z'
+updated_date: '2026-11-27T19:34:00Z'
 labels:
   - migration
   - webhooks
@@ -238,3 +238,9 @@ New: #10 bot-worded templates cover every supported language (P2, respecting #18
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Merged in #1891 (63ba6cd6) on 2026-11-27: the webhooks capability skeleton, the event model (InboundEvent, event types, SenderKind, WebhookInstance, Destination as a workplace reference), the webhooks/sender-kinds content kind, matcher, RFC 9535 JSONPath extraction, Liquid rendering with per-language bot wording, the email finder and the [webhooks] settings, all dark. All 12 ACs checked; no human step open.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,10 +1,10 @@
 ---
 id: TASK-37.2.4
 title: 'Webhooks slice 2.4: webhook inbox table (expand, empty)'
-status: In Progress
+status: Done
 assignee: []
 created_date: '2026-11-27T16:46:00Z'
-updated_date: '2026-11-27T19:16:00Z'
+updated_date: '2026-11-27T19:31:00Z'
 labels:
   - webhooks
   - terraform
@@ -39,9 +39,9 @@ Change notice: none (nothing reads it).
 <!-- AC:BEGIN -->
 - [x] #1 terraform/dynamodb.tf declares sre_bot_webhook_inbox with partition item_key, TTL on expires_at, and the sparse indexes by_due (due S, due_at N) and by_instance (instance_ref S, received_at N), each projecting every attribute; on-demand under the ceiling variables, point-in-time recovery for 7 days and deletion protection on (review + terraform plan)
 - [x] #2 The webhooks table gains the sparse index by_instance_ref (instance_ref S, projection ALL) and moves to on-demand under the same ceiling, both in place with no table replacement (review + terraform plan)
-- [ ] #3 The inbox table's ARN is in local.dynamodb_table_arns, so the task role reaches it and its indexes, and the backup selection leaves it out through local.dynamodb_backup_excluded_arns (subtracted from the table list, never both included and excluded), with the reason in a comment; the selection exists after the apply (review + terraform plan + apply)
+- [x] #3 The inbox table's ARN is in local.dynamodb_table_arns, so the task role reaches it and its indexes, and the backup selection leaves it out through local.dynamodb_backup_excluded_arns (subtracted from the table list, never both included and excluded), with the reason in a comment; the selection exists after the apply (review + terraform plan + apply)
 - [x] #4 The PR changes only terraform/, decisions/deployment.md, decisions/cloud-portability.md and its task file; terraform plan shows one table created, the webhooks table and the task-role policy updated in place, the backup selection replaced, and nothing else destroyed or replaced (check)
-- [ ] #5 bin/deploy-checks.zsh pre runs before the merge and post after the apply, and the output is read (human run, agent reads)
+- [x] #5 bin/deploy-checks.zsh pre runs before the merge and post after the apply, and the output is read (human run, agent reads)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,4 +103,12 @@ Change notice: none (nothing reads the table or the index). Size: about 120 line
 2026-11-27 (PR #1899): tf_plan (terraform-plan check passed) shows add aws_dynamodb_table.sre_bot_webhook_inbox; update in place aws_dynamodb_table.webhooks_table and aws_iam_policy.sre-bot_secrets_manager; recreate aws_backup_selection.sre_bot_backup_selection; nothing else, so ACs #1-#3 are confirmed. The PR changes only the 6 planned paths. AC #4 checked. AC #5 pre part (human run 2026-11-27T18:27:13Z, tmp/deploy-checks/pre-20261127T182713Z.txt, agent read): rollback target sre-bot-task:154, image_tag 3c1964678f6c23c6c4c89e9629861248e5b76694-2026-11-27, rolloutState COMPLETED with 2/2 running; 24h baseline 8 slack_app_initialized and 1 error line, aws_identity_store_group_memberships_error, which predates this change. AC #5 stays open until the post run after the apply.
 
 2026-11-27 (apply of #1899, run 46053603401): the inbox table, the webhooks table (on-demand switch and by_instance_ref, 12m20s) and the IAM policy applied. The backup selection was destroyed, and its replacement failed: CreateBackupSelection InvalidParameterValueException, 'arn:aws:dynamodb:ca-central-1:283582579564:table/sre_bot_webhook_inbox' both included and excluded from selection. AWS Backup rejects an ARN that a selection both includes and excludes (not_resources only narrows wildcard or tag selections). Until a fixed apply lands, no DynamoDB table is in a backup selection; the vault's recovery points are untouched, and the next scheduled backup is 06:00 UTC. Fix forward (a revert would try to destroy the deletion-protected inbox): local.dynamodb_backup_excluded_arns holds the inbox ARN with its reason, the selection's resources are setsubtract(local.dynamodb_table_arns, local.dynamodb_backup_excluded_arns), not_resources is gone, and deployment.md's Backups and Checks lines say so, with a Changes line. AC #3 reworded and unchecked until the fixed apply creates the selection; fmt and validate pass. Lesson: the planned not_resources pattern came from the provider's argument list without checking the service's selection rules; the AWS Backup resource-assignment guide states the constraint.
+
+2026-11-27 (fix #1903 merged 19:25Z, Terraform Apply success at 776ba97d): get-backup-selection lists the 10 tables (aws_access_requests, incidents, sre_bot_access, sre_bot_access_requests, sre_bot_audit_trail, sre_bot_idempotency, sre_bot_incident_bindings, sre_bot_incident_status_updates, sre_bot_incident_timeline, webhooks) and not sre_bot_webhook_inbox: AC #3 checked. describe-table sre_bot_webhook_inbox: ACTIVE, deletion protection true, PAY_PER_REQUEST. The webhooks by_instance_ref index: the provider's update waited until the index was ACTIVE (Modifications complete after 12m20s). deploy-checks post (human run 2026-11-27T19:15:11Z, after the first apply; the fix touched only the backup selection, with no app effect; tmp/deploy-checks/post-20261127T191511Z.txt, agent read): sre-bot-task:155 (W2's 63ba6cd6 deploy) COMPLETED 2/2; rollout, boot errors, runtime errors, slack_up and version PASS; health 200; non_json_lines WARN with 4 lines (two console-format built_conditional_write_store debug lines and two starlette.testclient import lines), which are in every post run since 2026-11-05 and predate this task. AC #5 checked. The backup selection had no tables between 19:13Z and the fix apply after 19:25Z; no scheduled backup fell in that window (daily at 06:00 UTC).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Provisioned the webhook inbox table and the webhooks table's by_instance_ref index ahead of the async ingest pipeline, and set the program's DynamoDB table rule. #1899: sre_bot_webhook_inbox (item_key, TTL expires_at, sparse by_due and by_instance, projection ALL, on-demand under the new dynamodb_max_read_request_units and dynamodb_max_write_request_units variables, PITR 7 days, deletion protection); webhooks moved to on-demand with by_instance_ref; index Query grants for both tables; decisions/deployment.md Tables (capacity, protection, backups and retention, removal) and decisions/cloud-portability.md (expiry as a backend seam, a drift test per RecordTable). The first apply destroyed the backup selection and failed to recreate it, because the inbox ARN was both in resources and in not_resources. #1903 fixed it forward: a local.dynamodb_backup_excluded_arns list subtracted from the table list, with deployment.md corrected. Verified in production: the selection holds every table but the inbox; the inbox is ACTIVE, deletion-protected and on-demand; deploy-checks pre and post clean apart from WARN lines that predate the task. Hand-offs in doc-11: drift tests to TASK-37.4.2 (22.7), the Notify leaked key in the envelope to TASK-37.3 (22.4), and the proposal that Lane A's on-demand task cover the remaining tables.
+<!-- SECTION:FINAL_SUMMARY:END -->

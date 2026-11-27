@@ -3,15 +3,17 @@
 Signatures are real: a test RSA key signs each message and the SNS signing-certificate and
 ``SubscribeURL`` hosts are answered over a faked HTTP edge, so the route's own validation runs.
 The webhook record store, the Slack Web API and the GC Notify API are faked at their external
-edges. Layout the bot builds for each notification kind is asserted by identifying facts (the
+edges (the GC Notify API through httpx's transport, which answers and records each request). Layout the bot builds for each notification kind is asserted by identifying facts (the
 alarm name and state, the budget figure, the repository, the mention), not as a golden layout.
 ``test_legacy_only_webhook_*`` tests pin behaviour the webhooks rebuild ends and are deleted by
 the task named in each docstring.
 """
 
 import json
+from dataclasses import dataclass, field
 from typing import Any
 
+import httpx
 import pytest
 from cryptography.hazmat.primitives import hashes
 
@@ -126,14 +128,32 @@ NOTIFICATIONS: list[Any] = [
 ]
 
 
+@dataclass
+class NotifyEdge:
+    """The GC Notify API as the leak response reaches it: the status it answers and the requests it got."""
+
+    status_code: int = 201
+    requests: list[httpx.Request] = field(default_factory=list)
+
+
 @pytest.fixture
-def notify_revocation(monkeypatch: pytest.MonkeyPatch, sns: SnsEdges) -> SnsEdges:
+def notify_revocation(monkeypatch: pytest.MonkeyPatch) -> NotifyEdge:
     """Configure the GC Notify tenant the API-key-leak response revokes keys through, over the faked HTTP edge."""
     monkeypatch.setenv("NOTIFY__TENANT", json.dumps({"api_url": NOTIFY_API_URL}))
     monkeypatch.setenv("NOTIFY__SRE_USER_NAME", "sre-bot-test")
     monkeypatch.setenv("NOTIFY__SRE_CLIENT_SECRET", "x" * 32)
     get_notify_settings.cache_clear()
-    return sns
+    edge = NotifyEdge()
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        edge.requests.append(request)
+        return httpx.Response(edge.status_code, json={"result": "ok"})
+
+    def mock_transport(**_: Any) -> httpx.MockTransport:
+        return httpx.MockTransport(answer)
+
+    monkeypatch.setattr(httpx, "AsyncHTTPTransport", mock_transport)
+    return edge
 
 
 def test_webhook_route_sns_subscription_confirmation_is_confirmed_and_announced_in_ops(
@@ -206,7 +226,8 @@ def test_webhook_route_sns_notification_on_an_alert_webhook_carries_the_incident
 )
 def test_webhook_route_sns_api_key_leak_is_revoked_and_announced_in_both_channels(
     webhook_surface: WebhookSurface,
-    notify_revocation: SnsEdges,
+    sns: SnsEdges,
+    notify_revocation: NotifyEdge,
     revocation_status: int,
     outcome_fact: str,
 ) -> None:
@@ -216,13 +237,14 @@ def test_webhook_route_sns_api_key_leak_is_revoked_and_announced_in_both_channel
     the on-call group from the typed settings slice.
     """
     webhook_surface.records.seed(hook_type="info")
-    revoke = notify_revocation.http.post(f"{NOTIFY_API_URL}/sre-tools/api-key-revoke", status_code=revocation_status)
+    notify_revocation.status_code = revocation_status
 
-    response = webhook_surface.post(notify_revocation.signer.message(message=LEAK_MESSAGE))
+    response = webhook_surface.post(sns.signer.message(message=LEAK_MESSAGE))
 
     assert response.status_code == 200
-    assert revoke.call_count == 1
-    assert revoke.last_request.json() == {
+    [revoke] = notify_revocation.requests
+    assert (revoke.method, str(revoke.url)) == ("POST", f"{NOTIFY_API_URL}/sre-tools/api-key-revoke")
+    assert json.loads(revoke.content) == {
         "token": LEAKED_KEY,
         "type": "cds-tokens",
         "url": LEAKED_REPOSITORY,
