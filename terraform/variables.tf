@@ -37,3 +37,27 @@ variable "slack_webhook_url" {
   sensitive   = true
 }
 
+
+# On-demand DynamoDB tables are capped at these request rates (decisions/deployment.md Tables),
+# a cost ceiling against unbounded traffic: past it, requests throttle instead of scaling.
+variable "dynamodb_max_read_request_units" {
+  description = "Highest read request units per second an on-demand DynamoDB table may serve"
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.dynamodb_max_read_request_units > 0
+    error_message = "dynamodb_max_read_request_units must be positive."
+  }
+}
+
+variable "dynamodb_max_write_request_units" {
+  description = "Highest write request units per second an on-demand DynamoDB table may serve"
+  type        = number
+  default     = 1000
+
+  validation {
+    condition     = var.dynamodb_max_write_request_units > 0
+    error_message = "dynamodb_max_write_request_units must be positive."
+  }
+}
