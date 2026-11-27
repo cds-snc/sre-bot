@@ -1,13 +1,13 @@
-"""The archived event sent to Sentinel through the legacy client.
+"""The response events sent to Sentinel through the legacy client: the archived event and the declare's events.
 
 TODO(TASK-122): moves onto the audit capability's sink, with TASK-171's Logs
-Ingestion API rebuild. Until then the event keeps the legacy envelope
+Ingestion API rebuild. Until then each event keeps the legacy envelope
 ``{event, message}`` so Sentinel queries keyed on ``event`` keep working, and the
-message holds only the incident, conversation, user and time, never the request
-body (decisions/observability.md).
+message holds only ids and times, never the request body (decisions/observability.md).
 """
 
 import asyncio
+from collections.abc import Mapping
 
 from features.incident.response.interfaces import ArchivedEvent
 from integrations.sentinel.client import log_to_sentinel
@@ -27,3 +27,11 @@ class SentinelArchiveEventSink:
             "at": event.at.isoformat(),
         }
         await asyncio.to_thread(log_to_sentinel, CHANNEL_ARCHIVED, message)
+
+
+class SentinelDeclareEventSink:
+    """Send a declare event (the form submitted, an alert button pressed) with ``log_to_sentinel``; never raises."""
+
+    async def send(self, event: str, message: Mapping[str, str]) -> None:
+        """Send ``event`` with its ids-only ``message``, off the event loop."""
+        await asyncio.to_thread(log_to_sentinel, event, dict(message))

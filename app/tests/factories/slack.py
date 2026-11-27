@@ -75,6 +75,30 @@ class FakeSlackReply:
             return OperationResult.success()
         return self.result  # type: ignore[return-value]
 
+    def update_message(
+        self,
+        *,
+        channel_id: str,
+        ts: str,
+        text: str,
+        attachments: Sequence[Mapping[str, Any]] = (),
+        blocks: Sequence[Mapping[str, Any]] = (),
+    ) -> OperationResult[None]:
+        self.calls.append(
+            ("update_message", {"channel_id": channel_id, "ts": ts, "text": text, "attachments": attachments, "blocks": blocks})
+        )
+        if self.result is None or self.result.is_success:
+            return OperationResult.success()
+        return self.result  # type: ignore[return-value]
+
+    def permalink(self, *, channel_id: str, message_ts: str) -> OperationResult[str]:
+        self.calls.append(("permalink", {"channel_id": channel_id, "message_ts": message_ts}))
+        if self.result is None:
+            return OperationResult.success(data=f"https://slack.test/archives/{channel_id}/p{message_ts.replace('.', '')}")
+        if self.result.is_success:
+            return OperationResult.success(data=self.result.data or "https://slack.test/archives/message")  # type: ignore[arg-type]
+        return self.result  # type: ignore[return-value]
+
     def calls_to(self, name: str) -> list[dict[str, Any]]:
         return [kwargs for called, kwargs in self.calls if called == name]
 

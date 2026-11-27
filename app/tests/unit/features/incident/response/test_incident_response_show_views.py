@@ -35,11 +35,11 @@ def test_a_set_time_is_a_slack_date_token_and_an_unset_one_is_unknown() -> None:
     assert time_text(None, "en-US") == "Unknown"
 
 
-def test_a_severity_outside_the_options_preselects_nothing() -> None:
+def test_the_severity_field_offers_sev0_first_and_preselects_a_stored_sev0() -> None:
     element = _input(build_field_view(replace(INCIDENT, severity=Severity.SEV0), Field.SEVERITY, locale="en-US", channel_id="C0"))
 
-    assert "initial_option" not in element
-    assert [option["value"] for option in element["options"]] == ["none", "sev-1", "sev-2", "sev-3", "sev-4"]
+    assert element["initial_option"]["value"] == "sev-0"
+    assert [option["value"] for option in element["options"]] == ["none", "sev-0", "sev-1", "sev-2", "sev-3", "sev-4"]
 
 
 def test_an_unrated_severity_preselects_none() -> None:

@@ -65,7 +65,7 @@ def only_response(harness: SlackCommandHarness) -> dict[str, Any]:
 
 
 def test_each_root_slash_command_is_registered_once(slack_command_harness: SlackCommandHarness) -> None:
-    """Every hookimpl command hangs off /sre or /rant, each wired to Bolt once.
+    """Every hookimpl command hangs off /sre, /rant or /incident (incident.response's declare), each wired to Bolt once.
 
     A duplicate would mean two registration paths for one command, which Bolt
     resolves silently by first match.
@@ -74,10 +74,11 @@ def test_each_root_slash_command_is_registered_once(slack_command_harness: Slack
 
     counts = Counter(slack_command_harness.app.registered_commands)
 
-    assert counts == Counter({f"/{prefix}sre": 1, f"/{prefix}rant": 1})
+    assert counts == Counter({f"/{prefix}sre": 1, f"/{prefix}rant": 1, f"/{prefix}incident": 1})
 
 
 REGISTERED_COMMAND_TREE: dict[str, bool] = {
+    "incident": False,
     "rant": False,
     "sre": True,
     "sre.access": False,
@@ -133,7 +134,7 @@ def test_command_prefix_is_applied_to_root_slash_commands(
 
     response = harness.dispatch("sre", "version")
 
-    assert sorted(harness.app.registered_commands) == ["/dev-rant", "/dev-sre"]
+    assert sorted(harness.app.registered_commands) == ["/dev-incident", "/dev-rant", "/dev-sre"]
     assert response.status == 200
     assert only_response(harness)["text"].startswith("🤖 SRE Bot version:")
 

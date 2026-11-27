@@ -47,8 +47,9 @@ TIME_ATTRIBUTES = {
     Field.END_IMPACT_TIME: "impact_ended_at",
 }
 
-# The severity picker's options until TASK-145.7.10 adds SEV0 with the declare picker.
-SEVERITY_OPTIONS = ("none", "sev-1", "sev-2", "sev-3", "sev-4")
+# The severity picker's options, shared by the update modal and the declare modal: unset, then every
+# level of the domain's closed set (common/vocabulary.py), so the pickers never restate the scale.
+SEVERITY_OPTIONS = ("none", *(f"sev-{level.value}" for level in Severity))
 STATUS_OPTIONS = tuple(
     status.value
     for status in (
@@ -186,7 +187,7 @@ def _select(field: Field, current: str | None, locale: str) -> dict[str, Any]:
         "options": options,
         "action_id": VALUE_ACTION_ID,
     }
-    # A stored value outside the options (a SEV0 before TASK-145.7.10) preselects nothing rather than an invalid option.
+    # A stored value outside the options preselects nothing rather than an invalid option.
     initial = next((option for option in options if option["value"] == current), None)
     if initial is not None:
         element["initial_option"] = initial

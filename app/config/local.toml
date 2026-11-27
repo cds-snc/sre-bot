@@ -33,6 +33,8 @@ api_url = "https://api.opsgenie.com"
 # Slack and Google are both configured here, so the system that creates a new incident's
 # report and video call is named: an unset policy with several systems fails boot.
 new_incident_system = "google"
+# This instance's incident conversations are named incident-dev-, apart from production's.
+dev_conversation_names = true
 
 [maxmind.tenant]
 # The database the devcontainer downloads (.devcontainer/maxmind-create.sh).

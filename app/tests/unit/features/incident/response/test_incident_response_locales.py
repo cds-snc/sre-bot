@@ -45,7 +45,7 @@ def test_entry_points_hold_no_sentence_literal() -> None:
         docstrings = {
             id(node.body[0].value)
             for node in ast.walk(tree)
-            if isinstance(node, ast.Module | ast.FunctionDef | ast.ClassDef)
+            if isinstance(node, ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef)
             and node.body
             and isinstance(node.body[0], ast.Expr)
             and isinstance(node.body[0].value, ast.Constant)

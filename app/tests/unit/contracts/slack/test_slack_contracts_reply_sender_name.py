@@ -18,7 +18,7 @@ def test_reply_module_exposes_the_reply_sender_protocol() -> None:
     assert getattr(sender, "_is_protocol", False)
     assert all(
         callable(getattr(sender, method))
-        for method in ("post_message", "post_ephemeral", "open_view", "push_view", "update_view")
+        for method in ("post_message", "post_ephemeral", "open_view", "push_view", "update_view", "update_message", "permalink")
     )
 
 

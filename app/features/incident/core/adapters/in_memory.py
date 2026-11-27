@@ -603,6 +603,7 @@ class InMemoryIncidentConversation:
     ) -> None:
         self._tenant = tenant
         self._accounts = dict(accounts or {})
+        self.created_names: list[str] = []
         self._conversations: dict[str, _StoredConversation] = {}
         for vendor_id in open_ids:
             self._conversations[vendor_id] = _StoredConversation(archived=False, member=True)
@@ -645,6 +646,7 @@ class InMemoryIncidentConversation:
         vendor_id = f"C0NEW{self._created}"
         self._conversations[vendor_id] = _StoredConversation(archived=False, member=True, private=private)
         self._names[channel_name] = vendor_id
+        self.created_names.append(channel_name)
         return OperationResult.success(
             ConversationReference(system=WorkplaceSystem.SLACK, tenant=self._tenant, vendor_id=vendor_id)
         )

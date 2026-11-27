@@ -44,7 +44,6 @@ def test_legacy_slack_commands_and_legacy_handlers_register_sre_command_once(moc
         patch("server.lifespan.aws"),
         patch("server.lifespan.secret"),
         patch("server.lifespan.webhook_helper"),
-        patch("server.lifespan.incident"),
         patch("server.lifespan.incident_helper"),
     ):
         _register_legacy_handlers(mock_bot, MagicMock())

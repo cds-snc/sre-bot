@@ -55,7 +55,11 @@ from features.incident.core.adapters.google_sheets import GoogleSheetsIncidentLi
 from features.incident.core.adapters.i18n import translate
 from features.incident.core.adapters.legacy_roles import GoogleDriveLegacyRolesReader
 from features.incident.core.adapters.legacy_schedule import GoogleDrivePlacementScheduleLookup
-from features.incident.core.adapters.slack import build_incident_conversation, build_incident_transcript_reader
+from features.incident.core.adapters.slack import (
+    build_incident_conversation,
+    build_incident_transcript_reader,
+    slack_conversation_link,
+)
 from features.incident.core.domain import (
     AttendeeBusy,
     BindingKind,
@@ -174,6 +178,7 @@ __all__ = [
     "incident_conversation_names",
     "read_incident_roles",
     "resolve_new_incident_system",
+    "slack_conversation_link",
     "translate",
 ]
 

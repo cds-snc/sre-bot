@@ -112,6 +112,17 @@ def test_the_conversation_name_bound_is_changed_in_configuration(monkeypatch: py
     assert IncidentCoreSettings().conversation_name_attempts == 8
 
 
+def test_conversation_names_are_production_shaped_by_default() -> None:
+    """The code default names conversations incident-; an environment file opts into incident-dev-."""
+    assert IncidentCoreSettings.model_fields["dev_conversation_names"].default is False
+
+
+def test_dev_conversation_names_are_set_in_configuration(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INCIDENT_CORE__DEV_CONVERSATION_NAMES", "true")
+
+    assert IncidentCoreSettings().dev_conversation_names is True
+
+
 @pytest.mark.parametrize("value", ["0", "-1"])
 def test_a_conversation_name_bound_below_one_is_rejected_naming_the_key(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
     """A bound below one would leave declare no name to try, so the slice fails at boot naming the key."""
@@ -154,6 +165,7 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
         "full_read_max_items": 10000,
         "timeline_update_attempts": 3,
         "conversation_name_attempts": 5,
+        "dev_conversation_names": False,
         "folder_id": "",
         "report_template_id": "",
         "list_sheet_id": "",
@@ -164,12 +176,13 @@ def test_base_declares_the_tables_and_empty_document_ids() -> None:
 def test_no_environment_file_holds_a_table_or_a_document_id(environment: str) -> None:
     """No environment file names a table or an id: the defaults are the provisioned tables and ids come from the environment.
 
-    The new-incident policy is the one [incident_core] key an environment sets, because it depends on which
-    workplace systems that environment configures.
+    The new-incident policy and the dev conversation names are the [incident_core] keys an environment
+    sets: the first depends on which workplace systems that environment configures, the second on
+    whether its conversations must be told apart from production's.
     """
     values = tomllib.loads((CONFIG_DIR / f"{environment}.toml").read_text(encoding="utf-8"))
 
-    assert set(values.get("incident_core", {})) <= {"new_incident_system"}
+    assert set(values.get("incident_core", {})) <= {"new_incident_system", "dev_conversation_names"}
 
 
 @pytest.mark.parametrize("field", _DOCUMENT_IDS)

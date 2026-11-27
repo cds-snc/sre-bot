@@ -46,7 +46,7 @@ class _FakeSlackProvider:
     def register_command(self, command: str, **kwargs) -> None:
         self.calls.append((command, kwargs.get("parent")))
 
-    def register_block_action(self, action_id: str, listener) -> None:
+    def register_block_action(self, action_id: str, listener, **aliases) -> None:
         _ = (action_id, listener)
 
     def register_view_submission(self, callback_id: str, listener) -> None:
