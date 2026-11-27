@@ -3,7 +3,7 @@ id: doc-18
 title: Stack W handoff
 type: guide
 created_date: '2026-11-25T20:23:00Z'
-updated_date: '2026-11-27T19:30:00Z'
+updated_date: '2026-11-27T21:30:00Z'
 ---
 ## Stack
 
@@ -33,22 +33,23 @@ updated_date: '2026-11-27T19:30:00Z'
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
 | W1 | TASK-37.1 provisioned-content loader, webhooks.md rewrite, task re-cut | `stack-w/task-37.1-content-loader` | #1889 | merged | merged 2026-11-27 (ba7e479b); TASK-37.1 and TASK-168 closed Done 2026-11-27 (committed with W3's plan commit) |
-| W2 | TASK-37.2.1 event model, sender-kind content kind, engines, [webhooks] settings, Destination as a workplace reference | `stack-w/task-37.2.1-event-model` | #1891 | in review | all 12 ACs checked; In Progress; rebased onto main 2026-11-27 (`gh stack sync`); stays open while layers above are planned |
-| W2b | TASK-37.2.3 event-consumer extension point, platform-neutral Slack poster, fallback rendering, Translator contract | `stack-w/task-37.2.3-event-consumers` | #1896 | in review | all 10 ACs checked; In Progress; submitted 2026-11-27 and retitled; shares server/lifespan.py, server/plugins/extension_points.py, integrations/slack/client.py, contracts/i18n/translator.py and three ADRs with main (keep both sides on rebase) |
-| W3 | TASK-37.2.2 async ingest: aws_sns and legacy_slack_json protocols, WebhookStore, the inbox on the records contract, inline processor, sweeper (built, not registered), route (not mounted) | `stack-w/task-37.2.2-async-ingest` | #1898 | in review | plan approved 2026-11-27 (D1-D20; one PR under a size-gate exception); plan commit 49f970e8, code commit 028c94f1; all 12 ACs checked, full mypy 33 pre-existing in untouched files, full pytest 8667 passed; In Progress; submitted 2026-11-27; stays open while W4 is planned |
+| W2 | TASK-37.2.1 event model, sender-kind content kind, engines, [webhooks] settings, Destination as a workplace reference | `stack-w/task-37.2.1-event-model` | #1891 | merged | merged 2026-11-27 (63ba6cd6); TASK-37.2.1 closed Done 2026-11-27 (committed on row 22.1a's branch `task-25.8-notify-outbound-client`) |
+| W2b | TASK-37.2.3 event-consumer extension point, platform-neutral Slack poster, fallback rendering, Translator contract | `stack-w/task-37.2.3-event-consumers` | #1896 | in review (bottom open layer, targets main) | all 10 ACs checked; In Progress; submitted 2026-11-27 and retitled; rebased onto main 776ba97d by hand 2026-11-27 (`git rebase --onto origin/main 63ba6cd6`: `gh stack sync` could not find the base because the merged W2 ref predates its squash), no conflict; shares server/lifespan.py, server/plugins/extension_points.py, integrations/slack/client.py, contracts/i18n/translator.py and three ADRs with main (keep both sides on rebase) |
+| W3 | TASK-37.2.2 async ingest: aws_sns and legacy_slack_json protocols, WebhookStore, the inbox on the records contract, inline processor, sweeper (built, not registered), route (not mounted) | `stack-w/task-37.2.2-async-ingest` | #1898 | in review | plan approved 2026-11-27 (D1-D20; one PR under a size-gate exception); plan commit 49f970e8, code commit 028c94f1; all 12 ACs checked, full mypy 33 pre-existing in untouched files, full pytest 8667 passed; In Progress; submitted 2026-11-27; rebased onto W2b 2026-11-27 (one conflict, the TASK-37.2.4 task file: main's copy kept per the side-row rule); stays open while W4 is planned |
 | W4 | TASK-37.3 sender kinds as YAML, parity and injection tests, Notify handler, incident alert consumer | `stack-w/task-37.3-...` | - | planned (task, no plan) | also waits on TASK-25.8 (row 22.1a); its SNS kinds match the parsed `Message` (W3 D11) |
 
 ## Position
 
-- Top of stack: `stack-w/task-37.2.2-async-ingest` (W3, #1898, in review), above W2b (#1896) above W2 (#1891). Main moved to 3c196467 (Lane A TASK-145.7.13, no file overlap with the stack): `gh stack sync` and `gh stack submit` on 2026-11-27, with this handoff update committed on W3 first.
-- No uncommitted stack work. Lane B's next session works row 22.3a on `task-37.2.4-webhook-inbox-table` from origin/main (not a stack layer).
+- Top of stack: `stack-w/task-37.2.2-async-ingest` (W3, #1898, in review), above W2b (#1896, the bottom open layer, targeting main). W1 (#1889) and W2 (#1891) merged; main at 776ba97d (row 22.3a, #1899 and #1903). Both open layers rebased by hand on 2026-11-27, then `gh stack push` and `gh stack submit --auto`, with this handoff update committed on W3 first (a bottom-layer commit would conflict with W3's handoff commit on the same lines).
+- When a merged layer's local ref predates its squash and `gh stack sync` reports it cannot determine the previous base: rebase the bottom open layer with `git rebase --onto origin/main <squash commit of the merged layer> <bottom branch>`, each layer above with `git rebase --onto <rebased layer below> <its old tip> <branch>`, then `gh stack push`.
+- No uncommitted stack work. Lane B works row 22.1a (TASK-25.8) on `task-25.8-notify-outbound-client` from origin/main (not a stack layer); its first commit closes TASK-37.2.1 and TASK-37.2.4.
 - Background agents: none.
 
 ## Next actions
 
 1. W2, W2b and W3 stay open (W4 is planned): never merge them.
-2. **agent, Lane B**: row 22.3a (TASK-37.2.4, inbox table and the webhooks-table index), a single PR from origin/main, before 22.7; then 22.3b (TASK-198).
-3. **agent, later**: plan W4 (TASK-37.3) after row 22.1a (TASK-25.8, single PR from origin/main, must merge before W4); row 22.1d (TASK-196) any time; rows 22.12a and 22.12b (TASK-197) before 22.13.
+2. **agent, Lane B**: row 22.1a (TASK-25.8, Notify on the outbound-client contract), a single PR from origin/main that must merge before W4; row 22.3a is done (#1899, #1903 applied).
+3. **agent, later**: plan W4 (TASK-37.3) once row 22.1a's plan is approved; 22.3b (TASK-198) before 22.7; row 22.1d (TASK-196) any time; rows 22.12a and 22.12b (TASK-197) before 22.13.
 
 ## Open decisions
 
