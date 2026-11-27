@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:07
-updated_date: '2026-11-25T19:24:00Z'
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - plugin-architecture
   - capabilities
@@ -46,6 +46,12 @@ Its vocabulary is the organization's (reach a person, post to a channel), not Sl
 - [ ] #3 An in-memory fake of the notifications Protocol lives in the package and is exercised by tests
 - [ ] #4 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved): the webhooks capability has its own ChannelPoster port (platform-neutral ChannelMessage, one adapter per WorkplaceSystem) for posting alerts and notifications outside a request. At this task's planning, decide whether the webhooks Slack adapter moves onto the notifications capability.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

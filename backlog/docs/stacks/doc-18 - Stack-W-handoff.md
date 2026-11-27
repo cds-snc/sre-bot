@@ -3,7 +3,7 @@ id: doc-18
 title: Stack W handoff
 type: guide
 created_date: '2026-11-25T20:23:00Z'
-updated_date: '2026-11-26T20:00:00Z'
+updated_date: '2026-11-26T23:00:00Z'
 ---
 ## Stack
 
@@ -31,32 +31,32 @@ updated_date: '2026-11-26T20:00:00Z'
 
 | # | Task | Branch | PR | State | Notes |
 | --- | --- | --- | --- | --- | --- |
-| W1 | TASK-37.1 provisioned-content loader (dark, no kind registered) + webhooks.md rewrite + ADR touches + task re-cut + TASK-168 ACs #1-#4 + delivery-session change-notice.md | `stack-w/task-37.1-content-loader` | #1889 | in review | plan approved 2026-11-25 with C1-C11; implemented, all 8 ACs checked, gates green (full pytest 8151 passed; mypy 33 pre-existing in untouched files); In Progress; committed 1197c9f and submitted 2026-11-25; stays in review until W2 is open above it |
-| W2 | TASK-37.2.1 skeleton, domain (InboundEvent, event types, SenderKind, WebhookInstance), the webhooks/sender-kinds content kind, matcher, JSONPath, Liquid with per-language bot wording, email finder, [webhooks] settings | `stack-w/task-37.2.1-event-model` | - | ready | plan approved 2026-11-26 (P1-P5; P2 respecting #1889's content decisions; OWASP corrections); all 12 ACs checked; full pytest 8295 passed, mypy 33 pre-existing in untouched files; In Progress; commit and `gh stack submit` pending (human) |
-| W2b | TASK-37.2.3 event-consumer extension point (consumers by type, handlers by id), escaping Slack poster with MultilingualText wording, fallback rendering, Slack lookup cap | `stack-w/task-37.2.3-...` | - | planned (task, no plan) | created 2026-11-26 by the P1 split; also waits on TASK-113 (row 22.1c; TASK-195 folded in 2026-11-26) merged |
+| W1 | TASK-37.1 provisioned-content loader (dark, no kind registered) + webhooks.md rewrite + ADR touches + task re-cut + TASK-168 ACs #1-#4 + delivery-session change-notice.md | `stack-w/task-37.1-content-loader` | #1889 | in review | plan approved 2026-11-25 with C1-C11; implemented, all 8 ACs checked, gates green (full pytest 8151 passed; mypy 33 pre-existing in untouched files); In Progress; rebased onto main twice on 2026-11-26 (after #1890; after #1894, conflicts in hookspecs.py, the hookspec inventory test and plugins.md resolved keeping both sides); may merge (W2 is open above it) |
+| W2 | TASK-37.2.1 skeleton, domain (InboundEvent, event types, SenderKind, WebhookInstance), the webhooks/sender-kinds content kind, matcher, JSONPath, Liquid with per-language bot wording, email finder, [webhooks] settings | `stack-w/task-37.2.1-event-model` | #1891 | in review | plan approved 2026-11-26 (P1-P5); all 12 ACs checked; In Progress; follow-up commit 2026-11-26 (TASK-37.2.3 S1): `Destination(system, tenant, conversation_id, triage)`, workplace-systems.md rule 4; stays open while layers above are planned |
+| W2b | TASK-37.2.3 event-consumer extension point (consumers by type, handlers by id), escaping Slack poster with MultilingualText wording, fallback rendering, Slack lookup cap | `stack-w/task-37.2.3-event-consumers` | - | ready | plan S1-S6 and D1-D10 approved 2026-11-26, plus the Translator contract pulled forward from TASK-118 (human); implemented after #1894 merged: all 10 ACs checked; mypy 33 pre-existing in untouched files; full pytest 8545 passed; fixed #1894's phase to be re-entrant on a cached plugin manager (server/plugins/extension_points.py, shared with Lane A); In Progress; commit and `gh stack submit` pending (human) |
 | W3 | TASK-37.2.2 async ingest: protocols (entrypoints/http_<protocol>.py, adapters/aws_sns.py), inbox (conditional insert as dedupe), inline processor + leased sweeper, KMS helper; route not mounted | `stack-w/task-37.2.2-...` | - | planned (task, no plan) | waits on W2b; also 58.2 (done) |
 | W4 | TASK-37.3 sender kinds as YAML (en-US and fr-FR bot wording, French reviewed by a human), parity + injection tests, Notify handler, incident alert consumer | `stack-w/task-37.3-...` | - | planned (task, no plan) | also waits on TASK-25.8 (doc-11 row 22.1a, single PR from main); names the Notify package's area (P5) |
 
 ## Position
 
-- Branch: `stack-w/task-37.2.1-event-model`, added above W1 with `gh stack add` (at 1197c9f, no commits of its own yet). W1 is `stack-w/task-37.1-content-loader`, PR #1889, open against main.
-- Uncommitted, all W2's commit: the webhooks capability, its tests, the exported schema, config, the lock file, four ADRs, the lifespan plugin-set test line, this doc, and the task files (TASK-37.1 notes; TASK-37.2.1; TASK-37.2.2 and TASK-37.3 comments, deps and ACs; new TASK-37.2.3, TASK-195, TASK-196). doc-11 is untracked and never staged.
+- Branch: `stack-w/task-37.2.3-event-consumers` (W2b), above W2 (#1891) above W1 (#1889), on main at d886a357 (#1894). Its plan commit 4fc03e4c is on the branch.
+- Uncommitted, all W2b's commit: the extension point, contracts, poster port, Slack adapter, composition root, locales, the Translator contract and host adapter, the Slack factory overrides, the phase re-entrancy fix, tests, four ADRs (webhooks, security, outbound-clients, i18n), and the task files (TASK-37.2.3; TASK-113 Done; notes on TASK-118, 125, 83, 37.2.2, 37.4.1, 37.6.1; TASK-147.5 dependency). doc-11 is untracked and never staged.
 - Background agents: none.
 
 ## Next actions
 
-1. **human**: commit W2 and `gh stack submit` (the session's command block). W1 (#1889) may then merge; W2 stays open (more layers are planned), so never merge the top layer.
-2. **agent, next Lane B session**: plan TASK-113 (row 22.1c, single PR from origin/main; TASK-195 folded in), then W2b (TASK-37.2.3) once W2 is open; W2b's branch is added with `gh stack add` above W2.
+1. **human**: commit W2b and `gh stack submit` (the session's command block). W1 (#1889) may merge; W2 and W2b stay open (W3 and W4 are planned), so never merge the top layer.
+2. **agent, next Lane B session**: plan W3 (TASK-37.2.2) against the W2b ports: the processor resolves languages before rendering, picks posters with `poster_for`, gathers actions where `triage` is set, sets `retry_at` from `retry_after`; W3's branch is added with `gh stack add` above W2b.
 3. **agent, later**: row 22.1a, TASK-25.8, a single PR from origin/main; it must merge before W4. Row 22.1d (TASK-196) any time.
 4. **human, when W1 merges**: Lane A drops the /workspace copies of the delivery-session skill files; the next Lane B session closes TASK-37.1 and TASK-168.
 
 ## Open decisions
 
-- None open for W2: P1-P5 approved 2026-11-26 (recorded in TASK-37.2.1's plan and comments, and in doc-11 row 22.2).
+- None open for W2 or W2b: P1-P5 (W2) and S1-S6, D1-D10 and the Translator contract (W2b) approved 2026-11-26 (recorded in the tasks and in doc-11 rows 22.2 and 22.2b).
 
 ## Planning queue
 
-- TASK-113 (22.1c, TASK-195 folded in): planned 2026-11-26 (D0 approved; D1-D4 and PS1-PS6 awaiting approval); single PR from origin/main on task-113-host-extension-points. W2 carries a follow-up commit: TASK-195 archived, TASK-37.2.3 repointed to TASK-113, this doc.
-- W2b TASK-37.2.3: plan once W2 is open; waits on TASK-113 merged before implementation.
-- W3 TASK-37.2.2: plan after W2b's plan.
+- TASK-113 (22.1c): merged in #1894 2026-11-26; Done.
+- W2b TASK-37.2.3: implemented 2026-11-26.
+- W3 TASK-37.2.2: plan next (no plan yet).
 - W4 TASK-37.3: plan after W3's; waits on TASK-25.8 (row 22.1a).

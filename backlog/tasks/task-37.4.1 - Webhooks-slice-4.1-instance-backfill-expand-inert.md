@@ -4,6 +4,7 @@ title: 'Webhooks slice 4.1: instance backfill (expand, inert)'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - migration
   - webhooks
@@ -44,3 +45,9 @@ Change notice: none (inert data, packet section 7.4).
 - [ ] #4 The backfill runs only through a GitHub Actions workflow with a dry-run mode; the TASK-46 evidence it uses is recorded in this task's notes (review)
 - [ ] #5 The legacy route ignores the new attributes: the TASK-36.2 pins pass unchanged (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved S1): a destination is a workplace reference, Destination(system, tenant, conversation_id, triage): the backfill writes system=slack and the configured [slack.tenant] id beside each channel id (workplace-systems.md rule 4).
+<!-- SECTION:NOTES:END -->

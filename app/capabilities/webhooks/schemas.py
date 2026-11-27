@@ -31,7 +31,7 @@ from capabilities.webhooks.domain.limits import WebhookLimits
 from capabilities.webhooks.domain.rendering import parse_template
 from capabilities.webhooks.domain.values import normalise_https_url
 from capabilities.webhooks.settings import content_settings
-from contracts.content import ContentDocument
+from contracts.content import ContentDocument, ContentKind
 
 SENDER_KINDS_OWNER = "webhooks"
 SENDER_KINDS_NAME = "sender-kinds"
@@ -319,3 +319,20 @@ def _hosts(hosts: list[str], limits: WebhookLimits) -> list[str]:
             raise ValueError(f"allowed host {host!r} is not a host name")
         normalised.append(url.removeprefix("https://").removesuffix("/"))
     return normalised
+
+
+def sender_kinds_content_kind() -> ContentKind[SenderKindFile, SenderKind]:
+    """The sender-kind content kind: its file model, its builder and its limits.
+
+    The plugin registers it and the extension point reads the loaded kinds through it; the
+    catalogue keys items by the kind's owner and name, so both see the same items.
+    """
+    settings = content_settings()
+    return ContentKind(
+        owner=SENDER_KINDS_OWNER,
+        name=SENDER_KINDS_NAME,
+        model=SenderKindFile,
+        build=build_sender_kind,
+        max_file_bytes=settings.max_kind_file_bytes,
+        max_items=settings.max_kinds,
+    )

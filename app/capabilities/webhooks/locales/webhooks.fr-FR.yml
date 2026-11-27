@@ -1,0 +1,2 @@
+webhooks:
+  fallback.header: "Message de webhook que le bot n'a pas pu mettre en forme"

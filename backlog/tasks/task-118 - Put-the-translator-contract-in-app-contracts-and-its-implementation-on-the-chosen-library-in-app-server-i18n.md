@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-09-24 20:00
-updated_date: '2026-11-25T19:25:00Z'
+updated_date: '2026-11-26T19:29:00Z'
 labels:
   - plugin-architecture
   - i18n
@@ -49,6 +49,12 @@ Legacy modules on python-i18n and app/locales/ are untouched; they retire with t
 - [ ] #4 Locale resolves per request from contextvars at the inbound boundary
 - [ ] #5 ruff, mypy (no new errors in touched files), lint-imports and pytest tests --ignore=tests/smoke pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved): the translator contract exists early: Translator in app/contracts/i18n/translator.py, served by app/server/i18n/translator.py (CatalogueTranslator over the TranslationService; a missing key or language returns the key) and registered in the service registry right after i18n init, before the extension-point phase. This task keeps the rest: the library decision's implementation, repointing every importer of infrastructure/i18n/ (and the import-linter ignore entries) onto the contract, and deleting infrastructure/i18n/.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

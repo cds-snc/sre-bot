@@ -3,8 +3,8 @@ id: TASK-83
 title: 'People and accounts: identity foundation and first adoption'
 status: To Do
 assignee: []
-created_date: '2026-09-10 16:18'
-updated_date: '2026-10-15 17:46'
+created_date: 2026-09-10 16:18
+updated_date: '2026-11-26T19:07:00Z'
 labels:
   - identity
 dependencies: []
@@ -13,7 +13,7 @@ references:
   - decisions/workplace-systems.md
   - decisions/platform-entrypoints.md
   - decisions/plugin-architecture.md
-  - 'https://github.com/cds-snc/sre-bot/issues/1619'
+  - https://github.com/cds-snc/sre-bot/issues/1619
 priority: medium
 ordinal: 167000
 ---
@@ -63,6 +63,12 @@ RULES FOR EVERY CHILD:
 - [ ] #2 No consumer switches to person-based resolution before SRE has reviewed a shadow comparison
 - [ ] #3 decisions/people-and-accounts.md is Accepted, and its Migration section lists only the gaps still tolerated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-26 (TASK-37.2.3, human-approved): the webhooks Slack poster turns email addresses in a sender's text into mentions with a direct, capped users_lookupByEmail, tolerated in decisions/webhooks.md until the people capability serves account lookup. Add webhook mentions to this epic's adoption step.
+<!-- SECTION:NOTES:END -->
 
 ## Comments
 

@@ -14,7 +14,7 @@ import pytest
 from slack_sdk.http_retry.builtin_async_handlers import AsyncRateLimitErrorRetryHandler
 from slack_sdk.web.async_client import AsyncWebClient
 
-from integrations.slack.client import get_async_slack_write_client
+from integrations.slack.client import get_async_slack_web_client, get_async_slack_write_client
 
 pytestmark = pytest.mark.unit
 
@@ -51,3 +51,27 @@ def test_building_the_write_handle_opens_no_connection(monkeypatch: pytest.Monke
     monkeypatch.setattr(socket, "create_connection", _refuse)
 
     get_async_slack_write_client()
+
+
+def test_a_caller_with_its_own_retry_point_overrides_timeout_and_rate_limit_retries() -> None:
+    """A caller that owns durable retry builds a handle that never waits on a 429 in process."""
+    client = get_async_slack_write_client(timeout_seconds=2, rate_limit_retries=0)
+
+    assert client.timeout == 2
+    assert client.retry_handlers == []
+
+
+def test_the_read_client_takes_the_same_overrides() -> None:
+    """A lookup bounded by a delivery deadline gets a short timeout and no retries."""
+    client = get_async_slack_web_client(timeout_seconds=2, retries=0)
+
+    assert client.timeout == 2
+    assert client.retry_handlers == []
+
+
+def test_the_defaults_are_unchanged_for_every_other_caller() -> None:
+    """Without overrides the factories keep the configured timeout and retry budget."""
+    reads = get_async_slack_web_client()
+
+    assert reads.timeout == 15
+    assert [handler.max_retry_count for handler in reads.retry_handlers] == [4, 4, 4]
