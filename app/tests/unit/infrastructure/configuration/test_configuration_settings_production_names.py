@@ -42,6 +42,13 @@ PRODUCTION_NAMES: list[tuple[type[BaseSettings], str, str, str, Any]] = [
     (IncidentCoreSettings, "INCIDENT_CORE__REPORT_TEMPLATE_ID", "report_template_id", "sentinel-id", "sentinel-id"),
     (IncidentCoreSettings, "INCIDENT_CORE__LIST_SHEET_ID", "list_sheet_id", "sentinel-id", "sentinel-id"),
     (IncidentResponseSettings, "INCIDENT_RESPONSE__HANDBOOK_ID", "handbook_id", "sentinel-id", "sentinel-id"),
+    (
+        IncidentResponseSettings,
+        "INCIDENT_RESPONSE__NOTIFY_MANAGEMENT_PLACEMENT_ID",
+        "notify_management_placement_id",
+        "sentinel-id",
+        "sentinel-id",
+    ),
     (IncidentPostmortemSettings, "INCIDENT_POSTMORTEM__CALENDAR_ID", "calendar_id", "sentinel-id", "sentinel-id"),
     (CloudOperationsSpendingSettings, "CLOUD_OPERATIONS_SPENDING__SHEET_ID", "sheet_id", "sentinel-id", "sentinel-id"),
     (TalentSettings, "TALENT__INTERNAL_FOLDER_ID", "internal_folder_id", "sentinel-id", "sentinel-id"),
