@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T19:06:00Z'
-updated_date: '2026-11-17T20:56:00Z'
+updated_date: '2026-11-26T19:33:00Z'
 labels:
   - incident
   - features
@@ -24,7 +24,7 @@ ordinal: 520000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Stack L L11 (outline in TASK-145.12's plan). /sre incident list active and stale read IncidentStore.list_open; the duplicate-row check is removed; get_incidents_from_sheet, create_missing_incidents and the dev incident commands are deleted with their callers, registrations and tests (the last legacy writers). After deploy the human reruns the job (dry run, then apply) and records it.
+Stack L L11 (outline in TASK-145.12's plan). /sre incident list active and stale read IncidentStore.list_open; the duplicate-row check is removed; get_incidents_from_sheet and the remaining dev incident commands (list) are deleted with their callers, registrations and tests (the last legacy readers of the sheet). After deploy the human reruns the job (dry run, then apply) and records it (row 18.L12).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -56,6 +56,14 @@ created: 2026-11-17T20:56:00Z
 ---
 
 2026-11-17 (TASK-145.8.3 OQ8): the legacy sheet-status writer (incident_folder.update_spreadsheet_incident_status, return_channel_name, channel_slug) is deleted by TASK-145.8.3 with its last caller; the status cell moves through the list projection (change_status). Nothing of it is left for this task.
+
+---
+
+created: 2026-11-26T19:33:00Z
+
+---
+
+2026-11-26 (human, TASK-145.7.10 OQ1): dev add-incident and load-incidents, create_missing_incidents and add_new_incident_to_list move to TASK-145.7.10.1 (deleted with app/models/incidents.py, kind (d)); this task keeps the sheet read, the list cutover and the remaining dev incident commands. Re-ground at pickup with rg.
 
 ---
 <!-- COMMENTS:END -->

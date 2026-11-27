@@ -4,7 +4,7 @@ title: Add the Notify management placement SSM parameter ahead of the declare cu
 status: In Progress
 assignee: []
 created_date: '2026-11-26T19:32:00Z'
-updated_date: '2026-11-27T16:08:00Z'
+updated_date: '2026-11-27T16:37:00Z'
 labels:
   - incident
   - terraform
@@ -40,4 +40,6 @@ Approved 2026-11-26 with the TASK-145.7.10 OQ7 ruling. 1. terraform/ssm.tf: add 
 2026-11-27 implementation. terraform/ssm.tf: INCIDENT_RESPONSE__NOTIFY_MANAGEMENT_PLACEMENT_ID added to sre_bot_secret_names after INCIDENT_RESPONSE__HANDBOOK_ID (sorted); ecs.tf and iam.tf derive from the set, so the PR adds one SSM parameter (placeholder 'set-outside-terraform'), one ECS secret and the matching read grant. Tests: test_configuration_settings_production_names.py enumerates names, so it gains the row (IncidentResponseSettings, notify_management_placement_id); it pins an existing field and passes on first run. test_server_plugins_configuration_requirements.py does not enumerate names (it derives supplied names from ssm.tf; nothing requires the Notify id), so it is unchanged. decisions/deployment.md: the Secret parameters paragraph and a Checks line (AC #2). Blast radius: the task definition gains one secret at the next deploy; settings default empty and only handbook_id is a boot requirement, so a placeholder fails nothing; the declare service that reads it stays unregistered until TASK-145.7.10. Rollback: never a plain revert (deployment.md rule). Open: AC #3 (human runs deploy-checks pre/post summary and make env-checks), AC #4 (human put-parameter/get-parameter), AC #5 full gates.
 
 Gates 2026-11-27 (before the rebase onto origin/main; the change touches one tf list entry and one test row): ruff check . All checks passed; targeted (production names, plugin configuration requirements, audit_env_coverage, incident response settings load) 108 passed; check-import-contracts 15 kept 0 broken; settings-key-ownership OK; package-shape OK (2 baselined); test-seams OK (47/12); mypy Found 33 errors in 11 files (baseline, none in touched files); pytest tests --ignore=tests/smoke 8230 passed.
+
+2026-11-27 (human): the task files 145.7.10, 145.7.10.1, 145.12.2 and 145.10.5 ride with this PR; decisions/migration.md stays with 18.L9b (TASK-145.7.10). Rebased onto origin/main ba7e479b; the stash pop conflicted only in decisions/migration.md Changes (W1's 2026-11-25 line and the 2026-11-26 step-5 line, both kept). The value is set in the console (no AWS CLI login in the Codespace).
 <!-- SECTION:NOTES:END -->
