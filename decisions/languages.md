@@ -27,7 +27,7 @@ Current state: `[languages] shared` (`server/languages/settings.py`), `LanguageP
 
 **A message in several languages is one value, laid out by the platform.** Features hand `MultilingualText` (ordered language and text pairs) to the platform; `plain_text()` (a line per language, in order) is the layout every platform can show. Slack posts one message, top to bottom; a Teams adapter lays it out as one card with a text block per language; email marks each part's language ([WCAG 3.1.2](https://www.w3.org/WAI/WCAG22/Understanding/language-of-parts)).
 
-**Only the bot's own wording is multilingual.** Text the bot forwards (a webhook sender's alert, a captured message) or that a model writes keeps its source language and appears once, beside the bot's lines ([W3C language tags](https://www.w3.org/International/articles/language-tags/)); AI-written text follows its own feature's rule.
+**Only the bot's own wording is multilingual.** Text the bot forwards (a webhook sender's alert, a captured message) or that a model writes keeps its source language and appears once, beside the bot's lines ([W3C language tags](https://www.w3.org/International/articles/language-tags/)); AI-written text follows its own feature's rule. **Organisation content that words a shared message as the bot** (a webhook sender kind's title, summary and link labels) holds one template per supported language, required by the kind's file model and its JSON Schema, the content counterpart of the catalogue parity gate ([i18n.md](i18n.md), [organisation-content.md](organisation-content.md)): every configured language is always present, with no runtime fallback. The sender's own text stays one template, in its source language.
 
 ## Consequences
 
@@ -37,7 +37,7 @@ Current state: `[languages] shared` (`server/languages/settings.py`), `LanguageP
 
 ## Checks
 
-- grep: no tuple or list of language tags in `app/features/` or `app/server/` outside `server/languages/settings.py`.
+- grep: no tuple or list of language tags in `app/features/` or `app/server/` outside `server/languages/settings.py`. A content file model that requires one template per supported language (`capabilities/webhooks/schemas.py`) names them as its fields, and a test pins them to the supported set.
 - `make check-settings-key-ownership`: `[languages]` is in `app/config/base.toml` and owned by `server/languages/settings.py`.
 - Review: a new post to a shared conversation passes `MultilingualText` built from `shared_languages`.
 
@@ -52,3 +52,4 @@ Tolerated until then:
 **Changes:**
 - 2026-11-25: Accepted. Instance languages configured; shared messages in the instance order, direct interactions in the user's language of choice; `LanguagePolicy` and `MultilingualText` (TASK-193; TASK-145.8.9 OQ2, human D1-D6).
 - 2026-11-26: `/sre incident status update`'s notice, the roles announcement and `/sre incident close`'s notices moved to the instance languages, their replies onto `reply_languages`; the tolerated line removed (TASK-145.8.9).
+- 2026-11-26: organisation content that words a shared message as the bot holds one template per supported language, required by the kind's file model and its JSON Schema; the sender's text stays in its source language, once (TASK-37.2.1, human).

@@ -6,7 +6,7 @@ title: >-
 status: In Progress
 assignee: []
 created_date: 2026-07-28 18:39
-updated_date: '2026-11-25T21:01:00Z'
+updated_date: '2026-11-25T21:14:00Z'
 labels:
   - migration
   - webhooks
@@ -189,6 +189,8 @@ ADRs: webhooks.md rewritten; touches in security, reliability, provisioned-conte
 Re-cut applied with the CLI (see TASK-168 comment). doc-2 Wave 5 row names Stack W. Delivery-session change-notice.md and SKILL.md copied from /workspace (identical).
 Gates (from app/): ruff check . All checks passed; targeted content/server/contracts tests 698 passed; full mypy 33 errors in 11 files, none in a file this branch touches (legacy modules/webhooks, modules/role, modules/incident, infrastructure/i18n, integrations/slack/channels.py, features/incident/core/adapters/google_calendar.py), pre-existing; full pytest 8151 passed, 235 warnings in 265s; make check-import-contracts 15 kept 0 broken; check-settings-key-ownership OK; check-package-shape OK (2 baselined); check-fake-coverage OK (4 baselined); check-test-seams OK (47 and 12 baselined); check-content-schemas ok (0 kinds). No deploy-checks: no terraform, IAM, SSM or env-name change.
 Open for the human: TASK-193's MultilingualText rule (bot wording multilingual, sender content in its source language) sits as comments on 37.2.1 and 37.3; decide at 37.2.1 planning whether it becomes an AC. Task files whose slugs no longer match their titles are renamed with git mv in the session's commands.
+
+2026-11-25: committed 1197c9f on stack-w/task-37.1-content-loader, PR #1889 open (Stack W bottom layer; stays in review until W2 is open above it). In Progress.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

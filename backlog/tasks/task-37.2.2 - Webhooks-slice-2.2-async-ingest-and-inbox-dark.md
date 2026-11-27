@@ -4,13 +4,14 @@ title: 'Webhooks slice 2.2: async ingest and inbox (dark)'
 status: To Do
 assignee: []
 created_date: '2026-11-25T20:48:00Z'
+updated_date: '2026-11-26T13:23:00Z'
 labels:
   - migration
   - webhooks
   - phase-4
 milestone: m-4
 dependencies:
-  - TASK-37.2.1
+  - TASK-37.2.3
   - TASK-58.2
 references:
   - decisions/webhooks.md
@@ -64,4 +65,29 @@ Change notice: none (dark slice, packet section 7.4).
 - [ ] #8 legacy_slack_json items are not deduplicated (the written exception), an optional Idempotency-Key header is honoured, and the passthrough-hardening fields are fingerprinted (test)
 - [ ] #9 Body caps, the inline deadline, the inbox TTL, retry and rate-limit values are typed [webhooks] settings with defaults; make check-settings-key-ownership is green (test + check)
 - [ ] #10 The slice is dark: no route is mounted and production behaviour is unchanged; make check-import-contracts is green with no new ignore entry (check)
+- [ ] #11 Protocol decoders parse JSON strictly (RFC 7493): a duplicate key, NaN or Infinity, a lone surrogate, a non-finite number or nesting past the depth limit answers 400 (test)
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-11-26T13:19:00Z
+
+---
+
+2026-11-26 (TASK-37.2.1 planning, human-approved P1 and P3). Now waits on TASK-37.2.3 (W2b: the extension point and the Slack poster that the inline processor dispatches to) instead of 37.2.1 directly. Protocol placement within the feature-packages.md layout table, since protocols/ is not a table name:
+- verify, delivery id and decode per protocol go in entrypoints/http_<protocol>.py (http_aws_sns.py, http_legacy_slack_json.py), beside entrypoints/http.py, following the entrypoints/slack_*.py precedent;
+- the Pydantic envelopes go in schemas.py;
+- the outbound SNS certificate fetch and the SubscriptionConfirmation call go in adapters/aws_sns.py, behind a Protocol in interfaces.py (with service.py).
+Verification stays at the capability's HTTP entrypoint on the raw body, before any handler (Stripe, Svix, GitHub, octokit); the platform-transports.md scope line saying per-instance webhook verification is not host middleware lands with TASK-37.2.1.
+
+---
+
+created: 2026-11-26T13:23:00Z
+
+---
+
+2026-11-26 OWASP review (TASK-37.2.1 planning): every protocol decoder parses JSON strictly per RFC 7493 (I-JSON): duplicate member names, NaN/Infinity, lone surrogates and non-finite numbers are rejected and nesting depth is limited (RecursionError caught), each answering a stable 400 (Bishop Fox, JSON interoperability vulnerabilities; stdlib json keeps the last duplicate silently).
+
+---
+<!-- COMMENTS:END -->

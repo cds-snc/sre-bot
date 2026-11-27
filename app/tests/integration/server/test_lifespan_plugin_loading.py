@@ -45,6 +45,7 @@ ENABLED_PLUGINS = {
     "incident.comms",
     "oncall",
     "ai_writing",
+    "webhooks",
 }
 RAISING_MODULE = "fake_plugin_raising_i18n"
 RAISING_SOURCE = """

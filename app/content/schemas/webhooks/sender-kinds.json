@@ -1,0 +1,408 @@
+{
+  "$defs": {
+    "AlertFile": {
+      "additionalProperties": false,
+      "description": "Templates for an alert's status, severity and dedup key.",
+      "properties": {
+        "dedup_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Renders the key grouping deliveries of one condition.",
+          "title": "Dedup Key"
+        },
+        "severity": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Renders critical, error, warning or info; none when empty.",
+          "title": "Severity"
+        },
+        "status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Renders firing, resolved or info; firing when absent.",
+          "title": "Status"
+        }
+      },
+      "title": "AlertFile",
+      "type": "object"
+    },
+    "ConditionFile": {
+      "additionalProperties": false,
+      "description": "One test of the decoded payload.",
+      "properties": {
+        "op": {
+          "$ref": "#/$defs/ConditionOp",
+          "description": "The operator: equals, in, exists, starts_with or contains."
+        },
+        "path": {
+          "description": "An RFC 9535 singular JSONPath query (name and index segments), such as $.Type.",
+          "title": "Path",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ScalarValue"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/ScalarValue"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "The operand: a scalar, a list for 'in', a boolean for 'exists', a string for 'starts_with'.",
+          "title": "Value"
+        }
+      },
+      "required": [
+        "path",
+        "op",
+        "value"
+      ],
+      "title": "ConditionFile",
+      "type": "object"
+    },
+    "ConditionOp": {
+      "description": "The closed set of condition operators; content holds no regular expression.",
+      "enum": [
+        "equals",
+        "in",
+        "exists",
+        "starts_with",
+        "contains"
+      ],
+      "title": "ConditionOp",
+      "type": "string"
+    },
+    "FieldFile": {
+      "additionalProperties": false,
+      "description": "One field the kind extracts from the payload.",
+      "properties": {
+        "allowed_hosts": {
+          "description": "For a url field: the hosts a link may point at; any https host when empty.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Hosts",
+          "type": "array"
+        },
+        "path": {
+          "description": "An RFC 9535 singular JSONPath query.",
+          "title": "Path",
+          "type": "string"
+        },
+        "required": {
+          "default": false,
+          "description": "Whether a delivery without the field fails rendering.",
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "$ref": "#/$defs/FieldType",
+          "default": "string",
+          "description": "string, integer, number, boolean, string_list or url."
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "title": "FieldFile",
+      "type": "object"
+    },
+    "FieldType": {
+      "description": "The types an extracted field may have.",
+      "enum": [
+        "string",
+        "integer",
+        "number",
+        "boolean",
+        "string_list",
+        "url"
+      ],
+      "title": "FieldType",
+      "type": "string"
+    },
+    "GroupFile": {
+      "additionalProperties": false,
+      "description": "Conditions combined: every one (all) or at least one (any). Exactly one of the two is set.",
+      "properties": {
+        "all": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ConditionFile"
+                  },
+                  {
+                    "$ref": "#/$defs/GroupFile"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Every item holds.",
+          "title": "All"
+        },
+        "any": {
+          "anyOf": [
+            {
+              "items": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ConditionFile"
+                  },
+                  {
+                    "$ref": "#/$defs/GroupFile"
+                  }
+                ]
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "One item holds.",
+          "title": "Any"
+        }
+      },
+      "title": "GroupFile",
+      "type": "object"
+    },
+    "LinkFile": {
+      "additionalProperties": false,
+      "description": "A link from a url field, under fixed wording that names no payload field.",
+      "properties": {
+        "field": {
+          "description": "The url field the link points at.",
+          "pattern": "^[a-z][a-z0-9_]{0,63}$",
+          "title": "Field",
+          "type": "string"
+        },
+        "label": {
+          "$ref": "#/$defs/LocalizedTemplateFile",
+          "description": "The link's label in every supported language."
+        }
+      },
+      "required": [
+        "field",
+        "label"
+      ],
+      "title": "LinkFile",
+      "type": "object"
+    },
+    "LocalizedTemplateFile": {
+      "additionalProperties": false,
+      "description": "The bot's wording in every language the app supports, each a Liquid template.",
+      "properties": {
+        "en-US": {
+          "description": "The English (en-US) template.",
+          "title": "En-Us",
+          "type": "string"
+        },
+        "fr-FR": {
+          "description": "The French (fr-FR) template.",
+          "title": "Fr-Fr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "en-US",
+        "fr-FR"
+      ],
+      "title": "LocalizedTemplateFile",
+      "type": "object"
+    },
+    "ScalarValue": {
+      "anyOf": [
+        {
+          "maxLength": 1024,
+          "type": "string"
+        },
+        {
+          "type": "integer"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        }
+      ]
+    },
+    "TemplatesFile": {
+      "additionalProperties": false,
+      "description": "The event's wording: the bot's title and summary per language, the sender's details once.",
+      "properties": {
+        "details": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The sender's own text, in its source language, shown once beside the bot's lines.",
+          "title": "Details"
+        },
+        "summary": {
+          "$ref": "#/$defs/LocalizedTemplateFile",
+          "description": "The event's summary, in every supported language."
+        },
+        "title": {
+          "$ref": "#/$defs/LocalizedTemplateFile",
+          "description": "The event's title, in every supported language."
+        }
+      },
+      "required": [
+        "title",
+        "summary"
+      ],
+      "title": "TemplatesFile",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A webhook sender kind: which deliveries it matches, what it extracts and how the event reads.",
+  "properties": {
+    "alert": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AlertFile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Alert values; only for event alert."
+    },
+    "event": {
+      "description": "The event type: alert or notification.",
+      "enum": [
+        "alert",
+        "notification"
+      ],
+      "title": "Event",
+      "type": "string"
+    },
+    "fields": {
+      "description": "The fields to extract, by name; templates read them as fields.<name>.",
+      "patternProperties": {
+        "^[a-z][a-z0-9_]{0,63}$": {
+          "$ref": "#/$defs/FieldFile"
+        }
+      },
+      "title": "Fields",
+      "type": "object"
+    },
+    "handler": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9_]*(?:\\.[a-z][a-z0-9_-]*)+$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "A code handler a plugin registers, by its dotted id.",
+      "title": "Handler"
+    },
+    "id": {
+      "description": "The item's identifier; it equals the file name without the .yaml extension.",
+      "pattern": "^[a-z0-9][a-z0-9_-]{0,63}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "kind": {
+      "description": "The owner and kind name the file belongs to, as '<owner>/<kind>'.",
+      "title": "Kind",
+      "type": "string"
+    },
+    "links": {
+      "description": "Links built from url fields.",
+      "items": {
+        "$ref": "#/$defs/LinkFile"
+      },
+      "title": "Links",
+      "type": "array"
+    },
+    "match": {
+      "$ref": "#/$defs/GroupFile",
+      "description": "The conditions a delivery must meet; kinds are tried in the instance's order."
+    },
+    "mentions": {
+      "default": false,
+      "description": "Turn email addresses in the text into mentions.",
+      "title": "Mentions",
+      "type": "boolean"
+    },
+    "suppress": {
+      "default": false,
+      "description": "Match and post nothing.",
+      "title": "Suppress",
+      "type": "boolean"
+    },
+    "templates": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TemplatesFile"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The wording; required unless suppress is true."
+    },
+    "version": {
+      "description": "The version of the kind's file format.",
+      "title": "Version",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "kind",
+    "version",
+    "id",
+    "event",
+    "match"
+  ],
+  "title": "SenderKindFile",
+  "type": "object"
+}

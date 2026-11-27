@@ -35,7 +35,7 @@ Rules:
 6. **No shared abstraction across platforms.** A feature serving two platforms writes two thin handlers over one service, which returns `OperationResult` and doesn't know who asked. A platform-neutral command model was tried and failed on rich dialogs and on concepts the platforms don't share.
 7. **No helper wraps the platform SDK.** Shared handler helpers add conventions on top of the SDK's documented calls; they never mirror, re-expose or patch its surface, and never re-implement what it already does ([outbound-clients.md](outbound-clients.md)). Whether each platform gets a standard interaction toolkit is open: [interaction-toolkits.md](interaction-toolkits.md) (Draft).
 
-HTTP is not a platform transport. It is the app's own protocol; its inbound boundary is FastAPI and ASGI middleware in `app/server/`.
+HTTP is not a platform transport. It is the app's own protocol; its inbound boundary is FastAPI and ASGI middleware in `app/server/`. Rule 2 covers a platform runtime's app-wide verification (one signing secret per platform). A webhook delivery's authenticity is per instance, its key and protocol known only after the instance lookup, so it is verified in the owning capability's HTTP entrypoint on the raw body before any handler runs, as Stripe, Svix and GitHub verify at the endpoint ([webhooks.md](webhooks.md)); the host middleware keeps the generic request limits.
 
 ### Outbound messages are intents
 
@@ -77,3 +77,4 @@ Tolerated until then:
 - 2026-10-06: feature entry points receive the SDK's listener arguments; connections and the app stay host-only (TASK-140.1).
 - 2026-10-23: current state: the transport settings live in `server/slack/settings.py`; `infrastructure/slack/` is gone (TASK-112.1).
 - 2026-11-25: a message in several languages is one intent the platform lays out, never lines a feature joins (TASK-193).
+- 2026-11-26: rule 2 is a platform runtime's app-wide verification; per-instance webhook verification is the webhooks capability's HTTP entrypoint (TASK-37.2.1, human).
